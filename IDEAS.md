@@ -4,6 +4,57 @@ This document tracks ideas that are interesting but out-of-scope for the current
 
 ---
 
+## Phase 3 Rethinking: IdlerGear as Infrastructure, Not a Wrapper
+
+**Original Phase 3 idea:** `idlergear ask gemini "write a test"` - wrapper around LLM CLIs
+**Better architecture:** IdlerGear provides tools and context that ANY LLM can discover and use
+
+### The Real Vision:
+1. **Setup:** `idlergear new my-project` creates project with all best practices baked in
+2. **Discovery:** Any LLM tool (Gemini CLI, Claude CLI, Copilot CLI, Claude Web) reads `DEVELOPMENT.md` and `AI_INSTRUCTIONS/README.md` automatically
+3. **Tools:** IdlerGear exposes commands that LLMs can invoke as tools:
+   - `idlergear status` - Project health (git status, test results, coverage, recent commits)
+   - `idlergear context` - Get full project context (charter docs + recent activity)
+   - `idlergear logs` - Get recent run logs for debugging
+   - `idlergear check` - Best practice nudges and reminders
+4. **Use Your Preferred Interface:** Keep using your favorite LLM interface (Gemini, Claude, Copilot, Web UIs)
+
+### Why This Is Better:
+- ✅ Don't force users to change their workflow
+- ✅ Works with ANY LLM tool (current and future)
+- ✅ Composable - works alongside other tools
+- ✅ IdlerGear focuses on what it's good at: project structure, best practices, and introspection
+- ✅ LLMs can register IdlerGear commands as tools they can invoke
+
+### Potential: Model Context Protocol (MCP) Server
+- IdlerGear could implement MCP (Model Context Protocol)
+- Claude Desktop and other MCP-compatible tools could connect to it
+- Provides standardized tools for project introspection
+- LLMs get rich context without manual prompting
+
+---
+
+## Next Phase Priorities
+
+### Phase 3: Enhanced Project Introspection Tools
+Commands that LLMs (or humans) can invoke to understand project state:
+- `idlergear status` - Comprehensive project status
+- `idlergear context` - Generate LLM-ready project context
+- `idlergear logs` - Access and filter run logs
+- `idlergear test` - Run tests with LLM-friendly output
+
+### Phase 4: Run Script Manager
+- `idlergear run-script create` - Generate standardized `./run.sh`
+- Capture detailed logs for debugging
+- Integrate with testing frameworks
+
+### Phase 5: Git Sync for Web UIs
+- `idlergear sync push` - Push everything to temp branch for web-based LLM tools
+- `idlergear sync pull` - Pull changes back from web sessions
+- Use case: Work seamlessly between local CLI and Claude Web
+
+---
+
 ## Alternative Architectures (Future Exploration)
 
 These are alternative designs that were considered but are out of scope for the current project.
