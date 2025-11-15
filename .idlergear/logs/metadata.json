@@ -1,0 +1,28 @@
+{
+  "sessions": {
+    "1": {
+      "session_id": 1,
+      "command": "echo Test log capture",
+      "name": "test-session",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-1-test-session.log",
+      "started": "2025-11-15T18:11:59.970965",
+      "status": "completed",
+      "cwd": ".",
+      "pid": 1865766,
+      "exit_code": 0,
+      "ended": "2025-11-15T18:11:59.985867"
+    },
+    "2": {
+      "session_id": 2,
+      "command": "for i in 1 2 3 4 5; do echo Line $i; sleep 0.1; done",
+      "name": "multi-line-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-2-multi-line-test.log",
+      "started": "2025-11-15T18:12:16.478813",
+      "status": "failed",
+      "cwd": ".",
+      "error": "[Errno 2] No such file or directory: 'for'",
+      "ended": "2025-11-15T18:12:16.489477"
+    }
+  },
+  "last_session_id": 2
+}

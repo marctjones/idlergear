@@ -7,6 +7,7 @@ from src.status import ProjectStatus
 from src.context import ProjectContext
 from src.check import ProjectChecker
 from src.sync import ProjectSync
+from src.logs import LogCoordinator
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -430,80 +431,140 @@ def sync_command(
 
 
 @app.command()
-def mcp(
-    action: str = typer.Argument("start", help="Action: start or info"),
+def logs(
+    action: str = typer.Argument(..., help="Action: run, list, show, export, or cleanup"),
+    session_id: int = typer.Option(None, "--session", "-s", help="Session ID"),
+    command: str = typer.Option(None, "--command", "-c", help="Command to run with capture"),
+    name: str = typer.Option(None, "--name", "-n", help="Session name"),
+    tail: int = typer.Option(None, "--tail", "-t", help="Show last N lines"),
+    output: str = typer.Option(None, "--output", "-o", help="Export output file"),
+    days: int = typer.Option(7, "--days", "-d", help="Days to keep logs (cleanup)"),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
 ):
     """
-    Start or manage the MCP (Model Context Protocol) server.
-    
-    The MCP server exposes IdlerGear tools for LLM clients.
-    - Runs on stdio (not network) for security
-    - Local LLM tools can connect and invoke IdlerGear commands
-    - Works with Gemini CLI, Claude Desktop, etc.
+    Capture and manage logs from shell scripts and processes.
     
     Actions:
-      start - Start the MCP server (runs until interrupted)
-      info  - Show MCP server information
+      run     - Run command and capture all output
+      list    - List all log sessions
+      show    - Show log for a session
+      export  - Export session log to file
+      cleanup - Delete old log files
     
-    Usage:
-      idlergear mcp start    # Start server
+    Examples:
+      # Run a script and capture logs
+      idlergear logs run --command "npm run dev" --name dev-server
       
-    LLM tools can then discover and invoke:
-      - project_status
-      - project_context
-      - project_check
-      - sync_status, sync_push, sync_pull
+      # List all sessions
+      idlergear logs list
+      
+      # Show log output
+      idlergear logs show --session 1
+      idlergear logs show --session 1 --tail 50
+      
+      # Export a log
+      idlergear logs export --session 1 --output dev.log
+      
+      # Clean up old logs
+      idlergear logs cleanup --days 7
     """
-    if action == "start":
-        try:
-            import asyncio
-            from src.mcp_server import main as mcp_main
+    try:
+        coordinator = LogCoordinator(path)
+        
+        if action == "run":
+            if not command:
+                typer.secho("Error: --command required for 'run' action", fg=typer.colors.RED)
+                raise typer.Exit(1)
             
-            typer.secho("🚀 Starting IdlerGear MCP server...", fg=typer.colors.GREEN)
-            typer.echo("   Protocol: stdio (standard input/output)")
-            typer.echo("   Security: Local only")
-            typer.echo("   Tools: status, context, check, sync")
+            # Parse command string into list
+            import shlex
+            cmd_parts = shlex.split(command)
+            
+            typer.echo(f"🎬 Starting log capture...")
+            typer.echo(f"   Command: {command}")
+            if name:
+                typer.echo(f"   Name: {name}")
+            
+            session = coordinator.run_with_capture(cmd_parts, name=name, cwd=path)
+            
+            typer.secho(f"\n✅ Session {session['session_id']} started", fg=typer.colors.GREEN)
+            typer.echo(f"   Log file: {session['log_file']}")
+            typer.echo(f"   PID: {session.get('pid', 'starting...')}")
+            typer.echo(f"\n   View logs: idlergear logs show --session {session['session_id']}")
+            typer.echo(f"   Tail logs: idlergear logs show --session {session['session_id']} --tail 50")
+        
+        elif action == "list":
+            sessions = coordinator.list_sessions()
+            
+            if not sessions:
+                typer.echo("📋 No log sessions found")
+                return
+            
             typer.echo("")
-            typer.echo("   Press Ctrl+C to stop")
+            typer.echo(f"📋 Log Sessions ({len(sessions)} total)")
+            typer.echo("=" * 80)
             typer.echo("")
             
-            asyncio.run(mcp_main())
+            for session in sessions:
+                status_icon = {
+                    'running': '🟢',
+                    'completed': '✅',
+                    'stopped': '⏹️',
+                    'failed': '❌'
+                }.get(session['status'], '❓')
+                
+                typer.echo(f"{status_icon} Session {session['session_id']}: {session['name']}")
+                typer.echo(f"   Status: {session['status']}")
+                typer.echo(f"   Started: {session['started']}")
+                if 'command' in session:
+                    typer.echo(f"   Command: {session['command']}")
+                if session['status'] in ['completed', 'stopped', 'failed'] and 'ended' in session:
+                    typer.echo(f"   Ended: {session['ended']}")
+                typer.echo("")
+        
+        elif action == "show":
+            if session_id is None:
+                typer.secho("Error: --session required for 'show' action", fg=typer.colors.RED)
+                raise typer.Exit(1)
             
-        except KeyboardInterrupt:
+            session = coordinator.get_session(session_id)
+            if not session:
+                typer.secho(f"Error: Session {session_id} not found", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            
+            log_content = coordinator.read_log(session_id, tail=tail)
+            
             typer.echo("")
-            typer.secho("✅ MCP server stopped", fg=typer.colors.GREEN)
-        except Exception as e:
-            typer.secho(f"❌ Error starting MCP server: {e}", fg=typer.colors.RED)
+            typer.echo(f"📄 Session {session_id}: {session['name']}")
+            typer.echo(f"   Status: {session['status']}")
+            if tail:
+                typer.echo(f"   Showing last {tail} lines")
+            typer.echo("─" * 80)
+            typer.echo(log_content)
+        
+        elif action == "export":
+            if session_id is None:
+                typer.secho("Error: --session required for 'export' action", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            if not output:
+                typer.secho("Error: --output required for 'export' action", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            
+            result_path = coordinator.export_session(session_id, output)
+            typer.secho(f"✅ Exported to: {result_path}", fg=typer.colors.GREEN)
+        
+        elif action == "cleanup":
+            typer.echo(f"🧹 Cleaning up logs older than {days} days...")
+            deleted = coordinator.cleanup_old_logs(days=days)
+            typer.secho(f"✅ Deleted {deleted} old log file(s)", fg=typer.colors.GREEN)
+        
+        else:
+            typer.secho(f"Unknown action: {action}", fg=typer.colors.RED)
+            typer.echo("Valid actions: run, list, show, export, cleanup")
             raise typer.Exit(1)
     
-    elif action == "info":
-        typer.echo("")
-        typer.echo("📡 IdlerGear MCP Server")
-        typer.echo("=" * 60)
-        typer.echo("")
-        typer.echo("Protocol: Model Context Protocol (MCP)")
-        typer.echo("Transport: stdio (standard input/output)")
-        typer.echo("Security: Local only - no network exposure")
-        typer.echo("")
-        typer.echo("Available Tools:")
-        typer.echo("  • project_status - Get project health and status")
-        typer.echo("  • project_context - Generate LLM-ready context")
-        typer.echo("  • project_check - Analyze best practices")
-        typer.echo("  • sync_status - Check web sync status")
-        typer.echo("  • sync_push - Push to web environment")
-        typer.echo("  • sync_pull - Pull from web environment")
-        typer.echo("")
-        typer.echo("Compatible LLM Tools:")
-        typer.echo("  • Gemini CLI")
-        typer.echo("  • Claude Desktop")
-        typer.echo("  • Any MCP-compatible client")
-        typer.echo("")
-        typer.echo("Start server:")
-        typer.echo("  idlergear mcp start")
-        typer.echo("")
-    
-    else:
-        typer.secho(f"Unknown action: {action}. Use 'start' or 'info'", fg=typer.colors.RED)
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
