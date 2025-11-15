@@ -197,6 +197,12 @@ def new(
             f"Successfully created repository '{new_repo.full_name}'",
             fg=typer.colors.GREEN,
         )
+        
+        # Wait for GitHub to finish generating the repository from template
+        import time
+        typer.echo("Waiting for GitHub to generate repository from template...")
+        time.sleep(5)
+        
     except Exception as e:
         typer.secho(
             f"Failed to create repository from template: {e}", fg=typer.colors.RED
@@ -223,43 +229,57 @@ def new(
     replace_placeholders(project_path, {"PROJECT_NAME": project_name})
     typer.secho("Placeholders replaced.", fg=typer.colors.GREEN)
 
-    # 5. Initial commit and push
+    # 5. Initial commit and push (only if there are changes)
     try:
-        typer.echo("Configuring git user...")
-        subprocess.run(
-            ["git", "config", "user.name", user.login],
+        # Check if there are any files to commit
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
             cwd=project_path,
+            capture_output=True,
+            text=True,
             check=True,
         )
-        subprocess.run(
-            ["git", "config", "user.email", user.email or f"{user.login}@users.noreply.github.com"],
-            cwd=project_path,
-            check=True,
-        )
+        
+        if status_result.stdout.strip():
+            typer.echo("Configuring git user...")
+            subprocess.run(
+                ["git", "config", "user.name", user.login],
+                cwd=project_path,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", user.email or f"{user.login}@users.noreply.github.com"],
+                cwd=project_path,
+                check=True,
+            )
 
-        typer.echo("Committing and pushing initial project setup...")
-        subprocess.run(
-            ["git", "add", "."],
-            cwd=project_path,
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "commit", "-m", "feat: Initial project setup from template"],
-            cwd=project_path,
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "push"],
-            cwd=project_path,
-            check=True,
-            capture_output=True,
-        )
-        typer.secho("Initial commit pushed successfully.", fg=typer.colors.GREEN)
+            typer.echo("Committing and pushing initial project setup...")
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=project_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "feat: Customize project from template"],
+                cwd=project_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "push"],
+                cwd=project_path,
+                check=True,
+                capture_output=True,
+            )
+            typer.secho("Changes committed and pushed successfully.", fg=typer.colors.GREEN)
+        else:
+            typer.secho("No changes to commit (template already customized).", fg=typer.colors.GREEN)
     except subprocess.CalledProcessError as e:
-        typer.secho(f"Failed to commit and push: {e.stderr.decode()}", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        error_msg = e.stderr.decode() if e.stderr else str(e)
+        typer.secho(f"Failed to commit and push: {error_msg}", fg=typer.colors.RED)
+        typer.secho(f"Project created but not fully configured. You can manually complete setup.", fg=typer.colors.YELLOW)
+        # Don't exit - project was created successfully
 
     typer.echo(f"\n✅ Project '{project_name}' created successfully!")
     typer.echo(f"   cd {project_path}")
