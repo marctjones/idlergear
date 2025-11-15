@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from github import Github
 from src.status import ProjectStatus
 from src.context import ProjectContext
+from src.check import ProjectChecker
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -316,44 +317,27 @@ def status(path: str = typer.Option(".", "--path", "-p", help="Project directory
 
 
 @app.command()
-def context(
-    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
-    format_type: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown or plain"),
-    no_docs: bool = typer.Option(False, "--no-docs", help="Exclude charter documents"),
-    no_activity: bool = typer.Option(False, "--no-activity", help="Exclude recent activity"),
-    no_structure: bool = typer.Option(False, "--no-structure", help="Exclude project structure"),
-    output: str = typer.Option(None, "--output", "-o", help="Write to file instead of stdout"),
-):
+def check(path: str = typer.Option(".", "--path", "-p", help="Project directory to check")):
     """
-    Generate comprehensive project context for LLM consumption.
+    Analyze project for best practice adherence.
     
-    Collects and formats:
-    - Charter documents (VISION.md, DESIGN.md, TODO.md, etc.)
-    - Recent git activity and commits
-    - Project structure
-    - LLM-managed branches
+    Checks for:
+    - Missing tests in recent commits
+    - Stale charter documents
+    - Excessive uncommitted changes
+    - Dangling branches needing cleanup
+    - Missing project files
+    - Multi-LLM coordination opportunities
     
-    Perfect for providing context to AI coding assistants.
+    Provides actionable suggestions for improvement.
     """
     try:
-        project_context = ProjectContext(path)
-        context_output = project_context.format_context(
-            include_docs=not no_docs,
-            include_activity=not no_activity,
-            include_structure=not no_structure,
-            format_type=format_type
-        )
-        
-        if output:
-            # Write to file
-            with open(output, 'w') as f:
-                f.write(context_output)
-            typer.secho(f"Context written to {output}", fg=typer.colors.GREEN)
-        else:
-            # Print to stdout
-            typer.echo(context_output)
+        checker = ProjectChecker(path)
+        checker.run_all_checks()
+        report = checker.format_report()
+        typer.echo(report)
     except Exception as e:
-        typer.secho(f"Error generating context: {e}", fg=typer.colors.RED)
+        typer.secho(f"Error checking project: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
