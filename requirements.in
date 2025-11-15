@@ -4,6 +4,7 @@ PyYAML
 python-dotenv
 pytest
 pytest-cov
+pytest-asyncio
 black
 ruff
 coverage

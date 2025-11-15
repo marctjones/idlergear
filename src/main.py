@@ -70,7 +70,9 @@ def main(ctx: typer.Context):
         )
         raise typer.Exit(1)
 
-    g = Github(token)
+    from github import Auth
+    auth = Auth.Token(token)
+    g = Github(auth=auth)
     ctx.obj = g
 
 
@@ -565,6 +567,84 @@ def logs(
     
     except Exception as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command()
+def mcp(
+    action: str = typer.Argument("start", help="Action: start or info"),
+):
+    """
+    Start or manage the MCP (Model Context Protocol) server.
+    
+    The MCP server exposes IdlerGear tools for LLM clients.
+    - Runs on stdio (not network) for security
+    - Local LLM tools can connect and invoke IdlerGear commands
+    - Works with Gemini CLI, Claude Desktop, etc.
+    
+    Actions:
+      start - Start the MCP server (runs until interrupted)
+      info  - Show MCP server information
+    
+    Usage:
+      idlergear mcp start    # Start server
+      
+    LLM tools can then discover and invoke:
+      - project_status
+      - project_context
+      - project_check
+      - sync_status, sync_push, sync_pull
+    """
+    if action == "start":
+        try:
+            import asyncio
+            from src.mcp_server import main as mcp_main
+            
+            typer.secho("🚀 Starting IdlerGear MCP server...", fg=typer.colors.GREEN)
+            typer.echo("   Protocol: stdio (standard input/output)")
+            typer.echo("   Security: Local only")
+            typer.echo("   Tools: status, context, check, sync")
+            typer.echo("")
+            typer.echo("   Press Ctrl+C to stop")
+            typer.echo("")
+            
+            asyncio.run(mcp_main())
+            
+        except KeyboardInterrupt:
+            typer.echo("")
+            typer.secho("✅ MCP server stopped", fg=typer.colors.GREEN)
+        except Exception as e:
+            typer.secho(f"❌ Error starting MCP server: {e}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    
+    elif action == "info":
+        typer.echo("")
+        typer.echo("📡 IdlerGear MCP Server")
+        typer.echo("=" * 60)
+        typer.echo("")
+        typer.echo("Protocol: Model Context Protocol (MCP)")
+        typer.echo("Transport: stdio (standard input/output)")
+        typer.echo("Security: Local only - no network exposure")
+        typer.echo("")
+        typer.echo("Available Tools:")
+        typer.echo("  • project_status - Get project health and status")
+        typer.echo("  • project_context - Generate LLM-ready context")
+        typer.echo("  • project_check - Analyze best practices")
+        typer.echo("  • sync_status - Check web sync status")
+        typer.echo("  • sync_push - Push to web environment")
+        typer.echo("  • sync_pull - Pull from web environment")
+        typer.echo("")
+        typer.echo("Compatible LLM Tools:")
+        typer.echo("  • Gemini CLI")
+        typer.echo("  • Claude Desktop")
+        typer.echo("  • Any MCP-compatible client")
+        typer.echo("")
+        typer.echo("Start server:")
+        typer.echo("  idlergear mcp start")
+        typer.echo("")
+    
+    else:
+        typer.secho(f"Unknown action: {action}. Use 'start' or 'info'", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
