@@ -4,6 +4,7 @@ import subprocess
 from dotenv import load_dotenv
 from github import Github
 from src.status import ProjectStatus
+from src.context import ProjectContext
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -302,6 +303,7 @@ def status(path: str = typer.Option(".", "--path", "-p", help="Project directory
     Displays:
     - Git status (branch, uncommitted changes, recent commits)
     - Charter document freshness (VISION.md, TODO.md, etc.)
+    - LLM-managed branches
     - Project location and name
     """
     try:
@@ -310,6 +312,48 @@ def status(path: str = typer.Option(".", "--path", "-p", help="Project directory
         typer.echo(output)
     except Exception as e:
         typer.secho(f"Error getting project status: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command()
+def context(
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    format_type: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown or plain"),
+    no_docs: bool = typer.Option(False, "--no-docs", help="Exclude charter documents"),
+    no_activity: bool = typer.Option(False, "--no-activity", help="Exclude recent activity"),
+    no_structure: bool = typer.Option(False, "--no-structure", help="Exclude project structure"),
+    output: str = typer.Option(None, "--output", "-o", help="Write to file instead of stdout"),
+):
+    """
+    Generate comprehensive project context for LLM consumption.
+    
+    Collects and formats:
+    - Charter documents (VISION.md, DESIGN.md, TODO.md, etc.)
+    - Recent git activity and commits
+    - Project structure
+    - LLM-managed branches
+    
+    Perfect for providing context to AI coding assistants.
+    """
+    try:
+        project_context = ProjectContext(path)
+        context_output = project_context.format_context(
+            include_docs=not no_docs,
+            include_activity=not no_activity,
+            include_structure=not no_structure,
+            format_type=format_type
+        )
+        
+        if output:
+            # Write to file
+            with open(output, 'w') as f:
+                f.write(context_output)
+            typer.secho(f"Context written to {output}", fg=typer.colors.GREEN)
+        else:
+            # Print to stdout
+            typer.echo(context_output)
+    except Exception as e:
+        typer.secho(f"Error generating context: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
