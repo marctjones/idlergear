@@ -10,6 +10,17 @@ git clone <repository-url>
 cd <project-name>
 ```
 
+**Note for IdlerGear Users:** When creating new projects with `idlergear new`, use the `--path` option to specify where to create projects. Avoid creating test projects inside the idlergear repository itself:
+
+```bash
+# Good: Create in a dedicated workspace
+idlergear new my-project --path ~/projects
+
+# Avoid: Creating inside idlergear repo
+cd ~/idlergear
+idlergear new my-project  # This will warn you!
+```
+
 ### 2. Set Up Isolated Development Environment
 
 **Python:**

@@ -130,6 +130,7 @@ def new(
     ctx: typer.Context,
     project_name: str,
     lang: str = typer.Option("python", "--lang", "-l"),
+    path: str = typer.Option(None, "--path", "-p", help="Directory to create project in (default: current directory)"),
 ):
     """
     Creates a new project from the idlergear-template.
@@ -139,6 +140,39 @@ def new(
     template_repo_name = "idlergear-template"
 
     typer.echo(f"Authenticated as {user.login}.")
+    
+    # Determine the target directory
+    if path:
+        target_dir = os.path.abspath(path)
+    else:
+        target_dir = os.getcwd()
+    
+    project_path = os.path.join(target_dir, project_name)
+    
+    # Check if we're inside the idlergear repository
+    try:
+        idlergear_root = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=target_dir
+        ).stdout.strip()
+        
+        if "idlergear" in idlergear_root.lower() and target_dir.startswith(idlergear_root):
+            typer.secho(
+                f"Warning: You're trying to create a project inside the idlergear repository.",
+                fg=typer.colors.YELLOW,
+            )
+            typer.secho(
+                f"Consider using --path to specify a different location (e.g., ~/projects)",
+                fg=typer.colors.YELLOW,
+            )
+            if not typer.confirm("Continue anyway?"):
+                raise typer.Exit(0)
+    except subprocess.CalledProcessError:
+        # Not in a git repository, that's fine
+        pass
 
     # 1. Get the template repository
     try:
@@ -171,9 +205,9 @@ def new(
 
     # 3. Clone the new repository
     try:
-        typer.echo(f"Cloning repository into './{project_name}'...")
+        typer.echo(f"Cloning repository into '{project_path}'...")
         subprocess.run(
-            ["git", "clone", new_repo.clone_url, project_name],
+            ["git", "clone", new_repo.clone_url, project_path],
             check=True,
             capture_output=True,
         )
@@ -186,7 +220,7 @@ def new(
 
     # 4. Replace placeholders
     typer.echo("Replacing placeholders...")
-    replace_placeholders(project_name, {"PROJECT_NAME": project_name})
+    replace_placeholders(project_path, {"PROJECT_NAME": project_name})
     typer.secho("Placeholders replaced.", fg=typer.colors.GREEN)
 
     # 5. Initial commit and push
@@ -194,31 +228,31 @@ def new(
         typer.echo("Configuring git user...")
         subprocess.run(
             ["git", "config", "user.name", user.login],
-            cwd=project_name,
+            cwd=project_path,
             check=True,
         )
         subprocess.run(
             ["git", "config", "user.email", user.email or f"{user.login}@users.noreply.github.com"],
-            cwd=project_name,
+            cwd=project_path,
             check=True,
         )
 
         typer.echo("Committing and pushing initial project setup...")
         subprocess.run(
             ["git", "add", "."],
-            cwd=project_name,
+            cwd=project_path,
             check=True,
             capture_output=True,
         )
         subprocess.run(
             ["git", "commit", "-m", "feat: Initial project setup from template"],
-            cwd=project_name,
+            cwd=project_path,
             check=True,
             capture_output=True,
         )
         subprocess.run(
             ["git", "push"],
-            cwd=project_name,
+            cwd=project_path,
             check=True,
             capture_output=True,
         )
@@ -228,7 +262,7 @@ def new(
         raise typer.Exit(1)
 
     typer.echo(f"\n✅ Project '{project_name}' created successfully!")
-    typer.echo(f"   cd {project_name}")
+    typer.echo(f"   cd {project_path}")
 
 
 @app.command()
