@@ -6,6 +6,7 @@ from github import Github
 from src.status import ProjectStatus
 from src.context import ProjectContext
 from src.check import ProjectChecker
+from src.sync import ProjectSync
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -338,6 +339,93 @@ def check(path: str = typer.Option(".", "--path", "-p", help="Project directory 
         typer.echo(report)
     except Exception as e:
         typer.secho(f"Error checking project: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command(name="sync")
+def sync_command(
+    action: str = typer.Argument(..., help="Action: push, pull, or status"),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    include_untracked: bool = typer.Option(False, "--include-untracked", "-u", help="Include untracked files (push only)"),
+    no_cleanup: bool = typer.Option(False, "--no-cleanup", help="Don't cleanup sync branch (pull only)"),
+):
+    """
+    Coordinate work between local and web LLM environments.
+    
+    Actions:
+      push   - Push current state to sync branch for web environment
+      pull   - Pull changes from sync branch to current branch
+      status - Check sync branch status
+    
+    Workflow:
+      1. Work locally with Gemini CLI
+      2. idlergear sync push
+      3. Open Claude Code Web, switch to sync branch
+      4. Work in web environment
+      5. idlergear sync pull
+      6. Continue locally
+    """
+    try:
+        syncer = ProjectSync(path)
+        
+        if action == "push":
+            typer.echo("🔄 Pushing to web sync branch...")
+            result = syncer.sync_push(include_untracked=include_untracked)
+            
+            typer.secho(f"✅ Pushed to sync branch: {result['sync_branch']}", fg=typer.colors.GREEN)
+            typer.echo(f"   From: {result['current_branch']}")
+            if result['created_branch']:
+                typer.echo("   Created new sync branch")
+            if result['committed_changes']:
+                typer.echo("   Committed changes")
+            typer.echo("")
+            typer.echo("📱 Next steps:")
+            typer.echo(f"   1. Open your web LLM tool (Claude Web, Copilot Web, etc.)")
+            typer.echo(f"   2. Switch to branch: {result['sync_branch']}")
+            typer.echo(f"   3. Work in web environment")
+            typer.echo(f"   4. Run: idlergear sync pull")
+            
+        elif action == "pull":
+            typer.echo("🔄 Pulling from web sync branch...")
+            result = syncer.sync_pull(cleanup=not no_cleanup)
+            
+            typer.secho(f"✅ Pulled from sync branch: {result['sync_branch']}", fg=typer.colors.GREEN)
+            typer.echo(f"   To: {result['current_branch']}")
+            if result['merged']:
+                typer.echo("   Merged changes successfully")
+            if result['cleaned_up']:
+                typer.echo("   Cleaned up sync branch")
+            
+        elif action == "status":
+            result = syncer.sync_status()
+            
+            typer.echo("")
+            typer.echo(f"📊 Sync Status")
+            typer.echo(f"   Current branch: {result['current_branch']}")
+            typer.echo(f"   Sync branch: {result['sync_branch']}")
+            typer.echo(f"   Local exists: {'Yes ✅' if result['local_exists'] else 'No'}")
+            typer.echo(f"   Remote exists: {'Yes ✅' if result['remote_exists'] else 'No'}")
+            typer.echo(f"   Uncommitted changes: {result['uncommitted_changes']}")
+            
+            if result['ahead_behind']:
+                ahead = result['ahead_behind']['ahead']
+                behind = result['ahead_behind']['behind']
+                typer.echo(f"   Status: {ahead} ahead, {behind} behind")
+                
+                if behind > 0:
+                    typer.echo("")
+                    typer.secho("   💡 Web environment has changes. Run: idlergear sync pull", fg=typer.colors.YELLOW)
+                elif ahead > 0:
+                    typer.echo("")
+                    typer.secho("   💡 Local has changes. Run: idlergear sync push", fg=typer.colors.YELLOW)
+            typer.echo("")
+            
+        else:
+            typer.secho(f"Unknown action: {action}. Use: push, pull, or status", fg=typer.colors.RED)
+            raise typer.Exit(1)
+            
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
