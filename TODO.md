@@ -7,13 +7,14 @@ This file tracks the high-level feature and bug list for the `IdlerGear` project
 *   [ ] **Task:** Design the CLI structure using `typer` or `click`.
 *   [ ] **Task:** Implement GitHub Authentication (using Personal Access Token).
 *   [ ] **Task:** Create a new private GitHub repository to serve as the project template (e.g., `idlergear-template`).
-    *   [ ] Populate it with the base files: `VISION.md`, `TODO.md`, `IDEAS.md`, `README.md`.
-    *   [ ] Create `AI_INSTRUCTIONS/` directory and populate it with a generic `GEMINI.md` file.
+    *   [ ] Populate it with the base files: `VISION.md`, `TODO.md`, `IDEAS.md`, `README.md`, `DEVELOPMENT.md`.
+    *   [ ] Create `AI_INSTRUCTIONS/` directory and populate it with generic instruction files for different AI tools.
     *   [ ] Use placeholders like `{{PROJECT_NAME}}` in the template files.
 *   [ ] **Task:** Implement the `idlergear new <project-name> --lang <language>` command.
     *   [ ] Use the GitHub API to create a new repository from the template.
     *   [ ] Clone the newly created repository.
     *   [ ] Customize the cloned files (replace placeholders).
+    *   [ ] Set up language-specific isolated environment (venv for Python, etc.).
     *   [ ] Fetch and apply the correct language-specific `.gitignore`.
     *   [ ] Create the project-specific `.idlergear.toml` configuration file.
     *   [ ] Perform the initial `git commit` and push to the new remote repository.

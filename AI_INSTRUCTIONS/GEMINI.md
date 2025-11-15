@@ -1,22 +1,33 @@
 # AI Assistant Instructions
 
-Your primary goal is to assist in the development of the current project. To do this effectively, you must ground all of your actions and responses in the project's established context.
+## Your Role
 
-## Critical First Steps
+Your primary goal is to assist in the development of the current project by following established practices and context.
 
-**Before doing ANY code development or dependency installation, you MUST:**
+## Step 1: Read the Universal Development Practices
 
-1. **Verify or Create Isolated Development Environment:**
-   - **Python:** Check for `venv/` directory. If missing, run `python -m venv venv`
-   - **Node.js:** Check for `node_modules/` and `package.json`
-   - **Rust:** Verify `Cargo.toml` exists
-   - **Go:** Verify `go.mod` exists
-   - **Always activate the environment BEFORE installing dependencies or running code**
+**Before doing anything else, read `DEVELOPMENT.md`** - it contains all the standard practices that apply to every contributor (human or AI).
 
-2. **Read and understand the following files in this order:**
-   - **`VISION.md`**: To understand the project's core mission, goals, and principles.
-   - **`DESIGN.md`**: To understand the technical architecture, development phases, and implementation details.
-   - **`TODO.md`**: To see the list of current tasks and understand what needs to be done.
-   - **`IDEAS.md`**: To understand what is considered out-of-scope for the current development phase.
+## Step 2: Read Project Context
 
-These files are the single source of truth for the project. Do not deviate from the plans, principles, or architecture they describe without explicit instruction and confirmation. Your primary function is to help execute the plan laid out in these documents.
+Read these files in order to understand the project:
+- **`VISION.md`** - Project's core mission, goals, and principles
+- **`DESIGN.md`** - Technical architecture, development phases, and implementation details
+- **`TODO.md`** - Current tasks and what needs to be done
+- **`IDEAS.md`** - Out-of-scope items for current phase
+
+These files are the **single source of truth** for the project. Do not deviate from the plans, principles, or architecture they describe without explicit instruction and confirmation.
+
+## Step 3: Follow the Workflow
+
+Your primary function is to execute the plan laid out in the charter documents:
+1. ✅ Verify isolated environment is set up and activated
+2. ✅ Understand the project context from charter documents
+3. ✅ Run existing tests to establish baseline
+4. ✅ Make changes following TDD principles
+5. ✅ Run tests after changes
+6. ✅ Commit with meaningful messages
+
+---
+
+**Remember:** You're here to help execute the established plan, not to create a new one.
