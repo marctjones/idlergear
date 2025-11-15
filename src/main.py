@@ -3,6 +3,7 @@ import os
 import subprocess
 from dotenv import load_dotenv
 from github import Github
+from src.status import ProjectStatus
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -291,6 +292,25 @@ def ask(llm: str, prompt: str):
     Asks a question to the specified LLM.
     """
     typer.echo(f"Asking {llm}: '{prompt}'")
+
+
+@app.command()
+def status(path: str = typer.Option(".", "--path", "-p", help="Project directory to check")):
+    """
+    Show project health and status.
+    
+    Displays:
+    - Git status (branch, uncommitted changes, recent commits)
+    - Charter document freshness (VISION.md, TODO.md, etc.)
+    - Project location and name
+    """
+    try:
+        project_status = ProjectStatus(path)
+        output = project_status.format_status()
+        typer.echo(output)
+    except Exception as e:
+        typer.secho(f"Error getting project status: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
