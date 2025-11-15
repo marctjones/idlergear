@@ -1,0 +1,9 @@
+typer
+pygithub
+PyYAML
+python-dotenv
+pytest
+pytest-cov
+black
+ruff
+coverage

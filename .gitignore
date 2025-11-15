@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Test projects created by idlergear
+my-*-test-project/
+idlergear-template-tmp/
+
 # C extensions
 *.so
 

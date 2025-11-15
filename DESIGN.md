@@ -26,6 +26,7 @@ The primary goals are to:
 
 This project will adhere to the following principles to ensure quality, security, and maintainability.
 
+* **Isolated Development Environments:** All projects *must* use language-specific isolated environments (e.g., Python `venv`, Node.js local `node_modules`, Rust workspaces, Go modules). Dependencies are installed into the project's isolated environment, never globally. This ensures reproducibility and prevents version conflicts.
 * **Dogfooding:** We will use `IdlerGear` to build and manage the `IdlerGear` project itself as soon as it is minimally viable.
 * **Iterative & TDD:** This tool *must* be built using TDD. We will write unit and integration tests for every feature.
 * **Git Workflow:** All new features will be in branches and merged via PRs. We will commit frequently.
