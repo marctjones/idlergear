@@ -8,7 +8,7 @@ This file tracks the high-level feature and bug list for the `IdlerGear` project
 *   [ ] **Task:** Implement GitHub Authentication (using Personal Access Token).
 *   [ ] **Task:** Create a new private GitHub repository to serve as the project template (e.g., `idlergear-template`).
     *   [ ] Populate it with the base files: `VISION.md`, `TODO.md`, `IDEAS.md`, `README.md`, `DEVELOPMENT.md`.
-    *   [ ] Create `AI_INSTRUCTIONS/` directory and populate it with generic instruction files for different AI tools.
+    *   [ ] Create `AI_INSTRUCTIONS/` directory with a single universal `README.md` file.
     *   [ ] Use placeholders like `{{PROJECT_NAME}}` in the template files.
 *   [ ] **Task:** Implement the `idlergear new <project-name> --lang <language>` command.
     *   [ ] Use the GitHub API to create a new repository from the template.

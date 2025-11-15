@@ -117,4 +117,4 @@ Before making any changes, read these files in order:
 
 ---
 
-**For AI Assistants:** See `AI_INSTRUCTIONS/<tool-name>.md` for tool-specific guidance on following these practices.
+**For AI Assistants:** See `AI_INSTRUCTIONS/README.md` for instructions on following these practices.
