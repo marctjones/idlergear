@@ -82,7 +82,116 @@ class ProjectStatus:
         except subprocess.CalledProcessError:
             return 0
     
+    def get_all_branches(self) -> List[Dict[str, str]]:
+        """Get all local and remote branches."""
+        if not self.is_git_repo:
+            return []
+        try:
+            result = subprocess.run(
+                ["git", "branch", "-a", "--format=%(refname:short)|%(upstream:short)|%(committerdate:relative)"],
+                cwd=self.project_path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            branches = []
+            current_branch = self.get_git_branch()
+            
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    parts = line.split('|', 2)
+                    if len(parts) >= 1:
+                        branch_name = parts[0].strip()
+                        # Skip remote tracking refs
+                        if branch_name.startswith('remotes/'):
+                            continue
+                        
+                        upstream = parts[1].strip() if len(parts) > 1 else ""
+                        last_commit = parts[2].strip() if len(parts) > 2 else ""
+                        
+                        branches.append({
+                            'name': branch_name,
+                            'upstream': upstream,
+                            'last_commit': last_commit,
+                            'is_current': branch_name == current_branch
+                        })
+            return branches
+        except subprocess.CalledProcessError:
+            return []
+    
     def get_recent_commits(self, count: int = 3) -> List[Dict[str, str]]:
+        """Get recent commit history."""
+        if not self.is_git_repo:
+            return []
+        try:
+            result = subprocess.run(
+                ["git", "log", f"-{count}", "--pretty=format:%h|%s|%ar"],
+                cwd=self.project_path,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            commits = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    parts = line.split('|', 2)
+                    if len(parts) == 3:
+                        commits.append({
+                            'hash': parts[0],
+                            'message': parts[1],
+                            'time': parts[2]
+                        })
+            return commits
+        except subprocess.CalledProcessError:
+            return []
+    
+    def get_llm_managed_branches(self) -> Dict[str, List[str]]:
+        """Identify branches managed by LLM tools."""
+        branches = self.get_all_branches()
+        
+        llm_branches = {
+            'web_sync': [],      # idlergear-web-sync branches
+            'claude': [],        # claude-*, claude-code-*
+            'copilot': [],       # copilot-*, github-copilot-*
+            'gemini': [],        # gemini-*
+            'other_llm': [],     # Other patterns
+            'dangling': []       # Old branches with no recent activity
+        }
+        
+        current_branch = self.get_git_branch()
+        main_branches = ['main', 'master', 'develop']
+        
+        for branch in branches:
+            name = branch['name']
+            last_commit = branch['last_commit']
+            
+            # Skip main branches
+            if name in main_branches or branch['is_current']:
+                continue
+            
+            # Identify by naming pattern
+            if 'idlergear' in name and 'sync' in name:
+                llm_branches['web_sync'].append(name)
+            elif name.startswith('claude') or 'claude-code' in name:
+                llm_branches['claude'].append(name)
+            elif name.startswith('copilot') or 'github-copilot' in name:
+                llm_branches['copilot'].append(name)
+            elif name.startswith('gemini'):
+                llm_branches['gemini'].append(name)
+            elif any(pattern in name.lower() for pattern in ['ai-', 'llm-', 'assistant-']):
+                llm_branches['other_llm'].append(name)
+            
+            # Check for dangling branches (no activity in 7+ days)
+            if last_commit and any(term in last_commit for term in ['week', 'month', 'year']):
+                # Try to parse "2 weeks ago" format
+                if 'week' in last_commit:
+                    weeks = int(last_commit.split()[0]) if last_commit.split()[0].isdigit() else 1
+                    if weeks >= 1:
+                        llm_branches['dangling'].append(name)
+                elif 'month' in last_commit or 'year' in last_commit:
+                    llm_branches['dangling'].append(name)
+        
+        return llm_branches
         """Get recent commit history."""
         if not self.is_git_repo:
             return []
@@ -206,5 +315,33 @@ class ProjectStatus:
                     status = "✅"
                 lines.append(f"  {doc}: Updated {age} {status}")
         lines.append("")
+        
+        # LLM-managed branches
+        if self.is_git_repo:
+            llm_branches = self.get_llm_managed_branches()
+            has_llm_branches = any(llm_branches.values())
+            
+            if has_llm_branches:
+                lines.append("🤖 LLM-Managed Branches:")
+                
+                if llm_branches['web_sync']:
+                    lines.append(f"  Web Sync: {', '.join(llm_branches['web_sync'])} 🌐")
+                
+                if llm_branches['claude']:
+                    lines.append(f"  Claude: {', '.join(llm_branches['claude'])}")
+                
+                if llm_branches['copilot']:
+                    lines.append(f"  Copilot: {', '.join(llm_branches['copilot'])}")
+                
+                if llm_branches['gemini']:
+                    lines.append(f"  Gemini: {', '.join(llm_branches['gemini'])}")
+                
+                if llm_branches['other_llm']:
+                    lines.append(f"  Other LLM: {', '.join(llm_branches['other_llm'])}")
+                
+                if llm_branches['dangling']:
+                    lines.append(f"  Dangling (cleanup needed): {', '.join(llm_branches['dangling'])} ⚠️")
+                
+                lines.append("")
         
         return "\n".join(lines)
