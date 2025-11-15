@@ -43,10 +43,8 @@ This project will adhere to the following principles to ensure quality, security
 
 ## 5. Technology Stack (Proposed)
 
-* **Language:** **Python 3** (with `typer` or `click`) for the initial prototype.
+* **Language:** **Python 3** (with `typer` or `click`).
     * *Rationale:* This is the user's strongest language, allowing for rapid prototyping of the complex logic. Key libraries (`GitPython`, `PyGithub`, `python-dotenv`) are mature.
-* **Future (V2) Language:** **Rust.**
-    * *Rationale:* A rewrite in Rust would be an ideal V2 goal. It would produce a fast, single-binary, cross-platform executable and align with the user's learning goals. We will design the Python version with this potential migration in mind.
 * **Authentication:** GitHub Personal Access Tokens (PATs) or OAuth, to be stored securely in the system keychain or an environment file (e.g., `.env`).
 
 ## 6. Phase 1: The Local Scaffolder
@@ -114,7 +112,6 @@ This outlines the major components to be built after Phase 1.
 
 This section documents alternative designs that were discussed. They are considered **out of scope** for the current project.
 
-* **A-1: Rust-Based (V2):** A full rewrite in Rust for a single, fast, cross-platform binary.
 * **A-2: Metaprogramming (Scheme/Racket):** Exploring how a Lisp-like language could *generate* the project structure and context-aware wrappers.
 * **A-3: Direct LLM IPC:** A more advanced version of Module 4 where two local LLM CLIs could "talk" to each other via file-based message passing, managed by `IdlerGear`.
 * **A-4: GitHub Template Repo:** `IdlerGear` could maintain a *personal GitHub template repository* for you, and new projects would be a "clone" of this template, ensuring all your preferences are pre-configured.
