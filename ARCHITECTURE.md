@@ -110,27 +110,24 @@ idlergear branches cleanup --execute
 ### What Is MCP?
 Model Context Protocol - a standard way for LLM tools to access external tools and context.
 
+### Security Model
+**IMPORTANT: Local Only - No Remote Access**
+- MCP server binds to `localhost` (127.0.0.1) ONLY
+- Never exposed to remote hosts
+- No network-accessible endpoints
+- Only local LLM tools can connect
+- Web-based LLM tools use Layer 1 (CLI) via sync branches, NOT direct MCP access
+
 ### IdlerGear MCP Server
 
 ```bash
-# Start MCP server
-idlergear mcp start --port 3000
+# Start MCP server (binds to localhost only)
+idlergear mcp start
+# Listening on 127.0.0.1:3000 (local only)
 
 # MCP server exposes all CLI commands as tools
-# LLM tools (Gemini, Claude, Copilot) can discover and invoke them
+# Only local LLM tools (Gemini CLI, Claude Desktop, etc.) can connect
 ```
-
-### MCP Tools Exposed:
-
-1. **project_status** - Get project health
-2. **project_context** - Get full project context
-3. **logs_show** - Show collected logs
-4. **logs_collect** - Start collecting logs
-5. **sync_push** - Push to web environment
-6. **sync_pull** - Pull from web environment
-7. **pr_create** - Create pull request
-8. **pr_merge** - Merge and cleanup
-9. **check** - Best practice analysis
 
 ### Configuration
 
@@ -139,7 +136,12 @@ idlergear mcp start --port 3000
 [mcp]
 enabled = true
 port = 3000
+bind_address = "127.0.0.1"  # MUST be localhost only
 auto_start = true
+
+[mcp.security]
+allow_remote = false  # Hardcoded, cannot be overridden
+require_auth = true   # Optional: require local auth token
 
 [mcp.tools]
 # Which commands to expose via MCP
@@ -148,21 +150,40 @@ expose = ["status", "context", "logs", "sync", "pr"]
 
 ### LLM Tool Integration
 
-**Gemini CLI:**
+**Local LLM Tools (via MCP):**
 ```bash
-# Gemini discovers IdlerGear MCP server
+# Gemini CLI (local) connects to MCP server
 gemini --mcp-server http://localhost:3000
+
+# Claude Desktop (local) connects to MCP server
+claude --mcp http://localhost:3000
 
 # Can now invoke:
 # "Show me project status" → calls project_status
 # "Collect logs from the running app" → calls logs_collect
 ```
 
-**Claude Code:**
+**Web-Based LLM Tools (via Sync, NOT MCP):**
 ```bash
-# Claude connects to MCP server
-claude --mcp http://localhost:3000
+# Claude Code Web, Copilot Web, etc. CANNOT access MCP directly
+# They use the sync mechanism instead:
+
+# 1. Push context/logs to sync branch
+idlergear sync push
+
+# 2. Web tool reads from sync branch
+# (No direct MCP access for security)
+
+# 3. Pull changes back
+idlergear sync pull
 ```
+
+### Why Local Only?
+
+1. **Security** - No exposed network services
+2. **Privacy** - Project data stays on your machine
+3. **Simplicity** - No authentication/authorization complexity
+4. **Web Access Pattern** - Web tools use sync branches (already designed for this)
 
 ---
 
@@ -381,11 +402,12 @@ idlergear pr merge --cleanup
 ## Key Principles
 
 1. **CLI First** - Everything works standalone, no LLM required
-2. **MCP Layer** - LLM tools get structured access via standard protocol
+2. **MCP Layer - Local Only** - Binds to localhost only, never exposed remotely
 3. **Runtime Awareness** - Collect telemetry from running code, not just static analysis
-4. **Cross-Environment** - Seamlessly work between local CLI and web UIs
+4. **Cross-Environment** - Seamlessly work between local CLI and web UIs (via sync, not MCP)
 5. **Tool Agnostic** - Works with any LLM tool (Gemini, Claude, Copilot, future)
 6. **Non-Invasive** - Doesn't change your workflow, enhances it
+7. **Security First** - MCP local only, no secrets in repos, proper isolation
 
 ---
 
