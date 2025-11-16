@@ -100,7 +100,7 @@ class TestLogPipe:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd='/home/marc/idlergear'
+            cwd='/home/user/idlergear'
         )
         
         stdout, stderr = process.communicate(input="CLI Line 1\nCLI Line 2\n")

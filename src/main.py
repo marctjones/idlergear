@@ -73,20 +73,15 @@ def main(ctx: typer.Context):
     IdlerGear: A meta-assistant for managing development workflows.
     """
     token = get_github_token()
-    if not token:
-        typer.secho(
-            "Error: GitHub token not found.\n"
-            "Please either log in with the GitHub CLI (`gh auth login`) "
-            "or create a .env file with GITHUB_TOKEN='your_pat_here'.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(1)
+    if token:
+        from github import Auth
 
-    from github import Auth
-
-    auth = Auth.Token(token)
-    g = Github(auth=auth)
-    ctx.obj = g
+        auth = Auth.Token(token)
+        g = Github(auth=auth)
+        ctx.obj = g
+    else:
+        # GitHub not available - commands that need it will check ctx.obj
+        ctx.obj = None
 
 
 @app.command()
@@ -96,6 +91,14 @@ def setup_template(ctx: typer.Context):
     This repository will be used as the template for all new projects.
     """
     g: Github = ctx.obj
+    if not g:
+        typer.secho(
+            "Error: GitHub token not found.\n"
+            "Please either log in with the GitHub CLI (`gh auth login`) "
+            "or create a .env file with GITHUB_TOKEN='your_pat_here'.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
     user = g.get_user()
     repo_name = "idlergear-template"
 
@@ -161,6 +164,14 @@ def new(
     Creates a new project from the idlergear-template.
     """
     g: Github = ctx.obj
+    if not g:
+        typer.secho(
+            "Error: GitHub token not found.\n"
+            "Please either log in with the GitHub CLI (`gh auth login`) "
+            "or create a .env file with GITHUB_TOKEN='your_pat_here'.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
     user = g.get_user()
     template_repo_name = "idlergear-template"
 

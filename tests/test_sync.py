@@ -19,6 +19,7 @@ class TestProjectSync:
         subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
         subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+        subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
         
         # Create initial commit
         test_file = Path(tmpdir) / "README.md"
@@ -223,6 +224,9 @@ class TestProjectSync:
             remote_workdir = Path(tempfile.mkdtemp(prefix="remote-workdir-"))
             try:
                 subprocess.run(["git", "clone", str(remote_path), str(remote_workdir)], check=True, capture_output=True)
+                subprocess.run(["git", "config", "user.name", "Test"], cwd=remote_workdir, check=True)
+                subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=remote_workdir, check=True)
+                subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=remote_workdir, check=True)
                 subprocess.run(
                     ["git", "checkout", "-b", sync_branch, f"origin/{sync_branch}"],
                     cwd=remote_workdir,
