@@ -22,7 +22,62 @@
       "cwd": ".",
       "error": "[Errno 2] No such file or directory: 'for'",
       "ended": "2025-11-15T18:12:16.489477"
+    },
+    "3": {
+      "session_id": 3,
+      "source": "echo command",
+      "name": "test-pipe",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-3-test-pipe.log",
+      "started": "2025-11-15T19:12:50.658432",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 5,
+      "ended": "2025-11-15T19:12:50.659106"
+    },
+    "4": {
+      "session_id": 4,
+      "source": "demo-script.sh",
+      "name": "my-app",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-4-my-app.log",
+      "started": "2025-11-15T19:21:56.231230",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 0,
+      "ended": "2025-11-15T19:21:56.232339"
+    },
+    "5": {
+      "session_id": 5,
+      "source": "demo-script.sh",
+      "name": "my-app",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-5-my-app.log",
+      "started": "2025-11-15T19:37:49.702825",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 7,
+      "ended": "2025-11-15T19:37:51.828063"
+    },
+    "6": {
+      "session_id": 6,
+      "source": "stdin",
+      "name": "simple-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-6-simple-test.log",
+      "started": "2025-11-15T19:38:23.726000",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 3,
+      "ended": "2025-11-15T19:38:23.727051"
+    },
+    "7": {
+      "session_id": 7,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-7-cli-test.log",
+      "started": "2025-11-15T19:38:24.227189",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T19:38:24.228489"
     }
   },
-  "last_session_id": 2
+  "last_session_id": 7
 }

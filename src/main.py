@@ -434,10 +434,11 @@ def sync_command(
 
 @app.command()
 def logs(
-    action: str = typer.Argument(..., help="Action: run, list, show, export, or cleanup"),
+    action: str = typer.Argument(..., help="Action: run, pipe, list, show, export, or cleanup"),
     session_id: int = typer.Option(None, "--session", "-s", help="Session ID"),
     command: str = typer.Option(None, "--command", "-c", help="Command to run with capture"),
     name: str = typer.Option(None, "--name", "-n", help="Session name"),
+    source: str = typer.Option(None, "--source", help="Source description for piped input"),
     tail: int = typer.Option(None, "--tail", "-t", help="Show last N lines"),
     output: str = typer.Option(None, "--output", "-o", help="Export output file"),
     days: int = typer.Option(7, "--days", "-d", help="Days to keep logs (cleanup)"),
@@ -448,6 +449,7 @@ def logs(
     
     Actions:
       run     - Run command and capture all output
+      pipe    - Capture input from stdin (piped data)
       list    - List all log sessions
       show    - Show log for a session
       export  - Export session log to file
@@ -456,6 +458,10 @@ def logs(
     Examples:
       # Run a script and capture logs
       idlergear logs run --command "npm run dev" --name dev-server
+      
+      # Pipe output from another command
+      ./run.sh | idlergear logs pipe --name my-app --source run.sh
+      tail -f /var/log/app.log | idlergear logs pipe --name app-monitor
       
       # List all sessions
       idlergear logs list
@@ -494,6 +500,31 @@ def logs(
             typer.echo(f"   PID: {session.get('pid', 'starting...')}")
             typer.echo(f"\n   View logs: idlergear logs show --session {session['session_id']}")
             typer.echo(f"   Tail logs: idlergear logs show --session {session['session_id']} --tail 50")
+        
+        elif action == "pipe":
+            # Capture from stdin
+            typer.echo(f"📥 Capturing from stdin...")
+            if name:
+                typer.echo(f"   Name: {name}")
+            if source:
+                typer.echo(f"   Source: {source}")
+            typer.echo(f"   Reading... (Ctrl+D to end, Ctrl+C to stop)")
+            typer.echo("")
+            
+            session = coordinator.capture_stdin(name=name, source=source)
+            
+            typer.echo("")
+            status_icon = {
+                'completed': '✅',
+                'stopped': '⏹️',
+                'failed': '❌'
+            }.get(session['status'], '❓')
+            
+            typer.secho(f"{status_icon} Capture {session['status']}", fg=typer.colors.GREEN if session['status'] == 'completed' else typer.colors.YELLOW)
+            typer.echo(f"   Session ID: {session['session_id']}")
+            typer.echo(f"   Lines captured: {session.get('line_count', 0)}")
+            typer.echo(f"   Log file: {session['log_file']}")
+            typer.echo(f"\n   View: idlergear logs show --session {session['session_id']}")
         
         elif action == "list":
             sessions = coordinator.list_sessions()
@@ -562,7 +593,7 @@ def logs(
         
         else:
             typer.secho(f"Unknown action: {action}", fg=typer.colors.RED)
-            typer.echo("Valid actions: run, list, show, export, cleanup")
+            typer.echo("Valid actions: run, pipe, list, show, export, cleanup")
             raise typer.Exit(1)
     
     except Exception as e:

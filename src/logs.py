@@ -90,6 +90,84 @@ class LogCoordinator:
         
         return session_info
     
+    def capture_stdin(self, name: Optional[str] = None, source: Optional[str] = None) -> Dict:
+        """
+        Capture input from stdin (piped data).
+        Useful for: ./run.sh | idlergear logs pipe --name my-app
+        
+        Args:
+            name: Session name
+            source: Optional description of source (e.g., "run.sh")
+        
+        Returns:
+            Session info dict
+        """
+        import sys
+        
+        session_id = self._next_session_id()
+        timestamp = datetime.now().isoformat()
+        
+        if name is None:
+            name = "piped-input"
+        
+        log_file = self.logs_dir / f"session-{session_id}-{name}.log"
+        
+        session_info = {
+            'session_id': session_id,
+            'source': source or 'stdin',
+            'name': name,
+            'log_file': str(log_file),
+            'started': timestamp,
+            'status': 'capturing',
+            'cwd': str(self.project_path)
+        }
+        
+        self.metadata['sessions'][str(session_id)] = session_info
+        self._save_metadata()
+        
+        # Read from stdin and write to log file
+        line_count = 0
+        with open(log_file, 'w') as f:
+            # Write header
+            f.write(f"# Log Session {session_id}\n")
+            f.write(f"# Source: {session_info['source']}\n")
+            f.write(f"# Started: {timestamp}\n")
+            f.write(f"# CWD: {session_info['cwd']}\n")
+            f.write("#" + "=" * 70 + "\n\n")
+            f.flush()
+            
+            # Read from stdin
+            try:
+                for line in sys.stdin:
+                    f.write(line)
+                    f.flush()
+                    line_count += 1
+                
+                # Completed successfully
+                session_info['status'] = 'completed'
+                session_info['line_count'] = line_count
+                
+            except KeyboardInterrupt:
+                # User interrupted
+                session_info['status'] = 'stopped'
+                session_info['line_count'] = line_count
+                
+            except Exception as e:
+                session_info['status'] = 'failed'
+                session_info['error'] = str(e)
+                session_info['line_count'] = line_count
+            
+            finally:
+                session_info['ended'] = datetime.now().isoformat()
+                self._save_metadata()
+                
+                # Write footer
+                f.write(f"\n#" + "=" * 70 + "\n")
+                f.write(f"# Ended: {session_info['ended']}\n")
+                f.write(f"# Lines captured: {line_count}\n")
+        
+        return session_info
+    
     def run_with_capture(self, command: List[str], name: Optional[str] = None, 
                         cwd: Optional[str] = None) -> Dict:
         """
