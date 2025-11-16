@@ -44,13 +44,29 @@ idlergear logs show              # Show collected logs
 idlergear check                  # Best practice nudges
 ```
 
-#### Web ↔ Local Coordination
+#### Web ↔ Local Coordination via Private Coordination Repo
 ```bash
-# Push work to web environment
+# Initialize coordination (creates private idlergear-coord repo)
+idlergear coord init
+# - Creates private GitHub repo: {username}/idlergear-coord
+# - Clones to ~/.idlergear/coord/
+# - Sets up project folders and issue templates
+
+# Message passing between LLMs (file-based)
+idlergear coord send --project my-app --to web "Please review auth.py"
+idlergear coord read --project my-app
+# Uses: idlergear-coord/projects/my-app/messages/*.json
+
+# Message passing between LLMs (issue-based)
+idlergear coord send --project my-app --to web --via issue "Review needed"
+idlergear coord read --project my-app --via issue
+# Uses: GitHub Issues with label: project:my-app
+
+# Push work to web environment (code sync)
 idlergear sync push
 # - Creates temp branch (e.g., idlergear-web-sync)
 # - Adds ALL files (including data, .env templates)
-# - Pushes to GitHub
+# - Pushes to project repo
 # - Output: "Ready for web: switch to branch 'idlergear-web-sync'"
 
 # Pull work from web environment

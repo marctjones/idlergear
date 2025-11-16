@@ -4,15 +4,17 @@ Tests for sync commands.
 import pytest
 import tempfile
 import subprocess
+import shutil
 from pathlib import Path
 from src.sync import ProjectSync
+from src.messages import MessageManager
 
 
 class TestProjectSync:
     """Tests for ProjectSync class."""
     
     def setup_git_repo(self, tmpdir):
-        """Helper to set up a git repo with remote."""
+        """Set up a git repo and return the checked-out branch name."""
         # Initialize git repo
         subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
@@ -23,6 +25,37 @@ class TestProjectSync:
         test_file.write_text("# Test Project")
         subprocess.run(["git", "add", "."], cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=tmpdir, check=True, capture_output=True)
+
+        branch_result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=tmpdir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return branch_result.stdout.strip() or "master"
+
+    def setup_remote(self, tmpdir, branch_name):
+        """Create a bare remote outside the working tree and push the branch."""
+        remote_path = Path(tempfile.mkdtemp(prefix="remote-repo-"))
+        subprocess.run(
+            ["git", "init", "--bare", str(remote_path)],
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "remote", "add", "origin", str(remote_path)],
+            cwd=tmpdir,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "push", "-u", "origin", branch_name],
+            cwd=tmpdir,
+            check=True,
+            capture_output=True,
+        )
+        return remote_path
     
     def test_initialization(self):
         """Test sync initialization."""
@@ -79,6 +112,156 @@ class TestProjectSync:
             except RuntimeError as e:
                 # Expected to fail on push without remote
                 assert "remote" in str(e).lower() or "origin" in str(e).lower()
+
+    def test_sync_push_with_remote_creates_branch_and_restores_local_branch(self):
+        """End-to-end push with a bare remote simulating Claude Web."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            branch = self.setup_git_repo(tmpdir)
+            remote_path = self.setup_remote(tmpdir, branch)
+            try:
+                notes_file = Path(tmpdir) / "notes.txt"
+                notes_file.write_text("codex scratch work")
+
+                syncer = ProjectSync(tmpdir)
+                result = syncer.sync_push(include_untracked=True)
+
+                assert result["pushed"] is True
+                assert result["sync_branch"].startswith("idlergear-web-sync")
+
+                ls_remote = subprocess.run(
+                    ["git", "ls-remote", "origin", result["sync_branch"]],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                assert result["sync_branch"] in ls_remote.stdout
+
+                branch_check = subprocess.run(
+                    ["git", "branch", "--show-current"],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                assert branch_check.stdout.strip() == branch
+
+                status = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                assert status.stdout.strip() == ""
+            finally:
+                shutil.rmtree(remote_path, ignore_errors=True)
+
+    def test_sync_pull_merges_remote_changes_and_cleans_up(self):
+        """Simulate Claude Web committing to sync branch and pulling locally."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            branch = self.setup_git_repo(tmpdir)
+            remote_path = self.setup_remote(tmpdir, branch)
+            syncer = ProjectSync(tmpdir)
+            try:
+                scratch = Path(tmpdir) / "scratch.md"
+                scratch.write_text("initial draft")
+                push_result = syncer.sync_push(include_untracked=True)
+                sync_branch = push_result["sync_branch"]
+
+                subprocess.run(["git", "checkout", sync_branch], cwd=tmpdir, check=True)
+                scratch.write_text("edited remotely in Claude Code")
+                subprocess.run(["git", "add", "scratch.md"], cwd=tmpdir, check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "commit", "-m", "Remote Claude update"],
+                    cwd=tmpdir,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "push", "origin", sync_branch],
+                    cwd=tmpdir,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(["git", "checkout", branch], cwd=tmpdir, check=True)
+
+                assert not scratch.exists()
+
+                pull_result = syncer.sync_pull()
+                assert pull_result["merged"] is True
+                assert pull_result["cleaned_up"] is True
+                assert scratch.exists()
+                assert scratch.read_text() == "edited remotely in Claude Code"
+
+                # Verify clean-up removed local and remote sync branches.
+                returncode, _, _ = syncer._run_git("rev-parse", "--verify", sync_branch, check=False)
+                assert returncode != 0
+                ls_remote = subprocess.run(
+                    ["git", "ls-remote", "origin", sync_branch],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                assert ls_remote.stdout.strip() == ""
+            finally:
+                shutil.rmtree(remote_path, ignore_errors=True)
+
+    def test_message_exchange_via_sync_branch(self):
+        """Full round-trip message exchange between local Codex and Claude Web."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            branch = self.setup_git_repo(tmpdir)
+            remote_path = self.setup_remote(tmpdir, branch)
+            syncer = ProjectSync(tmpdir)
+            manager = MessageManager(tmpdir)
+
+            message_id = manager.send_message(to="web", body="Ping from Codex", from_env="codex")
+            push_result = syncer.sync_push(include_untracked=True)
+            sync_branch = push_result["sync_branch"]
+
+            remote_workdir = Path(tempfile.mkdtemp(prefix="remote-workdir-"))
+            try:
+                subprocess.run(["git", "clone", str(remote_path), str(remote_workdir)], check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "checkout", "-b", sync_branch, f"origin/{sync_branch}"],
+                    cwd=remote_workdir,
+                    check=True,
+                    capture_output=True,
+                )
+
+                remote_manager = MessageManager(remote_workdir)
+                remote_messages = remote_manager.list_messages(filter_to="web")
+                assert any(msg["id"] == message_id for msg in remote_messages)
+
+                response_id = remote_manager.respond_to_message(
+                    message_id,
+                    "Reply from Claude",
+                    from_env="claude",
+                )
+
+                subprocess.run(["git", "add", "-A"], cwd=remote_workdir, check=True, capture_output=True)
+                subprocess.run(
+                    ["git", "commit", "-m", "Remote Claude response"],
+                    cwd=remote_workdir,
+                    check=True,
+                    capture_output=True,
+                )
+                subprocess.run(
+                    ["git", "push", "origin", sync_branch],
+                    cwd=remote_workdir,
+                    check=True,
+                    capture_output=True,
+                )
+
+                pull_result = syncer.sync_pull()
+                assert pull_result["merged"] is True
+
+                local_messages = manager.list_messages(filter_from="claude")
+                assert any(msg["id"] == response_id for msg in local_messages)
+            finally:
+                shutil.rmtree(remote_path, ignore_errors=True)
+                shutil.rmtree(remote_workdir, ignore_errors=True)
     
     def test_run_git_command(self):
         """Test git command execution."""

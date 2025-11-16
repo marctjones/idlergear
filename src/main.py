@@ -1,13 +1,25 @@
-import typer
+import importlib
 import os
 import subprocess
+import sys
+from pathlib import Path
+
+import typer
+
 from dotenv import load_dotenv
 from github import Github
-from src.status import ProjectStatus
-from src.context import ProjectContext
-from src.check import ProjectChecker
-from src.sync import ProjectSync
-from src.logs import LogCoordinator
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+ProjectStatus = importlib.import_module("src.status").ProjectStatus
+ProjectContext = importlib.import_module("src.context").ProjectContext
+ProjectChecker = importlib.import_module("src.check").ProjectChecker
+ProjectSync = importlib.import_module("src.sync").ProjectSync
+LogCoordinator = importlib.import_module("src.logs").LogCoordinator
+MessageManager = importlib.import_module("src.messages").MessageManager
+CoordRepo = importlib.import_module("src.coord").CoordRepo
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -71,6 +83,7 @@ def main(ctx: typer.Context):
         raise typer.Exit(1)
 
     from github import Auth
+
     auth = Auth.Token(token)
     g = Github(auth=auth)
     ctx.obj = g
@@ -137,7 +150,12 @@ def new(
     ctx: typer.Context,
     project_name: str,
     lang: str = typer.Option("python", "--lang", "-l"),
-    path: str = typer.Option(None, "--path", "-p", help="Directory to create project in (default: current directory)"),
+    path: str = typer.Option(
+        None,
+        "--path",
+        "-p",
+        help="Directory to create project in (default: current directory)",
+    ),
 ):
     """
     Creates a new project from the idlergear-template.
@@ -147,15 +165,15 @@ def new(
     template_repo_name = "idlergear-template"
 
     typer.echo(f"Authenticated as {user.login}.")
-    
+
     # Determine the target directory
     if path:
         target_dir = os.path.abspath(path)
     else:
         target_dir = os.getcwd()
-    
+
     project_path = os.path.join(target_dir, project_name)
-    
+
     # Check if we're inside the idlergear repository
     try:
         idlergear_root = subprocess.run(
@@ -163,16 +181,18 @@ def new(
             capture_output=True,
             text=True,
             check=True,
-            cwd=target_dir
+            cwd=target_dir,
         ).stdout.strip()
-        
-        if "idlergear" in idlergear_root.lower() and target_dir.startswith(idlergear_root):
+
+        if "idlergear" in idlergear_root.lower() and target_dir.startswith(
+            idlergear_root
+        ):
             typer.secho(
-                f"Warning: You're trying to create a project inside the idlergear repository.",
+                "Warning: You're trying to create a project inside the idlergear repository.",
                 fg=typer.colors.YELLOW,
             )
             typer.secho(
-                f"Consider using --path to specify a different location (e.g., ~/projects)",
+                "Consider using --path to specify a different location (e.g., ~/projects)",
                 fg=typer.colors.YELLOW,
             )
             if not typer.confirm("Continue anyway?"):
@@ -204,12 +224,13 @@ def new(
             f"Successfully created repository '{new_repo.full_name}'",
             fg=typer.colors.GREEN,
         )
-        
+
         # Wait for GitHub to finish generating the repository from template
         import time
+
         typer.echo("Waiting for GitHub to generate repository from template...")
         time.sleep(5)
-        
+
     except Exception as e:
         typer.secho(
             f"Failed to create repository from template: {e}", fg=typer.colors.RED
@@ -246,7 +267,7 @@ def new(
             text=True,
             check=True,
         )
-        
+
         if status_result.stdout.strip():
             typer.echo("Configuring git user...")
             subprocess.run(
@@ -255,7 +276,12 @@ def new(
                 check=True,
             )
             subprocess.run(
-                ["git", "config", "user.email", user.email or f"{user.login}@users.noreply.github.com"],
+                [
+                    "git",
+                    "config",
+                    "user.email",
+                    user.email or f"{user.login}@users.noreply.github.com",
+                ],
                 cwd=project_path,
                 check=True,
             )
@@ -279,13 +305,21 @@ def new(
                 check=True,
                 capture_output=True,
             )
-            typer.secho("Changes committed and pushed successfully.", fg=typer.colors.GREEN)
+            typer.secho(
+                "Changes committed and pushed successfully.", fg=typer.colors.GREEN
+            )
         else:
-            typer.secho("No changes to commit (template already customized).", fg=typer.colors.GREEN)
+            typer.secho(
+                "No changes to commit (template already customized).",
+                fg=typer.colors.GREEN,
+            )
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr.decode() if e.stderr else str(e)
         typer.secho(f"Failed to commit and push: {error_msg}", fg=typer.colors.RED)
-        typer.secho(f"Project created but not fully configured. You can manually complete setup.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "Project created but not fully configured. You can manually complete setup.",
+            fg=typer.colors.YELLOW,
+        )
         # Don't exit - project was created successfully
 
     typer.echo(f"\n✅ Project '{project_name}' created successfully!")
@@ -301,10 +335,12 @@ def ask(llm: str, prompt: str):
 
 
 @app.command()
-def status(path: str = typer.Option(".", "--path", "-p", help="Project directory to check")):
+def status(
+    path: str = typer.Option(".", "--path", "-p", help="Project directory to check")
+):
     """
     Show project health and status.
-    
+
     Displays:
     - Git status (branch, uncommitted changes, recent commits)
     - Charter document freshness (VISION.md, TODO.md, etc.)
@@ -321,10 +357,68 @@ def status(path: str = typer.Option(".", "--path", "-p", help="Project directory
 
 
 @app.command()
-def check(path: str = typer.Option(".", "--path", "-p", help="Project directory to check")):
+def context(
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    format: str = typer.Option(
+        "markdown", "--format", "-f", help="Output format: markdown or json"
+    ),
+    output: str = typer.Option(
+        None, "--output", "-o", help="Write to file instead of stdout"
+    ),
+):
+    """
+    Generate LLM-ready project context.
+
+    Collects and formats:
+    - All charter documents (VISION, TODO, IDEAS, DESIGN, etc.)
+    - Recent git activity and current status
+    - Project structure overview
+    - Formatted for easy LLM consumption
+
+    Output can be piped directly to an LLM or saved to a file.
+
+    Examples:
+      # Generate context and display
+      idlergear context
+
+      # Save to file
+      idlergear context --output context.md
+
+      # JSON format for programmatic use
+      idlergear context --format json
+
+      # Pipe to LLM
+      idlergear context | gemini "Analyze this project"
+    """
+    try:
+        context_gen = ProjectContext(path)
+
+        if format == "json":
+            output_text = context_gen.format_json()
+        else:
+            output_text = context_gen.format_markdown()
+
+        if output:
+            # Write to file
+            output_path = Path(output)
+            output_path.write_text(output_text)
+            typer.secho(f"✅ Context written to {output}", fg=typer.colors.GREEN)
+        else:
+            # Print to stdout
+            typer.echo(output_text)
+
+    except Exception as e:
+        typer.secho(f"Error generating context: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command()
+def check(
+    path: str = typer.Option(".", "--path", "-p", help="Project directory to check")
+):
     """
     Analyze project for best practice adherence.
-    
+
     Checks for:
     - Missing tests in recent commits
     - Stale charter documents
@@ -332,7 +426,7 @@ def check(path: str = typer.Option(".", "--path", "-p", help="Project directory 
     - Dangling branches needing cleanup
     - Missing project files
     - Multi-LLM coordination opportunities
-    
+
     Provides actionable suggestions for improvement.
     """
     try:
@@ -349,17 +443,21 @@ def check(path: str = typer.Option(".", "--path", "-p", help="Project directory 
 def sync_command(
     action: str = typer.Argument(..., help="Action: push, pull, or status"),
     path: str = typer.Option(".", "--path", "-p", help="Project directory"),
-    include_untracked: bool = typer.Option(False, "--include-untracked", "-u", help="Include untracked files (push only)"),
-    no_cleanup: bool = typer.Option(False, "--no-cleanup", help="Don't cleanup sync branch (pull only)"),
+    include_untracked: bool = typer.Option(
+        False, "--include-untracked", "-u", help="Include untracked files (push only)"
+    ),
+    no_cleanup: bool = typer.Option(
+        False, "--no-cleanup", help="Don't cleanup sync branch (pull only)"
+    ),
 ):
     """
     Coordinate work between local and web LLM environments.
-    
+
     Actions:
       push   - Push current state to sync branch for web environment
       pull   - Pull changes from sync branch to current branch
       status - Check sync branch status
-    
+
     Workflow:
       1. Work locally with Gemini CLI
       2. idlergear sync push
@@ -370,63 +468,82 @@ def sync_command(
     """
     try:
         syncer = ProjectSync(path)
-        
+
         if action == "push":
             typer.echo("🔄 Pushing to web sync branch...")
             result = syncer.sync_push(include_untracked=include_untracked)
-            
-            typer.secho(f"✅ Pushed to sync branch: {result['sync_branch']}", fg=typer.colors.GREEN)
+
+            typer.secho(
+                f"✅ Pushed to sync branch: {result['sync_branch']}",
+                fg=typer.colors.GREEN,
+            )
             typer.echo(f"   From: {result['current_branch']}")
-            if result['created_branch']:
+            if result["created_branch"]:
                 typer.echo("   Created new sync branch")
-            if result['committed_changes']:
+            if result["committed_changes"]:
                 typer.echo("   Committed changes")
             typer.echo("")
             typer.echo("📱 Next steps:")
-            typer.echo(f"   1. Open your web LLM tool (Claude Web, Copilot Web, etc.)")
+            typer.echo("   1. Open your web LLM tool (Claude Web, Copilot Web, etc.)")
             typer.echo(f"   2. Switch to branch: {result['sync_branch']}")
-            typer.echo(f"   3. Work in web environment")
-            typer.echo(f"   4. Run: idlergear sync pull")
-            
+            typer.echo("   3. Work in web environment")
+            typer.echo("   4. Run: idlergear sync pull")
+
         elif action == "pull":
             typer.echo("🔄 Pulling from web sync branch...")
             result = syncer.sync_pull(cleanup=not no_cleanup)
-            
-            typer.secho(f"✅ Pulled from sync branch: {result['sync_branch']}", fg=typer.colors.GREEN)
+
+            typer.secho(
+                f"✅ Pulled from sync branch: {result['sync_branch']}",
+                fg=typer.colors.GREEN,
+            )
             typer.echo(f"   To: {result['current_branch']}")
-            if result['merged']:
+            if result["merged"]:
                 typer.echo("   Merged changes successfully")
-            if result['cleaned_up']:
+            if result["cleaned_up"]:
                 typer.echo("   Cleaned up sync branch")
-            
+
         elif action == "status":
             result = syncer.sync_status()
-            
+
             typer.echo("")
-            typer.echo(f"📊 Sync Status")
+            typer.echo("📊 Sync Status")
             typer.echo(f"   Current branch: {result['current_branch']}")
             typer.echo(f"   Sync branch: {result['sync_branch']}")
-            typer.echo(f"   Local exists: {'Yes ✅' if result['local_exists'] else 'No'}")
-            typer.echo(f"   Remote exists: {'Yes ✅' if result['remote_exists'] else 'No'}")
+            typer.echo(
+                f"   Local exists: {'Yes ✅' if result['local_exists'] else 'No'}"
+            )
+            typer.echo(
+                f"   Remote exists: {'Yes ✅' if result['remote_exists'] else 'No'}"
+            )
             typer.echo(f"   Uncommitted changes: {result['uncommitted_changes']}")
-            
-            if result['ahead_behind']:
-                ahead = result['ahead_behind']['ahead']
-                behind = result['ahead_behind']['behind']
+
+            if result["ahead_behind"]:
+                ahead = result["ahead_behind"]["ahead"]
+                behind = result["ahead_behind"]["behind"]
                 typer.echo(f"   Status: {ahead} ahead, {behind} behind")
-                
+
                 if behind > 0:
                     typer.echo("")
-                    typer.secho("   💡 Web environment has changes. Run: idlergear sync pull", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        "   💡 Web environment has changes. Run: idlergear sync pull",
+                        fg=typer.colors.YELLOW,
+                    )
                 elif ahead > 0:
                     typer.echo("")
-                    typer.secho("   💡 Local has changes. Run: idlergear sync push", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        "   💡 Local has changes. Run: idlergear sync push",
+                        fg=typer.colors.YELLOW,
+                    )
             typer.echo("")
-            
+
         else:
-            typer.secho(f"Unknown action: {action}. Use: push, pull, or status", fg=typer.colors.RED)
+            typer.secho(
+                f"Unknown action: {action}. Use: push, pull, or status",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(1)
-            
+
     except Exception as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -434,11 +551,17 @@ def sync_command(
 
 @app.command()
 def logs(
-    action: str = typer.Argument(..., help="Action: run, pipe, list, show, export, or cleanup"),
+    action: str = typer.Argument(
+        ..., help="Action: run, pipe, list, show, export, or cleanup"
+    ),
     session_id: int = typer.Option(None, "--session", "-s", help="Session ID"),
-    command: str = typer.Option(None, "--command", "-c", help="Command to run with capture"),
+    command: str = typer.Option(
+        None, "--command", "-c", help="Command to run with capture"
+    ),
     name: str = typer.Option(None, "--name", "-n", help="Session name"),
-    source: str = typer.Option(None, "--source", help="Source description for piped input"),
+    source: str = typer.Option(
+        None, "--source", help="Source description for piped input"
+    ),
     tail: int = typer.Option(None, "--tail", "-t", help="Show last N lines"),
     output: str = typer.Option(None, "--output", "-o", help="Export output file"),
     days: int = typer.Option(7, "--days", "-d", help="Days to keep logs (cleanup)"),
@@ -446,7 +569,7 @@ def logs(
 ):
     """
     Capture and manage logs from shell scripts and processes.
-    
+
     Actions:
       run     - Run command and capture all output
       pipe    - Capture input from stdin (piped data)
@@ -454,119 +577,144 @@ def logs(
       show    - Show log for a session
       export  - Export session log to file
       cleanup - Delete old log files
-    
+
     Examples:
       # Run a script and capture logs
       idlergear logs run --command "npm run dev" --name dev-server
-      
+
       # Pipe output from another command
       ./run.sh | idlergear logs pipe --name my-app --source run.sh
       tail -f /var/log/app.log | idlergear logs pipe --name app-monitor
-      
+
       # List all sessions
       idlergear logs list
-      
+
       # Show log output
       idlergear logs show --session 1
       idlergear logs show --session 1 --tail 50
-      
+
       # Export a log
       idlergear logs export --session 1 --output dev.log
-      
+
       # Clean up old logs
       idlergear logs cleanup --days 7
     """
     try:
         coordinator = LogCoordinator(path)
-        
+
         if action == "run":
             if not command:
-                typer.secho("Error: --command required for 'run' action", fg=typer.colors.RED)
+                typer.secho(
+                    "Error: --command required for 'run' action", fg=typer.colors.RED
+                )
                 raise typer.Exit(1)
-            
+
             # Parse command string into list
             import shlex
+
             cmd_parts = shlex.split(command)
-            
-            typer.echo(f"🎬 Starting log capture...")
+
+            typer.echo("🎬 Starting log capture...")
             typer.echo(f"   Command: {command}")
             if name:
                 typer.echo(f"   Name: {name}")
-            
+
             session = coordinator.run_with_capture(cmd_parts, name=name, cwd=path)
-            
-            typer.secho(f"\n✅ Session {session['session_id']} started", fg=typer.colors.GREEN)
+
+            typer.secho(
+                f"\n✅ Session {session['session_id']} started", fg=typer.colors.GREEN
+            )
             typer.echo(f"   Log file: {session['log_file']}")
             typer.echo(f"   PID: {session.get('pid', 'starting...')}")
-            typer.echo(f"\n   View logs: idlergear logs show --session {session['session_id']}")
-            typer.echo(f"   Tail logs: idlergear logs show --session {session['session_id']} --tail 50")
-        
+            typer.echo(
+                f"\n   View logs: idlergear logs show --session {session['session_id']}"
+            )
+            typer.echo(
+                f"   Tail logs: idlergear logs show --session {session['session_id']} --tail 50"
+            )
+
         elif action == "pipe":
             # Capture from stdin
-            typer.echo(f"📥 Capturing from stdin...")
+            typer.echo("📥 Capturing from stdin...")
             if name:
                 typer.echo(f"   Name: {name}")
             if source:
                 typer.echo(f"   Source: {source}")
-            typer.echo(f"   Reading... (Ctrl+D to end, Ctrl+C to stop)")
+            typer.echo("   Reading... (Ctrl+D to end, Ctrl+C to stop)")
             typer.echo("")
-            
+
             session = coordinator.capture_stdin(name=name, source=source)
-            
+
             typer.echo("")
-            status_icon = {
-                'completed': '✅',
-                'stopped': '⏹️',
-                'failed': '❌'
-            }.get(session['status'], '❓')
-            
-            typer.secho(f"{status_icon} Capture {session['status']}", fg=typer.colors.GREEN if session['status'] == 'completed' else typer.colors.YELLOW)
+            status_icon = {"completed": "✅", "stopped": "⏹️", "failed": "❌"}.get(
+                session["status"], "❓"
+            )
+
+            typer.secho(
+                f"{status_icon} Capture {session['status']}",
+                fg=(
+                    typer.colors.GREEN
+                    if session["status"] == "completed"
+                    else typer.colors.YELLOW
+                ),
+            )
             typer.echo(f"   Session ID: {session['session_id']}")
             typer.echo(f"   Lines captured: {session.get('line_count', 0)}")
             typer.echo(f"   Log file: {session['log_file']}")
-            typer.echo(f"\n   View: idlergear logs show --session {session['session_id']}")
-        
+            typer.echo(
+                f"\n   View: idlergear logs show --session {session['session_id']}"
+            )
+
         elif action == "list":
             sessions = coordinator.list_sessions()
-            
+
             if not sessions:
                 typer.echo("📋 No log sessions found")
                 return
-            
+
             typer.echo("")
             typer.echo(f"📋 Log Sessions ({len(sessions)} total)")
             typer.echo("=" * 80)
             typer.echo("")
-            
+
             for session in sessions:
                 status_icon = {
-                    'running': '🟢',
-                    'completed': '✅',
-                    'stopped': '⏹️',
-                    'failed': '❌'
-                }.get(session['status'], '❓')
-                
-                typer.echo(f"{status_icon} Session {session['session_id']}: {session['name']}")
+                    "running": "🟢",
+                    "completed": "✅",
+                    "stopped": "⏹️",
+                    "failed": "❌",
+                }.get(session["status"], "❓")
+
+                typer.echo(
+                    f"{status_icon} Session {session['session_id']}: {session['name']}"
+                )
                 typer.echo(f"   Status: {session['status']}")
                 typer.echo(f"   Started: {session['started']}")
-                if 'command' in session:
+                if "command" in session:
                     typer.echo(f"   Command: {session['command']}")
-                if session['status'] in ['completed', 'stopped', 'failed'] and 'ended' in session:
+                if (
+                    session["status"] in ["completed", "stopped", "failed"]
+                    and "ended" in session
+                ):
                     typer.echo(f"   Ended: {session['ended']}")
                 typer.echo("")
-        
+
         elif action == "show":
             if session_id is None:
-                typer.secho("Error: --session required for 'show' action", fg=typer.colors.RED)
+                typer.secho(
+                    "Error: --session required for 'show' action", fg=typer.colors.RED
+                )
                 raise typer.Exit(1)
-            
+
             session = coordinator.get_session(session_id)
             if not session:
-                typer.secho(f"Error: Session {session_id} not found", fg=typer.colors.RED)
+                typer.secho(
+                    f"Error: Session {session_id} not found", fg=typer.colors.RED
+                )
                 raise typer.Exit(1)
-            
+
             log_content = coordinator.read_log(session_id, tail=tail)
-            
+
             typer.echo("")
             typer.echo(f"📄 Session {session_id}: {session['name']}")
             typer.echo(f"   Status: {session['status']}")
@@ -574,28 +722,224 @@ def logs(
                 typer.echo(f"   Showing last {tail} lines")
             typer.echo("─" * 80)
             typer.echo(log_content)
-        
+
         elif action == "export":
             if session_id is None:
-                typer.secho("Error: --session required for 'export' action", fg=typer.colors.RED)
+                typer.secho(
+                    "Error: --session required for 'export' action", fg=typer.colors.RED
+                )
                 raise typer.Exit(1)
             if not output:
-                typer.secho("Error: --output required for 'export' action", fg=typer.colors.RED)
+                typer.secho(
+                    "Error: --output required for 'export' action", fg=typer.colors.RED
+                )
                 raise typer.Exit(1)
-            
+
             result_path = coordinator.export_session(session_id, output)
             typer.secho(f"✅ Exported to: {result_path}", fg=typer.colors.GREEN)
-        
+
         elif action == "cleanup":
             typer.echo(f"🧹 Cleaning up logs older than {days} days...")
             deleted = coordinator.cleanup_old_logs(days=days)
             typer.secho(f"✅ Deleted {deleted} old log file(s)", fg=typer.colors.GREEN)
-        
+
         else:
             typer.secho(f"Unknown action: {action}", fg=typer.colors.RED)
             typer.echo("Valid actions: run, pipe, list, show, export, cleanup")
             raise typer.Exit(1)
-    
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command(name="message")
+def message_command(
+    action: str = typer.Argument(..., help="Action: send, list, read, or respond"),
+    message_id: str = typer.Option(None, "--id", help="Message ID"),
+    to: str = typer.Option(None, "--to", help="Target environment for send/respond"),
+    body: str = typer.Option(None, "--body", help="Message content"),
+    from_env: str = typer.Option("local", "--from", help="Source environment"),
+    unread_only: bool = typer.Option(False, "--unread", help="Show only unread"),
+    filter_to: str = typer.Option(
+        None, "--filter-to", help="Only list messages for this destination"
+    ),
+    filter_from: str = typer.Option(
+        None, "--filter-from", help="Only list messages from this source"
+    ),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+):
+    """Send/receive messages between LLM environments via git sync branches."""
+    try:
+        manager = MessageManager(path)
+
+        if action == "send":
+            if not to or not body:
+                typer.secho("Error: --to and --body required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            msg_id = manager.send_message(to=to, body=body, from_env=from_env)
+            typer.secho(f"✅ Message {msg_id} sent", fg=typer.colors.GREEN)
+            typer.echo("Next: idlergear sync push --include-untracked")
+
+        elif action == "list":
+            messages = manager.list_messages(
+                filter_to=filter_to,
+                filter_from=filter_from,
+                unread_only=unread_only,
+            )
+            typer.echo(manager.format_message_list(messages))
+
+        elif action == "read":
+            if not message_id:
+                typer.secho("Error: --id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            message = manager.read_message(message_id)
+            if not message:
+                typer.secho(f"Message {message_id} not found", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            typer.echo(manager.format_message(message))
+
+        elif action == "respond":
+            if not message_id or not body:
+                typer.secho("Error: --id and --body required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+            response_id = manager.respond_to_message(message_id, body, from_env)
+            typer.secho(f"✅ Response {response_id} sent", fg=typer.colors.GREEN)
+
+        else:
+            typer.secho(f"Unknown action: {action}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command(name="coord")
+def coord_command(
+    action: str = typer.Argument(..., help="Action: init, send, or read"),
+    project: str = typer.Option(None, "--project", help="Project name for messaging"),
+    message: str = typer.Option(None, "--message", "-m", help="Message to send"),
+    to: str = typer.Option("web", "--to", help="Target environment"),
+    via: str = typer.Option("file", "--via", help="Method: file or issue"),
+):
+    """
+    Coordinate between LLM environments via private coordination repo.
+
+    The coordination repo is a private GitHub repository used for:
+    - Message passing between local and web LLM tools
+    - Coordination data storage across environments
+    - Issue-based or file-based communication
+
+    Actions:
+      init  - Initialize coordination repository
+      send  - Send message to another LLM environment
+      read  - Read messages for current project
+
+    Examples:
+      # Initialize coordination repo (one-time setup)
+      idlergear coord init
+
+      # Send message via files
+      idlergear coord send --project my-app --message "Please review auth.py"
+
+      # Send message via GitHub issues
+      idlergear coord send --project my-app --message "Fix tests" --via issue
+
+      # Read messages
+      idlergear coord read --project my-app
+      idlergear coord read --project my-app --via issue
+    """
+    try:
+        coordinator = CoordRepo()
+
+        if action == "init":
+            typer.echo("🔧 Initializing coordination repository...")
+            result = coordinator.init()
+
+            if result["status"] == "created":
+                typer.secho("✅ Created coordination repo", fg=typer.colors.GREEN)
+                typer.echo(f"   Repo: {result['repo_url']}")
+                typer.echo(f"   Path: {result['path']}")
+            elif result["status"] == "already_exists":
+                typer.secho(
+                    "ℹ️  Coordination repo already exists", fg=typer.colors.YELLOW
+                )
+                typer.echo(f"   Path: {result['path']}")
+            else:
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "send":
+            if not project or not message:
+                typer.secho(
+                    "Error: --project and --message required", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+
+            typer.echo(f"📤 Sending message to {to} environment...")
+            result = coordinator.send_message(project, message, to=to, via=via)
+
+            if result["status"] == "sent":
+                typer.secho("✅ Message sent", fg=typer.colors.GREEN)
+                if via == "file":
+                    typer.echo(f"   Message ID: {result['message_id']}")
+                    typer.echo("   Method: File-based")
+                elif via == "issue":
+                    typer.echo(f"   Issue: {result['issue_url']}")
+                    typer.echo("   Method: GitHub Issue")
+            else:
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "read":
+            if not project:
+                typer.secho("Error: --project required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            typer.echo(f"📥 Reading messages for project: {project}")
+            result = coordinator.read_messages(project, via=via)
+
+            if result["status"] == "ok":
+                messages = result["messages"]
+                if not messages:
+                    typer.echo("   No messages found")
+                else:
+                    typer.echo(f"   Found {result['count']} message(s)")
+                    typer.echo("")
+
+                    for msg in messages:
+                        if via == "file":
+                            typer.echo(f"📨 Message {msg['id']}")
+                            typer.echo(f"   From: {msg['from']} → To: {msg['to']}")
+                            typer.echo(f"   Time: {msg['timestamp']}")
+                            typer.echo(f"   {msg['message']}")
+                        elif via == "issue":
+                            typer.echo(f"📨 Issue #{msg['number']}: {msg['title']}")
+                            typer.echo(f"   Created: {msg['createdAt']}")
+                            typer.echo(f"   State: {msg['state']}")
+                            typer.echo(f"   {msg['body'][:100]}...")
+                        typer.echo("")
+            else:
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        else:
+            typer.secho(
+                f"Unknown action: {action}. Use: init, send, or read",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
     except Exception as e:
         typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -607,19 +951,19 @@ def mcp(
 ):
     """
     Start or manage the MCP (Model Context Protocol) server.
-    
+
     The MCP server exposes IdlerGear tools for LLM clients.
     - Runs on stdio (not network) for security
     - Local LLM tools can connect and invoke IdlerGear commands
     - Works with Gemini CLI, Claude Desktop, etc.
-    
+
     Actions:
       start - Start the MCP server (runs until interrupted)
       info  - Show MCP server information
-    
+
     Usage:
       idlergear mcp start    # Start server
-      
+
     LLM tools can then discover and invoke:
       - project_status
       - project_context
@@ -630,7 +974,7 @@ def mcp(
         try:
             import asyncio
             from src.mcp_server import main as mcp_main
-            
+
             typer.secho("🚀 Starting IdlerGear MCP server...", fg=typer.colors.GREEN)
             typer.echo("   Protocol: stdio (standard input/output)")
             typer.echo("   Security: Local only")
@@ -638,16 +982,16 @@ def mcp(
             typer.echo("")
             typer.echo("   Press Ctrl+C to stop")
             typer.echo("")
-            
+
             asyncio.run(mcp_main())
-            
+
         except KeyboardInterrupt:
             typer.echo("")
             typer.secho("✅ MCP server stopped", fg=typer.colors.GREEN)
         except Exception as e:
             typer.secho(f"❌ Error starting MCP server: {e}", fg=typer.colors.RED)
             raise typer.Exit(1)
-    
+
     elif action == "info":
         typer.echo("")
         typer.echo("📡 IdlerGear MCP Server")
@@ -673,9 +1017,11 @@ def mcp(
         typer.echo("Start server:")
         typer.echo("  idlergear mcp start")
         typer.echo("")
-    
+
     else:
-        typer.secho(f"Unknown action: {action}. Use 'start' or 'info'", fg=typer.colors.RED)
+        typer.secho(
+            f"Unknown action: {action}. Use 'start' or 'info'", fg=typer.colors.RED
+        )
         raise typer.Exit(1)
 
 

@@ -77,7 +77,73 @@
       "cwd": "/home/marc/idlergear",
       "line_count": 2,
       "ended": "2025-11-15T19:38:24.228489"
+    },
+    "8": {
+      "session_id": 8,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-8-cli-test.log",
+      "started": "2025-11-15T19:38:49.711855",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T19:38:49.712590"
+    },
+    "9": {
+      "session_id": 9,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-9-cli-test.log",
+      "started": "2025-11-15T19:45:16.020908",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T19:45:16.021536"
+    },
+    "10": {
+      "session_id": 10,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-10-cli-test.log",
+      "started": "2025-11-15T21:26:17.494777",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T21:26:17.495167"
+    },
+    "11": {
+      "session_id": 11,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-11-cli-test.log",
+      "started": "2025-11-15T22:09:17.139882",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T22:09:17.140214"
+    },
+    "12": {
+      "session_id": 12,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-12-cli-test.log",
+      "started": "2025-11-15T22:15:03.006439",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T22:15:03.006777"
+    },
+    "13": {
+      "session_id": 13,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/marc/idlergear/.idlergear/logs/session-13-cli-test.log",
+      "started": "2025-11-15T22:17:16.384202",
+      "status": "completed",
+      "cwd": "/home/marc/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-15T22:17:16.384547"
     }
   },
-  "last_session_id": 7
+  "last_session_id": 13
 }

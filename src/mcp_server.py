@@ -4,10 +4,9 @@ MCP (Model Context Protocol) Server for IdlerGear.
 Exposes IdlerGear commands as tools that LLM clients can discover and invoke.
 Runs on localhost only for security.
 """
+
 import asyncio
-import json
-from typing import Any, Optional
-from pathlib import Path
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -36,10 +35,10 @@ async def list_tools() -> list[Tool]:
                     "path": {
                         "type": "string",
                         "description": "Project directory path (default: current directory)",
-                        "default": "."
+                        "default": ".",
                     }
-                }
-            }
+                },
+            },
         ),
         Tool(
             name="project_context",
@@ -50,31 +49,31 @@ async def list_tools() -> list[Tool]:
                     "path": {
                         "type": "string",
                         "description": "Project directory path",
-                        "default": "."
+                        "default": ".",
                     },
                     "format": {
                         "type": "string",
                         "enum": ["markdown", "plain"],
                         "description": "Output format",
-                        "default": "markdown"
+                        "default": "markdown",
                     },
                     "include_docs": {
                         "type": "boolean",
                         "description": "Include charter documents",
-                        "default": True
+                        "default": True,
                     },
                     "include_activity": {
                         "type": "boolean",
                         "description": "Include recent git activity",
-                        "default": True
+                        "default": True,
                     },
                     "include_structure": {
                         "type": "boolean",
                         "description": "Include project structure",
-                        "default": True
-                    }
-                }
-            }
+                        "default": True,
+                    },
+                },
+            },
         ),
         Tool(
             name="project_check",
@@ -85,10 +84,10 @@ async def list_tools() -> list[Tool]:
                     "path": {
                         "type": "string",
                         "description": "Project directory path",
-                        "default": "."
+                        "default": ".",
                     }
-                }
-            }
+                },
+            },
         ),
         Tool(
             name="sync_status",
@@ -99,10 +98,10 @@ async def list_tools() -> list[Tool]:
                     "path": {
                         "type": "string",
                         "description": "Project directory path",
-                        "default": "."
+                        "default": ".",
                     }
-                }
-            }
+                },
+            },
         ),
         Tool(
             name="sync_push",
@@ -113,15 +112,15 @@ async def list_tools() -> list[Tool]:
                     "path": {
                         "type": "string",
                         "description": "Project directory path",
-                        "default": "."
+                        "default": ".",
                     },
                     "include_untracked": {
                         "type": "boolean",
                         "description": "Include untracked files",
-                        "default": False
-                    }
-                }
-            }
+                        "default": False,
+                    },
+                },
+            },
         ),
         Tool(
             name="sync_pull",
@@ -132,15 +131,15 @@ async def list_tools() -> list[Tool]:
                     "path": {
                         "type": "string",
                         "description": "Project directory path",
-                        "default": "."
+                        "default": ".",
                     },
                     "cleanup": {
                         "type": "boolean",
                         "description": "Delete sync branch after merge",
-                        "default": True
-                    }
-                }
-            }
+                        "default": True,
+                    },
+                },
+            },
         ),
     ]
 
@@ -148,111 +147,105 @@ async def list_tools() -> list[Tool]:
 @app.call_tool()
 async def call_tool(name: str, arguments: Any) -> list[TextContent]:
     """Handle tool invocations."""
-    
+
     try:
         path = arguments.get("path", ".")
-        
+
         if name == "project_status":
             status = ProjectStatus(path)
             output = status.format_status()
             return [TextContent(type="text", text=output)]
-        
+
         elif name == "project_context":
             context = ProjectContext(path)
             output = context.format_context(
                 include_docs=arguments.get("include_docs", True),
                 include_activity=arguments.get("include_activity", True),
                 include_structure=arguments.get("include_structure", True),
-                format_type=arguments.get("format", "markdown")
+                format_type=arguments.get("format", "markdown"),
             )
             return [TextContent(type="text", text=output)]
-        
+
         elif name == "project_check":
             checker = ProjectChecker(path)
             checker.run_all_checks()
             output = checker.format_report()
             return [TextContent(type="text", text=output)]
-        
+
         elif name == "sync_status":
             syncer = ProjectSync(path)
             result = syncer.sync_status()
-            
+
             # Format status as readable text
             lines = [
-                f"📊 Sync Status",
+                "📊 Sync Status",
                 f"Current branch: {result['current_branch']}",
                 f"Sync branch: {result['sync_branch']}",
                 f"Local exists: {'Yes' if result['local_exists'] else 'No'}",
                 f"Remote exists: {'Yes' if result['remote_exists'] else 'No'}",
-                f"Uncommitted changes: {result['uncommitted_changes']}"
+                f"Uncommitted changes: {result['uncommitted_changes']}",
             ]
-            
-            if result['ahead_behind']:
-                ahead = result['ahead_behind']['ahead']
-                behind = result['ahead_behind']['behind']
+
+            if result["ahead_behind"]:
+                ahead = result["ahead_behind"]["ahead"]
+                behind = result["ahead_behind"]["behind"]
                 lines.append(f"Status: {ahead} ahead, {behind} behind")
-                
+
                 if behind > 0:
-                    lines.append("⚠️ Web environment has changes - consider running sync_pull")
+                    lines.append(
+                        "⚠️ Web environment has changes - consider running sync_pull"
+                    )
                 elif ahead > 0:
                     lines.append("💡 Local has changes - consider running sync_push")
-            
+
             return [TextContent(type="text", text="\n".join(lines))]
-        
+
         elif name == "sync_push":
             syncer = ProjectSync(path)
             result = syncer.sync_push(
                 include_untracked=arguments.get("include_untracked", False)
             )
-            
+
             lines = [
                 f"✅ Pushed to sync branch: {result['sync_branch']}",
-                f"From: {result['current_branch']}"
+                f"From: {result['current_branch']}",
             ]
-            
-            if result['created_branch']:
+
+            if result["created_branch"]:
                 lines.append("Created new sync branch")
-            if result['committed_changes']:
+            if result["committed_changes"]:
                 lines.append("Committed changes")
-            
+
             lines.append("")
             lines.append("📱 Next steps:")
-            lines.append(f"1. Open web LLM tool")
+            lines.append("1. Open web LLM tool")
             lines.append(f"2. Switch to branch: {result['sync_branch']}")
-            lines.append(f"3. Work in web environment")
-            lines.append(f"4. Run sync_pull when done")
-            
+            lines.append("3. Work in web environment")
+            lines.append("4. Run sync_pull when done")
+
             return [TextContent(type="text", text="\n".join(lines))]
-        
+
         elif name == "sync_pull":
             syncer = ProjectSync(path)
-            result = syncer.sync_pull(
-                cleanup=arguments.get("cleanup", True)
-            )
-            
+            result = syncer.sync_pull(cleanup=arguments.get("cleanup", True))
+
             lines = [
                 f"✅ Pulled from sync branch: {result['sync_branch']}",
-                f"To: {result['current_branch']}"
+                f"To: {result['current_branch']}",
             ]
-            
-            if result['merged']:
+
+            if result["merged"]:
                 lines.append("Merged changes successfully")
-            if result['cleaned_up']:
+            if result["cleaned_up"]:
                 lines.append("Cleaned up sync branch")
-            
+
             return [TextContent(type="text", text="\n".join(lines))]
-        
+
         else:
-            return [TextContent(
-                type="text",
-                text=f"❌ Unknown tool: {name}"
-            )]
-    
+            return [TextContent(type="text", text=f"❌ Unknown tool: {name}")]
+
     except Exception as e:
-        return [TextContent(
-            type="text",
-            text=f"❌ Error executing {name}: {str(e)}"
-        )]
+        return [TextContent(type="text", text=f"❌ Error executing {name}: {str(e)}")]
 
 
 async def main():
