@@ -26,6 +26,7 @@ class TestProjectStatus:
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
             
             status = ProjectStatus(tmpdir)
             assert status.is_git_repo
@@ -37,6 +38,7 @@ class TestProjectStatus:
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
             
             # Create initial commit so we have a branch
             test_file = Path(tmpdir) / "test.txt"
@@ -55,6 +57,7 @@ class TestProjectStatus:
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
             
             status = ProjectStatus(tmpdir)
             assert status.get_uncommitted_changes() == 0
@@ -77,6 +80,7 @@ class TestProjectStatus:
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
             
             status = ProjectStatus(tmpdir)
             assert status.get_recent_commits() == []
@@ -111,6 +115,7 @@ class TestProjectStatus:
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
             
             vision_file = Path(tmpdir) / "VISION.md"
             vision_file.write_text("# Vision")
@@ -129,6 +134,7 @@ class TestProjectStatus:
             subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+            subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
             
             # Create initial commit
             test_file = Path(tmpdir) / "test.txt"

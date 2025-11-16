@@ -143,7 +143,29 @@
       "cwd": "/home/marc/idlergear",
       "line_count": 2,
       "ended": "2025-11-15T22:17:16.384547"
+    },
+    "14": {
+      "session_id": 14,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/user/idlergear/.idlergear/logs/session-14-cli-test.log",
+      "started": "2025-11-16T03:42:06.291100",
+      "status": "completed",
+      "cwd": "/home/user/idlergear",
+      "line_count": 1,
+      "ended": "2025-11-16T03:42:06.292105"
+    },
+    "15": {
+      "session_id": 15,
+      "source": "stdin",
+      "name": "cli-test",
+      "log_file": "/home/user/idlergear/.idlergear/logs/session-15-cli-test.log",
+      "started": "2025-11-16T03:43:42.367259",
+      "status": "completed",
+      "cwd": "/home/user/idlergear",
+      "line_count": 2,
+      "ended": "2025-11-16T03:43:42.368407"
     }
   },
-  "last_session_id": 13
+  "last_session_id": 15
 }

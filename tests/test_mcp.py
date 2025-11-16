@@ -17,6 +17,7 @@ class TestMCPServer:
         subprocess.run(["git", "init"], cwd=tmpdir, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Test"], cwd=tmpdir, check=True)
         subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmpdir, check=True)
+        subprocess.run(["git", "config", "commit.gpgsign", "false"], cwd=tmpdir, check=True)
         
         # Create initial commit
         test_file = Path(tmpdir) / "README.md"
