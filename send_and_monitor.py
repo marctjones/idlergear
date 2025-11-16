@@ -1,170 +1,214 @@
 #!/usr/bin/env python3
 """
-Send a message and automatically monitor for responses
+Send a message via idlergear and optionally monitor for responses.
 """
+
+from __future__ import annotations
+
+import argparse
+import json
 import subprocess
 import sys
 import time
-import json
 from pathlib import Path
+from typing import Iterable, List, Optional
 
-def send_message(to, body, from_name="claude-web"):
-    """Send a message using idlergear"""
-    print(f"📤 Sending message to {to}...")
+REPO_ROOT = Path(__file__).resolve().parent
+MESSAGES_DIR = REPO_ROOT / ".idlergear" / "messages"
+CLI_PREFIX = [sys.executable, "src/main.py"]
 
-    result = subprocess.run(
-        [
-            "python", "src/main.py", "message", "send",
-            "--to", to,
-            "--body", body,
-            "--from", from_name
-        ],
+
+def run_idlergear_command(args: Iterable[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [*CLI_PREFIX, *args],
         capture_output=True,
         text=True,
-        cwd="/home/user/idlergear"
+        cwd=REPO_ROOT,
+        check=False,
+    )
+
+
+def send_message(to: str, body: str, from_name: str) -> Optional[str]:
+    """Invoke the Typer command to send a message."""
+    print(f"📤 Sending message to {to}...")
+    result = run_idlergear_command(
+        ["message", "send", "--to", to, "--body", body, "--from", from_name]
     )
 
     if result.returncode != 0:
-        print(f"❌ Error sending message: {result.stderr}")
+        print(f"❌ Error sending message:\n{result.stderr.strip()}")
         return None
 
-    # Extract message ID from output
-    # Format: "✅ Message <id> sent"
     output = result.stdout.strip()
     print(output)
 
-    if "Message" in output and "sent" in output:
-        message_id = output.split()[2]
-        return message_id
+    tokens = output.split()
+    if len(tokens) >= 3 and tokens[0].startswith("✅") and tokens[1] == "Message":
+        return tokens[2]
 
     return None
 
-def commit_message(message_id):
-    """Commit the message to git"""
+
+def commit_message(message_id: str, commit: bool) -> bool:
+    """Stage and commit the new message JSON (if requested)."""
+    if not commit:
+        return True
+
+    message_path = MESSAGES_DIR / f"{message_id}.json"
+    if not message_path.exists():
+        print(f"⚠️  Expected message file {message_path} not found.")
+        return False
+
     print("\n📝 Committing message to git...")
-
-    # Add the message file
-    subprocess.run(
-        ["git", "add", f".idlergear/messages/{message_id}.json"],
-        cwd="/home/user/idlergear"
-    )
-
-    # Create commit
+    subprocess.run(["git", "add", str(message_path)], cwd=REPO_ROOT, check=False)
     commit_msg = f"feat: Send message {message_id} via idlergear"
     result = subprocess.run(
         ["git", "commit", "-m", commit_msg],
         capture_output=True,
         text=True,
-        cwd="/home/user/idlergear"
+        cwd=REPO_ROOT,
+        check=False,
     )
 
     if result.returncode == 0:
         print("✅ Message committed")
         return True
-    else:
-        print(f"⚠️  Commit failed: {result.stderr}")
-        return False
 
-def get_unread_messages(from_source):
-    """Get all unread messages from a specific source"""
-    messages_dir = Path("/home/user/idlergear/.idlergear/messages")
-    unread = []
+    print(f"⚠️  Commit failed:\n{result.stderr.strip()}")
+    return False
 
-    if not messages_dir.exists():
+
+def get_unread_messages(from_source: str) -> List[dict]:
+    """Load unread message JSON blobs for a sender."""
+    unread: List[dict] = []
+
+    if not MESSAGES_DIR.exists():
         return unread
 
-    for msg_file in messages_dir.glob("*.json"):
+    for msg_file in sorted(MESSAGES_DIR.glob("*.json")):
         try:
-            with open(msg_file, 'r') as f:
-                msg = json.load(f)
-                if msg.get("from") == from_source and msg.get("status") != "read":
-                    unread.append(msg)
-        except Exception:
+            with msg_file.open("r") as handle:
+                message = json.load(handle)
+        except (OSError, json.JSONDecodeError):
             continue
 
-    return sorted(unread, key=lambda x: x.get("timestamp", ""))
+        if message.get("from") != from_source:
+            continue
+        if message.get("status") == "read":
+            continue
+        unread.append(message)
 
-def get_message_details(message_id):
-    """Get full details of a specific message"""
-    result = subprocess.run(
-        ["python", "src/main.py", "message", "read", "--id", message_id],
-        capture_output=True,
-        text=True,
-        cwd="/home/user/idlergear"
-    )
-    return result.stdout
+    return unread
 
-def monitor_for_response(from_source, interval=5, duration=300):
-    """Monitor for responses from a specific source"""
+
+def get_message_details(message_id: str) -> str:
+    result = run_idlergear_command(["message", "read", "--id", message_id])
+    return result.stdout.strip()
+
+
+def monitor_for_response(
+    from_source: str, interval: int, duration: int
+) -> Optional[str]:
+    """Poll for responses and return the first message ID if found."""
     print(f"\n🔍 Monitoring for responses from {from_source}...")
-    print(f"   Checking every {interval} seconds for up to {duration//60} minutes")
-    print(f"   Press Ctrl+C to stop early\n")
+    print(f"   Checking every {interval} seconds for {duration // 60} minutes")
+    print("   Press Ctrl+C to stop early\n")
 
-    seen_ids = set()
+    seen_ids = {message["id"] for message in get_unread_messages(from_source)}
     start_time = time.time()
-
-    # Mark existing messages as seen
-    initial_messages = get_unread_messages(from_source)
-    for msg in initial_messages:
-        seen_ids.add(msg["id"])
 
     try:
         while True:
             elapsed = time.time() - start_time
             if elapsed > duration:
-                print(f"\n⏱️  Monitoring period ({duration//60} minutes) completed with no response")
-                break
+                print(
+                    f"\n⏱️  Monitoring period ({duration // 60} minutes) completed with no response"
+                )
+                return None
 
-            # Check for new messages
-            messages = get_unread_messages(from_source)
-            new_messages = [msg for msg in messages if msg["id"] not in seen_ids]
+            unread_messages = get_unread_messages(from_source)
+            new_messages = [msg for msg in unread_messages if msg["id"] not in seen_ids]
 
             if new_messages:
-                for msg in new_messages:
-                    print("\n" + "="*70)
-                    print(f"📨 NEW RESPONSE RECEIVED!")
-                    print("="*70)
-                    print(get_message_details(msg["id"]))
-                    print("="*70 + "\n")
-                    seen_ids.add(msg["id"])
+                message = new_messages[0]
+                seen_ids.add(message["id"])
+                print("\n" + "=" * 70)
+                print("📨 NEW RESPONSE RECEIVED!")
+                print("=" * 70)
+                print(get_message_details(message["id"]))
+                print("=" * 70 + "\n")
+                return message["id"]
 
-                print("✅ Response received - monitoring complete")
-                return True
-            else:
-                remaining = int(duration - elapsed)
-                print(f"\r⏳ Waiting for response... ({remaining}s remaining)    ", end="", flush=True)
-
+            remaining = int(duration - elapsed)
+            print(
+                f"\r⏳ Waiting for response... ({remaining}s remaining)    ",
+                end="",
+                flush=True,
+            )
             time.sleep(interval)
 
     except KeyboardInterrupt:
         print("\n\n⛔ Monitoring stopped by user")
-        return False
+        return None
 
-    return False
 
-def main():
-    if len(sys.argv) < 3:
-        print("Usage: python send_and_monitor.py <to> <message> [monitor_duration]")
-        print("\nExample:")
-        print('  python send_and_monitor.py codex-local "Hello, can you help with testing?" 180')
-        sys.exit(1)
+def parse_args(argv: Optional[Iterable[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Send an idlergear message and optionally wait for a reply."
+    )
+    parser.add_argument("to", help="Recipient environment (e.g., codex-local)")
+    parser.add_argument("body", help="Message body to send (quote for spaces)")
+    parser.add_argument(
+        "--from",
+        dest="from_name",
+        default="claude-web",
+        help="Sender name recorded in the message (default: claude-web)",
+    )
+    parser.add_argument(
+        "--monitor",
+        action="store_true",
+        help="Monitor for a response after sending the message",
+    )
+    parser.add_argument(
+        "--monitor-from",
+        default=None,
+        help="Override which sender to watch for responses (defaults to the recipient)",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=5,
+        help="Polling interval when monitoring (default: 5 seconds)",
+    )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=300,
+        help="Maximum monitoring duration in seconds (default: 300 / 5 minutes)",
+    )
+    parser.add_argument(
+        "--skip-commit",
+        action="store_true",
+        help="Skip committing the generated message JSON",
+    )
+    return parser.parse_args(argv)
 
-    to = sys.argv[1]
-    body = sys.argv[2]
-    monitor_duration = int(sys.argv[3]) if len(sys.argv) > 3 else 300
 
-    # Send the message
-    message_id = send_message(to, body)
+def main() -> None:
+    args = parse_args()
+    message_id = send_message(args.to, args.body, args.from_name)
 
     if not message_id:
         print("❌ Failed to send message")
         sys.exit(1)
 
-    # Commit the message
-    commit_message(message_id)
+    if not commit_message(message_id, commit=not args.skip_commit):
+        print("⚠️  Message sent but not committed")
 
-    # Monitor for response
-    monitor_for_response(to, interval=5, duration=monitor_duration)
+    if args.monitor:
+        monitor_from = args.monitor_from or args.to
+        monitor_for_response(monitor_from, args.interval, args.duration)
+
 
 if __name__ == "__main__":
     main()

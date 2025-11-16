@@ -32,6 +32,11 @@ Use the built-in messaging plus sync commands to trade updates between a local O
 
 This mirrors the roadmap workflow: Codex pushes a sync branch with messages, Claude reads/responds on that branch, then Codex pulls the response back.
 
+Utilities under the repo root can help automate the workflow:
+
+- `python monitor_messages.py --from-source claude-web` polls `.idlergear/messages/` for new entries (pass `--interval`/`--duration` as needed).
+- `python send_and_monitor.py codex-local "Ping from Claude" --monitor` sends a message via the Typer CLI, commits the JSON file (unless `--skip-commit` is set), and watches for a reply.
+
 ## Development
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for complete development practices and workflow.

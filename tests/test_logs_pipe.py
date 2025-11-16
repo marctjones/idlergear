@@ -94,13 +94,14 @@ class TestLogPipe:
         import subprocess
         
         # Test piping to CLI command
+        repo_root = Path(__file__).resolve().parents[1]
         process = subprocess.Popen(
             ['python', '-m', 'src.main', 'logs', 'pipe', '--name', 'cli-test', '--path', '.'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            cwd='/home/user/idlergear'
+            cwd=str(repo_root)
         )
         
         stdout, stderr = process.communicate(input="CLI Line 1\nCLI Line 2\n")
