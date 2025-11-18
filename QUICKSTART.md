@@ -1026,6 +1026,214 @@ else:
 
 ---
 
+## Alternative: Using Teleport Restore (Simpler for Some Workflows)
+
+**Note:** The workflow above uses `eddi` for real-time message passing. Claude Code web also supports **teleport restore**, which is simpler for some use cases but less real-time.
+
+### What is Teleport Restore?
+
+Teleport restore is a built-in Claude Code web feature that lets you transfer your web session to local CLI:
+
+```bash
+# On claude.ai, after working on your code, copy the teleport command
+claude --teleport <uuid>
+
+# This downloads:
+# ✅ Complete chat transcript
+# ✅ All file changes from the web session
+# ✅ Session context to continue locally
+```
+
+### When to Use Teleport vs eddi
+
+| Scenario | Use Teleport | Use eddi |
+|----------|--------------|----------|
+| **Quick local continuation** | ✅ Perfect | ⚠️ Overkill |
+| **Real-time GUI testing** | ❌ No | ✅ Perfect |
+| **Log streaming** | ❌ No | ✅ Perfect |
+| **One-time session transfer** | ✅ Perfect | ⚠️ Overkill |
+| **Continuous collaboration** | ⚠️ Manual | ✅ Automatic |
+| **Round-trip web→local→web** | ⚠️ Manual sync | ✅ Seamless |
+
+### Teleport + IdlerGear Integration
+
+IdlerGear provides commands to track and manage teleport sessions:
+
+```bash
+# After running: claude --teleport abc-123-def
+
+# Log the session
+idlergear teleport log --session-id abc-123-def --description "Feature X implementation"
+
+# List past teleport sessions
+idlergear teleport list
+
+# Show details of a specific session
+idlergear teleport show --session-id abc-123
+
+# Export session info
+idlergear teleport export --session-id abc-123 --format markdown
+```
+
+### Hybrid Workflow with Teleport
+
+```
+┌────────────────────────────────────────────────┐
+│  Phase 1: Work on Claude Code Web             │
+├────────────────────────────────────────────────┤
+│  1. Clone repo on claude.ai                   │
+│  2. Develop features, write tests             │
+│  3. Commit changes to feature branch          │
+│  4. Copy teleport command when ready          │
+└────────────────────────────────────────────────┘
+                     ↓
+                     ↓ claude --teleport <uuid>
+                     ↓
+┌────────────────────────────────────────────────┐
+│  Phase 2: Continue Locally                    │
+├────────────────────────────────────────────────┤
+│  1. Run teleport command                      │
+│  2. Review changes: idlergear status          │
+│  3. Test GUI locally                          │
+│  4. Capture logs: idlergear logs run ...      │
+│  5. Make additional changes if needed         │
+│  6. Commit local changes                      │
+└────────────────────────────────────────────────┘
+                     ↓
+                     ↓ idlergear sync push
+                     ↓
+┌────────────────────────────────────────────────┐
+│  Phase 3: Back to Web (Optional)              │
+├────────────────────────────────────────────────┤
+│  1. Push to sync branch                       │
+│  2. Check out sync branch on web              │
+│  3. Continue development                      │
+└────────────────────────────────────────────────┘
+```
+
+### Complete Teleport Example
+
+```bash
+# 1. Work on claude.ai
+# (develop features, write tests, commit)
+
+# 2. Copy teleport command from web interface
+# Looks like: claude --teleport abc-123-def-456
+
+# 3. Run locally
+cd ~/projects/my-gui-app
+claude --teleport abc-123-def-456
+
+# 4. Log the session with IdlerGear
+idlergear teleport log \
+  --session-id abc-123-def-456 \
+  --description "User authentication feature"
+
+# 5. Review what changed
+idlergear status
+git status
+git diff
+
+# 6. Test GUI locally
+python -m src.gui.main &
+idlergear logs run --name gui-test --command "python -m src.gui.main"
+
+# 7. Make additional fixes if needed
+# (edit files, run tests)
+
+# 8. Commit local changes
+git commit -am "fix: Address GUI bugs from local testing"
+
+# 9. Push back to sync branch for web
+idlergear sync push --include-untracked
+
+# 10. On claude.ai, check out sync branch and continue
+```
+
+### Best Practices with Teleport
+
+1. **Log every session:**
+   ```bash
+   # Always log after teleport
+   idlergear teleport log --session-id <uuid> --description "What you worked on"
+   ```
+
+2. **Review before committing:**
+   ```bash
+   # Don't blindly accept teleported changes
+   git status
+   git diff
+   idlergear check  # Run best practices check
+   ```
+
+3. **Document in commit messages:**
+   ```bash
+   git commit -m "feat: Add authentication
+
+   Teleported from web session abc-123-def
+   - Implemented JWT-based auth
+   - Added password hashing
+   - Created login/logout endpoints"
+   ```
+
+4. **Use sync for round trips:**
+   ```bash
+   # After teleport and local changes, push back to web
+   idlergear sync push
+   ```
+
+5. **Track sessions for debugging:**
+   ```bash
+   # List all teleport sessions on current branch
+   idlergear teleport list --branch main
+
+   # Export session history
+   idlergear teleport export --session-id abc-123 --format markdown > session-notes.md
+   ```
+
+### Known Teleport Issues
+
+**Issue:** Teleport command returns 400 error
+
+**Solution:** Retry the command, or use `idlergear sync pull` as fallback
+
+```bash
+# If teleport fails
+claude --teleport <uuid>
+# Error: 400 tool use concurrency
+
+# Fallback: Use sync instead
+# (on claude.ai, commit your changes first)
+git commit -am "Work in progress"
+git push origin your-branch
+
+# Then locally:
+git pull origin your-branch
+```
+
+### Choosing Your Workflow
+
+**Use eddi (this guide's main workflow) if:**
+- ✅ You need real-time log streaming
+- ✅ You want GUI testing while coding on web
+- ✅ You need continuous collaboration
+- ✅ You want automatic command execution
+
+**Use teleport restore if:**
+- ✅ You just want to continue web session locally
+- ✅ You prefer simpler setup (no eddi)
+- ✅ One-time transfer is enough
+- ✅ You don't need real-time feedback
+
+**Use both together:**
+- Use **teleport** to move session from web to local
+- Use **eddi** for ongoing collaboration after teleport
+- Use **IdlerGear sync** for round-trip web↔local
+
+For complete teleport documentation, see: `AI_INSTRUCTIONS/TELEPORT_RESTORE_WORKFLOW.md`
+
+---
+
 ## Summary
 
 This workflow gives you:

@@ -20,6 +20,7 @@ ProjectSync = importlib.import_module("src.sync").ProjectSync
 LogCoordinator = importlib.import_module("src.logs").LogCoordinator
 MessageManager = importlib.import_module("src.messages").MessageManager
 CoordRepo = importlib.import_module("src.coord").CoordRepo
+TeleportTracker = importlib.import_module("src.teleport").TeleportTracker
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -1033,6 +1034,143 @@ def mcp(
         typer.secho(
             f"Unknown action: {action}. Use 'start' or 'info'", fg=typer.colors.RED
         )
+        raise typer.Exit(1)
+
+
+@app.command(name="teleport")
+def teleport_command(
+    action: str = typer.Argument(..., help="Action: log, list, show, or export"),
+    session_id: str = typer.Option(None, "--session-id", "--id", help="Teleport session UUID"),
+    description: str = typer.Option(None, "--description", "-d", help="Session description"),
+    files: str = typer.Option(None, "--files", help="Comma-separated list of changed files"),
+    branch: str = typer.Option(None, "--branch", "-b", help="Branch name"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Limit number of sessions to show"),
+    output_format: str = typer.Option("text", "--format", "-f", help="Output format: text, json, or markdown"),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+):
+    """
+    Track and manage Claude Code web teleport sessions.
+
+    Teleport restore is a feature in Claude Code web that transfers your
+    web-based coding session to your local CLI environment. This command
+    helps you track these sessions.
+
+    Actions:
+      log    - Log a new teleport session
+      list   - List past teleport sessions
+      show   - Show details of a specific session
+      export - Export session information
+
+    Examples:
+      # Log a teleport session (run after 'claude --teleport <uuid>')
+      idlergear teleport log --session-id abc-123-def --description "Feature X implementation"
+
+      # Log with auto-detected branch and files
+      idlergear teleport log --session-id abc-123-def
+
+      # List recent sessions
+      idlergear teleport list
+
+      # List sessions on specific branch
+      idlergear teleport list --branch main --limit 5
+
+      # Show session details
+      idlergear teleport show --session-id abc-123
+
+      # Export session as JSON
+      idlergear teleport export --session-id abc-123 --format json
+
+      # Export session as markdown
+      idlergear teleport export --session-id abc-123 --format markdown
+    """
+    try:
+        tracker = TeleportTracker(path)
+
+        if action == "log":
+            if not session_id:
+                typer.secho("Error: --session-id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            # Parse files if provided
+            files_list = None
+            if files:
+                files_list = [f.strip() for f in files.split(",")]
+
+            typer.echo(f"📍 Logging teleport session: {session_id[:8]}...")
+
+            result = tracker.log_session(
+                session_id=session_id,
+                description=description,
+                files_changed=files_list,
+                branch=branch,
+            )
+
+            if result["status"] == "created":
+                typer.secho("✅ Session logged", fg=typer.colors.GREEN)
+            else:
+                typer.secho("✅ Session updated", fg=typer.colors.GREEN)
+
+            session = result["session"]
+            typer.echo(f"   Session: {session['session_id'][:8]}")
+            typer.echo(f"   Branch: {session['branch']}")
+            typer.echo(f"   Files changed: {session['files_count']}")
+            typer.echo(f"   Saved to: {result['session_file']}")
+
+        elif action == "list":
+            # Get branch filter if specified
+            branch_filter = branch
+
+            sessions = tracker.list_sessions(limit=limit, branch=branch_filter)
+
+            if output_format == "json":
+                typer.echo(json.dumps(sessions, indent=2))
+            elif output_format == "markdown":
+                if not sessions:
+                    typer.echo("No sessions found.")
+                else:
+                    for session in sessions:
+                        typer.echo(tracker._format_session_markdown(session))
+                        typer.echo("")
+            else:  # text
+                typer.echo(tracker.format_session_list(sessions))
+
+        elif action == "show":
+            if not session_id:
+                typer.secho("Error: --session-id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            session = tracker.get_session(session_id)
+
+            if not session:
+                typer.secho(f"Session not found: {session_id}", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            if output_format == "json":
+                typer.echo(json.dumps(session, indent=2))
+            elif output_format == "markdown":
+                typer.echo(tracker._format_session_markdown(session))
+            else:  # text
+                typer.echo(tracker.format_session(session))
+
+        elif action == "export":
+            if not session_id:
+                typer.secho("Error: --session-id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            export_format = output_format if output_format in ["json", "markdown"] else "json"
+            result = tracker.export_session(session_id, export_format)
+
+            typer.echo(result["content"])
+
+        else:
+            typer.secho(
+                f"Unknown action: {action}. Use: log, list, show, or export",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
