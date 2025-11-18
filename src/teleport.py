@@ -8,6 +8,8 @@ export session details.
 
 import json
 import subprocess
+import time
+import signal
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -517,6 +519,317 @@ class TeleportTracker:
                 "error": str(e),
                 "messages": result.get("messages", []),
             }
+
+    def watch_session(
+        self,
+        command: str,
+        poll_interval: int = 10,
+        log_push_interval: int = 60,
+        callback=None,
+    ) -> Dict:
+        """
+        Run a long-running watch session for GUI testing.
+
+        This method:
+        1. Runs the specified command (e.g., GUI app)
+        2. Captures logs to .idlergear/logs/
+        3. Polls for new commits on current branch
+        4. Auto-pulls and restarts command when changes detected
+        5. Periodically commits and pushes logs for Claude Code web to see
+
+        Args:
+            command: Command to run (e.g., "python -m src.gui.main")
+            poll_interval: Seconds between checking for remote changes
+            log_push_interval: Seconds between pushing logs to remote
+            callback: Optional callback function for status updates
+
+        Returns:
+            Dictionary with session summary when terminated
+        """
+        result = {
+            "status": "ok",
+            "restarts": 0,
+            "logs_pushed": 0,
+            "duration": 0,
+            "messages": [],
+        }
+
+        # Track state
+        process = None
+        running = True
+        start_time = datetime.now()
+        last_log_push = start_time
+        last_commit = self._get_last_commit_hash()
+        log_file = None
+
+        def signal_handler(sig, frame):
+            nonlocal running
+            running = False
+            if callback:
+                callback("Received termination signal, shutting down...")
+
+        # Set up signal handlers
+        original_sigint = signal.signal(signal.SIGINT, signal_handler)
+        original_sigterm = signal.signal(signal.SIGTERM, signal_handler)
+
+        try:
+            current_branch = self._get_current_branch()
+            result["branch"] = current_branch
+
+            if callback:
+                callback(f"Starting watch session on branch '{current_branch}'")
+                callback(f"Command: {command}")
+                callback(
+                    f"Poll interval: {poll_interval}s, Log push interval: {log_push_interval}s"
+                )
+                callback("")
+
+            # Create log directory
+            logs_dir = self.project_root / ".idlergear" / "logs"
+            logs_dir.mkdir(parents=True, exist_ok=True)
+
+            session_name = f"watch-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            log_file = logs_dir / f"{session_name}.log"
+
+            def start_process():
+                nonlocal process
+                # Start process with output capture
+                process = subprocess.Popen(
+                    command,
+                    shell=True,
+                    cwd=self.project_root,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                )
+                if callback:
+                    callback(f"Started process (PID: {process.pid})")
+                return process
+
+            def stop_process():
+                nonlocal process
+                if process and process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                    if callback:
+                        callback("Stopped process")
+
+            def check_for_updates():
+                """Check if there are new commits on remote."""
+                # Fetch from remote
+                fetch_result = subprocess.run(
+                    ["git", "fetch", "origin", current_branch],
+                    cwd=self.project_root,
+                    capture_output=True,
+                    text=True,
+                )
+                if fetch_result.returncode != 0:
+                    return False
+
+                # Check if remote is ahead
+                result = subprocess.run(
+                    ["git", "rev-parse", f"origin/{current_branch}"],
+                    cwd=self.project_root,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    return False
+
+                remote_commit = result.stdout.strip()
+                return remote_commit != last_commit
+
+            def pull_updates():
+                nonlocal last_commit
+                pull_result = subprocess.run(
+                    ["git", "pull", "origin", current_branch],
+                    cwd=self.project_root,
+                    capture_output=True,
+                    text=True,
+                )
+                if pull_result.returncode == 0:
+                    last_commit = self._get_last_commit_hash()
+                    return True
+                return False
+
+            def push_logs():
+                """Commit and push logs so Claude Code web can see them."""
+                nonlocal last_log_push
+
+                # Add log file
+                subprocess.run(
+                    ["git", "add", str(log_file)],
+                    cwd=self.project_root,
+                    capture_output=True,
+                )
+
+                # Check if there are changes to commit
+                status = subprocess.run(
+                    ["git", "diff", "--cached", "--quiet"],
+                    cwd=self.project_root,
+                )
+
+                if status.returncode != 0:  # There are staged changes
+                    # Commit
+                    subprocess.run(
+                        [
+                            "git",
+                            "commit",
+                            "-m",
+                            f"chore: Update watch session logs ({session_name})",
+                        ],
+                        cwd=self.project_root,
+                        capture_output=True,
+                    )
+
+                    # Push
+                    push_result = subprocess.run(
+                        ["git", "push", "origin", current_branch],
+                        cwd=self.project_root,
+                        capture_output=True,
+                    )
+
+                    if push_result.returncode == 0:
+                        result["logs_pushed"] += 1
+                        if callback:
+                            callback(f"Pushed logs to {current_branch}")
+                        last_log_push = datetime.now()
+                        return True
+
+                return False
+
+            # Start initial process
+            process = start_process()
+
+            # Main watch loop
+            with open(log_file, "w") as lf:
+                lf.write(f"=== Watch Session Started: {start_time.isoformat()} ===\n")
+                lf.write(f"Command: {command}\n")
+                lf.write(f"Branch: {current_branch}\n")
+                lf.write("=" * 60 + "\n\n")
+
+                while running:
+                    # Read any available output from process
+                    if process and process.poll() is None:
+                        try:
+                            # Non-blocking read
+                            import select
+
+                            if hasattr(select, "select"):
+                                readable, _, _ = select.select(
+                                    [process.stdout], [], [], 0.1
+                                )
+                                if readable:
+                                    line = process.stdout.readline()
+                                    if line:
+                                        timestamp = datetime.now().strftime("%H:%M:%S")
+                                        log_line = f"[{timestamp}] {line}"
+                                        lf.write(log_line)
+                                        lf.flush()
+                                        if callback:
+                                            callback(f"LOG: {line.strip()}")
+                        except Exception:
+                            pass
+                    elif process:
+                        # Process ended
+                        if callback:
+                            callback(f"Process exited with code {process.returncode}")
+                        lf.write(f"\n[Process exited with code {process.returncode}]\n")
+                        lf.flush()
+
+                    # Check for remote updates
+                    if check_for_updates():
+                        if callback:
+                            callback("New commits detected on remote!")
+                        lf.write(
+                            f"\n[{datetime.now().strftime('%H:%M:%S')}] New commits detected, pulling...\n"
+                        )
+
+                        stop_process()
+
+                        if pull_updates():
+                            if callback:
+                                callback("Pulled updates, restarting...")
+                            lf.write(
+                                f"[{datetime.now().strftime('%H:%M:%S')}] Pulled updates, restarting command\n\n"
+                            )
+                            result["restarts"] += 1
+                            process = start_process()
+                        else:
+                            if callback:
+                                callback("Failed to pull updates")
+                            lf.write(
+                                f"[{datetime.now().strftime('%H:%M:%S')}] Failed to pull updates\n"
+                            )
+
+                    # Check if it's time to push logs
+                    now = datetime.now()
+                    if (now - last_log_push).total_seconds() >= log_push_interval:
+                        lf.flush()
+                        push_logs()
+
+                    # Sleep before next poll
+                    time.sleep(poll_interval)
+
+                # Clean shutdown
+                lf.write(
+                    f"\n=== Watch Session Ended: {datetime.now().isoformat()} ===\n"
+                )
+
+            # Stop the process
+            stop_process()
+
+            # Final log push
+            push_logs()
+
+            # Calculate duration
+            end_time = datetime.now()
+            result["duration"] = int((end_time - start_time).total_seconds())
+            result["log_file"] = str(log_file)
+
+            result["messages"].append("Watch session ended")
+            result["messages"].append(f"Duration: {result['duration']} seconds")
+            result["messages"].append(f"Restarts: {result['restarts']}")
+            result["messages"].append(f"Logs pushed: {result['logs_pushed']}")
+            result["messages"].append(f"Log file: {log_file}")
+
+            return result
+
+        except Exception as e:
+            result["status"] = "error"
+            result["error"] = str(e)
+            return result
+
+        finally:
+            # Restore signal handlers
+            signal.signal(signal.SIGINT, original_sigint)
+            signal.signal(signal.SIGTERM, original_sigterm)
+
+            # Ensure process is stopped
+            if process and process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+
+    def _get_last_commit_hash(self) -> str:
+        """Get the hash of the last commit on current branch."""
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError:
+            return ""
 
     def log_session(
         self,

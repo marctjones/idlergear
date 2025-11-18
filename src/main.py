@@ -1041,7 +1041,8 @@ def mcp(
 @app.command(name="teleport")
 def teleport_command(
     action: str = typer.Argument(
-        ..., help="Action: prepare, finish, log, list, show, export, or restore-stash"
+        ...,
+        help="Action: prepare, watch, finish, log, list, show, export, or restore-stash",
     ),
     session_id: str = typer.Option(
         None, "--session-id", "--id", help="Teleport session UUID"
@@ -1062,6 +1063,12 @@ def teleport_command(
         "text", "--format", "-f", help="Output format: text, json, or markdown"
     ),
     path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    command: str = typer.Option(
+        None, "--command", "-c", help="Command to run for watch mode"
+    ),
+    poll_interval: int = typer.Option(
+        10, "--poll", help="Seconds between checking for remote changes (watch mode)"
+    ),
 ):
     """
     Track and manage Claude Code web teleport sessions.
@@ -1072,6 +1079,7 @@ def teleport_command(
 
     Actions:
       prepare       - Prepare for teleport (defaults to main branch)
+      watch         - Run GUI with auto-pull and log sharing (Ctrl+C to stop)
       finish        - Merge to main, cleanup branches, push, restore stash
       log           - Log a teleport session
       list          - List past sessions
@@ -1079,23 +1087,28 @@ def teleport_command(
       export        - Export session info
       restore-stash - Restore stashed changes
 
-    Simple Workflow (3 commands):
+    Live Testing Workflow:
+      idlergear teleport prepare                    # Setup
+      claude --teleport <uuid>                      # Get session
+      idlergear teleport watch -c "python app.py"  # Run & watch
+      # (test GUI locally, Claude Code web sees logs & can push fixes)
+      # Press Ctrl+C when done
+      idlergear teleport finish                     # Cleanup
+
+    Simple Workflow (no live testing):
       idlergear teleport prepare        # Stash, fetch, checkout main
       claude --teleport <uuid>          # Run teleport
       idlergear teleport finish         # Merge to main, cleanup, push
 
     Examples:
+      # Watch mode - runs GUI, shares logs, auto-pulls fixes
+      idlergear teleport watch --command "python -m src.gui.main"
+
       # Prepare for teleport (defaults to main)
       idlergear teleport prepare
 
-      # Or specify a different branch
-      idlergear teleport prepare --branch feature/my-feature
-
       # After teleport, merge to main and cleanup
       idlergear teleport finish
-
-      # Log session for tracking
-      idlergear teleport log --session-id abc-123 --description "Feature X"
     """
     try:
         tracker = TeleportTracker(path)
@@ -1114,6 +1127,51 @@ def teleport_command(
                 typer.secho("✅ Ready for teleport!", fg=typer.colors.GREEN)
             else:
                 typer.echo("")
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "watch":
+            if not command:
+                typer.secho(
+                    "Error: --command required for watch mode", fg=typer.colors.RED
+                )
+                typer.echo(
+                    "Example: idlergear teleport watch --command 'python app.py'"
+                )
+                raise typer.Exit(1)
+
+            typer.echo("👁️  Starting watch session...")
+            typer.echo(f"   Command: {command}")
+            typer.echo(f"   Poll interval: {poll_interval}s")
+            typer.echo("")
+            typer.secho(
+                "Press Ctrl+C to stop the watch session", fg=typer.colors.YELLOW
+            )
+            typer.echo("")
+
+            def callback(message):
+                typer.echo(message)
+
+            result = tracker.watch_session(
+                command=command,
+                poll_interval=poll_interval,
+                log_push_interval=60,
+                callback=callback,
+            )
+
+            typer.echo("")
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("✅ Watch session ended", fg=typer.colors.GREEN)
+                typer.echo("")
+                typer.echo("Next step: idlergear teleport finish")
+            else:
                 typer.secho(
                     f"❌ Error: {result.get('error', 'Unknown error')}",
                     fg=typer.colors.RED,
@@ -1236,7 +1294,7 @@ def teleport_command(
 
         else:
             typer.secho(
-                f"Unknown action: {action}. Use: prepare, finish, log, list, show, export, or restore-stash",
+                f"Unknown action: {action}. Use: prepare, watch, finish, log, list, show, export, or restore-stash",
                 fg=typer.colors.RED,
             )
             raise typer.Exit(1)
