@@ -327,14 +327,16 @@ class TeleportTracker:
             desc = session.get("description", "")
             files_count = session.get("files_count", 0)
 
-            lines.extend([
-                f"📍 Session: {session_id_short}",
-                f"   Time: {timestamp}",
-                f"   Branch: {branch}",
-                f"   Description: {desc}",
-                f"   Files changed: {files_count}",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"📍 Session: {session_id_short}",
+                    f"   Time: {timestamp}",
+                    f"   Branch: {branch}",
+                    f"   Description: {desc}",
+                    f"   Files changed: {files_count}",
+                    "",
+                ]
+            )
 
         return "\n".join(lines)
 

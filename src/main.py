@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import subprocess
 import sys
@@ -1040,12 +1041,22 @@ def mcp(
 @app.command(name="teleport")
 def teleport_command(
     action: str = typer.Argument(..., help="Action: log, list, show, or export"),
-    session_id: str = typer.Option(None, "--session-id", "--id", help="Teleport session UUID"),
-    description: str = typer.Option(None, "--description", "-d", help="Session description"),
-    files: str = typer.Option(None, "--files", help="Comma-separated list of changed files"),
+    session_id: str = typer.Option(
+        None, "--session-id", "--id", help="Teleport session UUID"
+    ),
+    description: str = typer.Option(
+        None, "--description", "-d", help="Session description"
+    ),
+    files: str = typer.Option(
+        None, "--files", help="Comma-separated list of changed files"
+    ),
     branch: str = typer.Option(None, "--branch", "-b", help="Branch name"),
-    limit: int = typer.Option(10, "--limit", "-n", help="Limit number of sessions to show"),
-    output_format: str = typer.Option("text", "--format", "-f", help="Output format: text, json, or markdown"),
+    limit: int = typer.Option(
+        10, "--limit", "-n", help="Limit number of sessions to show"
+    ),
+    output_format: str = typer.Option(
+        "text", "--format", "-f", help="Output format: text, json, or markdown"
+    ),
     path: str = typer.Option(".", "--path", "-p", help="Project directory"),
 ):
     """
@@ -1157,7 +1168,9 @@ def teleport_command(
                 typer.secho("Error: --session-id required", fg=typer.colors.RED)
                 raise typer.Exit(1)
 
-            export_format = output_format if output_format in ["json", "markdown"] else "json"
+            export_format = (
+                output_format if output_format in ["json", "markdown"] else "json"
+            )
             result = tracker.export_session(session_id, export_format)
 
             typer.echo(result["content"])
