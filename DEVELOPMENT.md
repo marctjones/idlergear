@@ -86,6 +86,30 @@ Before making any changes, read these files in order:
 - Tests should be fast and deterministic
 - Use the project's `./run.sh` script when available
 
+## Adding Dependencies & Complex Features
+
+**IMPORTANT:** Before adding any new dependency or implementing complex features, you MUST follow the research requirements in `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md`.
+
+### Before Adding a Dependency
+1. ✅ Research at least 3 alternatives
+2. ✅ Evaluate: maintenance, adoption, security, license, documentation
+3. ✅ Find real-world usage examples
+4. ✅ Document your reasoning in comments or commit message
+
+### Before Implementing Complex Features
+1. ✅ Find and read the relevant specification/standard
+2. ✅ Read security considerations
+3. ✅ Find reference implementations
+4. ✅ Cite sources in code comments
+
+### Red Flags (Research More)
+- Library last updated >1 year ago
+- <100 GitHub stars for critical functionality
+- No documentation or examples
+- Copyleft license (GPL/AGPL) - requires approval
+
+See `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md` for complete guidance and checklists.
+
 ## Git Workflow
 
 - Work in feature branches: `git checkout -b feature/my-feature`
@@ -118,6 +142,7 @@ Before making any changes, read these files in order:
 - Ensure `.env` is in `.gitignore`
 - Use permissive licenses (MIT, Apache 2.0) for dependencies
 - Get approval before using copyleft licenses (GPL, etc.)
+- Research security implications before implementing auth, crypto, or network features (see `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md`)
 
 ## Documentation
 
