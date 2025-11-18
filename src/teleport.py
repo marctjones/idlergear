@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from src.messages import MessageManager
+
 
 class TeleportTracker:
     """
@@ -522,25 +524,24 @@ class TeleportTracker:
 
     def watch_session(
         self,
-        command: str,
+        command: Optional[str] = None,
         poll_interval: int = 10,
-        log_push_interval: int = 60,
+        auto_restart: bool = False,
         callback=None,
     ) -> Dict:
         """
         Run a long-running watch session for GUI testing.
 
         This method:
-        1. Runs the specified command (e.g., GUI app)
-        2. Captures logs to .idlergear/logs/
-        3. Polls for new commits on current branch
-        4. Auto-pulls and restarts command when changes detected
-        5. Periodically commits and pushes logs for Claude Code web to see
+        1. Polls for new commits on current branch
+        2. Auto-pulls when changes detected
+        3. Notifies user to run command (or auto-restarts if enabled)
+        4. Sends messages via MessageManager for Claude Code web to see
 
         Args:
-            command: Command to run (e.g., "python -m src.gui.main")
+            command: Command to run (default: ./run.sh). If None, just watches for updates.
             poll_interval: Seconds between checking for remote changes
-            log_push_interval: Seconds between pushing logs to remote
+            auto_restart: If True, auto-restart command on updates (default: False)
             callback: Optional callback function for status updates
 
         Returns:
@@ -548,25 +549,30 @@ class TeleportTracker:
         """
         result = {
             "status": "ok",
-            "restarts": 0,
-            "logs_pushed": 0,
+            "pulls": 0,
+            "messages_sent": 0,
             "duration": 0,
             "messages": [],
         }
+
+        # Default command
+        if command is None:
+            command = "./run.sh"
 
         # Track state
         process = None
         running = True
         start_time = datetime.now()
-        last_log_push = start_time
         last_commit = self._get_last_commit_hash()
-        log_file = None
+
+        # Initialize message manager
+        msg_manager = MessageManager(self.project_root)
 
         def signal_handler(sig, frame):
             nonlocal running
             running = False
             if callback:
-                callback("Received termination signal, shutting down...")
+                callback("\nReceived termination signal, shutting down...")
 
         # Set up signal handlers
         original_sigint = signal.signal(signal.SIGINT, signal_handler)
@@ -578,22 +584,27 @@ class TeleportTracker:
 
             if callback:
                 callback(f"Starting watch session on branch '{current_branch}'")
+                callback(f"Poll interval: {poll_interval}s")
+                callback(f"Auto-restart: {auto_restart}")
                 callback(f"Command: {command}")
-                callback(
-                    f"Poll interval: {poll_interval}s, Log push interval: {log_push_interval}s"
-                )
+                callback("")
+                callback("Watching for changes... (Ctrl+C to stop)")
                 callback("")
 
-            # Create log directory
-            logs_dir = self.project_root / ".idlergear" / "logs"
-            logs_dir.mkdir(parents=True, exist_ok=True)
-
-            session_name = f"watch-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-            log_file = logs_dir / f"{session_name}.log"
+            # Send initial message to web
+            msg_manager.send_message(
+                to="web",
+                body=f"Watch session started on branch '{current_branch}'. Polling every {poll_interval}s.",
+                message_type="status",
+                from_env="local",
+            )
+            result["messages_sent"] += 1
 
             def start_process():
                 nonlocal process
-                # Start process with output capture
+                if not command:
+                    return None
+                # Start process
                 process = subprocess.Popen(
                     command,
                     shell=True,
@@ -604,7 +615,7 @@ class TeleportTracker:
                     bufsize=1,
                 )
                 if callback:
-                    callback(f"Started process (PID: {process.pid})")
+                    callback(f"Started: {command} (PID: {process.pid})")
                 return process
 
             def stop_process():
@@ -620,6 +631,7 @@ class TeleportTracker:
 
             def check_for_updates():
                 """Check if there are new commits on remote."""
+                nonlocal last_commit
                 # Fetch from remote
                 fetch_result = subprocess.run(
                     ["git", "fetch", "origin", current_branch],
@@ -631,16 +643,16 @@ class TeleportTracker:
                     return False
 
                 # Check if remote is ahead
-                result = subprocess.run(
+                rev_result = subprocess.run(
                     ["git", "rev-parse", f"origin/{current_branch}"],
                     cwd=self.project_root,
                     capture_output=True,
                     text=True,
                 )
-                if result.returncode != 0:
+                if rev_result.returncode != 0:
                     return False
 
-                remote_commit = result.stdout.strip()
+                remote_commit = rev_result.stdout.strip()
                 return remote_commit != last_commit
 
             def pull_updates():
@@ -656,146 +668,118 @@ class TeleportTracker:
                     return True
                 return False
 
-            def push_logs():
-                """Commit and push logs so Claude Code web can see them."""
-                nonlocal last_log_push
-
-                # Add log file
-                subprocess.run(
-                    ["git", "add", str(log_file)],
+            def get_latest_commit_info():
+                """Get info about the latest commit."""
+                log_result = subprocess.run(
+                    ["git", "log", "-1", "--pretty=format:%h %s"],
                     cwd=self.project_root,
                     capture_output=True,
+                    text=True,
                 )
-
-                # Check if there are changes to commit
-                status = subprocess.run(
-                    ["git", "diff", "--cached", "--quiet"],
-                    cwd=self.project_root,
-                )
-
-                if status.returncode != 0:  # There are staged changes
-                    # Commit
-                    subprocess.run(
-                        [
-                            "git",
-                            "commit",
-                            "-m",
-                            f"chore: Update watch session logs ({session_name})",
-                        ],
-                        cwd=self.project_root,
-                        capture_output=True,
-                    )
-
-                    # Push
-                    push_result = subprocess.run(
-                        ["git", "push", "origin", current_branch],
-                        cwd=self.project_root,
-                        capture_output=True,
-                    )
-
-                    if push_result.returncode == 0:
-                        result["logs_pushed"] += 1
-                        if callback:
-                            callback(f"Pushed logs to {current_branch}")
-                        last_log_push = datetime.now()
-                        return True
-
-                return False
-
-            # Start initial process
-            process = start_process()
+                if log_result.returncode == 0:
+                    return log_result.stdout.strip()
+                return "unknown"
 
             # Main watch loop
-            with open(log_file, "w") as lf:
-                lf.write(f"=== Watch Session Started: {start_time.isoformat()} ===\n")
-                lf.write(f"Command: {command}\n")
-                lf.write(f"Branch: {current_branch}\n")
-                lf.write("=" * 60 + "\n\n")
+            while running:
+                # Check for remote updates
+                if check_for_updates():
+                    timestamp = datetime.now().strftime("%H:%M:%S")
 
-                while running:
-                    # Read any available output from process
-                    if process and process.poll() is None:
-                        try:
-                            # Non-blocking read
-                            import select
+                    if callback:
+                        callback(f"[{timestamp}] New commits detected on remote!")
 
-                            if hasattr(select, "select"):
-                                readable, _, _ = select.select(
-                                    [process.stdout], [], [], 0.1
-                                )
-                                if readable:
-                                    line = process.stdout.readline()
-                                    if line:
-                                        timestamp = datetime.now().strftime("%H:%M:%S")
-                                        log_line = f"[{timestamp}] {line}"
-                                        lf.write(log_line)
-                                        lf.flush()
-                                        if callback:
-                                            callback(f"LOG: {line.strip()}")
-                        except Exception:
-                            pass
-                    elif process:
-                        # Process ended
+                    if pull_updates():
+                        result["pulls"] += 1
+                        commit_info = get_latest_commit_info()
+
                         if callback:
-                            callback(f"Process exited with code {process.returncode}")
-                        lf.write(f"\n[Process exited with code {process.returncode}]\n")
-                        lf.flush()
+                            callback(f"[{timestamp}] Pulled: {commit_info}")
 
-                    # Check for remote updates
-                    if check_for_updates():
-                        if callback:
-                            callback("New commits detected on remote!")
-                        lf.write(
-                            f"\n[{datetime.now().strftime('%H:%M:%S')}] New commits detected, pulling...\n"
-                        )
-
-                        stop_process()
-
-                        if pull_updates():
+                        if auto_restart:
+                            # Auto-restart mode
+                            stop_process()
                             if callback:
-                                callback("Pulled updates, restarting...")
-                            lf.write(
-                                f"[{datetime.now().strftime('%H:%M:%S')}] Pulled updates, restarting command\n\n"
-                            )
-                            result["restarts"] += 1
+                                callback(f"[{timestamp}] Restarting: {command}")
                             process = start_process()
+
+                            # Send message to web
+                            msg_manager.send_message(
+                                to="web",
+                                body=f"Pulled and restarted: {commit_info}",
+                                message_type="update",
+                                from_env="local",
+                            )
                         else:
+                            # Manual mode - just notify
                             if callback:
-                                callback("Failed to pull updates")
-                            lf.write(
-                                f"[{datetime.now().strftime('%H:%M:%S')}] Failed to pull updates\n"
+                                callback("")
+                                callback("=" * 50)
+                                callback(f"NEW CODE PULLED: {commit_info}")
+                                callback(f"Run your app with: {command}")
+                                callback("=" * 50)
+                                callback("")
+
+                            # Send message to web
+                            msg_manager.send_message(
+                                to="web",
+                                body=f"Pulled: {commit_info}\n\nUser notified to run: {command}",
+                                message_type="update",
+                                from_env="local",
                             )
 
-                    # Check if it's time to push logs
-                    now = datetime.now()
-                    if (now - last_log_push).total_seconds() >= log_push_interval:
-                        lf.flush()
-                        push_logs()
+                        result["messages_sent"] += 1
+                    else:
+                        if callback:
+                            callback(f"[{timestamp}] Failed to pull updates")
 
-                    # Sleep before next poll
-                    time.sleep(poll_interval)
+                        msg_manager.send_message(
+                            to="web",
+                            body="Failed to pull updates - may need manual intervention",
+                            message_type="error",
+                            from_env="local",
+                        )
+                        result["messages_sent"] += 1
 
-                # Clean shutdown
-                lf.write(
-                    f"\n=== Watch Session Ended: {datetime.now().isoformat()} ===\n"
-                )
+                # Check if process ended (if we're managing one)
+                if auto_restart and process and process.poll() is not None:
+                    exit_code = process.returncode
+                    if callback:
+                        callback(f"Process exited with code {exit_code}")
 
-            # Stop the process
+                    # Send message about process exit
+                    msg_manager.send_message(
+                        to="web",
+                        body=f"Process exited with code {exit_code}. Waiting for new code...",
+                        message_type="status",
+                        from_env="local",
+                    )
+                    result["messages_sent"] += 1
+                    process = None
+
+                # Sleep before next poll
+                time.sleep(poll_interval)
+
+            # Clean shutdown
             stop_process()
-
-            # Final log push
-            push_logs()
 
             # Calculate duration
             end_time = datetime.now()
             result["duration"] = int((end_time - start_time).total_seconds())
-            result["log_file"] = str(log_file)
+
+            # Send final message
+            msg_manager.send_message(
+                to="web",
+                body=f"Watch session ended. Duration: {result['duration']}s, Pulls: {result['pulls']}",
+                message_type="status",
+                from_env="local",
+            )
+            result["messages_sent"] += 1
 
             result["messages"].append("Watch session ended")
             result["messages"].append(f"Duration: {result['duration']} seconds")
-            result["messages"].append(f"Restarts: {result['restarts']}")
-            result["messages"].append(f"Logs pushed: {result['logs_pushed']}")
-            result["messages"].append(f"Log file: {log_file}")
+            result["messages"].append(f"Pulls: {result['pulls']}")
+            result["messages"].append(f"Messages sent: {result['messages_sent']}")
 
             return result
 

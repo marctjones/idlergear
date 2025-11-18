@@ -1064,10 +1064,15 @@ def teleport_command(
     ),
     path: str = typer.Option(".", "--path", "-p", help="Project directory"),
     command: str = typer.Option(
-        None, "--command", "-c", help="Command to run for watch mode"
+        None, "--command", "-c", help="Command to run (default: ./run.sh)"
     ),
     poll_interval: int = typer.Option(
         10, "--poll", help="Seconds between checking for remote changes (watch mode)"
+    ),
+    auto_restart: bool = typer.Option(
+        False,
+        "--auto-restart",
+        help="Auto-restart command on code changes (default: manual)",
     ),
 ):
     """
@@ -1079,7 +1084,7 @@ def teleport_command(
 
     Actions:
       prepare       - Prepare for teleport (defaults to main branch)
-      watch         - Run GUI with auto-pull and log sharing (Ctrl+C to stop)
+      watch         - Watch for code changes and notify to run ./run.sh
       finish        - Merge to main, cleanup branches, push, restore stash
       log           - Log a teleport session
       list          - List past sessions
@@ -1088,12 +1093,12 @@ def teleport_command(
       restore-stash - Restore stashed changes
 
     Live Testing Workflow:
-      idlergear teleport prepare                    # Setup
-      claude --teleport <uuid>                      # Get session
-      idlergear teleport watch -c "python app.py"  # Run & watch
-      # (test GUI locally, Claude Code web sees logs & can push fixes)
+      idlergear teleport prepare        # Setup
+      claude --teleport <uuid>          # Get session
+      idlergear teleport watch          # Watch for changes
+      # (when new code arrives, you'll be notified to run: ./run.sh)
       # Press Ctrl+C when done
-      idlergear teleport finish                     # Cleanup
+      idlergear teleport finish         # Cleanup
 
     Simple Workflow (no live testing):
       idlergear teleport prepare        # Stash, fetch, checkout main
@@ -1101,8 +1106,11 @@ def teleport_command(
       idlergear teleport finish         # Merge to main, cleanup, push
 
     Examples:
-      # Watch mode - runs GUI, shares logs, auto-pulls fixes
-      idlergear teleport watch --command "python -m src.gui.main"
+      # Watch mode - notifies you when new code arrives
+      idlergear teleport watch
+
+      # Watch with auto-restart (optional)
+      idlergear teleport watch --auto-restart
 
       # Prepare for teleport (defaults to main)
       idlergear teleport prepare
@@ -1134,31 +1142,21 @@ def teleport_command(
                 raise typer.Exit(1)
 
         elif action == "watch":
-            if not command:
-                typer.secho(
-                    "Error: --command required for watch mode", fg=typer.colors.RED
-                )
-                typer.echo(
-                    "Example: idlergear teleport watch --command 'python app.py'"
-                )
-                raise typer.Exit(1)
+            cmd = command if command else "./run.sh"
 
             typer.echo("👁️  Starting watch session...")
-            typer.echo(f"   Command: {command}")
+            typer.echo(f"   Command: {cmd}")
             typer.echo(f"   Poll interval: {poll_interval}s")
-            typer.echo("")
-            typer.secho(
-                "Press Ctrl+C to stop the watch session", fg=typer.colors.YELLOW
-            )
+            typer.echo(f"   Auto-restart: {auto_restart}")
             typer.echo("")
 
             def callback(message):
                 typer.echo(message)
 
             result = tracker.watch_session(
-                command=command,
+                command=cmd,
                 poll_interval=poll_interval,
-                log_push_interval=60,
+                auto_restart=auto_restart,
                 callback=callback,
             )
 
