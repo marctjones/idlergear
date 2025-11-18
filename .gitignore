@@ -138,3 +138,25 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+# IdlerGear specific
+.idlergear/logs/
+.idlergear/messages/
+
+# eddi message server (installed to ~/.idlergear/bin/, but just in case)
+eddi-msgsrv
+eddi-msgsrv.exe
+*.onion
+
+# Tor hidden service keys (NEVER commit these)
+hs_ed25519_secret_key
+hs_ed25519_public_key
+hostname
+tor_data/
+hidden_service/
+
+# eddi SQLite databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
