@@ -22,6 +22,7 @@ LogCoordinator = importlib.import_module("src.logs").LogCoordinator
 MessageManager = importlib.import_module("src.messages").MessageManager
 CoordRepo = importlib.import_module("src.coord").CoordRepo
 TeleportTracker = importlib.import_module("src.teleport").TeleportTracker
+EddiManager = importlib.import_module("src.eddi").EddiManager
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -1438,6 +1439,116 @@ def teleport_command(
         else:
             typer.secho(
                 f"Unknown action: {action}. Use: prepare, watch, finish, log, list, show, export, or restore-stash",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command(name="eddi")
+def eddi_command(
+    action: str = typer.Argument(
+        ...,
+        help="Action: install, uninstall, or status",
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force reinstall even if already installed"
+    ),
+):
+    """
+    Manage eddi-msgsrv installation for secure message passing.
+
+    eddi-msgsrv provides Tor-based message passing for real-time
+    communication between LLM environments across machines/NAT.
+
+    Install location: ~/.idlergear/bin/eddi-msgsrv
+    (Binaries and Tor keys stay out of project repos)
+
+    Actions:
+      install   - Clone, build, and install eddi-msgsrv
+      uninstall - Remove eddi-msgsrv binary
+      status    - Show installation status
+
+    Examples:
+      # Install eddi
+      idlergear eddi install
+
+      # Check status
+      idlergear eddi status
+
+      # Force reinstall
+      idlergear eddi install --force
+
+      # Uninstall
+      idlergear eddi uninstall
+
+    Requirements:
+      - Rust toolchain (cargo): https://rustup.rs
+      - Git
+    """
+    try:
+        manager = EddiManager()
+
+        if action == "install":
+            typer.echo("Installing eddi-msgsrv...")
+            typer.echo("")
+
+            result = manager.install(force=force)
+
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("eddi-msgsrv installed successfully", fg=typer.colors.GREEN)
+            elif result["status"] == "already_installed":
+                typer.echo("")
+                typer.secho("Already installed", fg=typer.colors.YELLOW)
+            else:
+                typer.echo("")
+                typer.secho(
+                    f"Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "uninstall":
+            typer.echo("Uninstalling eddi-msgsrv...")
+
+            result = manager.uninstall()
+
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            typer.secho("Uninstalled", fg=typer.colors.GREEN)
+
+        elif action == "status":
+            status = manager.status()
+
+            typer.echo("")
+            typer.echo("eddi-msgsrv Status")
+            typer.echo("=" * 40)
+
+            if status["installed"]:
+                typer.secho("Installed: Yes", fg=typer.colors.GREEN)
+                typer.echo(f"Version: {status['version']}")
+                typer.echo(f"Binary: {status['binary_path']}")
+            else:
+                typer.secho("Installed: No", fg=typer.colors.YELLOW)
+                typer.echo("")
+                typer.echo("Install with: idlergear eddi install")
+
+            if status["src_dir"]:
+                typer.echo(f"Source: {status['src_dir']}")
+
+            typer.echo("")
+
+        else:
+            typer.secho(
+                f"Unknown action: {action}. Use: install, uninstall, or status",
                 fg=typer.colors.RED,
             )
             raise typer.Exit(1)
