@@ -1040,7 +1040,9 @@ def mcp(
 
 @app.command(name="teleport")
 def teleport_command(
-    action: str = typer.Argument(..., help="Action: log, list, show, or export"),
+    action: str = typer.Argument(
+        ..., help="Action: prepare, log, list, show, export, or restore-stash"
+    ),
     session_id: str = typer.Option(
         None, "--session-id", "--id", help="Teleport session UUID"
     ),
@@ -1067,37 +1069,76 @@ def teleport_command(
     helps you track these sessions.
 
     Actions:
-      log    - Log a new teleport session
-      list   - List past teleport sessions
-      show   - Show details of a specific session
-      export - Export session information
+      prepare       - Prepare local environment for teleport (fetch, stash, checkout)
+      log           - Log a new teleport session
+      list          - List past teleport sessions
+      show          - Show details of a specific session
+      export        - Export session information
+      restore-stash - Restore stashed changes after teleport
 
     Examples:
-      # Log a teleport session (run after 'claude --teleport <uuid>')
-      idlergear teleport log --session-id abc-123-def --description "Feature X implementation"
+      # Prepare for teleport (recommended first step)
+      idlergear teleport prepare --branch feature/my-feature
 
-      # Log with auto-detected branch and files
-      idlergear teleport log --session-id abc-123-def
+      # Then run teleport
+      claude --teleport abc-123-def
+
+      # Log the session
+      idlergear teleport log --session-id abc-123-def --description "Feature X"
+
+      # Restore any stashed changes
+      idlergear teleport restore-stash
 
       # List recent sessions
       idlergear teleport list
 
-      # List sessions on specific branch
-      idlergear teleport list --branch main --limit 5
-
       # Show session details
       idlergear teleport show --session-id abc-123
-
-      # Export session as JSON
-      idlergear teleport export --session-id abc-123 --format json
-
-      # Export session as markdown
-      idlergear teleport export --session-id abc-123 --format markdown
     """
     try:
         tracker = TeleportTracker(path)
 
-        if action == "log":
+        if action == "prepare":
+            if not branch:
+                typer.secho("Error: --branch required for prepare", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            typer.echo(f"🚀 Preparing for teleport to branch '{branch}'...")
+            typer.echo("")
+
+            result = tracker.prepare_for_teleport(branch)
+
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("✅ Ready for teleport!", fg=typer.colors.GREEN)
+            else:
+                typer.echo("")
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "restore-stash":
+            typer.echo("🔄 Restoring stashed changes...")
+
+            result = tracker.restore_stash()
+
+            if result["status"] == "restored":
+                typer.secho(f"✅ {result['message']}", fg=typer.colors.GREEN)
+            elif result["status"] == "no_stash":
+                typer.secho(f"ℹ️  {result['message']}", fg=typer.colors.YELLOW)
+            else:
+                typer.secho(
+                    f"❌ {result.get('message', result.get('error', 'Unknown error'))}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "log":
             if not session_id:
                 typer.secho("Error: --session-id required", fg=typer.colors.RED)
                 raise typer.Exit(1)
@@ -1177,7 +1218,7 @@ def teleport_command(
 
         else:
             typer.secho(
-                f"Unknown action: {action}. Use: log, list, show, or export",
+                f"Unknown action: {action}. Use: prepare, log, list, show, export, or restore-stash",
                 fg=typer.colors.RED,
             )
             raise typer.Exit(1)

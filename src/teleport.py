@@ -112,6 +112,244 @@ class TeleportTracker:
         except subprocess.CalledProcessError:
             return []
 
+    def prepare_for_teleport(self, branch: str) -> Dict:
+        """
+        Prepare the local environment for teleport.
+
+        This method:
+        1. Verifies we're in a git repo
+        2. Fetches latest from remote
+        3. Stashes any uncommitted changes
+        4. Checks out the specified branch
+        5. Pulls latest changes
+
+        Args:
+            branch: The branch to check out
+
+        Returns:
+            Dictionary with preparation status and details
+        """
+        result = {
+            "status": "ok",
+            "branch": branch,
+            "stashed": False,
+            "stash_name": None,
+            "messages": [],
+        }
+
+        try:
+            # 1. Check if we're in a git repo
+            git_check = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if git_check.returncode != 0:
+                return {
+                    "status": "error",
+                    "error": "Not a git repository",
+                    "messages": ["Please run this command from a git repository"],
+                }
+
+            # 2. Get current branch
+            current_branch = self._get_current_branch()
+            result["original_branch"] = current_branch
+
+            # 3. Fetch from remote
+            result["messages"].append("Fetching from remote...")
+            fetch_result = subprocess.run(
+                ["git", "fetch", "origin"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if fetch_result.returncode != 0:
+                result["messages"].append(
+                    f"Warning: fetch failed: {fetch_result.stderr}"
+                )
+
+            # 4. Check for uncommitted changes
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            has_changes = bool(status_result.stdout.strip())
+
+            # 5. Stash if there are uncommitted changes
+            if has_changes:
+                stash_name = (
+                    f"idlergear-teleport-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+                )
+                result["messages"].append(
+                    f"Stashing uncommitted changes as '{stash_name}'..."
+                )
+
+                stash_result = subprocess.run(
+                    ["git", "stash", "push", "-m", stash_name, "--include-untracked"],
+                    cwd=self.project_root,
+                    capture_output=True,
+                    text=True,
+                )
+
+                if stash_result.returncode == 0:
+                    result["stashed"] = True
+                    result["stash_name"] = stash_name
+                    result["messages"].append("Changes stashed successfully")
+                else:
+                    return {
+                        "status": "error",
+                        "error": f"Failed to stash changes: {stash_result.stderr}",
+                        "messages": result["messages"],
+                    }
+
+            # 6. Check out the branch
+            if current_branch != branch:
+                result["messages"].append(
+                    f"Switching from '{current_branch}' to '{branch}'..."
+                )
+
+                checkout_result = subprocess.run(
+                    ["git", "checkout", branch],
+                    cwd=self.project_root,
+                    capture_output=True,
+                    text=True,
+                )
+
+                if checkout_result.returncode != 0:
+                    # Try to create the branch from remote
+                    checkout_result = subprocess.run(
+                        ["git", "checkout", "-b", branch, f"origin/{branch}"],
+                        cwd=self.project_root,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                    if checkout_result.returncode != 0:
+                        # Restore stash if we made one
+                        if result["stashed"]:
+                            subprocess.run(
+                                ["git", "stash", "pop"],
+                                cwd=self.project_root,
+                                capture_output=True,
+                            )
+                        return {
+                            "status": "error",
+                            "error": f"Failed to checkout branch '{branch}': {checkout_result.stderr}",
+                            "messages": result["messages"],
+                        }
+
+                result["messages"].append(f"Switched to branch '{branch}'")
+            else:
+                result["messages"].append(f"Already on branch '{branch}'")
+
+            # 7. Pull latest changes
+            result["messages"].append("Pulling latest changes...")
+            pull_result = subprocess.run(
+                ["git", "pull", "origin", branch],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+
+            if pull_result.returncode == 0:
+                result["messages"].append("Pull completed successfully")
+            else:
+                result["messages"].append(f"Warning: pull failed: {pull_result.stderr}")
+
+            result["messages"].append("")
+            result["messages"].append("Ready for teleport! Run:")
+            result["messages"].append("  claude --teleport <uuid>")
+
+            if result["stashed"]:
+                result["messages"].append("")
+                result["messages"].append(
+                    "After teleport, restore your stashed changes with:"
+                )
+                result["messages"].append("  idlergear teleport restore-stash")
+
+            return result
+
+        except subprocess.CalledProcessError as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "messages": result.get("messages", []),
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "messages": result.get("messages", []),
+            }
+
+    def restore_stash(self) -> Dict:
+        """
+        Restore the most recent idlergear teleport stash.
+
+        Returns:
+            Dictionary with restoration status
+        """
+        try:
+            # List stashes to find idlergear teleport stashes
+            stash_list = subprocess.run(
+                ["git", "stash", "list"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            # Find the most recent idlergear-teleport stash
+            stash_index = None
+            stash_name = None
+            for line in stash_list.stdout.split("\n"):
+                if "idlergear-teleport-" in line:
+                    # Extract stash index (e.g., "stash@{0}")
+                    stash_index = line.split(":")[0]
+                    # Extract stash name
+                    if "idlergear-teleport-" in line:
+                        start = line.find("idlergear-teleport-")
+                        stash_name = line[start:].strip()
+                    break
+
+            if stash_index is None:
+                return {
+                    "status": "no_stash",
+                    "message": "No idlergear teleport stash found",
+                }
+
+            # Pop the stash
+            pop_result = subprocess.run(
+                ["git", "stash", "pop", stash_index],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+
+            if pop_result.returncode == 0:
+                return {
+                    "status": "restored",
+                    "stash_name": stash_name,
+                    "message": f"Restored stash: {stash_name}",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": pop_result.stderr,
+                    "message": f"Failed to restore stash: {pop_result.stderr}",
+                }
+
+        except subprocess.CalledProcessError as e:
+            return {
+                "status": "error",
+                "error": str(e),
+            }
+
     def log_session(
         self,
         session_id: str,
