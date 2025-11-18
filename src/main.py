@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import subprocess
 import sys
@@ -20,6 +21,7 @@ ProjectSync = importlib.import_module("src.sync").ProjectSync
 LogCoordinator = importlib.import_module("src.logs").LogCoordinator
 MessageManager = importlib.import_module("src.messages").MessageManager
 CoordRepo = importlib.import_module("src.coord").CoordRepo
+TeleportTracker = importlib.import_module("src.teleport").TeleportTracker
 
 app = typer.Typer()
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
@@ -1033,6 +1035,270 @@ def mcp(
         typer.secho(
             f"Unknown action: {action}. Use 'start' or 'info'", fg=typer.colors.RED
         )
+        raise typer.Exit(1)
+
+
+@app.command(name="teleport")
+def teleport_command(
+    action: str = typer.Argument(
+        ...,
+        help="Action: prepare, watch, finish, log, list, show, export, or restore-stash",
+    ),
+    session_id: str = typer.Option(
+        None, "--session-id", "--id", help="Teleport session UUID"
+    ),
+    description: str = typer.Option(
+        None, "--description", "-d", help="Session description"
+    ),
+    files: str = typer.Option(
+        None, "--files", help="Comma-separated list of changed files"
+    ),
+    branch: str = typer.Option(
+        "main", "--branch", "-b", help="Branch name (default: main)"
+    ),
+    limit: int = typer.Option(
+        10, "--limit", "-n", help="Limit number of sessions to show"
+    ),
+    output_format: str = typer.Option(
+        "text", "--format", "-f", help="Output format: text, json, or markdown"
+    ),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    command: str = typer.Option(
+        None, "--command", "-c", help="Command to run (default: ./run.sh)"
+    ),
+    poll_interval: int = typer.Option(
+        10, "--poll", help="Seconds between checking for remote changes (watch mode)"
+    ),
+    auto_restart: bool = typer.Option(
+        False,
+        "--auto-restart",
+        help="Auto-restart command on code changes (default: manual)",
+    ),
+):
+    """
+    Track and manage Claude Code web teleport sessions.
+
+    Teleport restore is a feature in Claude Code web that transfers your
+    web-based coding session to your local CLI environment. This command
+    helps you track these sessions and clean up branches.
+
+    Actions:
+      prepare       - Prepare for teleport (defaults to main branch)
+      watch         - Watch for code changes and notify to run ./run.sh
+      finish        - Merge to main, cleanup branches, push, restore stash
+      log           - Log a teleport session
+      list          - List past sessions
+      show          - Show session details
+      export        - Export session info
+      restore-stash - Restore stashed changes
+
+    Live Testing Workflow:
+      idlergear teleport prepare        # Setup
+      claude --teleport <uuid>          # Get session
+      idlergear teleport watch          # Watch for changes
+      # (when new code arrives, you'll be notified to run: ./run.sh)
+      # Press Ctrl+C when done
+      idlergear teleport finish         # Cleanup
+
+    Simple Workflow (no live testing):
+      idlergear teleport prepare        # Stash, fetch, checkout main
+      claude --teleport <uuid>          # Run teleport
+      idlergear teleport finish         # Merge to main, cleanup, push
+
+    Examples:
+      # Watch mode - notifies you when new code arrives
+      idlergear teleport watch
+
+      # Watch with auto-restart (optional)
+      idlergear teleport watch --auto-restart
+
+      # Prepare for teleport (defaults to main)
+      idlergear teleport prepare
+
+      # After teleport, merge to main and cleanup
+      idlergear teleport finish
+    """
+    try:
+        tracker = TeleportTracker(path)
+
+        if action == "prepare":
+            typer.echo(f"🚀 Preparing for teleport to branch '{branch}'...")
+            typer.echo("")
+
+            result = tracker.prepare_for_teleport(branch)
+
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("✅ Ready for teleport!", fg=typer.colors.GREEN)
+            else:
+                typer.echo("")
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "watch":
+            cmd = command if command else "./run.sh"
+
+            typer.echo("👁️  Starting watch session...")
+            typer.echo(f"   Command: {cmd}")
+            typer.echo(f"   Poll interval: {poll_interval}s")
+            typer.echo(f"   Auto-restart: {auto_restart}")
+            typer.echo("")
+
+            def callback(message):
+                typer.echo(message)
+
+            result = tracker.watch_session(
+                command=cmd,
+                poll_interval=poll_interval,
+                auto_restart=auto_restart,
+                callback=callback,
+            )
+
+            typer.echo("")
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("✅ Watch session ended", fg=typer.colors.GREEN)
+                typer.echo("")
+                typer.echo("Next step: idlergear teleport finish")
+            else:
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "finish":
+            typer.echo(f"🏁 Finishing teleport (merging to {branch})...")
+            typer.echo("")
+
+            result = tracker.finish_teleport(branch)
+
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("✅ Teleport complete!", fg=typer.colors.GREEN)
+            else:
+                typer.echo("")
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "restore-stash":
+            typer.echo("🔄 Restoring stashed changes...")
+
+            result = tracker.restore_stash()
+
+            if result["status"] == "restored":
+                typer.secho(f"✅ {result['message']}", fg=typer.colors.GREEN)
+            elif result["status"] == "no_stash":
+                typer.secho(f"ℹ️  {result['message']}", fg=typer.colors.YELLOW)
+            else:
+                typer.secho(
+                    f"❌ {result.get('message', result.get('error', 'Unknown error'))}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "log":
+            if not session_id:
+                typer.secho("Error: --session-id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            # Parse files if provided
+            files_list = None
+            if files:
+                files_list = [f.strip() for f in files.split(",")]
+
+            typer.echo(f"📍 Logging teleport session: {session_id[:8]}...")
+
+            result = tracker.log_session(
+                session_id=session_id,
+                description=description,
+                files_changed=files_list,
+                branch=branch,
+            )
+
+            if result["status"] == "created":
+                typer.secho("✅ Session logged", fg=typer.colors.GREEN)
+            else:
+                typer.secho("✅ Session updated", fg=typer.colors.GREEN)
+
+            session = result["session"]
+            typer.echo(f"   Session: {session['session_id'][:8]}")
+            typer.echo(f"   Branch: {session['branch']}")
+            typer.echo(f"   Files changed: {session['files_count']}")
+            typer.echo(f"   Saved to: {result['session_file']}")
+
+        elif action == "list":
+            # Get branch filter if specified
+            branch_filter = branch
+
+            sessions = tracker.list_sessions(limit=limit, branch=branch_filter)
+
+            if output_format == "json":
+                typer.echo(json.dumps(sessions, indent=2))
+            elif output_format == "markdown":
+                if not sessions:
+                    typer.echo("No sessions found.")
+                else:
+                    for session in sessions:
+                        typer.echo(tracker._format_session_markdown(session))
+                        typer.echo("")
+            else:  # text
+                typer.echo(tracker.format_session_list(sessions))
+
+        elif action == "show":
+            if not session_id:
+                typer.secho("Error: --session-id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            session = tracker.get_session(session_id)
+
+            if not session:
+                typer.secho(f"Session not found: {session_id}", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            if output_format == "json":
+                typer.echo(json.dumps(session, indent=2))
+            elif output_format == "markdown":
+                typer.echo(tracker._format_session_markdown(session))
+            else:  # text
+                typer.echo(tracker.format_session(session))
+
+        elif action == "export":
+            if not session_id:
+                typer.secho("Error: --session-id required", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            export_format = (
+                output_format if output_format in ["json", "markdown"] else "json"
+            )
+            result = tracker.export_session(session_id, export_format)
+
+            typer.echo(result["content"])
+
+        else:
+            typer.secho(
+                f"Unknown action: {action}. Use: prepare, watch, finish, log, list, show, export, or restore-stash",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
