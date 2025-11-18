@@ -957,6 +957,75 @@ eddi-msgsrv send "SCREENSHOT" --server local
 
 ---
 
+## Bonus: Using the Coding Assistant as Your App's AI Backend
+
+**IMPORTANT:** If your app needs LLM capabilities, use the coding assistant as the backend during development!
+
+### Don't Do This ❌
+
+```python
+import openai
+openai.api_key = os.getenv("OPENAI_API_KEY")  # Requires API key
+response = openai.ChatCompletion.create(...)  # Costs money
+```
+
+### Do This ✅
+
+```python
+from llm_client import LocalLLMClient
+
+llm = LocalLLMClient()  # Uses file-based IPC
+response = llm.complete("Your prompt here")  # Free, no API key needed!
+```
+
+**How it works:**
+1. Your app writes request to `.idlergear/llm-requests/request.json`
+2. Coding assistant (me!) sees the request
+3. I respond via `.idlergear/llm-responses/response.json`
+4. Your app reads the response
+
+**Benefits:**
+- ✅ No API keys needed
+- ✅ Zero cost during development
+- ✅ I can see what your app is asking and provide better responses
+- ✅ Easy debugging (I see all prompts in real-time)
+- ✅ Works offline
+
+**Example: Chat app using local LLM backend:**
+
+```python
+# src/chat_app.py
+from llm_client import LocalLLMClient
+
+llm = LocalLLMClient()
+
+while True:
+    user_input = input("You: ")
+    response = llm.complete(user_input)
+    print(f"AI: {response}")
+```
+
+When you run this, I (the coding assistant) will respond to your app's prompts!
+
+**For production deployment:**
+
+```python
+# Automatically switch based on environment
+if os.getenv("ENV") == "development":
+    llm = LocalLLMClient()  # IPC during dev
+else:
+    llm = OpenAIClient()     # Real API in production
+```
+
+**See `AI_INSTRUCTIONS/LLM_BACKEND.md` for complete documentation including:**
+- File-based IPC (simplest)
+- Unix socket IPC (fastest)
+- HTTP IPC (most compatible - works with OpenAI SDK!)
+- RAG application example
+- Production deployment patterns
+
+---
+
 ## Summary
 
 This workflow gives you:
@@ -967,6 +1036,7 @@ This workflow gives you:
 ✅ **Real-time feedback loop** - Logs stream instantly
 ✅ **Best of both worlds** - Web for coding, local for GUI testing
 ✅ **Complete automation** - Listeners handle all the complexity
+✅ **LLM as backend** - Use coding assistant as AI backend for your app (no API keys!)
 
 **The killer feature:** Claude Code Web can develop and test headless code, then delegate interactive testing to your local machine, receive logs in real-time, fix bugs, and repeat - all without you manually copying logs or switching contexts.
 
