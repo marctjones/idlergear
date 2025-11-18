@@ -350,6 +350,174 @@ class TeleportTracker:
                 "error": str(e),
             }
 
+    def finish_teleport(self, target_branch: str = "main") -> Dict:
+        """
+        Finish teleport by merging to target branch and cleaning up.
+
+        This method:
+        1. If on a feature branch, merge it to target branch (default: main)
+        2. Delete the feature branch locally and remotely
+        3. Push changes
+        4. Restore any stashed changes
+
+        Args:
+            target_branch: Branch to merge into (default: main)
+
+        Returns:
+            Dictionary with finish status and details
+        """
+        result = {
+            "status": "ok",
+            "messages": [],
+            "merged_branch": None,
+            "deleted_branches": [],
+        }
+
+        try:
+            current_branch = self._get_current_branch()
+            result["original_branch"] = current_branch
+
+            # If already on target branch, just push and restore stash
+            if current_branch == target_branch:
+                result["messages"].append(f"Already on {target_branch}")
+
+                # Push any changes
+                result["messages"].append(f"Pushing to {target_branch}...")
+                push_result = subprocess.run(
+                    ["git", "push", "origin", target_branch],
+                    cwd=self.project_root,
+                    capture_output=True,
+                    text=True,
+                )
+                if push_result.returncode == 0:
+                    result["messages"].append("Push completed")
+                else:
+                    result["messages"].append(
+                        f"Warning: push failed: {push_result.stderr}"
+                    )
+
+                # Restore stash
+                stash_result = self.restore_stash()
+                if stash_result["status"] == "restored":
+                    result["messages"].append(
+                        f"Restored stash: {stash_result.get('stash_name', '')}"
+                    )
+
+                return result
+
+            # We're on a feature branch - merge to target
+            feature_branch = current_branch
+            result["merged_branch"] = feature_branch
+            result["messages"].append(
+                f"Merging '{feature_branch}' into '{target_branch}'..."
+            )
+
+            # Checkout target branch
+            checkout_result = subprocess.run(
+                ["git", "checkout", target_branch],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if checkout_result.returncode != 0:
+                return {
+                    "status": "error",
+                    "error": f"Failed to checkout {target_branch}: {checkout_result.stderr}",
+                    "messages": result["messages"],
+                }
+
+            # Merge feature branch
+            merge_result = subprocess.run(
+                ["git", "merge", feature_branch, "--no-edit"],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if merge_result.returncode != 0:
+                return {
+                    "status": "error",
+                    "error": f"Merge failed: {merge_result.stderr}. Resolve conflicts manually.",
+                    "messages": result["messages"],
+                }
+
+            result["messages"].append(
+                f"Merged '{feature_branch}' into '{target_branch}'"
+            )
+
+            # Push target branch
+            result["messages"].append(f"Pushing {target_branch}...")
+            push_result = subprocess.run(
+                ["git", "push", "origin", target_branch],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if push_result.returncode == 0:
+                result["messages"].append("Push completed")
+            else:
+                result["messages"].append(f"Warning: push failed: {push_result.stderr}")
+
+            # Delete local feature branch
+            result["messages"].append(f"Deleting local branch '{feature_branch}'...")
+            delete_local = subprocess.run(
+                ["git", "branch", "-d", feature_branch],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if delete_local.returncode == 0:
+                result["deleted_branches"].append(f"{feature_branch} (local)")
+                result["messages"].append(f"Deleted local branch '{feature_branch}'")
+            else:
+                result["messages"].append(
+                    f"Warning: could not delete local branch: {delete_local.stderr}"
+                )
+
+            # Delete remote feature branch
+            result["messages"].append(f"Deleting remote branch '{feature_branch}'...")
+            delete_remote = subprocess.run(
+                ["git", "push", "origin", "--delete", feature_branch],
+                cwd=self.project_root,
+                capture_output=True,
+                text=True,
+            )
+            if delete_remote.returncode == 0:
+                result["deleted_branches"].append(f"{feature_branch} (remote)")
+                result["messages"].append(f"Deleted remote branch '{feature_branch}'")
+            else:
+                result["messages"].append(
+                    f"Warning: could not delete remote branch: {delete_remote.stderr}"
+                )
+
+            # Restore stash
+            stash_result = self.restore_stash()
+            if stash_result["status"] == "restored":
+                result["messages"].append(
+                    f"Restored stash: {stash_result.get('stash_name', '')}"
+                )
+
+            result["messages"].append("")
+            result["messages"].append(f"✅ All changes merged to {target_branch}")
+            if result["deleted_branches"]:
+                result["messages"].append(
+                    f"   Cleaned up: {', '.join(result['deleted_branches'])}"
+                )
+
+            return result
+
+        except subprocess.CalledProcessError as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "messages": result.get("messages", []),
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e),
+                "messages": result.get("messages", []),
+            }
+
     def log_session(
         self,
         session_id: str,

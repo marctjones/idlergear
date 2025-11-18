@@ -1041,7 +1041,7 @@ def mcp(
 @app.command(name="teleport")
 def teleport_command(
     action: str = typer.Argument(
-        ..., help="Action: prepare, log, list, show, export, or restore-stash"
+        ..., help="Action: prepare, finish, log, list, show, export, or restore-stash"
     ),
     session_id: str = typer.Option(
         None, "--session-id", "--id", help="Teleport session UUID"
@@ -1052,7 +1052,9 @@ def teleport_command(
     files: str = typer.Option(
         None, "--files", help="Comma-separated list of changed files"
     ),
-    branch: str = typer.Option(None, "--branch", "-b", help="Branch name"),
+    branch: str = typer.Option(
+        "main", "--branch", "-b", help="Branch name (default: main)"
+    ),
     limit: int = typer.Option(
         10, "--limit", "-n", help="Limit number of sessions to show"
     ),
@@ -1066,43 +1068,39 @@ def teleport_command(
 
     Teleport restore is a feature in Claude Code web that transfers your
     web-based coding session to your local CLI environment. This command
-    helps you track these sessions.
+    helps you track these sessions and clean up branches.
 
     Actions:
-      prepare       - Prepare local environment for teleport (fetch, stash, checkout)
-      log           - Log a new teleport session
-      list          - List past teleport sessions
-      show          - Show details of a specific session
-      export        - Export session information
-      restore-stash - Restore stashed changes after teleport
+      prepare       - Prepare for teleport (defaults to main branch)
+      finish        - Merge to main, cleanup branches, push, restore stash
+      log           - Log a teleport session
+      list          - List past sessions
+      show          - Show session details
+      export        - Export session info
+      restore-stash - Restore stashed changes
+
+    Simple Workflow (3 commands):
+      idlergear teleport prepare        # Stash, fetch, checkout main
+      claude --teleport <uuid>          # Run teleport
+      idlergear teleport finish         # Merge to main, cleanup, push
 
     Examples:
-      # Prepare for teleport (recommended first step)
+      # Prepare for teleport (defaults to main)
+      idlergear teleport prepare
+
+      # Or specify a different branch
       idlergear teleport prepare --branch feature/my-feature
 
-      # Then run teleport
-      claude --teleport abc-123-def
+      # After teleport, merge to main and cleanup
+      idlergear teleport finish
 
-      # Log the session
-      idlergear teleport log --session-id abc-123-def --description "Feature X"
-
-      # Restore any stashed changes
-      idlergear teleport restore-stash
-
-      # List recent sessions
-      idlergear teleport list
-
-      # Show session details
-      idlergear teleport show --session-id abc-123
+      # Log session for tracking
+      idlergear teleport log --session-id abc-123 --description "Feature X"
     """
     try:
         tracker = TeleportTracker(path)
 
         if action == "prepare":
-            if not branch:
-                typer.secho("Error: --branch required for prepare", fg=typer.colors.RED)
-                raise typer.Exit(1)
-
             typer.echo(f"🚀 Preparing for teleport to branch '{branch}'...")
             typer.echo("")
 
@@ -1114,6 +1112,26 @@ def teleport_command(
             if result["status"] == "ok":
                 typer.echo("")
                 typer.secho("✅ Ready for teleport!", fg=typer.colors.GREEN)
+            else:
+                typer.echo("")
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown error')}",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+        elif action == "finish":
+            typer.echo(f"🏁 Finishing teleport (merging to {branch})...")
+            typer.echo("")
+
+            result = tracker.finish_teleport(branch)
+
+            for message in result.get("messages", []):
+                typer.echo(message)
+
+            if result["status"] == "ok":
+                typer.echo("")
+                typer.secho("✅ Teleport complete!", fg=typer.colors.GREEN)
             else:
                 typer.echo("")
                 typer.secho(
@@ -1218,7 +1236,7 @@ def teleport_command(
 
         else:
             typer.secho(
-                f"Unknown action: {action}. Use: prepare, log, list, show, export, or restore-stash",
+                f"Unknown action: {action}. Use: prepare, finish, log, list, show, export, or restore-stash",
                 fg=typer.colors.RED,
             )
             raise typer.Exit(1)
