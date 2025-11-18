@@ -565,7 +565,8 @@ def sync_command(
 @app.command()
 def logs(
     action: str = typer.Argument(
-        ..., help="Action: run, pipe, list, show, export, or cleanup"
+        ...,
+        help="Action: run, pipe, serve, stream, follow, list, show, export, cleanup, pull-loki",
     ),
     session_id: int = typer.Option(None, "--session", "-s", help="Session ID"),
     command: str = typer.Option(
@@ -579,17 +580,32 @@ def logs(
     output: str = typer.Option(None, "--output", "-o", help="Export output file"),
     days: int = typer.Option(7, "--days", "-d", help="Days to keep logs (cleanup)"),
     path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    port: int = typer.Option(
+        None, "--port", help="TCP port for serve (default: Unix socket)"
+    ),
+    target: str = typer.Option(
+        None, "--to", help="Target for stream (session name or host:port)"
+    ),
+    loki_url: str = typer.Option(None, "--loki", help="Loki URL for pull-loki"),
+    query: str = typer.Option(None, "--query", "-q", help="Query for pull-loki"),
+    since: str = typer.Option(
+        "1h", "--since", help="Time range for pull (e.g., 1h, 30m, 2d)"
+    ),
 ):
     """
     Capture and manage logs from shell scripts and processes.
 
     Actions:
-      run     - Run command and capture all output
-      pipe    - Capture input from stdin (piped data)
-      list    - List all log sessions
-      show    - Show log for a session
-      export  - Export session log to file
-      cleanup - Delete old log files
+      run        - Run command and capture all output
+      pipe       - Capture input from stdin (piped data)
+      serve      - Start server to receive streamed logs
+      stream     - Stream stdin to a log server
+      follow     - Follow a log session in real-time
+      list       - List all log sessions
+      show       - Show log for a session
+      export     - Export session log to file
+      cleanup    - Delete old log files
+      pull-loki  - Pull logs from Grafana Loki
 
     Examples:
       # Run a script and capture logs
@@ -597,7 +613,20 @@ def logs(
 
       # Pipe output from another command
       ./run.sh | idlergear logs pipe --name my-app --source run.sh
-      tail -f /var/log/app.log | idlergear logs pipe --name app-monitor
+
+      # Multi-terminal: serve in one, stream from another
+      idlergear logs serve --name debug                    # Terminal 1
+      ./run.sh 2>&1 | idlergear logs stream --to debug     # Terminal 2
+
+      # Remote streaming (different machines)
+      idlergear logs serve --name debug --port 9999        # Local machine
+      ./run.sh 2>&1 | idlergear logs stream --to 192.168.1.100:9999  # Remote
+
+      # Follow logs in real-time
+      idlergear logs follow --session 1
+
+      # Pull from Loki
+      idlergear logs pull-loki --loki http://loki:3100 --query '{app="myapp"}' --since 1h
 
       # List all sessions
       idlergear logs list
@@ -756,9 +785,125 @@ def logs(
             deleted = coordinator.cleanup_old_logs(days=days)
             typer.secho(f"✅ Deleted {deleted} old log file(s)", fg=typer.colors.GREEN)
 
+        elif action == "serve":
+            if not name:
+                typer.secho(
+                    "Error: --name required for 'serve' action", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+
+            typer.echo("📡 Starting log server...")
+            typer.echo(f"   Name: {name}")
+            if port:
+                typer.echo(f"   Port: {port}")
+                typer.echo(
+                    f"   Connect with: idlergear logs stream --to <your-ip>:{port}"
+                )
+            else:
+                typer.echo(f"   Socket: /tmp/idlergear-logs-{name}.sock")
+                typer.echo(f"   Connect with: idlergear logs stream --to {name}")
+            typer.echo("")
+            typer.secho("Press Ctrl+C to stop", fg=typer.colors.YELLOW)
+            typer.echo("")
+
+            def callback(message):
+                typer.echo(message)
+
+            session = coordinator.serve(name=name, port=port, callback=callback)
+
+            typer.echo("")
+            typer.secho("Server stopped", fg=typer.colors.GREEN)
+            typer.echo(f"   Session ID: {session['session_id']}")
+            typer.echo(f"   Lines received: {session.get('line_count', 0)}")
+            typer.echo(
+                f"   View logs: idlergear logs show --session {session['session_id']}"
+            )
+
+        elif action == "stream":
+            if not target:
+                typer.secho(
+                    "Error: --to required for 'stream' action", fg=typer.colors.RED
+                )
+                typer.echo("Example: idlergear logs stream --to debug")
+                typer.echo("         idlergear logs stream --to 192.168.1.100:9999")
+                raise typer.Exit(1)
+
+            typer.echo(f"📤 Streaming to {target}...")
+            typer.echo("   Reading from stdin... (Ctrl+C to stop)")
+
+            def callback(message):
+                typer.echo(message)
+
+            result = coordinator.stream(target=target, callback=callback)
+
+            if result["status"] == "ok":
+                typer.secho(
+                    f"✅ Sent {result['lines_sent']} lines", fg=typer.colors.GREEN
+                )
+            else:
+                typer.secho(
+                    f"❌ Error: {result.get('error', 'Unknown')}", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+
+        elif action == "follow":
+            if session_id is None:
+                typer.secho(
+                    "Error: --session required for 'follow' action", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+
+            session = coordinator.get_session(session_id)
+            if not session:
+                typer.secho(
+                    f"Error: Session {session_id} not found", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+
+            typer.echo(f"👁️  Following session {session_id}: {session['name']}")
+            typer.secho("Press Ctrl+C to stop", fg=typer.colors.YELLOW)
+            typer.echo("")
+
+            coordinator.follow(session_id)
+
+            typer.echo("")
+            typer.secho("✅ Follow stopped", fg=typer.colors.GREEN)
+
+        elif action == "pull-loki":
+            if not loki_url:
+                typer.secho(
+                    "Error: --loki required for 'pull-loki' action", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+            if not query:
+                typer.secho(
+                    "Error: --query required for 'pull-loki' action",
+                    fg=typer.colors.RED,
+                )
+                raise typer.Exit(1)
+
+            typer.echo("Pulling logs from Loki...")
+            typer.echo(f"   URL: {loki_url}")
+            typer.echo(f"   Query: {query}")
+            typer.echo(f"   Since: {since}")
+
+            session = coordinator.pull_from_loki(
+                url=loki_url, query=query, since=since, name=name
+            )
+
+            typer.secho(
+                f"✅ Pulled {session.get('line_count', 0)} lines", fg=typer.colors.GREEN
+            )
+            typer.echo(f"   Session ID: {session['session_id']}")
+            typer.echo(
+                f"   View logs: idlergear logs show --session {session['session_id']}"
+            )
+
         else:
             typer.secho(f"Unknown action: {action}", fg=typer.colors.RED)
-            typer.echo("Valid actions: run, pipe, list, show, export, cleanup")
+            typer.echo(
+                "Valid actions: run, pipe, serve, stream, follow, list, show, export, cleanup, pull-loki"
+            )
             raise typer.Exit(1)
 
     except Exception as e:

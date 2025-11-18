@@ -17,6 +17,7 @@ You are assisting with this project. Your job is to **follow the established pro
 3. **Read the research and tools guides**:
    - `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md` - **REQUIRED before adding dependencies or implementing complex features**
    - `AI_INSTRUCTIONS/RECOMMENDED_TOOLS.md` - Tools for package search, security scanning, and research
+   - `AI_INSTRUCTIONS/LOGGING_DEBUGGING.md` - **REQUIRED when writing scripts that need debugging or log capture**
 
 4. **Follow the workflow** outlined in DEVELOPMENT.md:
    - Verify/activate isolated development environment
