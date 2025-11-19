@@ -372,6 +372,142 @@ sudo systemctl start myapp-gunicorn myapp-eddi
 
 ---
 
+## Why Use Unix Domain Sockets?
+
+### Benefits for Development and Testing
+
+**Performance**
+- 2-3x faster than TCP loopback for local connections
+- No TCP/IP stack overhead (no packet framing, checksums, routing)
+- Kernel handles data transfer directly between processes
+- Lower latency for high-frequency requests
+
+**Security**
+- File system permissions control access (chmod, chown)
+- Not exposed to network - can't be accessed remotely
+- No port scanning or accidental exposure
+- Audit trail via file system access logs
+
+**Simplicity**
+- No port conflicts - just use different socket paths
+- No firewall configuration needed
+- No "address already in use" errors (just delete old socket file)
+- Easy cleanup: `rm /tmp/myapp.sock`
+
+**Resource Efficiency**
+- No ephemeral port exhaustion
+- Lower memory footprint
+- Faster connection establishment
+
+### When to Use UDS
+
+**Good candidates:**
+- Web apps in development/testing (Flask, Django, FastAPI)
+- Microservices communicating on same host
+- Database connections (PostgreSQL, MySQL support UDS)
+- Apps that will be served via reverse proxy (nginx, eddi)
+- Background workers talking to web processes
+- Any app that only needs local access
+
+**Less suitable:**
+- Apps that must accept connections from other machines
+- Services that need to bind to specific network interfaces
+- Apps with clients that can't use UDS (older tools)
+
+### App Type Recommendations
+
+| App Type | UDS Recommended? | Notes |
+|----------|------------------|-------|
+| Flask/Django dev server | Yes | Use gunicorn with UDS bind |
+| FastAPI/ASGI apps | Yes | Uvicorn supports UDS natively |
+| API development | Yes | Test with curl --unix-socket |
+| Static site generators | Maybe | Only if serving via reverse proxy |
+| WebSocket apps | Yes | Works well with UDS |
+| gRPC services | Yes | gRPC supports UDS natively |
+| GraphQL servers | Yes | Standard HTTP over UDS |
+| Database servers | Yes | PostgreSQL: `host=/tmp` in connection |
+| Redis/Cache servers | Yes | Redis supports UDS by default |
+| Multi-container Docker | No | Containers need TCP for networking |
+| Kubernetes services | No | Service mesh needs TCP |
+| Public-facing production | No | Need load balancer/CDN |
+
+### Development Workflow
+
+1. **Local development**: Bind to UDS, test with curl
+2. **Integration testing**: Multiple services on different sockets
+3. **Staging**: UDS behind nginx or eddi
+4. **Production**: Keep UDS internally, expose via load balancer
+
+### Example: Switching Between TCP and UDS
+
+```python
+# config.py
+import os
+
+if os.getenv('PRODUCTION'):
+    # TCP for production load balancer
+    BIND = "0.0.0.0:8000"
+else:
+    # UDS for development
+    BIND = "unix:/tmp/myapp.sock"
+```
+
+```bash
+# Development
+gunicorn --bind unix:/tmp/myapp.sock myapp:app
+
+# Production
+gunicorn --bind 0.0.0.0:8000 myapp:app
+```
+
+### Database Connections via UDS
+
+PostgreSQL:
+```python
+# Faster than TCP localhost
+conn = psycopg2.connect(
+    host="/var/run/postgresql",  # Socket directory
+    database="mydb",
+    user="myuser"
+)
+```
+
+MySQL:
+```python
+conn = mysql.connector.connect(
+    unix_socket="/var/run/mysqld/mysqld.sock",
+    database="mydb",
+    user="myuser"
+)
+```
+
+Redis:
+```python
+import redis
+r = redis.Redis(unix_socket_path="/var/run/redis/redis.sock")
+```
+
+### When NOT to Use UDS
+
+- **Remote access needed**: Clients on other machines
+- **Container networking**: Docker/K8s service discovery uses TCP
+- **Cloud load balancers**: AWS ALB, GCP LB need TCP endpoints
+- **Legacy clients**: Some older tools don't support UDS
+- **Debugging network issues**: TCP gives better visibility with tcpdump
+
+### Performance Comparison
+
+Typical benchmarks (requests/second, local):
+
+| Connection Type | Simple GET | JSON POST | File Upload |
+|-----------------|------------|-----------|-------------|
+| TCP localhost   | 10,000     | 8,000     | 5,000       |
+| Unix socket     | 25,000     | 20,000    | 12,000      |
+
+*Results vary by hardware and payload size. UDS advantage increases with smaller payloads.*
+
+---
+
 ## Testing Your Hidden Service
 
 ### Accessing Apps via Unix Domain Sockets (Local Testing)
