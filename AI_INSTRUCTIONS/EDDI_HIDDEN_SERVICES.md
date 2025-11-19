@@ -374,6 +374,122 @@ sudo systemctl start myapp-gunicorn myapp-eddi
 
 ## Testing Your Hidden Service
 
+### Accessing Apps via Unix Domain Sockets (Local Testing)
+
+Before exposing your app via Tor, test it locally by connecting directly to the UDS.
+
+#### Using curl
+
+curl can connect directly to Unix sockets:
+
+```bash
+# Basic request
+curl --unix-socket /tmp/myapp.sock http://localhost/
+
+# With headers
+curl --unix-socket /tmp/myapp.sock -H "Content-Type: application/json" http://localhost/api/data
+
+# POST request
+curl --unix-socket /tmp/myapp.sock -X POST -d '{"key": "value"}' http://localhost/api/submit
+
+# Verbose output
+curl -v --unix-socket /tmp/myapp.sock http://localhost/health
+```
+
+Note: The `http://localhost/` part is required but the hostname is ignored - only the path matters.
+
+#### Using Python
+
+```python
+# Using requests with requests-unixsocket
+import requests_unixsocket
+
+session = requests_unixsocket.Session()
+# URL format: http+unix://%2Ftmp%2Fmyapp.sock/path
+response = session.get('http+unix://%2Ftmp%2Fmyapp.sock/')
+print(response.json())
+
+# Or with raw sockets
+import socket
+import http.client
+
+class UnixSocketHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, socket_path):
+        super().__init__('localhost')
+        self.socket_path = socket_path
+
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(self.socket_path)
+
+conn = UnixSocketHTTPConnection('/tmp/myapp.sock')
+conn.request('GET', '/')
+response = conn.getresponse()
+print(response.read().decode())
+```
+
+#### Using a Web Browser (via socat bridge)
+
+Browsers cannot connect to UDS directly. Bridge to TCP with socat:
+
+```bash
+# Install socat
+sudo apt install socat
+
+# Bridge UDS to TCP port 8080
+socat TCP-LISTEN:8080,reuseaddr,fork UNIX-CONNECT:/tmp/myapp.sock
+
+# Now access in browser: http://localhost:8080
+```
+
+Or use a simple Python bridge:
+
+```python
+#!/usr/bin/env python3
+import socket
+import threading
+
+def bridge(tcp_port, unix_socket_path):
+    tcp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    tcp_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    tcp_sock.bind(('127.0.0.1', tcp_port))
+    tcp_sock.listen(5)
+    print(f"Bridge: localhost:{tcp_port} → {unix_socket_path}")
+
+    while True:
+        client, addr = tcp_sock.accept()
+        unix_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        unix_sock.connect(unix_socket_path)
+
+        def forward(src, dst):
+            try:
+                while True:
+                    data = src.recv(4096)
+                    if not data: break
+                    dst.sendall(data)
+            except: pass
+            finally:
+                src.close()
+                dst.close()
+
+        threading.Thread(target=forward, args=(client, unix_sock)).start()
+        threading.Thread(target=forward, args=(unix_sock, client)).start()
+
+if __name__ == '__main__':
+    bridge(8080, '/tmp/myapp.sock')
+```
+
+#### Using httpie
+
+```bash
+# Install httpie with socket support
+pip install httpie httpie-unixsocket
+
+# Make requests
+http --unix-socket=/tmp/myapp.sock GET http://localhost/
+http --unix-socket=/tmp/myapp.sock POST http://localhost/api/data key=value
+```
+
 ### From Tor Browser
 
 1. Install Tor Browser: https://www.torproject.org/download/
