@@ -6,6 +6,10 @@
 
 ## Architecture Overview
 
+### Simple Setup (Recommended)
+
+eddi connects directly to gunicorn - no nginx needed:
+
 ```
                     Tor Network
                          │
@@ -18,17 +22,18 @@
                   │ /tmp/myapp.sock
                   ▼
 ┌─────────────────────────────────────────┐
-│  nginx (optional)                       │
-│  (reverse proxy, static files, TLS)     │
-│  UDS → gunicorn UDS                     │
-└─────────────────┬───────────────────────┘
-                  │ /tmp/myapp-gunicorn.sock
-                  ▼
-┌─────────────────────────────────────────┐
 │  gunicorn                               │
 │  (WSGI/ASGI server)                     │
 │  Serves your Python app                 │
 └─────────────────────────────────────────┘
+```
+
+### With nginx (Optional)
+
+Only add nginx if you need: static file serving, rate limiting, multiple backends, or additional buffering:
+
+```
+eddi → nginx (UDS) → gunicorn (UDS) → app
 ```
 
 ---
@@ -121,9 +126,16 @@ gunicorn --config gunicorn_config.py "main:app"
 
 ---
 
-## With nginx (Recommended for Production)
+## With nginx (Optional)
 
-nginx provides additional features: static file serving, buffering, rate limiting, and optional internal TLS.
+Only add nginx if you need these features:
+- Static file serving (images, CSS, JS)
+- Rate limiting
+- Request buffering for large uploads
+- Load balancing across multiple gunicorn instances
+- Additional security headers
+
+For most apps, eddi → gunicorn directly is sufficient.
 
 ### nginx Configuration
 
@@ -171,7 +183,7 @@ server {
 }
 ```
 
-### Enable Configuration
+### Enable nginx Configuration
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/myapp /etc/nginx/sites-enabled/
@@ -179,11 +191,12 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### Update gunicorn to Use Different Socket
+When using nginx, update gunicorn to use a separate socket:
 
 ```python
 # gunicorn_config.py
 bind = "unix:/tmp/myapp-gunicorn.sock"  # nginx connects here
+# eddi connects to nginx socket: /tmp/myapp.sock
 ```
 
 ---
@@ -239,16 +252,14 @@ chmod 600 ~/.idlergear/tor/myapp/hs_ed25519_secret_key
 
 ## Complete Startup Script
 
-Create `run.sh` for your project:
+Create `run.sh` for your project (direct eddi → gunicorn, no nginx):
 
 ```bash
 #!/bin/bash
 set -e
 
 APP_NAME="myapp"
-SOCKET_DIR="/tmp"
-GUNICORN_SOCKET="$SOCKET_DIR/${APP_NAME}-gunicorn.sock"
-NGINX_SOCKET="$SOCKET_DIR/${APP_NAME}.sock"
+SOCKET="/tmp/${APP_NAME}.sock"
 TOR_KEY_DIR="$HOME/.idlergear/tor/$APP_NAME"
 
 # Cleanup on exit
@@ -256,7 +267,7 @@ cleanup() {
     echo "Shutting down..."
     kill $GUNICORN_PID 2>/dev/null || true
     kill $EDDI_PID 2>/dev/null || true
-    rm -f $GUNICORN_SOCKET $NGINX_SOCKET
+    rm -f $SOCKET
 }
 trap cleanup EXIT
 
@@ -264,23 +275,20 @@ trap cleanup EXIT
 mkdir -p "$TOR_KEY_DIR"
 chmod 700 "$TOR_KEY_DIR"
 
-# Start gunicorn
+# Start gunicorn (eddi connects directly to this socket)
 echo "Starting gunicorn..."
-gunicorn --config gunicorn_config.py myapp:app &
+gunicorn --bind "unix:$SOCKET" myapp:app &
 GUNICORN_PID=$!
 
 # Wait for socket
-while [ ! -S "$GUNICORN_SOCKET" ]; do
+while [ ! -S "$SOCKET" ]; do
     sleep 0.1
 done
 
-# If using nginx, start it (assumes systemd)
-# sudo systemctl start nginx
-
-# Start eddi
+# Start eddi (connects directly to gunicorn)
 echo "Starting eddi hidden service..."
 ~/.idlergear/bin/eddi-msgsrv serve \
-    --socket "$GUNICORN_SOCKET" \
+    --socket "$SOCKET" \
     --key-dir "$TOR_KEY_DIR" &
 EDDI_PID=$!
 
@@ -321,7 +329,7 @@ After=network.target
 User=www-data
 Group=www-data
 WorkingDirectory=/path/to/myapp
-ExecStart=/path/to/venv/bin/gunicorn --config gunicorn_config.py myapp:app
+ExecStart=/path/to/venv/bin/gunicorn --bind unix:/tmp/myapp.sock myapp:app
 ExecReload=/bin/kill -s HUP $MAINPID
 Restart=on-failure
 RestartSec=5
@@ -331,6 +339,8 @@ WantedBy=multi-user.target
 ```
 
 ### Eddi Service
+
+eddi connects directly to gunicorn's socket:
 
 ```ini
 # /etc/systemd/system/myapp-eddi.service
@@ -343,7 +353,7 @@ Requires=myapp-gunicorn.service
 User=www-data
 Group=www-data
 ExecStart=/home/www-data/.idlergear/bin/eddi-msgsrv serve \
-    --socket /tmp/myapp-gunicorn.sock \
+    --socket /tmp/myapp.sock \
     --key-dir /home/www-data/.idlergear/tor/myapp
 Restart=on-failure
 RestartSec=10
