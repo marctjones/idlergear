@@ -294,9 +294,11 @@ idlergear teleport restore-stash
 
 ---
 
-## Eddi Tools (Secure Message Passing)
+## Eddi Tools (Tor Hidden Services & Messaging)
 
-Manage eddi-msgsrv for Tor-based secure communication.
+eddi provides two main tools:
+- **eddi-server**: Serve apps as Tor hidden services
+- **eddi-msgsrv**: Generic message server for any messaging use case
 
 ### Install
 ```bash
@@ -306,7 +308,7 @@ idlergear eddi install --force
 
 **MCP Tool:** `eddi_install`
 
-Installs to `~/.idlergear/bin/eddi-msgsrv` (keeps binaries out of repos).
+Installs both binaries to `~/.idlergear/bin/` (keeps binaries out of repos).
 
 Requirements:
 - Rust toolchain (cargo): https://rustup.rs
@@ -326,24 +328,117 @@ idlergear eddi uninstall
 
 **MCP Tool:** `eddi_uninstall`
 
-### Using Eddi for Log Streaming
+---
 
-Once installed, you can use eddi for secure remote log streaming:
+### eddi-server: Publishing Apps as Hidden Services
+
+Serve any app listening on a Unix socket as a Tor hidden service:
 
 ```bash
-# Local machine - start server with eddi
-idlergear logs serve --via eddi --name debug
-# Outputs a connection code like: H7K-9M3
+# Start your app on a Unix socket
+gunicorn --bind unix:/tmp/myapp.sock myapp:app
 
-# Remote machine - stream via eddi
-./run.sh 2>&1 | idlergear logs stream --via eddi --code H7K-9M3
+# Serve as hidden service
+~/.idlergear/bin/eddi-server --socket /tmp/myapp.sock
+```
+
+See `AI_INSTRUCTIONS/EDDI_HIDDEN_SERVICES.md` for complete setup guide.
+
+---
+
+### eddi-msgsrv: Generic Message Server
+
+A dynamically-created message server accessible via Tor. Useful for:
+- LLM-to-LLM communication across machines
+- Any application needing secure messaging through NAT/firewalls
+- Temporary collaboration channels
+
+#### Creating a Server
+
+```bash
+# Create a message server
+eddi-msgsrv create-server --name my-server --ttl 5
+
+# Local-only (no Tor)
+eddi-msgsrv create-server --name my-server --ttl 5 --local-only
+```
+
+#### Client Registration (Broker/Token Workflow)
+
+Clients connect via a human-mediated token exchange:
+
+1. **Admin creates broker** with short-lived code:
+```bash
+eddi-msgsrv create-broker --server my-server --namespace user@example.com
+# Output: Code H7K-9M3 (valid 120 seconds)
+```
+
+2. **Human gives code to client** (out of band - email, chat, etc.)
+
+3. **Client connects using code**:
+```bash
+eddi-msgsrv connect --code H7K-9M3 --namespace user@example.com
+```
+
+4. **Client receives persistent token** for future connections
+
+#### Sending and Receiving Messages
+
+```bash
+# Send a message
+eddi-msgsrv send "Hello from machine A"
+
+# Listen for messages
+eddi-msgsrv listen
+```
+
+#### Server Management
+
+```bash
+# List all servers
+eddi-msgsrv list-servers
+
+# Check server status
+eddi-msgsrv status
+
+# List connected clients
+eddi-msgsrv list-clients --server my-server
+
+# Revoke a client
+eddi-msgsrv revoke-client --server my-server --code <client-code>
+
+# Stop server
+eddi-msgsrv stop-server my-server
+
+# Cleanup all
+eddi-msgsrv cleanup --force
+```
+
+#### Example: LLM-to-LLM Coordination
+
+```bash
+# Machine A (coordinator): Create server
+eddi-msgsrv create-server --name llm-coord --ttl 60
+eddi-msgsrv create-broker --server llm-coord --namespace claude-a
+# Give code to Machine B
+
+# Machine B: Connect
+eddi-msgsrv connect --code H7K-9M3 --namespace claude-b --alias coordinator
+
+# Machine A: Send task
+eddi-msgsrv send "Please review auth.py and report issues"
+
+# Machine B: Listen and respond
+eddi-msgsrv listen
+eddi-msgsrv send "Found 3 issues: ..."
 ```
 
 Benefits:
 - Works through NAT/firewalls
 - No port forwarding needed
 - Encrypted via Tor
-- Short-lived connection codes
+- Human-mediated trust (code exchange)
+- Persistent tokens after initial connection
 
 ---
 

@@ -1,6 +1,6 @@
 # Publishing Apps as Tor Hidden Services with Eddi
 
-**Purpose:** Guide for configuring web apps to be served as Tor hidden (onion) services using eddi-msgsrv, gunicorn, and nginx with Unix Domain Sockets.
+**Purpose:** Guide for configuring web apps to be served as Tor hidden (onion) services using eddi-server, gunicorn, and optionally nginx with Unix Domain Sockets.
 
 ---
 
@@ -15,7 +15,7 @@ eddi connects directly to gunicorn - no nginx needed:
                          │
                          ▼
 ┌─────────────────────────────────────────┐
-│  eddi-msgsrv                            │
+│  eddi-server                            │
 │  (Tor hidden service proxy)             │
 │  *.onion:80 → UDS                       │
 └─────────────────┬───────────────────────┘
@@ -40,7 +40,7 @@ eddi → nginx (UDS) → gunicorn (UDS) → app
 
 ## Quick Start
 
-### 1. Install eddi-msgsrv
+### 1. Install eddi
 
 ```bash
 idlergear eddi install
@@ -64,7 +64,7 @@ gunicorn --config gunicorn_config.py myapp:app
 ### 4. Start eddi hidden service
 
 ```bash
-~/.idlergear/bin/eddi-msgsrv serve --socket /tmp/myapp.sock
+~/.idlergear/bin/eddi-server --socket /tmp/myapp.sock
 ```
 
 Your app is now accessible via the `.onion` address printed by eddi.
@@ -207,10 +207,10 @@ bind = "unix:/tmp/myapp-gunicorn.sock"  # nginx connects here
 
 ```bash
 # Serve app via UDS
-~/.idlergear/bin/eddi-msgsrv serve --socket /tmp/myapp.sock
+~/.idlergear/bin/eddi-server --socket /tmp/myapp.sock
 
 # With custom onion key directory
-~/.idlergear/bin/eddi-msgsrv serve \
+~/.idlergear/bin/eddi-server \
     --socket /tmp/myapp.sock \
     --key-dir ~/.idlergear/tor/myapp
 ```
@@ -221,7 +221,7 @@ By default, eddi generates a new `.onion` address each time. For a persistent ad
 
 ```bash
 # First run generates keys
-~/.idlergear/bin/eddi-msgsrv serve \
+~/.idlergear/bin/eddi-server \
     --socket /tmp/myapp.sock \
     --key-dir ~/.idlergear/tor/myapp
 
@@ -287,7 +287,7 @@ done
 
 # Start eddi (connects directly to gunicorn)
 echo "Starting eddi hidden service..."
-~/.idlergear/bin/eddi-msgsrv serve \
+~/.idlergear/bin/eddi-server \
     --socket "$SOCKET" \
     --key-dir "$TOR_KEY_DIR" &
 EDDI_PID=$!
@@ -352,7 +352,7 @@ Requires=myapp-gunicorn.service
 [Service]
 User=www-data
 Group=www-data
-ExecStart=/home/www-data/.idlergear/bin/eddi-msgsrv serve \
+ExecStart=/home/www-data/.idlergear/bin/eddi-server \
     --socket /tmp/myapp.sock \
     --key-dir /home/www-data/.idlergear/tor/myapp
 Restart=on-failure
@@ -447,7 +447,7 @@ sudo nginx -t
 ps aux | grep tor
 
 # Check eddi logs
-~/.idlergear/bin/eddi-msgsrv serve --socket /tmp/myapp.sock --verbose
+~/.idlergear/bin/eddi-server --socket /tmp/myapp.sock --verbose
 
 # Verify onion address is valid
 cat ~/.idlergear/tor/myapp/hostname
@@ -541,7 +541,7 @@ GUNICORN_PID=$!
 sleep 2
 
 # Start eddi
-~/.idlergear/bin/eddi-msgsrv serve \
+~/.idlergear/bin/eddi-server \
     --socket /tmp/flask-app.sock \
     --key-dir ~/.idlergear/tor/flask-app &
 EDDI_PID=$!

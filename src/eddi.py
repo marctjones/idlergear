@@ -1,10 +1,11 @@
 """
-eddi message server management for IdlerGear.
+eddi management for IdlerGear.
 
-Handles installation, configuration, and operation of eddi-msgsrv
-for secure Tor-based message passing between LLM environments.
+Handles installation, configuration, and operation of eddi tools:
+- eddi-server: Serve apps as Tor hidden services
+- eddi-msgsrv: Message server for LLM-to-LLM and generic messaging
 
-Installation location: ~/.idlergear/bin/eddi-msgsrv
+Installation location: ~/.idlergear/bin/
 This keeps binaries and Tor secrets out of project repositories.
 """
 
@@ -12,11 +13,11 @@ import os
 import subprocess
 import shutil
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 
 class EddiManager:
-    """Manage eddi-msgsrv installation and operations."""
+    """Manage eddi installation and operations."""
 
     EDDI_REPO = "https://github.com/marctjones/eddi"
     EDDI_BRANCH = "claude/cli-message-passing-01Sbqwn269RoUr7uc7yp4ce9"
@@ -26,37 +27,44 @@ class EddiManager:
         self.idlergear_home = Path.home() / ".idlergear"
         self.bin_dir = self.idlergear_home / "bin"
         self.src_dir = self.idlergear_home / "src" / "eddi"
-        self.binary_path = self.bin_dir / "eddi-msgsrv"
+        # Primary binaries
+        self.server_path = self.bin_dir / "eddi-server"
+        self.msgsrv_path = self.bin_dir / "eddi-msgsrv"
+        # Legacy compatibility
+        self.binary_path = self.server_path
 
     def is_installed(self) -> bool:
-        """Check if eddi-msgsrv is installed."""
-        return self.binary_path.exists()
+        """Check if eddi binaries are installed."""
+        return self.server_path.exists() or self.msgsrv_path.exists()
 
     def get_version(self) -> Optional[str]:
         """Get installed eddi version."""
         if not self.is_installed():
             return None
 
-        try:
-            result = subprocess.run(
-                [str(self.binary_path), "--version"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except Exception:
-            pass
+        # Try eddi-server first, then eddi-msgsrv
+        for binary in [self.server_path, self.msgsrv_path]:
+            if binary.exists():
+                try:
+                    result = subprocess.run(
+                        [str(binary), "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0:
+                        return result.stdout.strip()
+                except Exception:
+                    pass
 
         return "unknown"
 
     def install(self, force: bool = False) -> Dict:
         """
-        Install eddi-msgsrv from source.
+        Install eddi binaries from source.
 
         Clones the eddi repo, builds with cargo, and installs
-        the binary to ~/.idlergear/bin/
+        eddi-server and eddi-msgsrv to ~/.idlergear/bin/
 
         Args:
             force: If True, reinstall even if already installed
@@ -67,14 +75,17 @@ class EddiManager:
         result = {
             "status": "ok",
             "messages": [],
-            "binary_path": str(self.binary_path),
+            "binaries": {
+                "eddi-server": str(self.server_path),
+                "eddi-msgsrv": str(self.msgsrv_path),
+            },
         }
 
         # Check if already installed
         if self.is_installed() and not force:
             result["status"] = "already_installed"
             result["messages"].append(
-                f"eddi-msgsrv already installed at {self.binary_path}"
+                f"eddi already installed at {self.bin_dir}"
             )
             result["messages"].append("Use --force to reinstall")
             return result
@@ -96,7 +107,7 @@ class EddiManager:
             self.bin_dir.mkdir(parents=True, exist_ok=True)
             self.src_dir.parent.mkdir(parents=True, exist_ok=True)
 
-            result["messages"].append(f"Installing eddi-msgsrv to {self.binary_path}")
+            result["messages"].append(f"Installing eddi to {self.bin_dir}")
 
             # Clone or update repo
             if self.src_dir.exists():
@@ -134,18 +145,12 @@ class EddiManager:
                     check=True,
                 )
 
-            # Build with cargo
+            # Build with cargo from root directory
             result["messages"].append("Building with cargo (this may take a minute)...")
-
-            # Find the msgsrv crate directory
-            msgsrv_dir = self.src_dir / "crates" / "msgsrv"
-            if not msgsrv_dir.exists():
-                # Try root directory
-                msgsrv_dir = self.src_dir
 
             build_result = subprocess.run(
                 ["cargo", "build", "--release"],
-                cwd=msgsrv_dir,
+                cwd=self.src_dir,
                 capture_output=True,
                 text=True,
             )
@@ -155,31 +160,27 @@ class EddiManager:
                 result["error"] = f"Build failed: {build_result.stderr}"
                 return result
 
-            # Find and copy binary
-            # Try common locations
-            binary_locations = [
-                msgsrv_dir / "target" / "release" / "eddi-msgsrv",
-                self.src_dir / "target" / "release" / "eddi-msgsrv",
-                msgsrv_dir / "target" / "release" / "msgsrv",
-                self.src_dir / "target" / "release" / "msgsrv",
+            # Find and copy binaries
+            target_dir = self.src_dir / "target" / "release"
+            binaries_to_install = [
+                ("eddi-server", self.server_path),
+                ("eddi-msgsrv", self.msgsrv_path),
             ]
 
-            binary_found = None
-            for loc in binary_locations:
-                if loc.exists():
-                    binary_found = loc
-                    break
+            installed_count = 0
+            for binary_name, dest_path in binaries_to_install:
+                src_binary = target_dir / binary_name
+                if src_binary.exists():
+                    shutil.copy2(src_binary, dest_path)
+                    os.chmod(dest_path, 0o755)
+                    result["messages"].append(f"Installed {binary_name} to {dest_path}")
+                    installed_count += 1
 
-            if not binary_found:
+            if installed_count == 0:
                 result["status"] = "error"
-                result["error"] = "Binary not found after build. Check cargo output."
+                result["error"] = "No binaries found after build. Check cargo output."
                 return result
 
-            # Copy to bin directory
-            shutil.copy2(binary_found, self.binary_path)
-            os.chmod(self.binary_path, 0o755)
-
-            result["messages"].append(f"Installed to {self.binary_path}")
             result["messages"].append("")
             result["messages"].append("Add to PATH (optional):")
             result["messages"].append(f'  export PATH="{self.bin_dir}:$PATH"')
@@ -198,9 +199,9 @@ class EddiManager:
 
     def uninstall(self) -> Dict:
         """
-        Uninstall eddi-msgsrv.
+        Uninstall eddi binaries.
 
-        Removes binary and optionally source code.
+        Removes eddi-server and eddi-msgsrv binaries.
 
         Returns:
             Dict with status and messages
@@ -210,11 +211,15 @@ class EddiManager:
             "messages": [],
         }
 
-        if self.binary_path.exists():
-            self.binary_path.unlink()
-            result["messages"].append(f"Removed {self.binary_path}")
-        else:
-            result["messages"].append("Binary not found")
+        removed_count = 0
+        for binary_path in [self.server_path, self.msgsrv_path]:
+            if binary_path.exists():
+                binary_path.unlink()
+                result["messages"].append(f"Removed {binary_path}")
+                removed_count += 1
+
+        if removed_count == 0:
+            result["messages"].append("No binaries found")
 
         # Note: We don't remove source by default to speed up reinstalls
 
@@ -227,9 +232,16 @@ class EddiManager:
         Returns:
             Dict with installation info
         """
+        binaries = {}
+        if self.server_path.exists():
+            binaries["eddi-server"] = str(self.server_path)
+        if self.msgsrv_path.exists():
+            binaries["eddi-msgsrv"] = str(self.msgsrv_path)
+
         return {
             "installed": self.is_installed(),
             "version": self.get_version(),
-            "binary_path": str(self.binary_path) if self.is_installed() else None,
+            "binary_path": str(self.server_path) if self.server_path.exists() else str(self.msgsrv_path) if self.msgsrv_path.exists() else None,
+            "binaries": binaries,
             "src_dir": str(self.src_dir) if self.src_dir.exists() else None,
         }
