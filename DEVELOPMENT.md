@@ -1,114 +1,54 @@
 # Development Setup and Workflow
 
-This document describes the standard development practices for this project. **All contributors (human and AI assistants) must follow these practices.**
+This document describes the standard development practices for this project.
 
 ## Initial Setup
 
-### 1. Clone and Enter the Project
 ```bash
-git clone <repository-url>
-cd <project-name>
-```
-
-**Note for IdlerGear Users:** When creating new projects with `idlergear new`, use the `--path` option to specify where to create projects. Avoid creating test projects inside the idlergear repository itself:
-
-```bash
-# Good: Create in a dedicated workspace
-idlergear new my-project --path ~/projects
-
-# Avoid: Creating inside idlergear repo
-cd ~/idlergear
-idlergear new my-project  # This will warn you!
-```
-
-### 2. Set Up Isolated Development Environment
-
-**Python:**
-```bash
+git clone https://github.com/marctjones/idlergear.git
+cd idlergear
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-**Node.js:**
-```bash
-npm install
-# or
-yarn install
-```
+## Development Workflow
 
-**Rust:**
-```bash
-cargo build
-```
-
-**Go:**
-```bash
-go mod download
-```
-
-### 3. Read Project Context
-
-Before making any changes, read these files in order:
-1. **`VISION.md`** - Project goals and mission
-2. **`DESIGN.md`** - Technical architecture and phases
-3. **`TODO.md`** - Current tasks
-4. **`IDEAS.md`** - Out-of-scope items
-
-## Daily Development Workflow
-
-### Before Every Work Session
-1. ✅ Activate isolated environment
-2. ✅ Pull latest changes: `git pull`
-3. ✅ Review relevant charter documents
-4. ✅ Run existing tests to establish baseline
+### Before Every Session
+1. Activate environment: `source venv/bin/activate`
+2. Pull latest: `git pull`
+3. Read VISION.md for context
 
 ### During Development
-1. ✅ Follow Test-Driven Development (TDD)
+1. Follow Test-Driven Development (TDD)
    - Write tests first
    - Implement code to pass tests
    - Refactor while keeping tests green
-2. ✅ Make small, focused commits
-3. ✅ Keep charter documents updated as you work
+2. Make small, focused commits
 
 ### Before Committing
-1. ✅ Run all tests: `./run.sh` (or language-specific test command)
-2. ✅ Run linter/formatter (e.g., `black`, `ruff`, `eslint`)
-3. ✅ Verify no secrets or sensitive data in changes
-4. ✅ Write meaningful commit messages
+1. Run tests: `./run.sh`
+2. Run formatter/linter: `black src/` and `ruff check src/`
+3. Verify no secrets in changes
 
-## Testing Requirements
+## Testing
 
 - Every feature must have tests
-- Aim for high code coverage (>80%)
-- Tests should be fast and deterministic
-- Use the project's `./run.sh` script when available
+- Use pytest: `python -m pytest`
+- Aim for >80% coverage
 
-## Adding Dependencies & Complex Features
+## Adding Dependencies
 
-**IMPORTANT:** Before adding any new dependency or implementing complex features, you MUST follow the research requirements in `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md`.
+Before adding any dependency:
+1. Research at least 3 alternatives
+2. Check: maintenance, adoption, security, license
+3. Document reasoning in commit message
 
-### Before Adding a Dependency
-1. ✅ Research at least 3 alternatives
-2. ✅ Evaluate: maintenance, adoption, security, license, documentation
-3. ✅ Find real-world usage examples
-4. ✅ Document your reasoning in comments or commit message
-
-### Before Implementing Complex Features
-1. ✅ Find and read the relevant specification/standard
-2. ✅ Read security considerations
-3. ✅ Find reference implementations
-4. ✅ Cite sources in code comments
-
-### Red Flags (Research More)
-- Library last updated >1 year ago
+**Red flags:**
+- Last updated >1 year ago
 - <100 GitHub stars for critical functionality
-- No documentation or examples
-- Copyleft license (GPL/AGPL) - requires approval
-
-See `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md` for complete guidance and checklists.
+- No documentation
+- Copyleft license (GPL/AGPL) without approval
 
 ## Git Workflow
 
@@ -117,40 +57,15 @@ See `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md` for complete guidance and checkli
 - Create Pull Requests for review
 - Merge only after tests pass
 
-## Language-Specific Best Practices
+## Python Practices
 
-**Python:**
-- Use `black` for formatting
-- Use `ruff` for linting
-- Use `pytest` for testing
+- Formatter: `black`
+- Linter: `ruff`
+- Tests: `pytest`
 - Follow PEP 8
-
-**Node.js:**
-- Use `prettier` for formatting
-- Use `eslint` for linting
-- Use `jest` or `mocha` for testing
-
-**Rust:**
-- Use `rustfmt` for formatting
-- Use `clippy` for linting
-- Use built-in test framework
 
 ## Security
 
-- **Never** commit secrets, tokens, or passwords
-- Use environment variables for sensitive data (`.env` files)
-- Ensure `.env` is in `.gitignore`
-- Use permissive licenses (MIT, Apache 2.0) for dependencies
-- Get approval before using copyleft licenses (GPL, etc.)
-- Research security implications before implementing auth, crypto, or network features (see `AI_INSTRUCTIONS/RESEARCH_REQUIREMENTS.md`)
-
-## Documentation
-
-- Update README.md when adding major features
-- Update TODO.md as tasks are completed
-- Add out-of-scope ideas to IDEAS.md
-- Keep VISION.md and DESIGN.md as single source of truth
-
----
-
-**For AI Assistants:** See `AI_INSTRUCTIONS/README.md` for instructions on following these practices.
+- Never commit secrets, tokens, or passwords
+- Use `.env` for sensitive data (in `.gitignore`)
+- Use permissive licenses (MIT, Apache 2.0)

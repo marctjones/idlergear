@@ -1,53 +1,54 @@
-# idlergear
-### Usage
+# IdlerGear
+
+**A knowledge management API that synchronizes AI context management with human project management.**
+
+AI coding assistants are stateless. Every session starts fresh. Knowledge is constantly lost:
+- Issues discovered but forgotten next session
+- Learnings not recorded for future AI instances
+- Script output invisible to other agents
+- Project vision drifts without protection
+- Multiple AI instances can't coordinate
+
+IdlerGear provides a **command-based API** that manages this knowledge across sessions, machines, and teams.
+
+## Why Not Just AGENTS.md?
+
+AGENTS.md defines **file conventions**: "look for vision in docs/VISION.md"
+
+IdlerGear provides a **command-based API**:
 
 ```bash
-# Create a new project in the current directory
-idlergear new my-awesome-project
-
-# Create a new project in a specific location
-idlergear new my-awesome-project --path ~/projects
-
-# Create a project with a specific language
-idlergear new my-go-app --lang go --path ~/projects
+idlergear vision show    # Returns authoritative vision, wherever it's stored
 ```
 
-### Features
+The difference:
+- **Backend-agnostic** - Same command whether data is in local file, GitHub, or Jira
+- **Configurable** - Project decides where data lives, command stays the same
+- **Deterministic** - No AI interpretation needed, just run the command
 
-- Automatically creates a private GitHub repository from a template
-- Sets up project charter documents (VISION.md, TODO.md, IDEAS.md, etc.)
-- Configures language-specific `.gitignore`
-- Initializes with proper development practices and AI instructions
-- Warns if creating inside the idlergear repository itself
+## Design
 
-### Claude ↔ Codex Handshake
+IdlerGear manages 11 types of knowledge (tasks, reference, explorations, vision, plans, notes, outputs, contexts, configuration, resources, codebase) across four quadrants (local/shared × volatile/persistent).
 
-Use the built-in messaging plus sync commands to trade updates between a local OpenAI Codex session and Claude Code Web:
+See [DESIGN.md](DESIGN.md) for the full knowledge model and architecture.
 
-1. **Codex/local:** `idlergear message send --to web --body "Ping from Codex" --from codex`
-2. **Codex/local:** `idlergear sync push --include-untracked` (note the sync branch name in the output)
-3. **Claude Web:** `git fetch && git checkout <sync-branch>` then `idlergear message list --filter-to web`
-4. **Claude Web response:** `idlergear message respond --id <message-id> --body "Reply from Claude" --from claude` followed by `idlergear sync push --include-untracked`
-5. **Codex/local receive:** `idlergear sync pull` then `idlergear message list --filter-from claude`
+## Quick Start
 
-This mirrors the roadmap workflow: Codex pushes a sync branch with messages, Claude reads/responds on that branch, then Codex pulls the response back.
+```bash
+git clone https://github.com/marctjones/idlergear.git
+cd idlergear
+pip install -e .
+```
 
-Utilities under the repo root can help automate the workflow:
+```bash
+cd my-project
+idlergear init
+```
 
-- `python monitor_messages.py --from-source claude-web` polls `.idlergear/messages/` for new entries (pass `--interval`/`--duration` as needed).
-- `python send_and_monitor.py codex-local "Ping from Claude" --monitor` sends a message via the Typer CLI, commits the JSON file (unless `--skip-commit` is set), and watches for a reply.
+## The Key Insight
 
-## Development
+**Context management is an AI problem. Project management is a human problem. IdlerGear synchronizes them.**
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for complete development practices and workflow.
+## License
 
-## Project Structure
-
-- `src/` - Main source code
-- `tests/` - Test suite
-- `AI_INSTRUCTIONS/` - Instructions for AI coding assistants
-- Charter documents: `VISION.md`, `DESIGN.md`, `TODO.md`, `IDEAS.md`
-
-## Contributing
-
-This project follows Test-Driven Development (TDD). All changes must include tests.
+**All Rights Reserved.** This code is not open source. No license is granted for use, modification, or distribution without explicit written permission from the author.

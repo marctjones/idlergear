@@ -1,119 +1,471 @@
-# DESIGN.md: Project "IdlerGear"
+# IdlerGear Design
 
-This document outlines the design and implementation tasks for a command-line tool designed to automate project scaffolding and manage development workflows across multiple LLM-based coding assistants.
+---
 
-All AI-assisted development (via `gemini cli`, `copilot cli`, `claude cli`, etc.) should refer to this document as the single source of truth for goals, constraints, and tasks.
+## Part 1: Vision
 
-## 1. Project Metadata
+---
 
-* **Owner:** marctjones
-* **Project Name:** `IdlerGear`
-* **GitHub Repo:** `https://github.com/marctjones/idlergear`
+### Mission
 
-## 2. Core Mission
+**IdlerGear is a knowledge management API that synchronizes AI context management with human project management.**
 
-To design and build a command-line tool that automates the repetitive "toil" of project setup and development, acting as a "meta-assistant" that manages the developer's workflow and their interaction with various LLM coding tools.
+### The Problem
 
-The primary goals are to:
-1.  **Scaffold New Projects:** Automate the creation of local directories, `git` initialization, and **private-by-default** GitHub repositories, complete with language-specific `.gitignore` files.
-2.  **Establish Project Context:** Automatically create and maintain a set of "charter" documents (`VISION.md`, `TODO.md`, `IDEAS.md`) to define the project's purpose, track tasks, and prevent scope creep.
-3.  **Unify LLM Interaction:** Act as a "wrapper" for calling different LLM CLIs (`gemini`, `claude`, etc.), automatically providing them with the full project context (the charter files, recent logs, etc.) on every invocation.
-4.  **Enforce Best Practices:** Nudge the developer and the LLMs to adhere to Test-Driven Development (TDD), write extensive unit/integration tests, maintain high code coverage, and produce granular developer-focused logging.
-5.  **Streamline Development:** Manage a simple, consistent `./run.sh` script for testing, which captures detailed logs from the last run for easy debugging with an LLM.
-6.  **Manage Multi-LLM Workflows:** Simplify switching between LLM assistants, enable them to "check" each other's work, and (in the future) manage syncing code and data files between local and web-based environments (like Claude Web).
+AI coding assistants are stateless. Every session starts fresh. You constantly re-explain:
+- What the project is trying to achieve
+- What you learned last session about how something works
+- What issues were discovered but deferred
+- What the current implementation plan is
+- What happened when you ran that script
 
-## 3. Development Principles & Methodology
+### The Solution
 
-This project will adhere to the following principles to ensure quality, security, and maintainability.
+A **command-based API** that manages knowledge across sessions, machines, and teams.
 
-* **Isolated Development Environments:** All projects *must* use language-specific isolated environments (e.g., Python `venv`, Node.js local `node_modules`, Rust workspaces, Go modules). Dependencies are installed into the project's isolated environment, never globally. This ensures reproducibility and prevents version conflicts.
-* **Dogfooding:** We will use `IdlerGear` to build and manage the `IdlerGear` project itself as soon as it is minimally viable.
-* **Iterative & TDD:** This tool *must* be built using TDD. We will write unit and integration tests for every feature.
-* **Git Workflow:** All new features will be in branches and merged via PRs. We will commit frequently.
-* **Working Demos:** We will create simple, working demos for each major feature (e.g., scaffolding, the LLM wrapper) before combining them.
-* **Language Best Practices:** We will follow all best practices for the chosen language (e.g., `clippy`/`rustfmt` for Rust, `black`/`flake8` for Python).
-* **Dependency & Licensing:** We will **strongly prefer** permissive licenses (MIT, Apache 2.0). All Copyleft (GPL, etc.) dependencies must be explicitly approved.
-* **Guard Against Scope Creep:** `IdlerGear` does one thing: it manages the *workflow* and *context* of a project. It is *not* an IDE, a new shell, or a build system. Out-of-scope ideas will be logged in this tool's own `IDEAS.md` file.
+### Key Insight
 
-## 4. Core Architectural Constraints
+Context management is an AI problem. Project management is a human problem. **IdlerGear synchronizes them.**
 
-* **CLI-First:** The tool must be a pure command-line interface.
-* **Cross-Platform (Target):** The tool must work on Ubuntu (primary) and Windows 11 (secondary).
-* **External Tool Interaction:** The tool will need to execute other shell commands (e.g., `git`, `gemini`, `claude`, `gh`).
-* **API-Driven:** The tool will need to interact with the GitHub API for repo creation and management.
+### Why Not Just AGENTS.md?
 
-## 5. Technology Stack (Proposed)
+AGENTS.md defines **file naming conventions**:
+> "Look for the vision in docs/VISION.md"
 
-* **Language:** **Python 3** (with `typer` or `click`).
-    * *Rationale:* This is the user's strongest language, allowing for rapid prototyping of the complex logic. Key libraries (`GitPython`, `PyGithub`, `python-dotenv`) are mature.
-* **Authentication:** GitHub Personal Access Tokens (PATs) or OAuth, to be stored securely in the system keychain or an environment file (e.g., `.env`).
+IdlerGear provides a **command-based API**:
+```bash
+idlergear vision show    # Returns the vision, wherever it's stored
+```
 
-## 6. Phase 1: The Local Scaffolder
+The difference:
+- **Consistent interface** - Same command across all projects
+- **Backend-agnostic** - Could be local file, GitHub, Jira, or central server
+- **Configurable** - Project decides where data lives, command stays the same
+- **Deterministic** - No AI interpretation needed, just run the command
 
-The first "working demo."
+### What IdlerGear Is NOT
 
-* **Command:** `idlergear new <project-name> --lang <language>`
-* **Actions:**
-    1.  Creates directory `<project-name>`.
-    2.  Runs `git init`.
-    3.  Fetches a language-specific `.gitignore` (e.g., from `gitignore.io`) and saves it.
-    4.  Creates `README.md` with `# <project-name>`.
-    5.  Creates `VISION.md` (from a template).
-    6.  Creates `IDEAS.md` (from a template, for out-of-scope items).
-    7.  Creates `TODO.md` (a simple checklist for bugs/features).
-    8.  Performs the initial `git commit`.
-* **Out of Scope for Phase 1:** GitHub API interaction. This phase is local-only.
+- **Not an IDE** - It manages context, not editing
+- **Not a build system** - Use make, cargo, npm for that
+- **Not an AI wrapper** - It provides context TO AI tools
+- **Not a cloud service** - Runs locally, your data stays local
+- **Not enterprise-only** - Works solo, scales to teams
 
-## 7. Core Design Modules & Future Phases
+---
 
-This outlines the major components to be built after Phase 1.
+## Part 2: Knowledge Model
 
-* **Module 1: GitHub Integration (Phase 2):**
-    * **Command:** `idlergear github create`
-    * **Action:** Reads GitHub auth, creates a **private** repo on `github.com/marctjones`, adds the `origin` remote, and pushes the initial commit.
+---
 
-* **Module 2: The LLM Wrapper (Phase 3 - The Core Feature):**
-    * **Command:** `idlergear ask <llm-name> "My prompt..."` (e.g., `idlergear ask gemini "Write a test for the main function"`)
-    * **Action:**
-        1.  Collects context: Reads `VISION.md`, `TODO.md`, and (optionally) the last run log from `./run.sh`.
-        2.  Constructs a "system prompt" containing this context.
-        3.  Executes the *actual* LLM command (e.g., `gemini -p "--- PROJECT CONTEXT --- ... --- END CONTEXT --- My prompt..."`).
+### Eleven Types of Knowledge
 
-* **Module 3: Run Script Manager (Phase 4):**
-    * **Command:** `idlergear run-script create`
-    * **Action:** Creates a `./run.sh` script that:
-        1.  Sets up the environment (e.g., `python -m venv venv`, `source venv/bin/activate`).
-        2.  Sets granular logging levels (e.g., `export LOG_LEVEL=DEBUG`).
-        3.  Runs the project's main command (e.g., `python -m src.main`)
-        4.  **Pipes** detailed `stdout` and `stderr` to a version-controlled log file (e.g., `.logs/last_run.log`). The `idlergear ask` command will be configured to read this file.
+IdlerGear manages eleven distinct types of knowledge:
 
-* **Module 4: Git Sync (Phase 5 - Advanced):**
-    * **Commands:** `idlergear sync push`, `idlergear sync pull`
-    * **Action:** Implements the "Web UI Sync" feature. `sync push` will create a temp branch, add *all* files (even data files), and push. `sync pull` will fetch that branch, merge it, and optionally clean it up. This is for syncing with tools like Claude Web.
+#### 1. Tasks
+Things that need to be done. Have a lifecycle (open → in progress → closed). Can be assigned, prioritized, labeled.
 
-* **Module 5: The "Nudger" (Phase 6):**
-    * **Command:** `idlergear check`
-    * **Action:** Analyzes `git log` and file timestamps to provide "best practice" reminders:
-        * "You haven't added a test in the last 3 commits."
-        * "Your `VISION.md` hasn't been updated in 30 days."
-        * "You haven't committed to `main` in 24 hours."
+```bash
+idlergear task create "Fix parser bug"
+idlergear task list
+idlergear task close 42
+```
 
-## 8. Security & Logging
+#### 2. Reference
+Explanations of how things work - design decisions, technical docs, world knowledge. Persists long-term, updated as understanding evolves.
 
-* **Logging:** `IdlerGear` itself will use extensive, granular logging (via Python `logging`).
-* **Security:** GitHub PATs/OAuth tokens are sensitive. They **must not** be stored in plain text. We will use the system keychain (e.g., `keyring`) or a `.env` file (with a `.gitignore` entry) as a first step.
+```bash
+idlergear reference add "GGUF-Format"
+idlergear reference search "quantization"
+```
 
-## 9. Next Steps (Task List for AI)
+#### 3. Explorations
+Open-ended questions being explored with context and reasoning. More thought-out than notes - meant to last and be understandable later. Not yet actionable (tasks) or documented (reference). May become either eventually.
 
-1.  [X] **Task:** Confirm the project name. *(Done: "IdlerGear")*
-2.  [ ] **Task:** Confirm the Technology Stack (Python for V1).
-3.  [ ] **Task:** Begin implementation of **Phase 1: The Local Scaffolder**. (I can help you write the `click` or `typer` code for this first command).
+```bash
+idlergear explore "Should we support Windows?"
+idlergear explore list
+idlergear explore show 1
+```
 
-## 10. Appendix: Alternative Architectures (Future Exploration)
+#### 4. Vision
+The "why" - purpose, mission, long-term direction. Protected, rarely changes. Guides decisions across the project.
 
-This section documents alternative designs that were discussed. They are considered **out of scope** for the current project.
+```bash
+idlergear vision show
+idlergear vision edit
+```
 
-* **A-2: Metaprogramming (Scheme/Racket):** Exploring how a Lisp-like language could *generate* the project structure and context-aware wrappers.
-* **A-3: Direct LLM IPC:** A more advanced version of Module 4 where two local LLM CLIs could "talk" to each other via file-based message passing, managed by `IdlerGear`.
-* **A-4: GitHub Template Repo:** `IdlerGear` could maintain a *personal GitHub template repository* for you, and new projects would be a "clone" of this template, ensuring all your preferences are pre-configured.
-* **A-5: "LLM-in-LLM" Detection:** The feature where a program *being built* by `IdlerGear` can auto-detect it's running *inside* an LLM (like Claude Web) and use it as a service backend.
+#### 5. Plans
+How to achieve a specific goal. Groups related tasks, defines sequence. More tactical than vision, more structured than explorations.
+
+```bash
+idlergear plan show
+idlergear plan list
+idlergear plan switch "auth-system"
+```
+
+#### 6. Notes
+Quick capture - the post-it note. Unstructured, temporary. Use when you don't want to get distracted or lose context on what you're doing. May become tasks, reference, or explorations later.
+
+```bash
+idlergear note "Parser quirk with compound words"
+idlergear note list
+idlergear note promote 1 --to task
+```
+
+#### 7. Outputs
+Results from executed processes. Logs, test results, script output. Queryable history of what happened.
+
+```bash
+idlergear run ./train.sh --name training
+idlergear run status
+idlergear run logs training --tail 50
+```
+
+#### 8. Contexts
+The current state of an AI session - conversation history, model configuration, system prompts. Multiple contexts can exist (different sessions, different agents). Contexts are flat text data that can be saved, restored, and shared.
+
+```bash
+idlergear context save "before-refactor"
+idlergear context list
+idlergear context restore "before-refactor"
+```
+
+#### 9. Configuration
+Instance-specific settings. API keys, passwords, local paths. Not shared across instances. Persistent but per-machine.
+
+```bash
+idlergear config set github.token "..."
+idlergear config get github.token
+```
+
+#### 10. Resources
+Files and data the project operates on - tracked with labels and purpose. Not documentation, not code - the "stuff" being processed or used. Helps remember what files are for and where they are.
+
+```bash
+idlergear resource add ./assets/logo.png --label "approved-logo"
+idlergear resource add ./data/book.txt --label "source-text"
+idlergear resource list
+idlergear resource list --label "approved-logo"
+```
+
+#### 11. Codebase
+Source code, tests, the implementation - everything managed by git. IdlerGear assumes git and GitHub (other git hosts may be supported later). This is the traditional version-controlled codebase, not a new abstraction.
+
+```bash
+idlergear code status          # git status with context
+idlergear code changed         # files changed since last commit
+idlergear code recent          # recent commit history
+```
+
+### Four Quadrants
+
+Knowledge exists across two dimensions: **scope** (local vs shared) and **persistence** (volatile vs persistent):
+
+```
+                VOLATILE                      PERSISTENT
+          ┌─────────────────────────┬─────────────────────────┐
+          │                         │                         │
+          │  LOCAL VOLATILE         │  LOCAL PERSISTENT       │
+  LOCAL   │                         │                         │
+          │  • Contexts             │  • .idlergear/ storage  │
+          │  • Live outputs         │  • Local config         │
+          │  • In-memory state      │  • Saved contexts       │
+          │                         │                         │
+          ├─────────────────────────┼─────────────────────────┤
+          │                         │                         │
+          │  SHARED VOLATILE        │  SHARED PERSISTENT      │
+  SHARED  │                         │                         │
+          │  • Multi-agent coord    │  • GitHub repo          │
+          │  • Running process info │  • GitHub/Jira issues   │
+          │  • Locks, file changes  │  • Shared wikis         │
+          │                         │                         │
+          └─────────────────────────┴─────────────────────────┘
+```
+
+IdlerGear operates across all four quadrants:
+- **Local Volatile** - Context management, live process output
+- **Local Persistent** - `.idlergear/` stores knowledge locally
+- **Shared Volatile** - Daemon coordinates multiple agents
+- **Shared Persistent** - Sync to GitHub, Jira, etc. when ready
+
+---
+
+## Part 3: Architecture
+
+---
+
+### Overview
+
+- **Python** - installed via pipx, uses official MCP SDK
+- **Single daemon per project** listening on `.idlergear/daemon.sock`
+- **MCP server** for AI tool integration
+- **Local-first** - everything works offline, sync when ready
+- **Multi-agent coordination** - multiple Claude Code instances share the same daemon
+- **Eddi bridge** (later) - cross-machine coordination for distributed teams
+- Project state lives in `.idlergear/` directory
+- Assumes **git and GitHub** for version control (other git hosts later)
+- **AI-tool agnostic** - works with Claude Code, Goose, Aider, Copilot, Gemini CLI, Codex
+
+### Design Principles
+
+#### 1. Command API, Not File Conventions
+Same commands everywhere. Backend is configuration.
+
+#### 2. Local-First, Sync-Later
+Works offline. No external services required. Sync when ready.
+
+#### 3. Observable by AI
+Every piece of state can be queried. Structured responses.
+
+#### 4. Lightweight Defaults
+Built-in implementations for all knowledge types. External tools optional.
+
+#### 5. Deterministic
+Regular code, not AI magic. Commands are predictable.
+
+---
+
+## Part 4: v1 / MVP
+
+---
+
+### Scope
+
+v1 includes everything with a GitHub analog, plus core infrastructure.
+
+| Type | Local Storage | GitHub Sync |
+|------|---------------|-------------|
+| Tasks | Markdown + frontmatter | GitHub Issues |
+| Notes | Markdown + frontmatter | GitHub Issues (with label) |
+| Explorations | Markdown + frontmatter | GitHub Discussions |
+| Vision | Single markdown file | Repo file (VISION.md) |
+| Plans | Markdown + frontmatter | GitHub Projects |
+| Reference | Markdown + frontmatter | GitHub Wiki |
+| Outputs | Log files | *(no sync)* |
+
+### Infrastructure
+
+- **Daemon** - socket IPC, process management, serves CLI and MCP
+- **MCP Server** - AI tool integration (structured JSON responses)
+- **CLI** - human interface (same commands, text output)
+- **Config** - `.idlergear/config.toml`
+
+### Commands
+
+```bash
+# Setup
+idlergear init
+idlergear daemon start|stop|status
+idlergear config get|set
+
+# Tasks (→ GitHub Issues)
+idlergear task create|list|show|close|edit
+idlergear task sync github
+
+# Notes (→ GitHub Issues with label)
+idlergear note create|list|show|delete
+idlergear note promote --to task
+idlergear note sync github
+
+# Explorations (→ GitHub Discussions)
+idlergear explore create|list|show|close
+idlergear explore sync github
+
+# Vision (→ repo VISION.md)
+idlergear vision show|edit
+idlergear vision sync github
+
+# Plans (→ GitHub Projects)
+idlergear plan create|list|show|switch
+idlergear plan sync github
+
+# Reference (→ GitHub Wiki)
+idlergear reference add|list|show|edit|search
+idlergear reference sync github
+
+# Outputs (no sync)
+idlergear run ./script.sh --name X
+idlergear run list|status|logs
+```
+
+### MCP Tools
+
+Same functionality exposed as MCP tools:
+
+```python
+# Tasks
+idlergear_task_create(title, body=None, labels=[], assignees=[])
+idlergear_task_list(state="open")
+idlergear_task_show(id)
+idlergear_task_close(id)
+
+# Notes
+idlergear_note_create(content)
+idlergear_note_list()
+idlergear_note_promote(id, to="task")
+
+# Explorations
+idlergear_explore_create(title, body)
+idlergear_explore_list(state="open")
+
+# Vision
+idlergear_vision_show()
+idlergear_vision_edit(content)
+
+# Plans
+idlergear_plan_list()
+idlergear_plan_show(name)
+idlergear_plan_switch(name)
+
+# Reference
+idlergear_reference_add(title, body)
+idlergear_reference_list()
+idlergear_reference_search(query)
+
+# Runs
+idlergear_run_start(command, name=None)
+idlergear_run_list()
+idlergear_run_status(name)
+idlergear_run_logs(name, tail=None)
+
+# Config
+idlergear_config_get(key)
+idlergear_config_set(key, value)
+```
+
+### File Structure
+
+```
+.idlergear/
+├── config.toml
+├── daemon.sock
+├── daemon.pid
+├── vision.md
+├── tasks/
+│   ├── 001-fix-parser-bug.md
+│   └── 002-add-tests.md
+├── notes/
+│   └── 001.md
+├── explorations/
+│   └── 001-windows-support.md
+├── plans/
+│   └── auth-system.md
+├── reference/
+│   └── gguf-format.md
+└── runs/
+    └── training/
+        ├── command.txt
+        ├── status.txt
+        ├── stdout.log
+        └── stderr.log
+```
+
+### Deferred to Later
+
+- Contexts (AI session state management)
+- Resources (file registry with labels)
+- Codebase (git wrapper commands)
+- Eddi bridge (cross-machine coordination)
+- Non-GitHub sync backends (Jira, GitLab, etc.)
+
+---
+
+## Part 5: Implementation Status
+
+---
+
+### Completed (v1 Core)
+
+#### CLI Commands
+All core CLI commands are implemented:
+
+| Command Group | Status | Notes |
+|---------------|--------|-------|
+| `idlergear init` | ✅ Done | Initializes `.idlergear/` directory |
+| `idlergear new` | ✅ Done | Creates new projects with full Claude Code integration |
+| `idlergear install/uninstall` | ✅ Done | Manages `.mcp.json` and `AGENTS.md` |
+| `idlergear task *` | ✅ Done | create, list, show, close, edit |
+| `idlergear note *` | ✅ Done | create, list, show, delete, promote |
+| `idlergear explore *` | ✅ Done | create, list, show, close |
+| `idlergear reference *` | ✅ Done | add, list, show, edit, search |
+| `idlergear vision *` | ✅ Done | show, edit |
+| `idlergear plan *` | ✅ Done | create, list, show, switch |
+| `idlergear run *` | ✅ Done | start, list, status, logs |
+| `idlergear config *` | ✅ Done | get, set |
+
+#### MCP Server
+- ✅ 30+ tools implemented matching CLI functionality
+- ✅ Stdio transport using official MCP SDK
+- ✅ Structured JSON responses for AI consumption
+
+#### Project Templates
+- ✅ Base template with Claude Code integration
+- ✅ Python template with venv auto-activation
+- ✅ Protected files (`.idlergear/`, `.claude/`, `.mcp.json`)
+- ✅ `CLAUDE.md` and `AGENTS.md` generation
+
+#### Claude Code Integration
+The `idlergear new` command creates projects with:
+- `.mcp.json` - Registers `idlergear-mcp` server
+- `.claude/settings.json` - Permission rules protecting IdlerGear files
+- `.claude/rules/` - Modular instructions for Claude
+- `CLAUDE.md` - Project instructions
+- `AGENTS.md` - Universal agent instructions
+
+Python projects additionally get:
+- Virtual environment creation
+- `env` settings for PATH and VIRTUAL_ENV
+- SessionStart hook for venv activation
+
+#### Tests
+- ✅ 25 passing tests covering core functionality
+
+### In Progress
+
+#### Daemon Architecture
+Design complete, implementation pending. The daemon provides:
+
+1. **Multi-agent coordination** - Multiple Claude Code instances share state
+2. **File locking** - Prevent concurrent modifications
+3. **Event pub/sub** - Notify agents of changes
+4. **Process management** - Track running scripts
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         IdlerGear Daemon                            │
+│                    (.idlergear/daemon.sock)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
+│  │ Connection  │  │    File     │  │   Event     │  │  Process   │ │
+│  │  Manager    │  │   Locks     │  │    Bus      │  │  Manager   │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+         ↑                                       ↑
+         │           Unix Socket IPC             │
+         ↓                                       ↓
+┌─────────────────┐                    ┌─────────────────┐
+│   MCP Server    │                    │   MCP Server    │
+│  (Claude #1)    │                    │  (Claude #2)    │
+└─────────────────┘                    └─────────────────┘
+```
+
+**Protocol:** JSON-RPC 2.0 over Unix domain socket
+
+**Implementation Tasks:**
+1. Daemon core (socket server, connection handling)
+2. Daemon protocol (JSON-RPC messages)
+3. Daemon client library
+4. Daemon auto-start and lifecycle
+5. Event pub/sub system
+6. File locking coordination
+7. Migrate MCP server to use daemon client
+8. Add daemon status/start/stop CLI commands
+
+### Not Started
+
+- GitHub sync (Issues, Discussions, Wiki, Projects)
+- Contexts (AI session state management)
+- Resources (file registry with labels)
+- Codebase (git wrapper commands)
