@@ -38,6 +38,10 @@ include = ["src/idlergear"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "claude_integration: marks tests that require claude CLI and API access",
+]
 
 [tool.black]
 line-length = 88

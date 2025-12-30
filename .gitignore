@@ -138,6 +138,5 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-# IdlerGear daemon files (don't commit)
-.idlergear/daemon.sock
-.idlergear/daemon.pid
+# IdlerGear project data (don't commit)
+.idlergear/
