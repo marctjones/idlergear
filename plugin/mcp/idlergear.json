@@ -1,0 +1,6 @@
+{
+  "command": "idlergear-mcp",
+  "args": [],
+  "type": "stdio",
+  "description": "IdlerGear MCP server for knowledge management tools"
+}

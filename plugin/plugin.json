@@ -1,0 +1,18 @@
+{
+  "name": "idlergear",
+  "version": "0.1.0",
+  "description": "Knowledge management for AI-assisted development - tasks, notes, explorations, and more synced to GitHub",
+  "author": "marctjones",
+  "repository": "https://github.com/marctjones/idlergear",
+  "homepage": "https://github.com/marctjones/idlergear",
+  "license": "MIT",
+  "keywords": [
+    "knowledge-management",
+    "github-issues",
+    "ai-development",
+    "context-management"
+  ],
+  "dependencies": {
+    "cli": ["idlergear"]
+  }
+}
