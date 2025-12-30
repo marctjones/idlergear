@@ -235,3 +235,202 @@ def remove_agents_md_section(project_path: Path | None = None) -> bool:
         agents_path.unlink()
 
     return True
+
+
+# CLAUDE.md section content - shorter than AGENTS.md, focuses on Claude Code specifics
+CLAUDE_MD_SECTION = """\
+## IdlerGear Usage
+
+**ALWAYS run at session start:**
+```bash
+idlergear context
+```
+
+**FORBIDDEN files:** `TODO.md`, `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
+**FORBIDDEN comments:** `// TODO:`, `# FIXME:`, `/* HACK: */`
+
+**Use instead:**
+- `idlergear task create "..."` - Create actionable tasks
+- `idlergear note create "..."` - Capture quick thoughts
+- `idlergear explore create "..."` - Research questions
+- `idlergear vision show` - Check project goals
+
+See AGENTS.md for full command reference.
+"""
+
+
+def add_claude_md_section(project_path: Path | None = None) -> bool:
+    """Add IdlerGear section to CLAUDE.md.
+
+    Returns True if added, False if already present.
+    """
+    import re
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    claude_path = project_path / "CLAUDE.md"
+
+    if claude_path.exists():
+        content = claude_path.read_text()
+        if "## IdlerGear Usage" in content:
+            return False
+        # Append section
+        content = content.rstrip() + "\n\n" + CLAUDE_MD_SECTION
+    else:
+        content = "# CLAUDE.md\n\n" + CLAUDE_MD_SECTION
+
+    claude_path.write_text(content)
+    return True
+
+
+def remove_claude_md_section(project_path: Path | None = None) -> bool:
+    """Remove IdlerGear section from CLAUDE.md.
+
+    Returns True if removed, False if not present.
+    """
+    import re
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    claude_path = project_path / "CLAUDE.md"
+
+    if not claude_path.exists():
+        return False
+
+    content = claude_path.read_text()
+
+    if "## IdlerGear Usage" not in content:
+        return False
+
+    # Remove the IdlerGear Usage section
+    pattern = r"\n*## IdlerGear Usage\n.*?(?=\n## |\Z)"
+    new_content = re.sub(pattern, "", content, flags=re.DOTALL)
+
+    if new_content.strip():
+        claude_path.write_text(new_content)
+    else:
+        claude_path.unlink()
+
+    return True
+
+
+# Claude Code rules file content
+RULES_FILE_CONTENT = """\
+---
+description: IdlerGear knowledge management rules
+alwaysApply: true
+---
+
+# IdlerGear Usage Rules
+
+## Session Start
+
+**ALWAYS run this command at the start of EVERY conversation:**
+
+```bash
+idlergear context
+```
+
+This provides the project vision, current plan, and open tasks. Do NOT skip this step.
+
+## FORBIDDEN: File-Based Knowledge
+
+**DO NOT create any of these files:**
+- `TODO.md`, `TODO.txt`, `TASKS.md`
+- `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
+- `FEATURE_IDEAS.md`, `RESEARCH.md`, `BACKLOG.md`
+- Any markdown file for tracking work or capturing thoughts
+
+**ALWAYS use IdlerGear commands instead.**
+
+## FORBIDDEN: Inline TODOs
+
+**DO NOT write inline TODO comments:**
+- `// TODO: ...`
+- `# FIXME: ...`
+- `/* HACK: ... */`
+
+**INSTEAD:** Create a task with `idlergear task create "..." --label technical-debt`
+
+## REQUIRED: Use IdlerGear Commands
+
+| Instead of... | Use this command |
+|---------------|------------------|
+| Creating TODO.md | `idlergear task create "description"` |
+| Writing notes to files | `idlergear note create "content"` |
+| Adding TODO comments | `idlergear task create "..." --label technical-debt` |
+| Creating VISION.md | `idlergear vision edit` |
+| Documenting findings | `idlergear reference add "title" --body "..."` |
+
+## Knowledge Flow
+
+```
+note → explore → task
+```
+- Quick thoughts go to notes (capture now, review later)
+- Research questions go to explorations (open-ended investigation)
+- Actionable work goes to tasks (clear completion criteria)
+- Use `idlergear note promote <id>` to convert notes to tasks/explorations
+
+## Data Protection
+
+**NEVER modify `.idlergear/` files directly** - Use CLI commands only
+"""
+
+
+def add_rules_file(project_path: Path | None = None) -> bool:
+    """Create .claude/rules/idlergear.md for Claude Code.
+
+    Returns True if created, False if already exists.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    rules_dir = project_path / ".claude" / "rules"
+    rules_file = rules_dir / "idlergear.md"
+
+    if rules_file.exists():
+        return False
+
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    rules_file.write_text(RULES_FILE_CONTENT)
+    return True
+
+
+def remove_rules_file(project_path: Path | None = None) -> bool:
+    """Remove .claude/rules/idlergear.md.
+
+    Returns True if removed, False if not present.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    rules_file = project_path / ".claude" / "rules" / "idlergear.md"
+
+    if not rules_file.exists():
+        return False
+
+    rules_file.unlink()
+
+    # Clean up empty directories
+    rules_dir = rules_file.parent
+    claude_dir = rules_dir.parent
+    try:
+        if rules_dir.exists() and not any(rules_dir.iterdir()):
+            rules_dir.rmdir()
+        if claude_dir.exists() and not any(claude_dir.iterdir()):
+            claude_dir.rmdir()
+    except OSError:
+        pass  # Directory not empty, that's fine
+
+    return True

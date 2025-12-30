@@ -190,6 +190,8 @@ def uninstall_idlergear(
     results = {
         "mcp_config": False,
         "agents_md": False,
+        "claude_md": False,
+        "rules_file": False,
         "claude_settings": False,
         "idlergear_data": False,
     }
@@ -197,6 +199,8 @@ def uninstall_idlergear(
     # Check what exists
     mcp_file = project_path / ".mcp.json"
     agents_file = project_path / "AGENTS.md"
+    claude_file = project_path / "CLAUDE.md"
+    rules_file = project_path / ".claude" / "rules" / "idlergear.md"
     settings_file = project_path / ".claude" / "settings.json"
     idlergear_dir = project_path / ".idlergear"
 
@@ -213,6 +217,14 @@ def uninstall_idlergear(
         content = agents_file.read_text()
         if "## IdlerGear" in content:
             results["agents_md"] = True
+
+    if claude_file.exists():
+        content = claude_file.read_text()
+        if "## IdlerGear Usage" in content:
+            results["claude_md"] = True
+
+    if rules_file.exists():
+        results["rules_file"] = True
 
     if settings_file.exists():
         try:
@@ -236,6 +248,14 @@ def uninstall_idlergear(
 
     if results["agents_md"]:
         results["agents_md"] = remove_agents_md_section(project_path)
+
+    if results["claude_md"]:
+        from idlergear.install import remove_claude_md_section
+        results["claude_md"] = remove_claude_md_section(project_path)
+
+    if results["rules_file"]:
+        from idlergear.install import remove_rules_file
+        results["rules_file"] = remove_rules_file(project_path)
 
     if results["claude_settings"]:
         results["claude_settings"] = remove_claude_settings(project_path)

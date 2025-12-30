@@ -364,8 +364,12 @@ def uninstall(
     typer.echo("The following will be removed:" if not dry_run else "Would remove:")
     if results["mcp_config"]:
         typer.echo("  • IdlerGear from .mcp.json")
+    if results["claude_md"]:
+        typer.echo("  • IdlerGear section from CLAUDE.md")
     if results["agents_md"]:
         typer.echo("  • IdlerGear section from AGENTS.md")
+    if results["rules_file"]:
+        typer.echo("  • .claude/rules/idlergear.md")
     if results["claude_settings"]:
         typer.echo("  • Protected paths from .claude/settings.json")
     if results["idlergear_data"]:
@@ -394,8 +398,12 @@ def uninstall(
     typer.echo("Removed:")
     if results["mcp_config"]:
         typer.secho("  ✓ IdlerGear from .mcp.json", fg=typer.colors.GREEN)
+    if results["claude_md"]:
+        typer.secho("  ✓ IdlerGear section from CLAUDE.md", fg=typer.colors.GREEN)
     if results["agents_md"]:
         typer.secho("  ✓ IdlerGear section from AGENTS.md", fg=typer.colors.GREEN)
+    if results["rules_file"]:
+        typer.secho("  ✓ .claude/rules/idlergear.md", fg=typer.colors.GREEN)
     if results["claude_settings"]:
         typer.secho("  ✓ Protected paths from .claude/settings.json", fg=typer.colors.GREEN)
     if results["idlergear_data"]:
@@ -410,14 +418,21 @@ def uninstall(
 @app.command()
 def install(
     skip_agents: bool = typer.Option(False, "--skip-agents", help="Skip AGENTS.md update"),
+    skip_claude: bool = typer.Option(False, "--skip-claude", help="Skip CLAUDE.md update"),
+    skip_rules: bool = typer.Option(False, "--skip-rules", help="Skip .claude/rules/ creation"),
 ):
     """Install IdlerGear integration for Claude Code.
 
-    Creates .mcp.json to register the MCP server and optionally
-    adds usage instructions to AGENTS.md.
+    Creates .mcp.json to register the MCP server, adds usage instructions
+    to CLAUDE.md and AGENTS.md, and creates .claude/rules/idlergear.md.
     """
     from idlergear.config import find_idlergear_root
-    from idlergear.install import add_agents_md_section, install_mcp_server
+    from idlergear.install import (
+        add_agents_md_section,
+        add_claude_md_section,
+        add_rules_file,
+        install_mcp_server,
+    )
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
@@ -429,12 +444,26 @@ def install(
     else:
         typer.echo(".mcp.json already has idlergear configured")
 
+    # Add CLAUDE.md section
+    if not skip_claude:
+        if add_claude_md_section():
+            typer.secho("Added IdlerGear section to CLAUDE.md", fg=typer.colors.GREEN)
+        else:
+            typer.echo("CLAUDE.md already has IdlerGear section")
+
     # Add AGENTS.md section
     if not skip_agents:
         if add_agents_md_section():
             typer.secho("Added IdlerGear section to AGENTS.md", fg=typer.colors.GREEN)
         else:
             typer.echo("AGENTS.md already has IdlerGear section")
+
+    # Create rules file
+    if not skip_rules:
+        if add_rules_file():
+            typer.secho("Created .claude/rules/idlergear.md", fg=typer.colors.GREEN)
+        else:
+            typer.echo(".claude/rules/idlergear.md already exists")
 
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")

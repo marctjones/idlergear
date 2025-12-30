@@ -180,21 +180,27 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 1,
-                "title": "Test Task",
-                "body": "Description",
-                "state": "OPEN",
-                "labels": [],
-                "assignees": [],
-            })
+            # First call returns the URL from gh issue create
+            # Second call returns JSON from gh issue view
+            mock_run.side_effect = [
+                "https://github.com/owner/repo/issues/1",
+                json.dumps({
+                    "number": 1,
+                    "title": "Test Task",
+                    "body": "Description",
+                    "state": "OPEN",
+                    "labels": [],
+                    "assignees": [],
+                }),
+            ]
 
             result = backend.create("Test Task", body="Description")
 
             assert result["id"] == 1
             assert result["title"] == "Test Task"
-            mock_run.assert_called_once()
-            args = mock_run.call_args[0][0]
+            assert mock_run.call_count == 2
+            # First call was the create
+            args = mock_run.call_args_list[0][0][0]
             assert "issue" in args
             assert "create" in args
             assert "Test Task" in args
@@ -204,18 +210,22 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 1,
-                "title": "Test",
-                "body": "",
-                "state": "OPEN",
-                "labels": [{"name": "bug"}],
-                "assignees": [],
-            })
+            mock_run.side_effect = [
+                "https://github.com/owner/repo/issues/1",
+                json.dumps({
+                    "number": 1,
+                    "title": "Test",
+                    "body": "",
+                    "state": "OPEN",
+                    "labels": [{"name": "bug"}],
+                    "assignees": [],
+                }),
+            ]
 
             backend.create("Test", labels=["bug"])
 
-            args = mock_run.call_args[0][0]
+            # First call was the create
+            args = mock_run.call_args_list[0][0][0]
             assert "--label" in args
             assert "bug" in args
 
@@ -224,18 +234,22 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 1,
-                "title": "Test",
-                "body": "",
-                "state": "OPEN",
-                "labels": [{"name": "priority:high"}],
-                "assignees": [],
-            })
+            mock_run.side_effect = [
+                "https://github.com/owner/repo/issues/1",
+                json.dumps({
+                    "number": 1,
+                    "title": "Test",
+                    "body": "",
+                    "state": "OPEN",
+                    "labels": [{"name": "priority:high"}],
+                    "assignees": [],
+                }),
+            ]
 
             backend.create("Test", priority="high")
 
-            args = mock_run.call_args[0][0]
+            # First call was the create
+            args = mock_run.call_args_list[0][0][0]
             assert "--label" in args
             assert "priority:high" in args
 
@@ -349,19 +363,25 @@ class TestGitHubExploreBackend:
         backend = GitHubExploreBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 1,
-                "title": "Exploration",
-                "body": "",
-                "state": "OPEN",
-                "labels": [{"name": "exploration"}],
-            })
+            # First two calls are label create (may fail) and issue create
+            # Third call is issue view to get details
+            mock_run.side_effect = [
+                "",  # label create succeeds (or fails silently)
+                "https://github.com/owner/repo/issues/1",  # issue create
+                json.dumps({
+                    "number": 1,
+                    "title": "Exploration",
+                    "body": "",
+                    "state": "OPEN",
+                    "labels": [{"name": "exploration"}],
+                }),  # issue view
+            ]
 
             result = backend.create("Exploration")
 
             assert result["id"] == 1
-            # Check that exploration label is added
-            args = mock_run.call_args[0][0]
+            # Check that exploration label is added (second call was the create)
+            args = mock_run.call_args_list[1][0][0]
             assert "--label" in args
             assert "exploration" in args
 

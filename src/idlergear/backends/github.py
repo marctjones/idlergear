@@ -7,6 +7,7 @@ via the `gh` CLI tool.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -72,6 +73,22 @@ def _parse_json(output: str) -> Any:
         raise GitHubBackendError(f"Invalid JSON from gh: {e}")
 
 
+def _extract_issue_number_from_url(url: str) -> int | None:
+    """Extract issue number from a GitHub issue URL.
+
+    Args:
+        url: GitHub issue URL like "https://github.com/owner/repo/issues/123"
+
+    Returns:
+        Issue number as int, or None if parsing fails
+    """
+    # Match URLs like https://github.com/owner/repo/issues/123
+    match = re.search(r"/issues/(\d+)(?:\s|$)", url)
+    if match:
+        return int(match.group(1))
+    return None
+
+
 def _map_issue_to_task(issue: dict[str, Any]) -> dict[str, Any]:
     """Map GitHub issue fields to IdlerGear task fields."""
     # Extract labels as list of strings
@@ -132,8 +149,8 @@ class GitHubTaskBackend:
         """Create a new GitHub issue."""
         args = ["issue", "create", "--title", title]
 
-        if body:
-            args.extend(["--body", body])
+        # gh issue create requires --body when running non-interactively
+        args.extend(["--body", body if body else ""])
 
         # Build label list including priority
         all_labels = list(labels or [])
@@ -146,13 +163,16 @@ class GitHubTaskBackend:
         for assignee in assignees or []:
             args.extend(["--assignee", assignee])
 
-        # Add JSON output format
-        args.append("--json")
-        args.append("number,title,body,state,labels,assignees,url,createdAt,updatedAt")
-
+        # gh issue create returns the issue URL, not JSON
         output = _run_gh_command(args)
-        issue = _parse_json(output)
-        return _map_issue_to_task(issue)
+
+        # Parse issue number from URL (e.g., "https://github.com/owner/repo/issues/123")
+        issue_number = _extract_issue_number_from_url(output)
+        if issue_number is None:
+            raise GitHubBackendError(f"Could not parse issue number from: {output}")
+
+        # Fetch full issue details
+        return self.get(issue_number) or {"id": issue_number, "title": title}
 
     def list(self, state: str = "open") -> list[dict[str, Any]]:
         """List GitHub issues."""
@@ -281,17 +301,20 @@ class GitHubExploreBackend:
             "issue", "create",
             "--title", title,
             "--label", self.EXPLORE_LABEL,
+            # gh issue create requires --body when running non-interactively
+            "--body", body if body else "",
         ]
 
-        if body:
-            args.extend(["--body", body])
-
-        args.append("--json")
-        args.append("number,title,body,state,labels,url,createdAt,updatedAt")
-
+        # gh issue create returns the issue URL, not JSON
         output = _run_gh_command(args)
-        issue = _parse_json(output)
-        return self._map_to_exploration(issue)
+
+        # Parse issue number from URL
+        issue_number = _extract_issue_number_from_url(output)
+        if issue_number is None:
+            raise GitHubBackendError(f"Could not parse issue number from: {output}")
+
+        # Fetch full issue details
+        return self.get(issue_number) or {"id": issue_number, "title": title}
 
     def list(self, state: str = "open") -> list[dict[str, Any]]:
         """List explorations (issues with exploration label)."""
