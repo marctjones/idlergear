@@ -419,17 +419,15 @@ Python projects additionally get:
 - SessionStart hook for venv activation
 
 #### Tests
-- ✅ 25 passing tests covering core functionality
-
-### In Progress
+- ✅ 46 passing tests covering core functionality
 
 #### Daemon Architecture
-Design complete, implementation pending. The daemon provides:
+Daemon core implemented with:
 
-1. **Multi-agent coordination** - Multiple Claude Code instances share state
-2. **File locking** - Prevent concurrent modifications
-3. **Event pub/sub** - Notify agents of changes
-4. **Process management** - Track running scripts
+1. **Multi-agent coordination** - Multiple Claude Code instances share state via Unix socket
+2. **Event pub/sub** - Notify subscribed agents of changes (task.closed, vision.updated, etc.)
+3. **JSON-RPC 2.0 protocol** - Standard request/response and notification format
+4. **Lifecycle management** - Auto-start, health checks, graceful shutdown
 
 **Architecture:**
 ```
@@ -451,17 +449,22 @@ Design complete, implementation pending. The daemon provides:
 └─────────────────┘                    └─────────────────┘
 ```
 
-**Protocol:** JSON-RPC 2.0 over Unix domain socket
+**Implemented Modules:**
+- `daemon/protocol.py` - JSON-RPC 2.0 message types (Request, Response, Notification)
+- `daemon/server.py` - Unix socket server with connection handling
+- `daemon/client.py` - Async client library for daemon communication
+- `daemon/lifecycle.py` - Start/stop/restart and health check management
+- `daemon/handlers.py` - Knowledge management method handlers
 
-**Implementation Tasks:**
-1. Daemon core (socket server, connection handling)
-2. Daemon protocol (JSON-RPC messages)
-3. Daemon client library
-4. Daemon auto-start and lifecycle
-5. Event pub/sub system
-6. File locking coordination
-7. Migrate MCP server to use daemon client
-8. Add daemon status/start/stop CLI commands
+**CLI Commands:**
+- `idlergear daemon start [--foreground]` - Start the daemon
+- `idlergear daemon stop` - Stop the daemon
+- `idlergear daemon status` - Check daemon health
+
+### In Progress
+
+- Migrate MCP server to use daemon client (optional, can work standalone)
+- File locking coordination for concurrent access
 
 ### Not Started
 

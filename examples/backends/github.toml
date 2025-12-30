@@ -1,0 +1,133 @@
+# GitHub Backend Configuration for IdlerGear
+#
+# This file shows how to configure IdlerGear to use GitHub Issues as a task backend.
+# Place this file in one of:
+#   - .idlergear/backends/github.toml (project-specific)
+#   - ~/.config/idlergear/backends/github.toml (user-wide)
+#
+# Then configure IdlerGear to use it:
+#   idlergear config backend task github
+#
+# Requirements:
+#   - GitHub CLI (gh) installed and authenticated
+#   - Run from a git repository with a GitHub remote
+
+[task]
+# Field mapping from GitHub to IdlerGear canonical names
+# GitHub uses "number" for issue ID, we use "id"
+[task.field_map]
+number = "id"
+
+# Commands for task operations
+# Use $param for parameter substitution
+[task.commands]
+# Create a new issue
+# Parameters: $title, $body, $labels (comma-separated), $assignees (comma-separated)
+create = '''
+gh issue create \
+  --title "$title" \
+  --body "$body" \
+  ${labels:+--label "$labels"} \
+  ${assignees:+--assignee "$assignees"} \
+  --json number,title,body,state,labels,assignees
+'''
+
+# List issues
+# Parameters: $state (open, closed, all)
+list = '''
+gh issue list \
+  --state "$state" \
+  --json number,title,body,state,labels,assignees
+'''
+
+# Get a single issue
+# Parameters: $id
+get = '''
+gh issue view $id --json number,title,body,state,labels,assignees
+'''
+
+# Update an issue
+# Parameters: $id, $title, $body, $state, $labels, $assignees
+update = '''
+gh issue edit $id \
+  ${title:+--title "$title"} \
+  ${body:+--body "$body"} \
+  ${labels:+--add-label "$labels"} \
+  --json number,title,body,state,labels,assignees
+'''
+
+# Close an issue
+# Parameters: $id
+close = '''
+gh issue close $id --json number,title,body,state,labels,assignees
+'''
+
+# Reopen an issue
+# Parameters: $id
+reopen = '''
+gh issue reopen $id --json number,title,body,state,labels,assignees
+'''
+
+
+[explore]
+# Use GitHub Discussions for explorations (if enabled on the repo)
+# Or use issues with a specific label
+
+[explore.field_map]
+number = "id"
+
+[explore.commands]
+create = '''
+gh issue create \
+  --title "$title" \
+  --body "$body" \
+  --label "exploration" \
+  --json number,title,body,state
+'''
+
+list = '''
+gh issue list \
+  --state "$state" \
+  --label "exploration" \
+  --json number,title,body,state
+'''
+
+get = '''
+gh issue view $id --json number,title,body,state
+'''
+
+close = '''
+gh issue close $id --json number,title,body,state
+'''
+
+reopen = '''
+gh issue reopen $id --json number,title,body,state
+'''
+
+
+[reference]
+# Use GitHub Wiki or a docs repo for references
+# This example uses GitHub Gists for simplicity
+
+[reference.field_map]
+id = "id"
+
+[reference.commands]
+# Note: Gists are a simplified example
+# A real implementation might use GitHub Wiki API or a docs repo
+
+add = '''
+gh gist create --public --desc "$title" - <<< "$body" --json id,description,files
+'''
+
+list = '''
+gh gist list --json id,description,files
+'''
+
+get = '''
+gh gist view "$title" --json id,description,files
+'''
+
+search = '''
+gh gist list --json id,description,files | jq '[.[] | select(.description | test("$query"; "i"))]'
+'''
