@@ -102,11 +102,16 @@ note = "local"       # Keep notes local
 vision = "github"    # Sync vision to repo
 ```
 
-## Design
+## Documentation
 
-IdlerGear manages 11 types of knowledge (tasks, reference, explorations, vision, plans, notes, outputs, contexts, configuration, resources, codebase) across four quadrants (local/shared x volatile/persistent).
+- [Getting Started](docs/wiki/Getting-Started.md) - Installation and setup
+- [Knowledge Types](docs/wiki/Knowledge-Types.md) - All 6 knowledge types
+- [Commands Reference](docs/wiki/Commands-Reference.md) - Full CLI reference
+- [MCP Server](docs/wiki/MCP-Server.md) - Claude Code integration (35 tools)
+- [GitHub Integration](docs/wiki/GitHub-Integration.md) - GitHub backend setup
+- [Architecture](docs/wiki/Architecture.md) - System design
 
-See [DESIGN.md](DESIGN.md) for the full knowledge model and architecture.
+See [DESIGN.md](DESIGN.md) for the full knowledge model vision.
 
 ## The Key Insight
 
