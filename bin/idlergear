@@ -1,0 +1,16 @@
+#!/bin/bash
+# Wrapper script for idlergear that activates the venv
+# This allows idlergear to be called without manually activating the venv
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+VENV_DIR="$PROJECT_DIR/venv"
+
+if [ -f "$VENV_DIR/bin/activate" ]; then
+    source "$VENV_DIR/bin/activate"
+    exec "$VENV_DIR/bin/idlergear" "$@"
+else
+    echo "Error: venv not found at $VENV_DIR" >&2
+    echo "Run: python -m venv venv && pip install -e ." >&2
+    exit 1
+fi

@@ -1,12 +1,35 @@
 """IdlerGear CLI - Command-line interface."""
 
+from importlib.metadata import version as get_version
+
 import typer
+
+__version__ = get_version("idlergear")
+
+
+def version_callback(value: bool) -> None:
+    """Print version and exit."""
+    if value:
+        typer.echo(f"idlergear {__version__}")
+        raise typer.Exit()
+
 
 app = typer.Typer(
     name="idlergear",
     help="Knowledge management API for AI-assisted development.",
     no_args_is_help=True,
 )
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", "-V", callback=version_callback, is_eager=True,
+        help="Show version and exit."
+    ),
+) -> None:
+    """IdlerGear - Knowledge management for AI-assisted development."""
+    pass
 
 
 # Sub-command groups

@@ -11,7 +11,11 @@ from typing import Any, Literal
 
 from idlergear.backends.github import (
     GitHubExploreBackend,
+    GitHubNoteBackend,
+    GitHubPlanBackend,
+    GitHubReferenceBackend,
     GitHubTaskBackend,
+    GitHubVisionBackend,
 )
 from idlergear.backends.local import (
     LocalExploreBackend,
@@ -28,11 +32,11 @@ BackendType = Literal["task", "note", "explore", "reference", "plan", "vision"]
 # Backend class registry (for built-in backends)
 _backend_classes: dict[str, dict[str, type]] = {
     "task": {"local": LocalTaskBackend, "github": GitHubTaskBackend},
-    "note": {"local": LocalNoteBackend},
+    "note": {"local": LocalNoteBackend, "github": GitHubNoteBackend},
     "explore": {"local": LocalExploreBackend, "github": GitHubExploreBackend},
-    "reference": {"local": LocalReferenceBackend},
-    "plan": {"local": LocalPlanBackend},
-    "vision": {"local": LocalVisionBackend},
+    "reference": {"local": LocalReferenceBackend, "github": GitHubReferenceBackend},
+    "plan": {"local": LocalPlanBackend, "github": GitHubPlanBackend},
+    "vision": {"local": LocalVisionBackend, "github": GitHubVisionBackend},
 }
 
 # Shell backend class mapping

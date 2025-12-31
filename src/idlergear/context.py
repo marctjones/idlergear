@@ -139,12 +139,14 @@ def format_context(ctx: ProjectContext, verbose: bool = False) -> str:
 
     # Vision
     lines.append("## Vision")
-    if ctx.vision:
+    if ctx.vision and ctx.vision.strip() and ctx.vision.strip() != "# Project Vision":
         # Indent vision content
         for line in ctx.vision.strip().split("\n"):
             lines.append(line)
     else:
         lines.append("*No vision defined*")
+        lines.append("")
+        lines.append("💡 **Tip:** Set the project vision with `idlergear vision edit`")
     lines.append("")
 
     # Current Plan

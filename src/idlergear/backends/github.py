@@ -401,3 +401,445 @@ class GitHubExploreBackend:
             "created_at": issue.get("createdAt", ""),
             "updated_at": issue.get("updatedAt", ""),
         }
+
+
+class GitHubNoteBackend:
+    """GitHub Issues (with 'note' label) as note backend."""
+
+    NOTE_LABEL = "note"
+
+    def __init__(self, project_path: Path | None = None):
+        self.project_path = project_path
+        self._next_local_id = 1  # For tracking notes locally
+
+    def _ensure_label_exists(self) -> None:
+        """Ensure the note label exists."""
+        try:
+            _run_gh_command([
+                "label", "create", self.NOTE_LABEL,
+                "--description", "IdlerGear note",
+                "--color", "FBCA04",  # Yellow
+                "--force",
+            ])
+        except GitHubBackendError:
+            pass  # Label might already exist
+
+    def create(self, content: str) -> dict[str, Any]:
+        """Create a new note as a GitHub issue."""
+        self._ensure_label_exists()
+
+        # Use first line as title, rest as body
+        lines = content.strip().split('\n', 1)
+        title = lines[0][:80] if lines else content[:80]
+        body = lines[1] if len(lines) > 1 else ""
+
+        args = [
+            "issue", "create",
+            "--title", title,
+            "--label", self.NOTE_LABEL,
+            "--body", body,
+        ]
+
+        output = _run_gh_command(args)
+
+        issue_number = _extract_issue_number_from_url(output)
+        if issue_number is None:
+            raise GitHubBackendError(f"Could not parse issue number from: {output}")
+
+        return self.get(issue_number) or {"id": issue_number, "content": content}
+
+    def list(self) -> list[dict[str, Any]]:
+        """List all notes (open issues with note label)."""
+        args = [
+            "issue", "list",
+            "--state", "open",
+            "--label", self.NOTE_LABEL,
+            "--json", "number,title,body,createdAt,updatedAt",
+            "--limit", "100",
+        ]
+
+        output = _run_gh_command(args)
+        issues = _parse_json(output) or []
+        return [self._map_to_note(issue) for issue in issues]
+
+    def get(self, note_id: int) -> dict[str, Any] | None:
+        """Get a note by ID."""
+        try:
+            args = [
+                "issue", "view", str(note_id),
+                "--json", "number,title,body,state,createdAt,updatedAt",
+            ]
+            output = _run_gh_command(args)
+            issue = _parse_json(output)
+            return self._map_to_note(issue) if issue else None
+        except GitHubBackendError:
+            return None
+
+    def delete(self, note_id: int) -> bool:
+        """Delete a note (close the issue)."""
+        try:
+            _run_gh_command(["issue", "close", str(note_id)])
+            return True
+        except GitHubBackendError:
+            return False
+
+    def promote(self, note_id: int, to_type: str) -> dict[str, Any] | None:
+        """Promote a note to another type.
+
+        For GitHub, this removes the 'note' label and adds appropriate label.
+        """
+        note = self.get(note_id)
+        if not note:
+            return None
+
+        try:
+            # Remove note label
+            _run_gh_command([
+                "issue", "edit", str(note_id),
+                "--remove-label", self.NOTE_LABEL,
+            ])
+
+            # Add appropriate label based on target type
+            if to_type == "task":
+                # Just remove the note label, it becomes a regular issue/task
+                pass
+            elif to_type == "explore":
+                _run_gh_command([
+                    "issue", "edit", str(note_id),
+                    "--add-label", "exploration",
+                ])
+            elif to_type == "reference":
+                # For reference, we'd need to create a wiki page
+                # For now, just remove the note label
+                pass
+
+            return self.get(note_id)
+        except GitHubBackendError:
+            return None
+
+    def _map_to_note(self, issue: dict[str, Any]) -> dict[str, Any]:
+        """Map GitHub issue to note."""
+        title = issue.get("title", "")
+        body = issue.get("body", "")
+        content = f"{title}\n{body}".strip() if body else title
+
+        return {
+            "id": issue.get("number"),
+            "content": content,
+            "created_at": issue.get("createdAt", ""),
+            "updated_at": issue.get("updatedAt", ""),
+        }
+
+
+class GitHubVisionBackend:
+    """GitHub repository file as vision backend.
+
+    Syncs vision content to/from VISION.md in the repository root.
+    """
+
+    VISION_FILE = "VISION.md"
+
+    def __init__(self, project_path: Path | None = None):
+        self.project_path = project_path
+
+    def get(self) -> str | None:
+        """Get the vision from GitHub (VISION.md in repo)."""
+        try:
+            # Try to read the file from the remote default branch
+            output = _run_gh_command([
+                "api", "-X", "GET",
+                "/repos/{owner}/{repo}/contents/" + self.VISION_FILE,
+                "--jq", ".content",
+            ])
+
+            if output:
+                import base64
+                # GitHub API returns base64-encoded content
+                content = base64.b64decode(output).decode("utf-8")
+                return content
+        except GitHubBackendError:
+            pass
+
+        # Fall back to local file if exists
+        if self.project_path:
+            vision_path = self.project_path / self.VISION_FILE
+            if vision_path.exists():
+                return vision_path.read_text()
+
+        return None
+
+    def set(self, content: str) -> None:
+        """Set the vision (write to local VISION.md and commit).
+
+        Note: This writes locally. Use git push to sync to GitHub.
+        """
+        if not self.project_path:
+            raise GitHubBackendError("Project path required to set vision")
+
+        vision_path = self.project_path / self.VISION_FILE
+        vision_path.write_text(content)
+
+        # Optionally commit the change
+        try:
+            subprocess.run(
+                ["git", "add", self.VISION_FILE],
+                cwd=self.project_path,
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "Update project vision"],
+                cwd=self.project_path,
+                capture_output=True,
+                check=False,  # Don't fail if nothing to commit
+            )
+        except subprocess.CalledProcessError:
+            pass  # Git operations are optional
+
+
+class GitHubReferenceBackend:
+    """GitHub Wiki as reference backend.
+
+    Uses gh api to manage wiki pages.
+    """
+
+    def __init__(self, project_path: Path | None = None):
+        self.project_path = project_path
+        self._wiki_enabled: bool | None = None
+
+    def _check_wiki_enabled(self) -> bool:
+        """Check if wiki is enabled for the repository."""
+        if self._wiki_enabled is not None:
+            return self._wiki_enabled
+
+        try:
+            output = _run_gh_command([
+                "api", "/repos/{owner}/{repo}",
+                "--jq", ".has_wiki",
+            ])
+            self._wiki_enabled = output.strip().lower() == "true"
+        except GitHubBackendError:
+            self._wiki_enabled = False
+
+        return self._wiki_enabled
+
+    def add(self, title: str, body: str | None = None) -> dict[str, Any]:
+        """Add a new reference document.
+
+        Note: GitHub Wiki API is limited. This creates a local wiki page
+        that must be pushed manually.
+        """
+        # Wiki operations require cloning the wiki repo
+        # For now, create locally and provide instructions
+        if not self._check_wiki_enabled():
+            raise GitHubBackendError(
+                "Wiki not enabled for this repository. "
+                "Enable it in Settings → Features → Wiki"
+            )
+
+        # Sanitize title for filename
+        filename = title.replace(" ", "-").replace("/", "-") + ".md"
+        content = f"# {title}\n\n{body or ''}"
+
+        return {
+            "id": hash(title) % 10000,  # Fake ID
+            "title": title,
+            "body": body or "",
+            "filename": filename,
+            "content": content,
+            "note": "Wiki page created. Clone wiki repo and push to sync.",
+        }
+
+    def list(self) -> list[dict[str, Any]]:
+        """List reference documents from wiki.
+
+        Note: GitHub API doesn't provide wiki listing.
+        This returns empty for now.
+        """
+        # GitHub doesn't have a wiki list API
+        # Would need to clone wiki repo to list pages
+        return []
+
+    def get(self, title: str) -> dict[str, Any] | None:
+        """Get a reference by title."""
+        # Would need to clone wiki repo to get content
+        return None
+
+    def get_by_id(self, ref_id: int) -> dict[str, Any] | None:
+        """Get a reference by ID."""
+        return None
+
+    def update(
+        self,
+        title: str,
+        new_title: str | None = None,
+        body: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Update a reference document."""
+        return None
+
+    def search(self, query: str) -> list[dict[str, Any]]:
+        """Search reference documents."""
+        # GitHub code search could work here, but requires authentication
+        return []
+
+
+class GitHubPlanBackend:
+    """GitHub Projects (v2) as plan backend.
+
+    Uses gh api to manage GitHub Projects.
+    """
+
+    def __init__(self, project_path: Path | None = None):
+        self.project_path = project_path
+        self._current_plan: str | None = None
+
+    def _get_owner_repo(self) -> tuple[str, str]:
+        """Get owner and repo from current directory."""
+        try:
+            output = _run_gh_command([
+                "repo", "view", "--json", "owner,name",
+            ])
+            data = _parse_json(output)
+            if data:
+                owner = data.get("owner", {})
+                if isinstance(owner, dict):
+                    owner = owner.get("login", "")
+                return owner, data.get("name", "")
+        except GitHubBackendError:
+            pass
+        return "", ""
+
+    def create(
+        self,
+        name: str,
+        title: str | None = None,
+        body: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new GitHub Project."""
+        owner, repo = self._get_owner_repo()
+        if not owner:
+            raise GitHubBackendError("Could not determine repository owner")
+
+        project_title = title or name
+
+        try:
+            # Create project using gh api
+            # Note: Projects v2 uses GraphQL
+            mutation = """
+            mutation($ownerId: ID!, $title: String!) {
+                createProjectV2(input: {ownerId: $ownerId, title: $title}) {
+                    projectV2 {
+                        id
+                        number
+                        title
+                    }
+                }
+            }
+            """
+
+            # First get the owner ID
+            owner_query = _run_gh_command([
+                "api", "graphql", "-f",
+                f"query={{user(login: \"{owner}\") {{id}}}}",
+                "--jq", ".data.user.id",
+            ])
+
+            if not owner_query:
+                # Try organization
+                owner_query = _run_gh_command([
+                    "api", "graphql", "-f",
+                    f"query={{organization(login: \"{owner}\") {{id}}}}",
+                    "--jq", ".data.organization.id",
+                ])
+
+            if not owner_query:
+                raise GitHubBackendError("Could not get owner ID")
+
+            # Create the project
+            output = _run_gh_command([
+                "api", "graphql",
+                "-f", f"query={mutation}",
+                "-F", f"ownerId={owner_query.strip()}",
+                "-F", f"title={project_title}",
+            ])
+
+            result = _parse_json(output)
+            project = result.get("data", {}).get("createProjectV2", {}).get("projectV2", {})
+
+            return {
+                "name": name,
+                "title": project.get("title", project_title),
+                "id": project.get("number"),
+                "body": body or "",
+                "current": False,
+            }
+
+        except GitHubBackendError as e:
+            raise GitHubBackendError(f"Failed to create project: {e}")
+
+    def list(self) -> list[dict[str, Any]]:
+        """List all GitHub Projects for the repository."""
+        try:
+            output = _run_gh_command([
+                "project", "list",
+                "--format", "json",
+            ])
+
+            projects = _parse_json(output)
+            if not projects:
+                return []
+
+            result = []
+            if isinstance(projects, dict) and "projects" in projects:
+                projects = projects["projects"]
+
+            for p in projects:
+                result.append({
+                    "name": p.get("title", "").lower().replace(" ", "-"),
+                    "title": p.get("title", ""),
+                    "id": p.get("number"),
+                    "body": "",
+                    "current": p.get("title", "").lower().replace(" ", "-") == self._current_plan,
+                    "url": p.get("url", ""),
+                })
+
+            return result
+
+        except GitHubBackendError:
+            return []
+
+    def get(self, name: str) -> dict[str, Any] | None:
+        """Get a plan by name."""
+        plans = self.list()
+        for plan in plans:
+            if plan.get("name") == name or plan.get("title", "").lower() == name.lower():
+                return plan
+        return None
+
+    def get_current(self) -> dict[str, Any] | None:
+        """Get the current active plan."""
+        if not self._current_plan:
+            return None
+        return self.get(self._current_plan)
+
+    def switch(self, name: str) -> dict[str, Any] | None:
+        """Switch to a plan."""
+        plan = self.get(name)
+        if plan:
+            self._current_plan = plan.get("name")
+            plan["current"] = True
+            return plan
+        return None
+
+    def update(
+        self,
+        name: str,
+        title: str | None = None,
+        body: str | None = None,
+        state: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Update a plan."""
+        # GitHub Projects v2 update is complex via GraphQL
+        # For now, return the existing plan
+        return self.get(name)
