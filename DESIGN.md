@@ -43,6 +43,49 @@ The difference:
 - **Configurable** - Project decides where data lives, command stays the same
 - **Deterministic** - No AI interpretation needed, just run the command
 
+### Token Efficiency: Structured API vs File Parsing
+
+The AGENTS.md approach throws GPU cycles at parsing natural language:
+
+| Aspect | AGENTS.md | IdlerGear |
+|--------|-----------|-----------|
+| **Data access** | Read entire markdown file | Query specific information |
+| **Token cost** | ~2000 tokens per file read | ~50 tokens per query |
+| **Data freshness** | Stale until manual edit | Always current |
+| **Write capability** | Manual file edits only | AI stores via API |
+| **Structure** | Varies by author | Consistent schema |
+
+**Example efficiency gain:**
+```
+# AGENTS.md approach - every session:
+Load AGENTS.md (2000 tokens)
+Parse to find build info
+Maybe load additional files
+Total: 2000-5000 tokens
+
+# IdlerGear approach:
+idlergear config get build
+Returns: {"tool": "npm", "command": "npm run build"}
+Total: ~50 tokens
+```
+
+**40-100x more efficient per query.** Over a session with 10-20 context refreshes, this compounds.
+
+### The Adoption Challenge
+
+IdlerGear is more efficient, but current AI assistants aren't trained to use it:
+
+| Direction | Challenge | Solution |
+|-----------|-----------|----------|
+| **Read** | AI prefers file search | MCP tools appear as native |
+| **Write** | AI doesn't think to store discoveries | Hooks, slash commands, training |
+
+**The goal:** A virtuous cycle where AI queries IdlerGear for context, stores discoveries via API, and knowledge accumulates across sessions instead of resetting.
+
+**Compatibility:** IdlerGear works WITH AGENTS.md - the instruction file just says "use IdlerGear commands" instead of describing file locations.
+
+See issue #94 for adoption strategies
+
 ### What IdlerGear Is NOT
 
 - **Not an IDE** - It manages context, not editing
