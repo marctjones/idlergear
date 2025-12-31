@@ -1,6 +1,10 @@
 """MCP Server for IdlerGear - exposes knowledge management as AI tools."""
 
 import json
+import os
+import signal
+import sys
+from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
@@ -8,6 +12,72 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from idlergear.config import find_idlergear_root, get_config_value, set_config_value
+
+# Version tracking for reload detection
+__version__ = "0.2.0"
+
+# Global flag for reload request
+_reload_requested = False
+
+# PID file for external reload triggers
+def _get_pid_file() -> Path:
+    """Get path to PID file for this MCP server."""
+    return Path("/tmp") / f"idlergear-mcp-{os.getpid()}.pid"
+
+
+def _write_pid_file() -> None:
+    """Write PID file for external reload triggers."""
+    pid_file = _get_pid_file()
+    pid_file.write_text(str(os.getpid()))
+
+
+def _cleanup_pid_file() -> None:
+    """Remove PID file on exit."""
+    try:
+        _get_pid_file().unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _signal_handler(signum: int, frame: Any) -> None:
+    """Handle reload signal (SIGUSR1).
+
+    When we receive SIGUSR1, we flush all output and exec ourselves.
+    This replaces the current process with a fresh one, inheriting
+    the stdin/stdout file descriptors.
+    """
+    import sys
+
+    # Flush all output before exec
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    # Clean up
+    _cleanup_pid_file()
+
+    # Re-execute ourselves
+    _do_reload()
+
+
+def _setup_reload_signal() -> None:
+    """Set up signal handler for reload."""
+    if hasattr(signal, "SIGUSR1"):
+        signal.signal(signal.SIGUSR1, _signal_handler)
+
+
+def _do_reload() -> None:
+    """Reload the MCP server by re-executing the process."""
+    # Clean up PID file
+    _cleanup_pid_file()
+
+    # Get the executable and arguments
+    python = sys.executable
+
+    # Re-execute with the same arguments
+    # This replaces the current process completely
+    os.execv(python, [python, "-m", "idlergear.mcp_server"] + sys.argv[1:])
+
+
 from idlergear.explorations import (
     close_exploration,
     create_exploration,
@@ -490,6 +560,17 @@ async def list_tools() -> list[Tool]:
                 "required": ["type", "backend"],
             },
         ),
+        # Server management tools
+        Tool(
+            name="idlergear_version",
+            description="Show IdlerGear MCP server version and PID",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="idlergear_reload",
+            description="Reload the IdlerGear MCP server to pick up code changes. Call this after IdlerGear has been updated (e.g., after git pull or pip install) to use the new version without restarting Claude Code. The server will re-execute itself with the latest code.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -739,6 +820,34 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 "set": True,
             })
 
+        # Server management handlers
+        elif name == "idlergear_version":
+            return _format_result({
+                "version": __version__,
+                "pid": os.getpid(),
+                "python": sys.executable,
+            })
+
+        elif name == "idlergear_reload":
+            import threading
+            import time
+
+            def delayed_reload():
+                """Send reload signal after a short delay to allow response to be sent."""
+                time.sleep(0.1)  # Wait for response to be flushed
+                if hasattr(signal, "SIGUSR1"):
+                    os.kill(os.getpid(), signal.SIGUSR1)
+
+            # Start delayed reload in background thread
+            threading.Thread(target=delayed_reload, daemon=True).start()
+
+            return _format_result({
+                "status": "reload_triggered",
+                "message": "MCP server will reload in 100ms. The new version will be active for subsequent tool calls.",
+                "current_version": __version__,
+                "pid": os.getpid(),
+            })
+
         else:
             raise ValueError(f"Unknown tool: {name}")
 
@@ -747,14 +856,28 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
 
 async def run_server():
-    """Run the MCP server."""
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+    """Run the MCP server with reload support."""
+    # Set up signal handler for reload (SIGUSR1)
+    _setup_reload_signal()
+
+    # Write PID file so CLI can find and signal us
+    _write_pid_file()
+
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            init_options = server.create_initialization_options()
+            await server.run(read_stream, write_stream, init_options)
+    finally:
+        _cleanup_pid_file()
 
 
 def main():
     """Entry point for the MCP server."""
     import asyncio
+    import atexit
+
+    # Register cleanup
+    atexit.register(_cleanup_pid_file)
 
     asyncio.run(run_server())
 

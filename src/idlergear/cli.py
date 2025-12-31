@@ -42,6 +42,7 @@ reference_app = typer.Typer(help="Reference docs (→ GitHub Wiki)")
 run_app = typer.Typer(help="Script execution and logs")
 config_app = typer.Typer(help="Configuration management")
 daemon_app = typer.Typer(help="Daemon control")
+mcp_app = typer.Typer(help="MCP server management")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -52,6 +53,7 @@ app.add_typer(reference_app, name="reference")
 app.add_typer(run_app, name="run")
 app.add_typer(config_app, name="config")
 app.add_typer(daemon_app, name="daemon")
+app.add_typer(mcp_app, name="mcp")
 
 
 @app.command()
@@ -716,6 +718,111 @@ def daemon_status():
     else:
         typer.secho("Daemon: not running", fg=typer.colors.YELLOW)
         typer.echo(f"  Socket: {status.get('socket')}")
+
+
+# MCP server commands
+@mcp_app.command("reload")
+def mcp_reload():
+    """Reload the MCP server to pick up code changes.
+
+    Sends SIGUSR1 to the running MCP server process, causing it to
+    re-execute itself with the latest code. This is useful after
+    updating IdlerGear (e.g., git pull, pip install) without needing
+    to restart Claude Code.
+
+    The reload is transparent to Claude Code - the stdin/stdout
+    connection is preserved across the reload.
+    """
+    import glob
+    import os
+    import signal
+
+    # Find running MCP server by PID file
+    pid_files = glob.glob("/tmp/idlergear-mcp-*.pid")
+
+    if not pid_files:
+        typer.secho("No running MCP server found.", fg=typer.colors.YELLOW)
+        typer.echo("The MCP server may not be running, or was started without PID tracking.")
+        raise typer.Exit(1)
+
+    reloaded = 0
+    for pid_file in pid_files:
+        try:
+            pid = int(open(pid_file).read().strip())
+
+            # Check if process exists
+            os.kill(pid, 0)  # Signal 0 just checks existence
+
+            # Send reload signal
+            os.kill(pid, signal.SIGUSR1)
+            typer.secho(f"Sent reload signal to MCP server (PID {pid})", fg=typer.colors.GREEN)
+            reloaded += 1
+
+        except (ValueError, FileNotFoundError):
+            # Invalid or missing PID file
+            try:
+                os.unlink(pid_file)
+            except Exception:
+                pass
+        except ProcessLookupError:
+            # Process doesn't exist, clean up stale PID file
+            try:
+                os.unlink(pid_file)
+            except Exception:
+                pass
+            typer.secho(f"Cleaned up stale PID file: {pid_file}", fg=typer.colors.YELLOW)
+        except PermissionError:
+            typer.secho(f"Permission denied sending signal to PID from {pid_file}", fg=typer.colors.RED)
+
+    if reloaded == 0:
+        typer.secho("No active MCP servers found to reload.", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+    else:
+        typer.echo(f"\nReloaded {reloaded} MCP server(s). New code will be active for next tool call.")
+
+
+@mcp_app.command("status")
+def mcp_status():
+    """Show status of running MCP servers."""
+    import glob
+    import os
+
+    from idlergear.mcp_server import __version__
+
+    pid_files = glob.glob("/tmp/idlergear-mcp-*.pid")
+
+    if not pid_files:
+        typer.secho("No running MCP servers found.", fg=typer.colors.YELLOW)
+        typer.echo("The MCP server may not be running, or was started without PID tracking.")
+        return
+
+    typer.echo(f"IdlerGear MCP Server version: {__version__}")
+    typer.echo("")
+
+    active = 0
+    for pid_file in pid_files:
+        try:
+            pid = int(open(pid_file).read().strip())
+
+            # Check if process exists
+            os.kill(pid, 0)
+
+            typer.secho(f"  PID {pid}: running", fg=typer.colors.GREEN)
+            active += 1
+
+        except (ValueError, FileNotFoundError):
+            pass
+        except ProcessLookupError:
+            # Stale PID file
+            try:
+                os.unlink(pid_file)
+            except Exception:
+                pass
+
+    if active == 0:
+        typer.secho("No active MCP servers.", fg=typer.colors.YELLOW)
+    else:
+        typer.echo(f"\n{active} active MCP server(s)")
 
 
 # Config commands
