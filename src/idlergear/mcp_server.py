@@ -58,7 +58,7 @@ async def list_tools() -> list[Tool]:
         # Task tools
         Tool(
             name="idlergear_task_create",
-            description="Create a new task. USE THIS instead of creating TODO.md or similar files. Call when you discover work that needs to be done.",
+            description="MANDATORY: Create a task. You MUST call this when you: 1) Find a bug (add --label bug), 2) Make a design decision (add --label decision), 3) Leave technical debt (add --label tech-debt), 4) Identify work to be done. NEVER write TODO comments or create TODO.md files - use this tool instead.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -84,7 +84,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="idlergear_task_list",
-            description="List tasks. Call at session start to see what work needs to be done.",
+            description="List tasks. CALL AT SESSION START to see open work items. Check this before starting any new work.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -149,7 +149,7 @@ async def list_tools() -> list[Tool]:
         # Note tools
         Tool(
             name="idlergear_note_create",
-            description="Create a quick note. USE THIS instead of writing notes to files. Capture thoughts, discoveries, or reminders for later review.",
+            description="MANDATORY: Create a note. You MUST call this to capture: thoughts, discoveries, learnings, reminders. NEVER write to NOTES.md, SESSION_*.md, or SCRATCH.md - use this tool instead.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -204,7 +204,7 @@ async def list_tools() -> list[Tool]:
         # Exploration tools
         Tool(
             name="idlergear_explore_create",
-            description="Create an exploration",
+            description="Create an exploration for research questions or investigations. Use this when you need to explore a topic, investigate options, or research before making a decision.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -254,7 +254,7 @@ async def list_tools() -> list[Tool]:
         # Vision tools
         Tool(
             name="idlergear_vision_show",
-            description="Show the project vision. CALL AT SESSION START to understand project goals and direction. Check before making major decisions.",
+            description="REQUIRED AT SESSION START: Show the project vision. You MUST call this or idlergear_context at the beginning of every session to understand project goals. Check this before making any major decisions.",
             inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
@@ -433,7 +433,7 @@ async def list_tools() -> list[Tool]:
         # Context tool - session start
         Tool(
             name="idlergear_context",
-            description="Get full project context. CALL THIS AT SESSION START. Returns vision, current plan, open tasks, explorations, and recent notes in one call.",
+            description="MANDATORY AT SESSION START: Get full project context. You MUST call this at the beginning of EVERY session BEFORE doing any work. Returns vision, current plan, open tasks, explorations, and recent notes. Do NOT skip this step.",
             inputSchema={
                 "type": "object",
                 "properties": {

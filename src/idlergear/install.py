@@ -320,67 +320,136 @@ def remove_claude_md_section(project_path: Path | None = None) -> bool:
     return True
 
 
-# Claude Code rules file content
+# Claude Code rules file content - stronger enforcement language
 RULES_FILE_CONTENT = """\
 ---
-description: IdlerGear knowledge management rules
+description: MANDATORY IdlerGear knowledge management rules - MUST follow
 alwaysApply: true
 ---
 
-# IdlerGear Usage Rules
+# IdlerGear Usage Rules (MANDATORY)
 
-## Session Start
+## CRITICAL: Session Start (REQUIRED)
 
-**ALWAYS run this command at the start of EVERY conversation:**
+**Before responding to ANY user request, you MUST run:**
 
 ```bash
 idlergear context
 ```
 
-This provides the project vision, current plan, and open tasks. Do NOT skip this step.
+This is NOT optional. Do NOT skip this step. Do NOT proceed without running this command first.
+If you have not run `idlergear context` in this session, STOP and run it now.
 
-## FORBIDDEN: File-Based Knowledge
+## MANDATORY: Bug Discovery
 
-**DO NOT create any of these files:**
+When you identify ANY bug, error, or issue, you MUST IMMEDIATELY run:
+
+```bash
+idlergear task create "Bug: <description>" --label bug
+```
+
+Do NOT continue working until the task is created. Do NOT just mention the bug in conversation.
+
+## MANDATORY: Design Decisions
+
+When making ANY architectural choice or design decision, you MUST IMMEDIATELY run:
+
+```bash
+idlergear task create "Decision: <what you decided>" --label decision
+```
+
+Record the decision BEFORE implementing it.
+
+## MANDATORY: Technical Debt
+
+When you write code that could be improved later, you MUST run:
+
+```bash
+idlergear task create "<what needs improvement>" --label tech-debt
+```
+
+Do NOT write `// TODO:` comments. Do NOT skip this step.
+
+## FORBIDDEN: File-Based Knowledge (WILL BE BLOCKED)
+
+You are PROHIBITED from creating these files:
 - `TODO.md`, `TODO.txt`, `TASKS.md`
 - `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
 - `FEATURE_IDEAS.md`, `RESEARCH.md`, `BACKLOG.md`
 - Any markdown file for tracking work or capturing thoughts
 
-**ALWAYS use IdlerGear commands instead.**
+These files will be REJECTED by hooks. Use IdlerGear commands instead.
 
-## FORBIDDEN: Inline TODOs
+## FORBIDDEN: Inline TODOs (WILL BE BLOCKED)
 
-**DO NOT write inline TODO comments:**
+You are PROHIBITED from writing these comments:
 - `// TODO: ...`
+- `# TODO: ...`
 - `# FIXME: ...`
 - `/* HACK: ... */`
+- `<!-- TODO: ... -->`
 
-**INSTEAD:** Create a task with `idlergear task create "..." --label technical-debt`
+These comments will be REJECTED by hooks. Create tasks instead:
+`idlergear task create "..." --label tech-debt`
 
 ## REQUIRED: Use IdlerGear Commands
 
-| Instead of... | Use this command |
-|---------------|------------------|
-| Creating TODO.md | `idlergear task create "description"` |
-| Writing notes to files | `idlergear note create "content"` |
-| Adding TODO comments | `idlergear task create "..." --label technical-debt` |
-| Creating VISION.md | `idlergear vision edit` |
-| Documenting findings | `idlergear reference add "title" --body "..."` |
-
-## Knowledge Flow
-
-```
-note → explore → task
-```
-- Quick thoughts go to notes (capture now, review later)
-- Research questions go to explorations (open-ended investigation)
-- Actionable work goes to tasks (clear completion criteria)
-- Use `idlergear note promote <id>` to convert notes to tasks/explorations
+| When you... | You MUST run... |
+|-------------|-----------------|
+| Find a bug | `idlergear task create "Bug: ..." --label bug` |
+| Have an idea | `idlergear note create "..."` |
+| Make a decision | `idlergear task create "Decision: ..." --label decision` |
+| Leave tech debt | `idlergear task create "..." --label tech-debt` |
+| Complete work | `idlergear task close <id>` |
+| Research something | `idlergear explore create "..."` |
+| Document findings | `idlergear reference add "..." --body "..."` |
 
 ## Data Protection
 
 **NEVER modify `.idlergear/` files directly** - Use CLI commands only
+**NEVER modify `.claude/` or `.mcp.json`** - These are protected
+
+## Enforcement
+
+Hooks are configured to:
+1. Block commits with TODO comments
+2. Block creation of forbidden files
+3. Remind you to run `idlergear context` at session start
+"""
+
+
+# Hooks configuration for enforcement
+HOOKS_CONFIG = {
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Write|Edit",
+                "command": "idlergear check --file \"$TOOL_INPUT_PATH\" --quiet",
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "command": "idlergear check --context-reminder",
+            }
+        ],
+    }
+}
+
+# Slash command for session start
+START_COMMAND_CONTENT = """\
+---
+description: Start IdlerGear session - run context and show project state
+---
+
+Run `idlergear context` to show the project vision, current plan, open tasks, and recent notes.
+
+After running the command, summarize:
+1. The project vision (what is this project for?)
+2. Current plan if any
+3. Number of open tasks and their priorities
+4. Any open explorations
+
+This gives you the full context to start working effectively.
 """
 
 
@@ -402,6 +471,69 @@ def add_rules_file(project_path: Path | None = None) -> bool:
 
     rules_dir.mkdir(parents=True, exist_ok=True)
     rules_file.write_text(RULES_FILE_CONTENT)
+    return True
+
+
+def add_hooks_config(project_path: Path | None = None) -> bool:
+    """Create .claude/hooks.json for enforcement.
+
+    Returns True if created, False if already exists.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    hooks_dir = project_path / ".claude"
+    hooks_file = hooks_dir / "hooks.json"
+
+    if hooks_file.exists():
+        # Check if idlergear hooks already present
+        with open(hooks_file) as f:
+            existing = json.load(f)
+        if "hooks" in existing:
+            for hook_type in HOOKS_CONFIG["hooks"]:
+                if hook_type in existing["hooks"]:
+                    for hook in existing["hooks"][hook_type]:
+                        if "idlergear" in hook.get("command", ""):
+                            return False
+        # Merge hooks
+        if "hooks" not in existing:
+            existing["hooks"] = {}
+        for hook_type, hooks in HOOKS_CONFIG["hooks"].items():
+            if hook_type not in existing["hooks"]:
+                existing["hooks"][hook_type] = []
+            existing["hooks"][hook_type].extend(hooks)
+        with open(hooks_file, "w") as f:
+            json.dump(existing, f, indent=2)
+            f.write("\n")
+        return True
+
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    with open(hooks_file, "w") as f:
+        json.dump(HOOKS_CONFIG, f, indent=2)
+        f.write("\n")
+    return True
+
+
+def add_start_command(project_path: Path | None = None) -> bool:
+    """Create .claude/commands/start.md slash command.
+
+    Returns True if created, False if already exists.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    commands_dir = project_path / ".claude" / "commands"
+    command_file = commands_dir / "start.md"
+
+    if command_file.exists():
+        return False
+
+    commands_dir.mkdir(parents=True, exist_ok=True)
+    command_file.write_text(START_COMMAND_CONTENT)
     return True
 
 

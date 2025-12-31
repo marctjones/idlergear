@@ -196,6 +196,119 @@ def context(
 
 
 @app.command()
+def check(
+    file: str = typer.Option(None, "--file", "-f", help="File to check for violations"),
+    no_todos: bool = typer.Option(False, "--no-todos", help="Check for TODO comments"),
+    no_forbidden: bool = typer.Option(False, "--no-forbidden", help="Check for forbidden files"),
+    context_reminder: bool = typer.Option(False, "--context-reminder", help="Remind to run context at session start"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Only output on violations"),
+):
+    """Check for IdlerGear policy violations.
+
+    Used by hooks to enforce IdlerGear usage:
+    - Block TODO comments in code
+    - Block forbidden files (TODO.md, NOTES.md, etc.)
+    - Remind to run context at session start
+
+    Examples:
+        idlergear check --file src/main.py --quiet
+        idlergear check --no-todos
+        idlergear check --context-reminder
+    """
+    from pathlib import Path
+    import re
+
+    violations = []
+
+    # Check file for TODO comments
+    if file:
+        file_path = Path(file)
+        if file_path.exists() and file_path.is_file():
+            try:
+                content = file_path.read_text()
+                # Check for TODO patterns
+                todo_patterns = [
+                    r'//\s*TODO:',
+                    r'#\s*TODO:',
+                    r'/\*\s*TODO:',
+                    r'//\s*FIXME:',
+                    r'#\s*FIXME:',
+                    r'/\*\s*FIXME:',
+                    r'//\s*HACK:',
+                    r'#\s*HACK:',
+                    r'/\*\s*HACK:',
+                    r'<!--\s*TODO:',
+                ]
+                for pattern in todo_patterns:
+                    if re.search(pattern, content, re.IGNORECASE):
+                        violations.append(f"TODO/FIXME/HACK comment found in {file}")
+                        violations.append("Use: idlergear task create \"...\" --label tech-debt")
+                        break
+            except Exception:
+                pass  # Can't read file, skip
+
+        # Check for forbidden file names
+        forbidden_files = [
+            "TODO.md", "TODO.txt", "TASKS.md",
+            "NOTES.md", "SCRATCH.md", "BACKLOG.md",
+            "FEATURE_IDEAS.md", "RESEARCH.md",
+        ]
+        if file_path.name in forbidden_files:
+            violations.append(f"Forbidden file: {file_path.name}")
+            violations.append("Use IdlerGear commands instead:")
+            violations.append("  idlergear task create \"...\"")
+            violations.append("  idlergear note create \"...\"")
+
+        if file_path.name.startswith("SESSION_") and file_path.suffix == ".md":
+            violations.append(f"Forbidden file pattern: {file_path.name}")
+            violations.append("Use: idlergear note create \"...\"")
+
+    # Check for forbidden files in project
+    if no_forbidden:
+        from idlergear.config import find_idlergear_root
+        root = find_idlergear_root()
+        if root:
+            forbidden = [
+                "TODO.md", "TODO.txt", "TASKS.md",
+                "NOTES.md", "SCRATCH.md", "BACKLOG.md",
+            ]
+            for f in forbidden:
+                if (root / f).exists():
+                    violations.append(f"Forbidden file exists: {f}")
+
+    # Grep for TODO comments in project
+    if no_todos:
+        from idlergear.config import find_idlergear_root
+        root = find_idlergear_root()
+        if root:
+            import subprocess
+            result = subprocess.run(
+                ["grep", "-rn", "-E", r"(//|#|/\*)\s*(TODO|FIXME|HACK):", str(root),
+                 "--include=*.py", "--include=*.js", "--include=*.ts", "--include=*.go",
+                 "--include=*.rs", "--include=*.java", "--include=*.c", "--include=*.cpp"],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                violations.append("TODO/FIXME/HACK comments found:")
+                for line in result.stdout.strip().split("\n")[:5]:
+                    violations.append(f"  {line}")
+                violations.append("Use: idlergear task create \"...\" --label tech-debt")
+
+    # Context reminder
+    if context_reminder:
+        if not quiet:
+            typer.secho("REMINDER: Run 'idlergear context' at session start", fg=typer.colors.CYAN)
+
+    # Report violations
+    if violations:
+        for v in violations:
+            typer.secho(v, fg=typer.colors.RED)
+        raise typer.Exit(1)
+    elif not quiet and not context_reminder:
+        typer.secho("No violations found.", fg=typer.colors.GREEN)
+
+
+@app.command()
 def new(
     name: str = typer.Argument(..., help="Project name"),
     path: str = typer.Option(None, "--path", "-p", help="Parent directory (default: current)"),
@@ -443,17 +556,26 @@ def install(
     skip_agents: bool = typer.Option(False, "--skip-agents", help="Skip AGENTS.md update"),
     skip_claude: bool = typer.Option(False, "--skip-claude", help="Skip CLAUDE.md update"),
     skip_rules: bool = typer.Option(False, "--skip-rules", help="Skip .claude/rules/ creation"),
+    skip_hooks: bool = typer.Option(False, "--skip-hooks", help="Skip .claude/hooks.json creation"),
+    skip_commands: bool = typer.Option(False, "--skip-commands", help="Skip /start command creation"),
 ):
     """Install IdlerGear integration for Claude Code.
 
-    Creates .mcp.json to register the MCP server, adds usage instructions
-    to CLAUDE.md and AGENTS.md, and creates .claude/rules/idlergear.md.
+    Creates:
+    - .mcp.json - MCP server registration
+    - CLAUDE.md - Usage instructions
+    - AGENTS.md - AI agent instructions
+    - .claude/rules/idlergear.md - Enforcement rules
+    - .claude/hooks.json - Enforcement hooks
+    - .claude/commands/start.md - /start slash command
     """
     from idlergear.config import find_idlergear_root
     from idlergear.install import (
         add_agents_md_section,
         add_claude_md_section,
+        add_hooks_config,
         add_rules_file,
+        add_start_command,
         install_mcp_server,
     )
 
@@ -488,8 +610,23 @@ def install(
         else:
             typer.echo(".claude/rules/idlergear.md already exists")
 
+    # Create hooks config
+    if not skip_hooks:
+        if add_hooks_config():
+            typer.secho("Added hooks to .claude/hooks.json", fg=typer.colors.GREEN)
+        else:
+            typer.echo(".claude/hooks.json already has IdlerGear hooks")
+
+    # Create /start command
+    if not skip_commands:
+        if add_start_command():
+            typer.secho("Created .claude/commands/start.md", fg=typer.colors.GREEN)
+        else:
+            typer.echo(".claude/commands/start.md already exists")
+
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
+    typer.echo("Use /start at session beginning to load project context.")
     typer.echo("Restart Claude Code or run /mcp to verify.")
 
 
