@@ -114,13 +114,16 @@ idlergear task close 42
 #### 2. Notes
 Quick capture - the post-it note. Unstructured, flexible. Use for:
 - Quick observations you don't want to forget
-- Explorations and open questions (use `--tag explore`)
+- Explorations and open questions (`--tag explore`)
+- Vague ideas to flesh out later (`--tag idea`)
 - Discoveries that might become tasks or references later
 
 ```bash
 idlergear note create "Parser quirk with compound words"
 idlergear note create "Should we support Windows?" --tag explore
+idlergear note create "What if we cached the AST?" --tag idea
 idlergear note list
+idlergear note list --tag idea
 idlergear note promote 1 --to task
 ```
 
