@@ -11,6 +11,21 @@ AI coding assistants are stateless. Every session starts fresh. Knowledge is con
 
 IdlerGear provides a **command-based API** that manages this knowledge across sessions, machines, and teams.
 
+## AI-Assistant Agnostic
+
+IdlerGear works identically across all major AI coding assistants:
+
+| Assistant | Integration | Status |
+|-----------|-------------|--------|
+| Claude Code | MCP + CLAUDE.md | ✅ Full support |
+| Gemini CLI | MCP + GEMINI.md | ✅ Full support |
+| GitHub Copilot CLI | MCP + agents | ✅ Full support |
+| OpenAI Codex CLI | MCP + AGENTS.md | ✅ Full support |
+| Aider | CLI + .aider.conf.yml | ✅ CLI support |
+| Block's Goose | MCP + .goosehints | ✅ Full support |
+
+**Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
+
 ## Features (v0.2.0)
 
 ### Knowledge Types
@@ -26,9 +41,10 @@ IdlerGear provides a **command-based API** that manages this knowledge across se
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - Model Context Protocol for Claude Code
-- **CLAUDE.md** - Rules and context for Claude Code sessions
-- **AGENTS.md** - Universal AI agent conventions
+- **MCP Server** - 35+ tools via Model Context Protocol (universal)
+- **Project Instructions** - CLAUDE.md, GEMINI.md, AGENTS.md, .goosehints
+- **Slash Commands** - `/ig-*` commands for Claude Code (planned)
+- **CLI Fallback** - Same commands work via shell for any assistant
 
 ## Why Not Just AGENTS.md?
 
@@ -104,14 +120,24 @@ vision = "github"    # Sync vision to repo
 
 ## Documentation
 
-- [Getting Started](docs/wiki/Getting-Started.md) - Installation and setup
-- [Knowledge Types](docs/wiki/Knowledge-Types.md) - All 6 knowledge types
-- [Commands Reference](docs/wiki/Commands-Reference.md) - Full CLI reference
-- [MCP Server](docs/wiki/MCP-Server.md) - Claude Code integration (35 tools)
-- [GitHub Integration](docs/wiki/GitHub-Integration.md) - GitHub backend setup
-- [Architecture](docs/wiki/Architecture.md) - System design
+**[Full Wiki](https://github.com/marctjones/idlergear/wiki)**
 
-See [DESIGN.md](DESIGN.md) for the full knowledge model vision.
+### Core
+- [Getting Started](https://github.com/marctjones/idlergear/wiki/Getting-Started) - Installation and setup
+- [Knowledge Types](https://github.com/marctjones/idlergear/wiki/Knowledge-Types) - All 6 knowledge types
+- [Commands Reference](https://github.com/marctjones/idlergear/wiki/Commands-Reference) - Full CLI reference
+- [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 35+ MCP tools
+
+### AI Assistant Guides
+- [AI Assistant Comparison](https://github.com/marctjones/idlergear/wiki/AI-Assistant-Comparison) - Feature comparison
+- [Built-in Tools Comparison](https://github.com/marctjones/idlergear/wiki/Built-in-Tools-Comparison) - What each assistant provides
+- [Claude Code Integration](https://github.com/marctjones/idlergear/wiki/Claude-Code-Integration) - Full setup guide
+- [Slash Commands](https://github.com/marctjones/idlergear/wiki/Slash-Commands) - `/ig-*` command reference
+
+### Backends
+- [GitHub Integration](https://github.com/marctjones/idlergear/wiki/GitHub-Integration) - GitHub backend setup
+
+See [DESIGN.md](DESIGN.md) for the full knowledge model and architecture.
 
 ## The Key Insight
 

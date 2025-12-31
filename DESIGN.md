@@ -51,15 +51,51 @@ The difference:
 - **Not a cloud service** - Runs locally, your data stays local
 - **Not enterprise-only** - Works solo, scales to teams
 
+### Cross-Assistant Strategy
+
+IdlerGear is **AI-assistant agnostic**. It works identically across:
+- Claude Code
+- Gemini CLI
+- GitHub Copilot CLI
+- OpenAI Codex CLI
+- Aider
+- Block's Goose
+
+**Why this matters:** Developers use multiple AI assistants. Knowledge should persist regardless of which assistant is active.
+
+**How it works:**
+1. **MCP-first** - Universal tool protocol supported by all major assistants
+2. **CLI fallback** - Same commands work via shell when MCP isn't available
+3. **Project instructions** - Generate appropriate files for each assistant (CLAUDE.md, GEMINI.md, AGENTS.md, .goosehints)
+
+**What IdlerGear provides vs. built-in tools:**
+
+All AI assistants have similar built-in capabilities (file operations, shell, web access). IdlerGear focuses on what they lack:
+
+| Category | Built-in Status | IdlerGear Solution |
+|----------|----------------|-------------------|
+| File operations | All have it | Out of scope |
+| Shell execution | All have it | Out of scope |
+| Web search/fetch | Most have it | Out of scope |
+| **Task tracking** | Varies, limited | `idlergear task` ✅ |
+| **Notes/capture** | None | `idlergear note` ✅ |
+| **Project vision** | None | `idlergear vision` ✅ |
+| **Plans/roadmaps** | None | `idlergear plan` ✅ |
+| **Explorations** | None | `idlergear explore` ✅ |
+| **References** | None | `idlergear reference` ✅ |
+| **Memory/prefs** | Varies | `idlergear memory` (planned) |
+| **Session state** | Varies | `idlergear session` (planned) |
+| **Usage tracking** | Some have it | `idlergear usage` (planned) |
+
 ---
 
 ## Part 2: Knowledge Model
 
 ---
 
-### Eleven Types of Knowledge
+### Fourteen Types of Knowledge
 
-IdlerGear manages eleven distinct types of knowledge:
+IdlerGear manages fourteen distinct types of knowledge (11 core + 3 planned cross-assistant tools):
 
 #### 1. Tasks
 Things that need to be done. Have a lifecycle (open → in progress → closed). Can be assigned, prioritized, labeled.
@@ -156,6 +192,34 @@ Source code, tests, the implementation - everything managed by git. IdlerGear as
 idlergear code status          # git status with context
 idlergear code changed         # files changed since last commit
 idlergear code recent          # recent commit history
+```
+
+#### 12. Memory (Planned)
+User preferences and patterns that persist across sessions. Cross-assistant capability - saves what you tell any AI assistant about your preferences.
+
+```bash
+idlergear memory save "prefer TypeScript over JavaScript"
+idlergear memory save "use pytest for testing" --tag python
+idlergear memory list
+idlergear memory recall --tag python
+```
+
+#### 13. Sessions (Planned)
+Work context that can be saved and restored. Enables continuity when switching between tasks or resuming after a break.
+
+```bash
+idlergear session save "debugging auth flow"
+idlergear session list
+idlergear session resume <id>
+```
+
+#### 14. Usage (Planned)
+Token and cost tracking across sessions and AI assistants. Provides visibility into AI usage patterns.
+
+```bash
+idlergear usage log --tokens 50000 --model claude-opus
+idlergear usage show --today
+idlergear usage export --format csv
 ```
 
 ### Four Quadrants
