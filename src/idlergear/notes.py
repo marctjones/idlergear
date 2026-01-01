@@ -21,8 +21,17 @@ def get_notes_dir(project_path: Path | None = None) -> Path | None:
     return project_path / ".idlergear" / "notes"
 
 
-def create_note(content: str, project_path: Path | None = None) -> dict[str, Any]:
+def create_note(
+    content: str,
+    tags: list[str] | None = None,
+    project_path: Path | None = None,
+) -> dict[str, Any]:
     """Create a new note.
+
+    Args:
+        content: The note content
+        tags: Optional list of tags (e.g., ["explore", "idea"])
+        project_path: Optional project path
 
     Returns the created note data including its ID.
     """
@@ -36,10 +45,12 @@ def create_note(content: str, project_path: Path | None = None) -> dict[str, Any
     filename = f"{note_id:03d}.md"
     filepath = notes_dir / filename
 
-    frontmatter = {
+    frontmatter: dict[str, Any] = {
         "id": note_id,
         "created": now_iso(),
     }
+    if tags:
+        frontmatter["tags"] = tags
 
     file_content = render_frontmatter(frontmatter, content.strip() + "\n")
     filepath.write_text(file_content)
@@ -47,13 +58,21 @@ def create_note(content: str, project_path: Path | None = None) -> dict[str, Any
     return {
         "id": note_id,
         "content": content.strip(),
+        "tags": tags or [],
         "created": frontmatter["created"],
         "path": str(filepath),
     }
 
 
-def list_notes(project_path: Path | None = None) -> list[dict[str, Any]]:
-    """List all notes.
+def list_notes(
+    tag: str | None = None,
+    project_path: Path | None = None,
+) -> list[dict[str, Any]]:
+    """List notes, optionally filtered by tag.
+
+    Args:
+        tag: Optional tag to filter by (e.g., "explore", "idea")
+        project_path: Optional project path
 
     Returns list of note data dicts sorted by ID.
     """
@@ -65,7 +84,8 @@ def list_notes(project_path: Path | None = None) -> list[dict[str, Any]]:
     for filepath in sorted(notes_dir.glob("*.md")):
         note = load_note_from_file(filepath)
         if note:
-            notes.append(note)
+            if tag is None or tag in note.get("tags", []):
+                notes.append(note)
 
     return sorted(notes, key=lambda n: n.get("id", 0))
 
@@ -81,6 +101,7 @@ def load_note_from_file(filepath: Path) -> dict[str, Any] | None:
     return {
         "id": frontmatter.get("id"),
         "content": body.strip(),
+        "tags": frontmatter.get("tags", []),
         "created": frontmatter.get("created"),
         "path": str(filepath),
     }
@@ -122,7 +143,7 @@ def delete_note(note_id: int, project_path: Path | None = None) -> bool:
 def promote_note(
     note_id: int, to_type: str, project_path: Path | None = None
 ) -> dict[str, Any] | None:
-    """Promote a note to another type (task, explore, reference).
+    """Promote a note to another type (task or reference).
 
     Returns the created item data, or None if note not found.
     """
@@ -140,13 +161,6 @@ def promote_note(
         title = lines[0].strip()
         body = lines[1].strip() if len(lines) > 1 else None
         result = create_task(title, body=body, project_path=project_path)
-    elif to_type == "explore":
-        from idlergear.explorations import create_exploration
-
-        lines = content.split("\n", 1)
-        title = lines[0].strip()
-        body = lines[1].strip() if len(lines) > 1 else None
-        result = create_exploration(title, body=body, project_path=project_path)
     elif to_type == "reference":
         from idlergear.reference import add_reference
 
@@ -155,7 +169,7 @@ def promote_note(
         body = lines[1].strip() if len(lines) > 1 else None
         result = add_reference(title, body=body, project_path=project_path)
     else:
-        raise ValueError(f"Unknown promotion target: {to_type}")
+        raise ValueError(f"Unknown promotion target: {to_type}. Valid targets: task, reference")
 
     # Delete the original note after successful promotion
     delete_note(note_id, project_path)

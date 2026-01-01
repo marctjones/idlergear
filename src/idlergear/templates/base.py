@@ -36,11 +36,11 @@ CLAUDE_MD = """\
 
 This project uses IdlerGear for knowledge management. IdlerGear provides:
 - **Tasks** - Track work items (syncs to GitHub Issues)
-- **Notes** - Quick capture for later
-- **Explorations** - Open questions being investigated
+- **Notes** - Quick capture (use `--tag explore` for research, `--tag idea` for ideas)
 - **Reference** - Technical documentation
 - **Plans** - Implementation roadmaps
 - **Vision** - Project goals and direction
+- **Runs** - Process output tracking
 
 ### Before Starting Work
 
@@ -49,7 +49,7 @@ Always check context first:
 idlergear vision show    # Understand project goals
 idlergear plan show      # See current plan
 idlergear task list      # Review open tasks
-idlergear explore list   # Check open questions
+idlergear note list      # Check recent notes
 ```
 
 ### During Development
@@ -57,6 +57,7 @@ idlergear explore list   # Check open questions
 Capture knowledge as you work:
 ```bash
 idlergear note create "discovered X while working on Y"
+idlergear note create "should we try Z?" --tag explore
 idlergear task create "need to fix Z" --label bug
 idlergear reference add "API Design" --body "..."
 ```
@@ -114,13 +115,30 @@ alwaysApply: true
 
 ## CRITICAL: Session Start
 
-**ALWAYS run this command at the start of EVERY conversation:**
+**ALWAYS run this at the start of EVERY conversation:**
 
 ```bash
 idlergear context
 ```
 
-This provides the project vision, current plan, and open tasks. Do NOT skip this step.
+This provides vision, current plan, and open tasks. Do NOT skip this step.
+
+## CRITICAL: Persist Your Discoveries
+
+**When you learn something, STORE IT:**
+
+```bash
+# Discovered API behavior
+idlergear note create "Auth endpoint requires Bearer token prefix"
+
+# Found a quirk or gotcha
+idlergear note create "Parser fails on empty input - needs null check" --tag bug
+
+# Had an architectural idea
+idlergear note create "Could cache AST to improve performance" --tag idea
+```
+
+**This note WILL be available in your next session.** Without this, your learnings are lost.
 
 ## FORBIDDEN: File-Based Knowledge
 
@@ -128,7 +146,6 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 - `TODO.md`, `TODO.txt`, `TASKS.md`
 - `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
 - `FEATURE_IDEAS.md`, `RESEARCH.md`, `BACKLOG.md`
-- Any markdown file for tracking work or capturing thoughts
 
 **ALWAYS use IdlerGear commands instead.**
 
@@ -139,7 +156,17 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 - `# FIXME: ...`
 - `/* HACK: ... */`
 
-**INSTEAD:** Create a task with `idlergear task create "..." --label technical-debt`
+**INSTEAD:** `idlergear task create "..." --label technical-debt`
+
+## PREFER: IdlerGear Search Over File Search
+
+**Before searching files for project context, try:**
+
+```bash
+idlergear search "authentication"
+```
+
+This searches tasks, notes, references, and plans - structured knowledge that persists.
 
 ## REQUIRED: Use IdlerGear Commands
 
@@ -151,33 +178,29 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 | Creating VISION.md | `idlergear vision edit` |
 | Documenting findings | `idlergear reference add "title" --body "..."` |
 
-## Data Protection
-
-1. **NEVER modify `.idlergear/` files directly** - Use CLI commands only
-2. **NEVER modify `.claude/` or `.mcp.json`** - These are protected
-
 ## Workflow
 
 1. **Session start**: Run `idlergear context`
-2. **Found a bug**: `idlergear task create "..." --label bug`
-3. **Had an idea**: `idlergear note create "..."`
-4. **Research question**: `idlergear explore create "..."`
-5. **Completed work**: `idlergear task close <id>`
-6. **Document finding**: `idlergear reference add "..."`
+2. **Discovered something**: `idlergear note create "..."`
+3. **Found a bug**: `idlergear task create "..." --label bug`
+4. **Had an idea**: `idlergear note create "..." --tag idea`
+5. **Research question**: `idlergear note create "..." --tag explore`
+6. **Completed work**: `idlergear task close <id>`
+7. **Session end**: Consider what should be noted for next time
 
 ## Knowledge Promotion Flow
 
 ```
-note → explore → task
+note → task or reference
 ```
 - Quick thoughts go to notes (capture now, review later)
-- Research questions go to explorations (open-ended investigation)
+- Use `--tag explore` for research questions, `--tag idea` for ideas
 - Actionable work goes to tasks (clear completion criteria)
-- Use `idlergear note promote <id>` to convert notes to tasks/explorations
+- Use `idlergear note promote <id> --to task` to convert notes to tasks
 
 ## MCP Tools
 
-The IdlerGear MCP server provides direct tool access. Use these when available.
+The IdlerGear MCP server provides direct tool access. PREFER these over file operations when available.
 """
 
 # .mcp.json content
@@ -205,13 +228,40 @@ This project uses [IdlerGear](https://github.com/marctjones/idlergear) for knowl
 
 ### CRITICAL: Session Start
 
-**ALWAYS run this command at the start of EVERY session:**
+**ALWAYS run this at the start of EVERY session:**
 
 ```bash
 idlergear context
 ```
 
-This shows the project vision, current plan, open tasks, and recent notes. Do NOT skip this step.
+This shows vision, current plan, open tasks, and recent notes. Do NOT skip this step.
+
+### CRITICAL: Persist Your Discoveries
+
+**When you learn something, STORE IT for future sessions:**
+
+```bash
+# Discovered API behavior
+idlergear note create "Auth endpoint requires Bearer token prefix"
+
+# Found a quirk or gotcha
+idlergear note create "Parser fails on empty input - needs null check" --tag bug
+
+# Had an architectural idea
+idlergear note create "Could cache AST to improve performance" --tag idea
+```
+
+**This note WILL be available in your next session.** Without this, your learnings are lost.
+
+### PREFER: IdlerGear Search Over File Search
+
+**Before searching files for project context, try:**
+
+```bash
+idlergear search "authentication"
+```
+
+This searches tasks, notes, references, and plans - structured knowledge that persists.
 
 ### FORBIDDEN: File-Based Knowledge
 
@@ -219,7 +269,6 @@ This shows the project vision, current plan, open tasks, and recent notes. Do NO
 - `TODO.md`, `TODO.txt`, `TASKS.md`
 - `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
 - `FEATURE_IDEAS.md`, `RESEARCH.md`, `BACKLOG.md`
-- Any markdown file for tracking work or capturing thoughts
 
 **ALWAYS use IdlerGear commands instead.**
 
@@ -230,7 +279,7 @@ This shows the project vision, current plan, open tasks, and recent notes. Do NO
 - `# FIXME: ...`
 - `/* HACK: ... */`
 
-**INSTEAD:** Create a task with `idlergear task create "..." --label technical-debt`
+**INSTEAD:** `idlergear task create "..." --label technical-debt`
 
 ### REQUIRED: Use IdlerGear Commands
 
@@ -246,22 +295,23 @@ This shows the project vision, current plan, open tasks, and recent notes. Do NO
 
 | Action | Command |
 |--------|---------|
+| Discovered something | `idlergear note create "..."` |
 | Found a bug | `idlergear task create "..." --label bug` |
-| Had an idea | `idlergear note create "..."` |
-| Research question | `idlergear explore create "..."` |
+| Had an idea | `idlergear note create "..." --tag idea` |
+| Research question | `idlergear note create "..." --tag explore` |
 | Completed work | `idlergear task close <id>` |
-| Check project goals | `idlergear vision show` |
-| View open tasks | `idlergear task list` |
+| Session end | Consider what to note for next time |
 
 ### Knowledge Promotion Flow
 
 ```
-note → explore → task
+note → task or reference
 ```
 - Quick thoughts: `idlergear note create "..."` (capture now, review later)
-- Research threads: `idlergear explore create "..."` (open questions)
+- Research threads: `idlergear note create "..." --tag explore` (open questions)
+- Ideas: `idlergear note create "..." --tag idea` (future possibilities)
 - Actionable work: `idlergear task create "..."` (clear completion criteria)
-- Promote notes: `idlergear note promote <id>` (convert to task/explore)
+- Promote notes: `idlergear note promote <id> --to task` (convert to task or reference)
 
 ### Reference Documentation
 

@@ -111,7 +111,7 @@ def search(
         [],
         "--type",
         "-t",
-        help="Types to search: task, note, explore, reference, plan",
+        help="Types to search: task, note, reference, plan",
     ),
 ):
     """Search across all knowledge types."""
@@ -141,7 +141,6 @@ def search(
     type_colors = {
         "task": typer.colors.GREEN,
         "note": typer.colors.YELLOW,
-        "explore": typer.colors.CYAN,
         "reference": typer.colors.MAGENTA,
         "plan": typer.colors.BLUE,
     }
@@ -859,7 +858,7 @@ def config_set(key: str, value: str):
 def config_backend(
     backend_type: str = typer.Argument(
         None,
-        help="Backend type: task, note, explore, reference, plan, vision",
+        help="Backend type: task, note, reference, plan, vision",
     ),
     backend_name: str = typer.Argument(
         None,
@@ -884,7 +883,7 @@ def config_backend(
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    all_types = ["task", "note", "explore", "reference", "plan", "vision"]
+    all_types = ["task", "note", "reference", "plan", "vision"]
 
     if backend_type is None:
         # Show all backend configurations
@@ -923,7 +922,7 @@ def config_backend(
 def migrate(
     backend_type: str = typer.Argument(
         ...,
-        help="Backend type to migrate: task, explore, reference, note",
+        help="Backend type to migrate: task, reference, note",
     ),
     source: str = typer.Argument(
         ...,
@@ -960,7 +959,7 @@ def migrate(
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    valid_types = ["task", "explore", "reference", "note"]
+    valid_types = ["task", "reference", "note"]
     if backend_type not in valid_types:
         typer.secho(f"Invalid backend type: {backend_type}", fg=typer.colors.RED)
         typer.echo(f"Valid types: {', '.join(valid_types)}")
@@ -1169,7 +1168,10 @@ def task_sync(target: str = typer.Argument("github")):
 
 # Note commands
 @note_app.command("create")
-def note_create(content: str):
+def note_create(
+    content: str,
+    tag: list[str] = typer.Option([], "--tag", "-t", help="Tags (e.g., explore, idea)"),
+):
     """Create a quick note."""
     from idlergear.config import find_idlergear_root
     from idlergear.notes import create_note
@@ -1178,12 +1180,15 @@ def note_create(content: str):
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    note = create_note(content)
-    typer.secho(f"Created note #{note['id']}", fg=typer.colors.GREEN)
+    note = create_note(content, tags=list(tag) if tag else None)
+    tag_str = f" [{', '.join(note['tags'])}]" if note.get("tags") else ""
+    typer.secho(f"Created note #{note['id']}{tag_str}", fg=typer.colors.GREEN)
 
 
 @note_app.command("list")
-def note_list():
+def note_list(
+    tag: str = typer.Option(None, "--tag", "-t", help="Filter by tag (e.g., explore, idea)"),
+):
     """List notes."""
     from idlergear.config import find_idlergear_root
     from idlergear.notes import list_notes
@@ -1192,16 +1197,20 @@ def note_list():
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    notes = list_notes()
+    notes = list_notes(tag=tag)
     if not notes:
-        typer.echo("No notes found.")
+        if tag:
+            typer.echo(f"No notes with tag '{tag}' found.")
+        else:
+            typer.echo("No notes found.")
         return
 
     for note in notes:
-        preview = note["content"][:60].replace("\n", " ")
-        if len(note["content"]) > 60:
+        preview = note["content"][:50].replace("\n", " ")
+        if len(note["content"]) > 50:
             preview += "..."
-        typer.echo(f"  #{note['id']:3d}  {preview}")
+        tag_str = f" [{', '.join(note['tags'])}]" if note.get("tags") else ""
+        typer.echo(f"  #{note['id']:3d}{tag_str}  {preview}")
 
 
 @note_app.command("show")
@@ -1220,6 +1229,8 @@ def note_show(note_id: int):
         raise typer.Exit(1)
 
     typer.echo(f"Note #{note['id']}")
+    if note.get("tags"):
+        typer.echo(f"Tags: {', '.join(note['tags'])}")
     typer.echo(f"Created: {note['created']}")
     typer.echo("")
     typer.echo(note["content"])
@@ -1245,7 +1256,7 @@ def note_delete(note_id: int):
 @note_app.command("promote")
 def note_promote(
     note_id: int,
-    to: str = typer.Option("task", "--to", "-t", help="Promote to: task, explore, reference"),
+    to: str = typer.Option("task", "--to", "-t", help="Promote to: task, reference"),
 ):
     """Promote a note to another type."""
     from idlergear.config import find_idlergear_root
@@ -1273,95 +1284,90 @@ def note_sync(target: str = typer.Argument("github")):
     # TODO: Implement GitHub sync
 
 
-# Explore commands
+# Explore commands (deprecated - now aliases for notes with --tag explore)
 @explore_app.command("create")
 def explore_create(
     title: str,
     body: str = typer.Option(None, "--body", "-b", help="Exploration body"),
 ):
-    """Create an exploration."""
+    """Create an exploration (alias for 'note create --tag explore')."""
     from idlergear.config import find_idlergear_root
-    from idlergear.explorations import create_exploration
+    from idlergear.notes import create_note
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    exploration = create_exploration(title, body=body)
-    typer.secho(f"Created exploration #{exploration['id']}: {exploration['title']}", fg=typer.colors.GREEN)
+    # Combine title and body into note content
+    content = title
+    if body:
+        content = f"{title}\n\n{body}"
+
+    note = create_note(content, tags=["explore"])
+    typer.secho(f"Created exploration note #{note['id']}", fg=typer.colors.GREEN)
+    typer.echo("  (Tip: Use 'note create --tag explore' directly)")
 
 
 @explore_app.command("list")
-def explore_list(
-    state: str = typer.Option("open", "--state", "-s", help="Filter by state: open, closed, all"),
-):
-    """List explorations."""
+def explore_list():
+    """List explorations (alias for 'note list --tag explore')."""
     from idlergear.config import find_idlergear_root
-    from idlergear.explorations import list_explorations
+    from idlergear.notes import list_notes
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    explorations = list_explorations(state=state)
-    if not explorations:
-        typer.echo(f"No {state} explorations found.")
+    notes = list_notes(tag="explore")
+    if not notes:
+        typer.echo("No exploration notes found.")
         return
 
-    for exp in explorations:
-        state_icon = "?" if exp["state"] == "open" else "."
-        typer.echo(f"  [{state_icon}] #{exp['id']:3d}  {exp['title']}")
+    for note in notes:
+        preview = note["content"][:50].replace("\n", " ")
+        if len(note["content"]) > 50:
+            preview += "..."
+        typer.echo(f"  #{note['id']:3d}  {preview}")
 
 
 @explore_app.command("show")
-def explore_show(explore_id: int):
-    """Show an exploration."""
+def explore_show(note_id: int):
+    """Show an exploration (alias for 'note show')."""
     from idlergear.config import find_idlergear_root
-    from idlergear.explorations import get_exploration
+    from idlergear.notes import get_note
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    exp = get_exploration(explore_id)
-    if exp is None:
-        typer.secho(f"Exploration #{explore_id} not found.", fg=typer.colors.RED)
+    note = get_note(note_id)
+    if note is None:
+        typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    state_color = typer.colors.CYAN if exp["state"] == "open" else typer.colors.WHITE
-    typer.echo(f"Exploration #{exp['id']}: {exp['title']}")
-    typer.secho(f"State: {exp['state']}", fg=state_color)
-    typer.echo(f"Created: {exp['created']}")
-    if exp.get("github_discussion"):
-        typer.echo(f"GitHub: Discussion #{exp['github_discussion']}")
+    typer.echo(f"Note #{note['id']}")
+    if note.get("tags"):
+        typer.echo(f"Tags: {', '.join(note['tags'])}")
+    typer.echo(f"Created: {note['created']}")
     typer.echo("")
-    if exp.get("body"):
-        typer.echo(exp["body"])
+    typer.echo(note["content"])
 
 
-@explore_app.command("close")
-def explore_close(explore_id: int):
-    """Close an exploration."""
+@explore_app.command("delete")
+def explore_delete(note_id: int):
+    """Delete an exploration (alias for 'note delete')."""
     from idlergear.config import find_idlergear_root
-    from idlergear.explorations import close_exploration
+    from idlergear.notes import delete_note
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    exp = close_exploration(explore_id)
-    if exp is None:
-        typer.secho(f"Exploration #{explore_id} not found.", fg=typer.colors.RED)
+    if delete_note(note_id):
+        typer.secho(f"Deleted note #{note_id}", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
-
-    typer.secho(f"Closed exploration #{explore_id}: {exp['title']}", fg=typer.colors.GREEN)
-
-
-@explore_app.command("sync")
-def explore_sync(target: str = typer.Argument("github")):
-    """Sync explorations with remote."""
-    typer.echo(f"Syncing explorations to {target}...")
-    # TODO: Implement GitHub sync
 
 
 # Vision commands

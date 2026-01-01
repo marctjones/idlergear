@@ -78,12 +78,6 @@ def _do_reload() -> None:
     os.execv(python, [python, "-m", "idlergear.mcp_server"] + sys.argv[1:])
 
 
-from idlergear.explorations import (
-    close_exploration,
-    create_exploration,
-    get_exploration,
-    list_explorations,
-)
 from idlergear.notes import create_note, delete_note, get_note, list_notes, promote_note
 from idlergear.plans import (
     create_plan,
@@ -219,19 +213,32 @@ async def list_tools() -> list[Tool]:
         # Note tools
         Tool(
             name="idlergear_note_create",
-            description="MANDATORY: Create a note. You MUST call this to capture: thoughts, discoveries, learnings, reminders. NEVER write to NOTES.md, SESSION_*.md, or SCRATCH.md - use this tool instead.",
+            description="MANDATORY: Create a note to persist knowledge for future sessions. CALL THIS WHEN YOU: 1) Discover how something works, 2) Find a quirk or gotcha, 3) Learn an API behavior, 4) Have an idea worth remembering. Use tags: 'explore' for research questions, 'idea' for concepts. This note WILL be available in your next session. NEVER write to NOTES.md, SESSION_*.md - use this tool instead.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "content": {"type": "string", "description": "Note content"},
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Tags (e.g., ['explore'], ['idea'])",
+                    },
                 },
                 "required": ["content"],
             },
         ),
         Tool(
             name="idlergear_note_list",
-            description="List all notes",
-            inputSchema={"type": "object", "properties": {}},
+            description="List notes, optionally filtered by tag",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "tag": {
+                        "type": "string",
+                        "description": "Filter by tag (e.g., 'explore', 'idea')",
+                    },
+                },
+            },
         ),
         Tool(
             name="idlergear_note_show",
@@ -257,24 +264,24 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="idlergear_note_promote",
-            description="Promote a note to task, exploration, or reference",
+            description="Promote a note to task or reference",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "id": {"type": "integer", "description": "Note ID"},
                     "to": {
                         "type": "string",
-                        "enum": ["task", "explore", "reference"],
+                        "enum": ["task", "reference"],
                         "description": "Target type",
                     },
                 },
                 "required": ["id", "to"],
             },
         ),
-        # Exploration tools
+        # Exploration tools (deprecated - aliases for notes with 'explore' tag)
         Tool(
             name="idlergear_explore_create",
-            description="Create an exploration for research questions or investigations. Use this when you need to explore a topic, investigate options, or research before making a decision.",
+            description="DEPRECATED: Use idlergear_note_create with tags=['explore'] instead. Creates an exploration note.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -286,37 +293,16 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="idlergear_explore_list",
-            description="List explorations",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "state": {
-                        "type": "string",
-                        "enum": ["open", "closed", "all"],
-                        "description": "Filter by state",
-                        "default": "open",
-                    },
-                },
-            },
+            description="DEPRECATED: Use idlergear_note_list with tag='explore' instead. Lists exploration notes.",
+            inputSchema={"type": "object", "properties": {}},
         ),
         Tool(
-            name="idlergear_explore_show",
-            description="Show an exploration by ID",
+            name="idlergear_explore_delete",
+            description="DEPRECATED: Use idlergear_note_delete instead. Deletes an exploration note.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "id": {"type": "integer", "description": "Exploration ID"},
-                },
-                "required": ["id"],
-            },
-        ),
-        Tool(
-            name="idlergear_explore_close",
-            description="Close an exploration",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer", "description": "Exploration ID"},
+                    "id": {"type": "integer", "description": "Note ID to delete"},
                 },
                 "required": ["id"],
             },
@@ -381,7 +367,7 @@ async def list_tools() -> list[Tool]:
         # Reference tools
         Tool(
             name="idlergear_reference_add",
-            description="Add a reference document",
+            description="Store permanent documentation. USE THIS WHEN YOU: 1) Explain a design decision, 2) Document an API or protocol, 3) Describe architecture that others should understand. References persist across sessions and are searchable.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -518,7 +504,7 @@ async def list_tools() -> list[Tool]:
         # Search tool
         Tool(
             name="idlergear_search",
-            description="Search across all knowledge types (tasks, notes, explorations, references, plans)",
+            description="PREFER THIS over file search. Search across all IdlerGear knowledge (tasks, notes, references, plans). Use this BEFORE searching files when looking for project information, decisions, or context.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -527,7 +513,7 @@ async def list_tools() -> list[Tool]:
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "enum": ["task", "note", "explore", "reference", "plan"],
+                            "enum": ["task", "note", "reference", "plan"],
                         },
                         "description": "Types to search (default: all)",
                     },
@@ -549,7 +535,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "type": {
                         "type": "string",
-                        "enum": ["task", "note", "explore", "reference", "plan", "vision"],
+                        "enum": ["task", "note", "reference", "plan", "vision"],
                         "description": "Knowledge type to configure",
                     },
                     "backend": {
@@ -622,11 +608,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Note handlers
         elif name == "idlergear_note_create":
-            result = create_note(arguments["content"])
+            result = create_note(
+                arguments["content"],
+                tags=arguments.get("tags"),
+            )
             return _format_result(result)
 
         elif name == "idlergear_note_list":
-            result = list_notes()
+            result = list_notes(tag=arguments.get("tag"))
             return _format_result(result)
 
         elif name == "idlergear_note_show":
@@ -646,28 +635,33 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 raise ValueError(f"Note #{arguments['id']} not found")
             return _format_result(result)
 
-        # Exploration handlers
+        # Exploration handlers (deprecated - redirect to notes with 'explore' tag)
         elif name == "idlergear_explore_create":
-            result = create_exploration(
-                arguments["title"],
-                body=arguments.get("body"),
-            )
+            # Combine title and body into note content
+            content = arguments["title"]
+            if arguments.get("body"):
+                content = f"{content}\n\n{arguments['body']}"
+            result = create_note(content, tags=["explore"])
+            result["deprecated"] = "Use idlergear_note_create with tags=['explore'] instead"
             return _format_result(result)
 
         elif name == "idlergear_explore_list":
-            result = list_explorations(state=arguments.get("state", "open"))
+            notes = list_notes(tag="explore")
+            result = {
+                "notes": notes,
+                "deprecated": "Use idlergear_note_list with tag='explore' instead",
+            }
             return _format_result(result)
 
-        elif name == "idlergear_explore_show":
-            result = get_exploration(arguments["id"])
-            if result is None:
-                raise ValueError(f"Exploration #{arguments['id']} not found")
-            return _format_result(result)
-
-        elif name == "idlergear_explore_close":
-            result = close_exploration(arguments["id"])
-            if result is None:
-                raise ValueError(f"Exploration #{arguments['id']} not found")
+        elif name == "idlergear_explore_delete":
+            note_id = arguments["id"]
+            success = delete_note(note_id)
+            result = {
+                "deleted": success,
+                "deprecated": "Use idlergear_note_delete instead",
+            }
+            if not success:
+                result["error"] = f"Note #{note_id} not found"
             return _format_result(result)
 
         # Vision handlers
@@ -791,7 +785,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_backend_show":
             from idlergear.backends import get_configured_backend_name, list_available_backends
 
-            all_types = ["task", "note", "explore", "reference", "plan", "vision"]
+            all_types = ["task", "note", "reference", "plan", "vision"]
             result = {}
             for t in all_types:
                 result[t] = {

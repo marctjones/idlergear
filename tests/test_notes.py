@@ -54,6 +54,26 @@ class TestCreateNote:
         assert note2["id"] == 2
         assert note3["id"] == 3
 
+    def test_create_note_with_tags(self, temp_project):
+        """Test creating a note with tags."""
+        note = create_note("Exploration note", tags=["explore"])
+
+        assert note["id"] == 1
+        assert note["content"] == "Exploration note"
+        assert note["tags"] == ["explore"]
+
+    def test_create_note_with_multiple_tags(self, temp_project):
+        """Test creating a note with multiple tags."""
+        note = create_note("Multi-tagged note", tags=["explore", "idea"])
+
+        assert note["tags"] == ["explore", "idea"]
+
+    def test_create_note_without_tags(self, temp_project):
+        """Test that notes without tags have empty tags list."""
+        note = create_note("Plain note")
+
+        assert note["tags"] == []
+
 
 class TestListNotes:
     """Tests for list_notes."""
@@ -82,6 +102,34 @@ class TestListNotes:
         notes = list_notes()
         ids = [n["id"] for n in notes]
         assert ids == [1, 2, 3]
+
+    def test_list_notes_by_tag(self, temp_project):
+        """Test filtering notes by tag."""
+        create_note("Exploration 1", tags=["explore"])
+        create_note("Plain note")
+        create_note("Exploration 2", tags=["explore"])
+        create_note("Idea", tags=["idea"])
+
+        explore_notes = list_notes(tag="explore")
+        assert len(explore_notes) == 2
+        assert all("explore" in n["tags"] for n in explore_notes)
+
+    def test_list_notes_by_tag_empty_result(self, temp_project):
+        """Test filtering by tag with no matches."""
+        create_note("Plain note")
+        create_note("Another note")
+
+        tagged_notes = list_notes(tag="explore")
+        assert tagged_notes == []
+
+    def test_list_notes_all_returns_all_tags(self, temp_project):
+        """Test that list_notes without tag filter returns all notes."""
+        create_note("Exploration", tags=["explore"])
+        create_note("Plain note")
+        create_note("Idea", tags=["idea"])
+
+        all_notes = list_notes()
+        assert len(all_notes) == 3
 
 
 class TestGetNote:
@@ -159,24 +207,6 @@ class TestPromoteNote:
         assert task is not None
         assert task["title"] == "Add authentication"
 
-    def test_promote_note_to_explore(self, temp_project):
-        """Test promoting a note to an exploration."""
-        from idlergear.explorations import get_exploration
-
-        note = create_note("Research topic\nMore details here")
-        result = promote_note(note["id"], "explore")
-
-        assert result is not None
-        assert result["title"] == "Research topic"
-        assert result["body"] == "More details here"
-
-        # Original note should be deleted
-        assert get_note(note["id"]) is None
-
-        # Exploration should exist
-        explore = get_exploration(result["id"])
-        assert explore is not None
-
     def test_promote_note_to_reference(self, temp_project):
         """Test promoting a note to a reference."""
         from idlergear.reference import get_reference
@@ -212,3 +242,13 @@ class TestPromoteNote:
 
         with pytest.raises(ValueError, match="Unknown promotion target"):
             promote_note(note["id"], "invalid_type")
+
+    def test_promote_explore_not_valid(self, temp_project):
+        """Test that 'explore' is no longer a valid promotion target.
+
+        Explorations were merged into notes - use tags instead.
+        """
+        note = create_note("Test note")
+
+        with pytest.raises(ValueError, match="Unknown promotion target"):
+            promote_note(note["id"], "explore")

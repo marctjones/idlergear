@@ -11,7 +11,7 @@ It provides a **command-based API** (not file conventions like AGENTS.md):
 - `idlergear task list` - not "check GitHub Issues or TODO.md"
 - Same commands everywhere, configurable backends
 
-See `DESIGN.md` for the full vision, knowledge model (11 types), and architecture.
+See `DESIGN.md` for the full vision, knowledge model (6 types), and architecture.
 
 ## Development
 
@@ -69,7 +69,7 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 |--------|---------|
 | Found a bug | `idlergear task create "..." --label bug` |
 | Had an idea | `idlergear note create "..."` |
-| Research question | `idlergear explore create "..."` |
+| Research question | `idlergear note create "..." --tag explore` |
 | Completed work | `idlergear task close <id>` |
 | Check project goals | `idlergear vision show` |
 | View open tasks | `idlergear task list` |
@@ -77,13 +77,31 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 ### Knowledge Flow
 
 ```
-note → explore → task
+note → task or reference
 ```
 - Quick thoughts go to notes (capture now, review later)
-- Research questions go to explorations (open-ended investigation)
+- Use `--tag explore` for research questions, `--tag idea` for ideas
 - Actionable work goes to tasks (clear completion criteria)
-- Use `idlergear note promote <id>` to convert notes to tasks/explorations
+- Use `idlergear note promote <id> --to task` to convert notes to tasks
 
 ### Data Protection
 
 **NEVER modify `.idlergear/` files directly** - Use CLI commands only
+
+## IdlerGear Usage
+
+**ALWAYS run at session start:**
+```bash
+idlergear context
+```
+
+**FORBIDDEN files:** `TODO.md`, `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
+**FORBIDDEN comments:** `// TODO:`, `# FIXME:`, `/* HACK: */`
+
+**Use instead:**
+- `idlergear task create "..."` - Create actionable tasks
+- `idlergear note create "..."` - Capture quick thoughts
+- `idlergear note create "..." --tag explore` - Research questions
+- `idlergear vision show` - Check project goals
+
+See AGENTS.md for full command reference.

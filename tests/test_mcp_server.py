@@ -194,32 +194,40 @@ class TestCallToolNotes:
 
 
 class TestCallToolExplore:
-    """Tests for exploration-related tool calls."""
+    """Tests for exploration-related tool calls (deprecated - redirects to notes with 'explore' tag)."""
 
     @pytest.mark.asyncio
     async def test_explore_create(self, mcp_project):
+        """Deprecated explore_create now creates a note with 'explore' tag."""
         result = await call_tool("idlergear_explore_create", {"title": "Test exploration"})
 
         data = json.loads(result[0].text)
-        assert data["title"] == "Test exploration"
+        # Now creates a note with content = title
+        assert data["content"] == "Test exploration"
+        assert "explore" in data["tags"]
+        assert "deprecated" in data
 
     @pytest.mark.asyncio
     async def test_explore_list(self, mcp_project):
+        """Deprecated explore_list now lists notes with 'explore' tag."""
         await call_tool("idlergear_explore_create", {"title": "Exp 1"})
 
         result = await call_tool("idlergear_explore_list", {})
 
         data = json.loads(result[0].text)
-        assert len(data) == 1
+        assert len(data["notes"]) == 1
+        assert "deprecated" in data
 
     @pytest.mark.asyncio
-    async def test_explore_close(self, mcp_project):
+    async def test_explore_delete(self, mcp_project):
+        """Deprecated explore_delete now deletes the note."""
         await call_tool("idlergear_explore_create", {"title": "Test"})
 
-        result = await call_tool("idlergear_explore_close", {"id": 1})
+        result = await call_tool("idlergear_explore_delete", {"id": 1})
 
         data = json.loads(result[0].text)
-        assert data["state"] == "closed"
+        assert data["deleted"] is True
+        assert "deprecated" in data
 
 
 class TestCallToolVision:

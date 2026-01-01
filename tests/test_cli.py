@@ -158,13 +158,14 @@ class TestNoteCommands:
 
 
 class TestExploreCommands:
-    """Tests for explore commands."""
+    """Tests for explore commands (deprecated - redirects to notes with --tag explore)."""
 
     def test_explore_create(self, cli_project):
         result = runner.invoke(app, ["explore", "create", "Test exploration"])
 
         assert result.exit_code == 0
-        assert "Created exploration #1" in result.output
+        assert "Created exploration note #1" in result.output
+        assert "Tip: Use 'note create --tag explore'" in result.output
 
     def test_explore_list(self, cli_project):
         runner.invoke(app, ["explore", "create", "Exploration one"])
@@ -182,13 +183,13 @@ class TestExploreCommands:
         assert result.exit_code == 0
         assert "Test" in result.output
 
-    def test_explore_close(self, cli_project):
-        runner.invoke(app, ["explore", "create", "To close"])
+    def test_explore_delete(self, cli_project):
+        runner.invoke(app, ["explore", "create", "To delete"])
 
-        result = runner.invoke(app, ["explore", "close", "1"])
+        result = runner.invoke(app, ["explore", "delete", "1"])
 
         assert result.exit_code == 0
-        assert "Closed exploration #1" in result.output
+        assert "Deleted note #1" in result.output
 
 
 class TestVisionCommands:
@@ -540,7 +541,7 @@ class TestAdditionalNoteCommands:
 
 
 class TestAdditionalExploreCommands:
-    """Additional explore command tests."""
+    """Additional explore command tests (deprecated - redirects to notes with --tag explore)."""
 
     def test_explore_show_not_found(self, cli_project):
         result = runner.invoke(app, ["explore", "show", "999"])
@@ -548,24 +549,17 @@ class TestAdditionalExploreCommands:
         assert result.exit_code == 1
         assert "not found" in result.output
 
-    def test_explore_close_not_found(self, cli_project):
-        result = runner.invoke(app, ["explore", "close", "999"])
+    def test_explore_delete_not_found(self, cli_project):
+        result = runner.invoke(app, ["explore", "delete", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
-
-
-    def test_explore_sync(self, cli_project):
-        result = runner.invoke(app, ["explore", "sync"])
-
-        assert result.exit_code == 0
-        assert "Syncing" in result.output
 
     def test_explore_list_empty(self, cli_project):
         result = runner.invoke(app, ["explore", "list"])
 
         assert result.exit_code == 0
-        assert "No open explorations" in result.output
+        assert "No exploration notes found" in result.output
 
 
 class TestAdditionalPlanCommands:
