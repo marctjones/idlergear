@@ -1,4 +1,10 @@
-"""Reference document management for IdlerGear."""
+"""Reference document management for IdlerGear.
+
+In v0.3+, references are stored in .idlergear/wiki/.
+For backward compatibility, also checks .idlergear/reference/.
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -14,12 +20,31 @@ from idlergear.storage import (
 
 
 def get_reference_dir(project_path: Path | None = None) -> Path | None:
-    """Get the reference directory path."""
+    """Get the reference/wiki directory path.
+
+    Returns the wiki/ directory (v0.3+) if it exists, otherwise
+    falls back to reference/ (legacy) for backward compatibility.
+    New projects will use wiki/.
+    """
     if project_path is None:
         project_path = find_idlergear_root()
     if project_path is None:
         return None
-    return project_path / ".idlergear" / "reference"
+
+    idlergear_dir = project_path / ".idlergear"
+
+    # Prefer v0.3 wiki/ directory
+    wiki_dir = idlergear_dir / "wiki"
+    if wiki_dir.exists():
+        return wiki_dir
+
+    # Fall back to legacy reference/ directory
+    reference_dir = idlergear_dir / "reference"
+    if reference_dir.exists():
+        return reference_dir
+
+    # For new projects, use wiki/
+    return wiki_dir
 
 
 def add_reference(

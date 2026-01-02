@@ -1,4 +1,10 @@
-"""Task management for IdlerGear."""
+"""Task management for IdlerGear.
+
+In v0.3+, tasks are stored in .idlergear/issues/.
+For backward compatibility, also checks .idlergear/tasks/.
+"""
+
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -14,12 +20,31 @@ from idlergear.storage import (
 
 
 def get_tasks_dir(project_path: Path | None = None) -> Path | None:
-    """Get the tasks directory path."""
+    """Get the tasks directory path.
+
+    Returns the issues/ directory (v0.3+) if it exists, otherwise
+    falls back to tasks/ (legacy) for backward compatibility.
+    New projects will use issues/.
+    """
     if project_path is None:
         project_path = find_idlergear_root()
     if project_path is None:
         return None
-    return project_path / ".idlergear" / "tasks"
+
+    idlergear_dir = project_path / ".idlergear"
+
+    # Prefer v0.3 issues/ directory
+    issues_dir = idlergear_dir / "issues"
+    if issues_dir.exists():
+        return issues_dir
+
+    # Fall back to legacy tasks/ directory
+    tasks_dir = idlergear_dir / "tasks"
+    if tasks_dir.exists():
+        return tasks_dir
+
+    # For new projects, use issues/
+    return issues_dir
 
 
 def create_task(

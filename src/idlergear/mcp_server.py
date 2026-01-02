@@ -79,6 +79,18 @@ def _do_reload() -> None:
 
 
 from idlergear.notes import create_note, delete_note, get_note, list_notes, promote_note
+from idlergear.projects import (
+    add_task_to_project,
+    create_project,
+    delete_project,
+    get_project,
+    link_to_github_project,
+    list_github_projects,
+    list_projects,
+    move_task,
+    remove_task_from_project,
+    sync_project_to_github,
+)
 from idlergear.plans import (
     create_plan,
     get_current_plan,
@@ -557,6 +569,130 @@ async def list_tools() -> list[Tool]:
             description="Reload the IdlerGear MCP server to pick up code changes. Call this after IdlerGear has been updated (e.g., after git pull or pip install) to use the new version without restarting Claude Code. The server will re-execute itself with the latest code.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        # Project tools (Kanban boards)
+        Tool(
+            name="idlergear_project_create",
+            description="Create a Kanban project board for organizing tasks into columns. Use this to track work across stages (Backlog, In Progress, Review, Done). Optionally syncs to GitHub Projects v2.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Project title"},
+                    "columns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Custom columns (default: Backlog, In Progress, Review, Done)",
+                    },
+                    "create_on_github": {
+                        "type": "boolean",
+                        "description": "Also create on GitHub Projects v2",
+                        "default": False,
+                    },
+                },
+                "required": ["title"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_list",
+            description="List all project boards",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "include_github": {
+                        "type": "boolean",
+                        "description": "Also list GitHub Projects",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_project_show",
+            description="Show a project board with all columns and tasks",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Project name or slug"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_delete",
+            description="Delete a project board",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Project name or slug"},
+                    "delete_on_github": {
+                        "type": "boolean",
+                        "description": "Also delete from GitHub",
+                        "default": False,
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_add_task",
+            description="Add a task to a project board column",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_name": {"type": "string", "description": "Project name or slug"},
+                    "task_id": {"type": "string", "description": "Task ID to add"},
+                    "column": {"type": "string", "description": "Target column (default: first column)"},
+                },
+                "required": ["project_name", "task_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_remove_task",
+            description="Remove a task from a project board",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_name": {"type": "string", "description": "Project name or slug"},
+                    "task_id": {"type": "string", "description": "Task ID to remove"},
+                },
+                "required": ["project_name", "task_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_move_task",
+            description="Move a task to a different column in the project board",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_name": {"type": "string", "description": "Project name or slug"},
+                    "task_id": {"type": "string", "description": "Task ID to move"},
+                    "column": {"type": "string", "description": "Target column"},
+                },
+                "required": ["project_name", "task_id", "column"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_sync",
+            description="Sync a local project to GitHub Projects v2",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Project name or slug"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_project_link",
+            description="Link a local project to an existing GitHub Project",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Local project name or slug"},
+                    "github_project_number": {"type": "integer", "description": "GitHub Project number"},
+                },
+                "required": ["name", "github_project_number"],
+            },
+        ),
     ]
 
 
@@ -841,6 +977,80 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 "current_version": __version__,
                 "pid": os.getpid(),
             })
+
+        # Project handlers
+        elif name == "idlergear_project_create":
+            result = create_project(
+                arguments["title"],
+                columns=arguments.get("columns"),
+                create_on_github=arguments.get("create_on_github", False),
+            )
+            return _format_result(result)
+
+        elif name == "idlergear_project_list":
+            projects = list_projects()
+            result = {"projects": projects}
+            if arguments.get("include_github"):
+                result["github_projects"] = list_github_projects()
+            return _format_result(result)
+
+        elif name == "idlergear_project_show":
+            result = get_project(arguments["name"])
+            if result is None:
+                raise ValueError(f"Project '{arguments['name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_project_delete":
+            if not delete_project(
+                arguments["name"],
+                delete_on_github=arguments.get("delete_on_github", False),
+            ):
+                raise ValueError(f"Project '{arguments['name']}' not found")
+            return _format_result({"deleted": True, "name": arguments["name"]})
+
+        elif name == "idlergear_project_add_task":
+            result = add_task_to_project(
+                arguments["project_name"],
+                arguments["task_id"],
+                column=arguments.get("column"),
+            )
+            if result is None:
+                raise ValueError(f"Project '{arguments['project_name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_project_remove_task":
+            result = remove_task_from_project(
+                arguments["project_name"],
+                arguments["task_id"],
+            )
+            if result is None:
+                raise ValueError(f"Project '{arguments['project_name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_project_move_task":
+            result = move_task(
+                arguments["project_name"],
+                arguments["task_id"],
+                arguments["column"],
+            )
+            if result is None:
+                raise ValueError(f"Project '{arguments['project_name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_project_sync":
+            result = sync_project_to_github(arguments["name"])
+            if result is None:
+                raise ValueError(f"Project '{arguments['name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_project_link":
+            result = link_to_github_project(
+                arguments["name"],
+                arguments["github_project_number"],
+            )
+            if result is None:
+                raise ValueError(f"Project '{arguments['name']}' not found")
+            return _format_result(result)
 
         else:
             raise ValueError(f"Unknown tool: {name}")

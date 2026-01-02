@@ -119,6 +119,30 @@ def get_recommended_backends(features: GitHubFeatures) -> dict[str, str]:
     return recommendations
 
 
+def get_github_owner(project_path: Path | None = None) -> str | None:
+    """Get the GitHub owner (user or org) for the repository.
+
+    Args:
+        project_path: Optional path to check (defaults to cwd)
+
+    Returns:
+        Owner name string, or None if not a GitHub repo
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", "--json", "owner", "--jq", ".owner.login"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=project_path,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() or None
+        return None
+    except Exception:
+        return None
+
+
 def format_features_summary(features: GitHubFeatures) -> str:
     """Format a human-readable summary of detected features.
 

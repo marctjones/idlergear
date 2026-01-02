@@ -43,6 +43,7 @@ run_app = typer.Typer(help="Script execution and logs")
 config_app = typer.Typer(help="Configuration management")
 daemon_app = typer.Typer(help="Daemon control")
 mcp_app = typer.Typer(help="MCP server management")
+project_app = typer.Typer(help="Kanban project boards (→ GitHub Projects v2)")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -54,6 +55,7 @@ app.add_typer(run_app, name="run")
 app.add_typer(config_app, name="config")
 app.add_typer(daemon_app, name="daemon")
 app.add_typer(mcp_app, name="mcp")
+app.add_typer(project_app, name="project")
 
 
 @app.command()
@@ -202,24 +204,68 @@ def check(
     no_todos: bool = typer.Option(False, "--no-todos", help="Check for TODO comments"),
     no_forbidden: bool = typer.Option(False, "--no-forbidden", help="Check for forbidden files"),
     context_reminder: bool = typer.Option(False, "--context-reminder", help="Remind to run context at session start"),
+    structure: bool = typer.Option(False, "--structure", help="Check .idlergear/ directory structure"),
+    files: bool = typer.Option(False, "--files", help="Check for misplaced files in project root"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Only output on violations"),
 ):
-    """Check for IdlerGear policy violations.
+    """Check for IdlerGear policy violations and structure issues.
 
     Used by hooks to enforce IdlerGear usage:
     - Block TODO comments in code
     - Block forbidden files (TODO.md, NOTES.md, etc.)
     - Remind to run context at session start
+    - Validate .idlergear/ directory structure
+    - Find misplaced files that should be organized
 
     Examples:
         idlergear check --file src/main.py --quiet
         idlergear check --no-todos
         idlergear check --context-reminder
+        idlergear check --structure       # Validate directory structure
+        idlergear check --files           # Find misplaced files
     """
     from pathlib import Path
     import re
 
     violations = []
+
+    # Check .idlergear/ structure (v0.3)
+    if structure:
+        from idlergear.config import find_idlergear_root
+        from idlergear.schema import IdlerGearSchema
+
+        root = find_idlergear_root()
+        if root is None:
+            violations.append("Not in an IdlerGear project")
+        else:
+            schema = IdlerGearSchema(root)
+            result = schema.validate()
+
+            if result["missing"]:
+                violations.append("Missing directories (run 'idlergear migrate' to fix):")
+                for d in result["missing"]:
+                    violations.append(f"  {d}")
+
+            if result["legacy"]:
+                if not quiet:
+                    typer.secho("Legacy directories found (run 'idlergear migrate'):", fg=typer.colors.YELLOW)
+                    for d in result["legacy"]:
+                        typer.echo(f"  {d}")
+
+    # Check for misplaced files
+    if files:
+        from idlergear.config import find_idlergear_root
+        from idlergear.schema import detect_misplaced_files
+
+        root = find_idlergear_root()
+        if root is None:
+            violations.append("Not in an IdlerGear project")
+        else:
+            misplaced = detect_misplaced_files(root)
+            if misplaced:
+                violations.append("Misplaced files found:")
+                for item in misplaced:
+                    violations.append(f"  {item['name']}: {item['action']}")
 
     # Check file for TODO comments
     if file:
@@ -307,6 +353,111 @@ def check(
         raise typer.Exit(1)
     elif not quiet and not context_reminder:
         typer.secho("No violations found.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def migrate(
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without making changes"),
+):
+    """Migrate .idlergear/ to v0.3 schema.
+
+    Performs the following migrations:
+    - tasks/ → issues/
+    - reference/ → wiki/
+    - vision.md → vision/VISION.md
+    - Removes empty explorations/ (notes use tags now)
+    - Creates missing directories (sync/, projects/)
+
+    Examples:
+        idlergear migrate --dry-run   # Preview changes
+        idlergear migrate             # Perform migration
+    """
+    from pathlib import Path
+    import shutil
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.schema import IdlerGearSchema, SCHEMA_VERSION
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    schema = IdlerGearSchema(root)
+
+    if not schema.needs_migration():
+        typer.secho(f"Already on v{SCHEMA_VERSION} schema. Nothing to migrate.", fg=typer.colors.GREEN)
+        return
+
+    actions = []
+
+    # Check tasks/ → issues/
+    if schema.legacy_tasks_dir.exists() and not schema.issues_dir.exists():
+        actions.append(("rename", schema.legacy_tasks_dir, schema.issues_dir, "tasks/ → issues/"))
+
+    # Check reference/ → wiki/
+    if schema.legacy_reference_dir.exists() and not schema.wiki_dir.exists():
+        actions.append(("rename", schema.legacy_reference_dir, schema.wiki_dir, "reference/ → wiki/"))
+
+    # Check vision.md → vision/VISION.md
+    if schema.legacy_vision_file.exists() and not schema.vision_file.exists():
+        actions.append(("move", schema.legacy_vision_file, schema.vision_file, "vision.md → vision/VISION.md"))
+
+    # Check explorations/ (if empty, remove; otherwise prompt)
+    if schema.legacy_explorations_dir.exists():
+        exploration_files = list(schema.legacy_explorations_dir.glob("*.md"))
+        if not exploration_files:
+            actions.append(("remove", schema.legacy_explorations_dir, None, "Remove empty explorations/"))
+        else:
+            actions.append(("warn", schema.legacy_explorations_dir, None,
+                           f"explorations/ has {len(exploration_files)} files - convert to notes with 'explore' tag"))
+
+    # Create missing v0.3 directories
+    for dir_path in schema.get_all_directories():
+        if not dir_path.exists():
+            actions.append(("create", dir_path, None, f"Create {dir_path.name}/"))
+
+    if not actions:
+        typer.secho(f"Already on v{SCHEMA_VERSION} schema. Nothing to migrate.", fg=typer.colors.GREEN)
+        return
+
+    # Show planned actions
+    typer.echo(f"Migration to v{SCHEMA_VERSION}:")
+    typer.echo("")
+
+    for action_type, source, target, description in actions:
+        if action_type == "warn":
+            typer.secho(f"  WARNING: {description}", fg=typer.colors.YELLOW)
+        else:
+            typer.echo(f"  {description}")
+
+    if dry_run:
+        typer.echo("")
+        typer.secho("Dry run - no changes made.", fg=typer.colors.CYAN)
+        return
+
+    typer.echo("")
+
+    # Execute actions
+    for action_type, source, target, description in actions:
+        if action_type == "rename":
+            source.rename(target)
+            typer.secho(f"  ✓ {description}", fg=typer.colors.GREEN)
+        elif action_type == "move":
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(target))
+            typer.secho(f"  ✓ {description}", fg=typer.colors.GREEN)
+        elif action_type == "remove":
+            source.rmdir()
+            typer.secho(f"  ✓ {description}", fg=typer.colors.GREEN)
+        elif action_type == "create":
+            source.mkdir(parents=True, exist_ok=True)
+            typer.secho(f"  ✓ {description}", fg=typer.colors.GREEN)
+        elif action_type == "warn":
+            typer.secho(f"  ! {description}", fg=typer.colors.YELLOW)
+
+    typer.echo("")
+    typer.secho(f"Migration to v{SCHEMA_VERSION} complete!", fg=typer.colors.GREEN)
 
 
 @app.command()
@@ -1767,6 +1918,268 @@ def run_stop(name: str):
         typer.secho(f"Stopped run '{name}'", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Run '{name}' is not running or not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+# Project commands
+@project_app.command("create")
+def project_create(
+    title: str,
+    columns: list[str] = typer.Option(
+        [],
+        "--column",
+        "-c",
+        help="Custom columns (default: Backlog, In Progress, Review, Done)",
+    ),
+    github: bool = typer.Option(False, "--github", "-g", help="Also create on GitHub Projects v2"),
+):
+    """Create a new project board."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import create_project
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        project = create_project(
+            title,
+            columns=list(columns) if columns else None,
+            create_on_github=github,
+        )
+        typer.secho(f"Created project: {project['title']}", fg=typer.colors.GREEN)
+        typer.echo(f"  ID: {project['id']}")
+        typer.echo(f"  Columns: {', '.join(project['columns'])}")
+        if project.get("github_project_number"):
+            typer.echo(f"  GitHub Project: #{project['github_project_number']}")
+    except ValueError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@project_app.command("list")
+def project_list(
+    github: bool = typer.Option(False, "--github", "-g", help="Also list GitHub Projects"),
+):
+    """List project boards."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import list_github_projects, list_projects
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    projects = list_projects()
+
+    if not projects and not github:
+        typer.echo("No projects found. Create one with 'idlergear project create <title>'")
+        return
+
+    if projects:
+        typer.echo("Local Projects:")
+        for proj in projects:
+            gh_link = f" (GitHub #{proj['github_project_number']})" if proj.get("github_project_number") else ""
+            typer.echo(f"  {proj['title']}{gh_link}")
+            task_count = sum(len(tasks) for tasks in proj["tasks"].values())
+            typer.echo(f"    {task_count} tasks across {len(proj['columns'])} columns")
+
+    if github:
+        typer.echo("")
+        typer.echo("GitHub Projects:")
+        gh_projects = list_github_projects()
+        if not gh_projects:
+            typer.echo("  No GitHub Projects found (or gh CLI not authenticated)")
+        else:
+            for proj in gh_projects:
+                typer.echo(f"  #{proj.get('number', '?')}: {proj.get('title', 'Untitled')}")
+
+
+@project_app.command("show")
+def project_show(name: str):
+    """Show a project board with tasks in each column."""
+    from idlergear.backends.registry import get_backend
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import get_project
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    project = get_project(name)
+    if project is None:
+        typer.secho(f"Project '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.echo(f"Project: {project['title']}")
+    if project.get("github_project_number"):
+        typer.echo(f"GitHub Project: #{project['github_project_number']}")
+    typer.echo(f"Created: {project['created_at']}")
+    typer.echo("")
+
+    # Show Kanban columns
+    task_backend = get_backend("task")
+
+    for column in project["columns"]:
+        task_ids = project["tasks"].get(column, [])
+        typer.secho(f"═══ {column} ({len(task_ids)}) ═══", bold=True)
+
+        if not task_ids:
+            typer.echo("  (empty)")
+        else:
+            for task_id in task_ids:
+                task = task_backend.get(task_id)
+                if task:
+                    title = task.get("title", "(no title)")[:50]
+                    typer.echo(f"  #{task_id}: {title}")
+                else:
+                    typer.secho(f"  #{task_id}: (task not found)", fg=typer.colors.YELLOW)
+        typer.echo("")
+
+
+@project_app.command("delete")
+def project_delete(
+    name: str,
+    github: bool = typer.Option(False, "--github", "-g", help="Also delete from GitHub"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+):
+    """Delete a project board."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import delete_project, get_project
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    project = get_project(name)
+    if project is None:
+        typer.secho(f"Project '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not force:
+        confirm_msg = f"Delete project '{project['title']}'?"
+        if github and project.get("github_project_number"):
+            confirm_msg = f"Delete project '{project['title']}' locally AND from GitHub?"
+        if not typer.confirm(confirm_msg):
+            typer.echo("Cancelled.")
+            raise typer.Exit(0)
+
+    if delete_project(name, delete_on_github=github):
+        typer.secho(f"Deleted project: {project['title']}", fg=typer.colors.GREEN)
+    else:
+        typer.secho("Failed to delete project.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@project_app.command("add-task")
+def project_add_task(
+    project_name: str,
+    task_id: int,
+    column: str = typer.Option(None, "--column", "-c", help="Target column (default: first column)"),
+):
+    """Add a task to a project board."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import add_task_to_project
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        project = add_task_to_project(project_name, str(task_id), column)
+        if project is None:
+            typer.secho(f"Project '{project_name}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        target_col = column or project["columns"][0]
+        typer.secho(f"Added task #{task_id} to '{project['title']}' → {target_col}", fg=typer.colors.GREEN)
+    except ValueError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@project_app.command("remove-task")
+def project_remove_task(project_name: str, task_id: int):
+    """Remove a task from a project board."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import remove_task_from_project
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    project = remove_task_from_project(project_name, str(task_id))
+    if project is None:
+        typer.secho(f"Project '{project_name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.secho(f"Removed task #{task_id} from '{project['title']}'", fg=typer.colors.GREEN)
+
+
+@project_app.command("move")
+def project_move_task(project_name: str, task_id: int, column: str):
+    """Move a task to a different column."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import move_task
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        project = move_task(project_name, str(task_id), column)
+        if project is None:
+            typer.secho(f"Project '{project_name}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        typer.secho(f"Moved task #{task_id} to '{column}'", fg=typer.colors.GREEN)
+    except ValueError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@project_app.command("sync")
+def project_sync(name: str):
+    """Sync a project to GitHub Projects v2."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import sync_project_to_github
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.echo(f"Syncing project '{name}' to GitHub...")
+
+    try:
+        project = sync_project_to_github(name)
+        if project is None:
+            typer.secho(f"Project '{name}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        typer.secho(f"Synced project to GitHub Projects #{project['github_project_number']}", fg=typer.colors.GREEN)
+    except RuntimeError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@project_app.command("link")
+def project_link(name: str, github_project_number: int):
+    """Link a local project to an existing GitHub Project."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.projects import link_to_github_project
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        project = link_to_github_project(name, github_project_number)
+        if project is None:
+            typer.secho(f"Local project '{name}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        typer.secho(f"Linked '{project['title']}' to GitHub Project #{github_project_number}", fg=typer.colors.GREEN)
+    except RuntimeError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
 
 

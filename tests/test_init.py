@@ -21,13 +21,19 @@ class TestInitProject:
             idlergear_path = Path(tmpdir) / ".idlergear"
             assert idlergear_path.exists()
             assert (idlergear_path / "config.toml").exists()
-            assert (idlergear_path / "vision.md").exists()
-            assert (idlergear_path / "tasks").is_dir()
+            # v0.3: vision is now in vision/VISION.md
+            assert (idlergear_path / "vision" / "VISION.md").exists()
+            # v0.3: tasks renamed to issues
+            assert (idlergear_path / "issues").is_dir()
             assert (idlergear_path / "notes").is_dir()
-            assert (idlergear_path / "explorations").is_dir()
+            # v0.3: explorations removed (merged into notes with tags)
             assert (idlergear_path / "plans").is_dir()
-            assert (idlergear_path / "reference").is_dir()
+            # v0.3: reference renamed to wiki
+            assert (idlergear_path / "wiki").is_dir()
             assert (idlergear_path / "runs").is_dir()
+            # v0.3: new directories
+            assert (idlergear_path / "projects").is_dir()
+            assert (idlergear_path / "sync").is_dir()
 
     def test_init_already_initialized(self, save_cwd, capsys):
         from idlergear.init import init_project
@@ -67,7 +73,8 @@ class TestInitProject:
 
             init_project(".")
 
-            vision_path = Path(tmpdir) / ".idlergear" / "vision.md"
+            # v0.3: vision is now in vision/VISION.md
+            vision_path = Path(tmpdir) / ".idlergear" / "vision" / "VISION.md"
             content = vision_path.read_text()
 
             assert "Project Vision" in content

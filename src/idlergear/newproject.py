@@ -8,6 +8,7 @@ from typing import Any
 
 from idlergear.templates.base import (
     AGENTS_MD,
+    CLAUDE_COMMAND_CONTEXT,
     CLAUDE_MD,
     CLAUDE_RULES_IDLERGEAR,
     CLAUDE_SETTINGS,
@@ -82,10 +83,14 @@ def _create_base_structure(
     project_path: Path, name: str, vision: str, description: str
 ) -> None:
     """Create base project structure common to all templates."""
-    # .idlergear/ directory
-    idlergear_path = project_path / ".idlergear"
-    for subdir in ["tasks", "notes", "explorations", "plans", "reference", "runs"]:
-        (idlergear_path / subdir).mkdir(parents=True)
+    from idlergear.schema import IdlerGearSchema
+
+    # Use schema to create correct v0.3 structure
+    schema = IdlerGearSchema(project_path)
+
+    # Create all directories from schema
+    for dir_path in schema.get_all_directories():
+        dir_path.mkdir(parents=True, exist_ok=True)
 
     # .idlergear/config.toml
     config_content = f"""\
@@ -98,15 +103,16 @@ name = "{name}"
 # repo = "owner/repo"
 # token = ""  # Or use GITHUB_TOKEN env var
 """
-    (idlergear_path / "config.toml").write_text(config_content)
+    schema.config_file.write_text(config_content)
 
-    # .idlergear/vision.md
-    (idlergear_path / "vision.md").write_text(vision)
+    # .idlergear/vision/VISION.md
+    schema.vision_file.write_text(vision)
 
     # .claude/ directory
     claude_path = project_path / ".claude"
     claude_path.mkdir()
     (claude_path / "rules").mkdir()
+    (claude_path / "commands").mkdir()
 
     # .claude/settings.json
     with open(claude_path / "settings.json", "w") as f:
@@ -119,6 +125,9 @@ name = "{name}"
 
     # .claude/rules/idlergear.md
     (claude_path / "rules" / "idlergear.md").write_text(CLAUDE_RULES_IDLERGEAR)
+
+    # .claude/commands/context.md - /context slash command
+    (claude_path / "commands" / "context.md").write_text(CLAUDE_COMMAND_CONTEXT)
 
     # Root CLAUDE.md (Claude Code also looks here)
     (project_path / "CLAUDE.md").write_text(claude_md_content)
