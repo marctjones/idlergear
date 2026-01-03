@@ -513,6 +513,21 @@ async def list_tools() -> list[Tool]:
                 },
             },
         ),
+        # Status tool - quick project overview
+        Tool(
+            name="idlergear_status",
+            description="Get quick project status dashboard (tasks, notes, runs, git). Use this for a quick overview of current state.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "detailed": {
+                        "type": "boolean",
+                        "description": "Show detailed dashboard",
+                        "default": False,
+                    },
+                },
+            },
+        ),
         # Search tool
         Tool(
             name="idlergear_search",
@@ -908,6 +923,20 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             ctx = gather_context(include_references=arguments.get("include_refs", False))
             return _format_result(format_context_json(ctx))
+
+        # Status handler
+        elif name == "idlergear_status":
+            from idlergear.status import get_project_status
+
+            status = get_project_status()
+            if arguments.get("detailed", False):
+                from idlergear.status import format_detailed_status
+                return _format_result({"detailed": format_detailed_status(status)})
+            else:
+                return _format_result({
+                    "summary": status.summary(),
+                    **status.to_dict()
+                })
 
         # Search handler
         elif name == "idlergear_search":

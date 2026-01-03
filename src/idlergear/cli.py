@@ -199,6 +199,30 @@ def context(
 
 
 @app.command()
+def status(
+    detailed: bool = typer.Option(False, "--detailed", "-d", help="Show detailed dashboard"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+):
+    """Show unified project status dashboard.
+
+    Quick one-line summary of tasks, notes, runs, and git status.
+
+    Examples:
+        idlergear status              # One-line summary
+        idlergear status --detailed   # Full dashboard
+        idlergear status --json       # JSON output for tools
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.status import show_status
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    show_status(detailed=detailed, json_output=json_output)
+
+
+@app.command()
 def check(
     file: str = typer.Option(None, "--file", "-f", help="File to check for violations"),
     no_todos: bool = typer.Option(False, "--no-todos", help="Check for TODO comments"),
