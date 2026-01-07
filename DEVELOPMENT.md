@@ -37,6 +37,31 @@ pip install -r requirements.txt
 - Use pytest: `python -m pytest`
 - Aim for >80% coverage
 
+### Daemon Integration Tests
+
+For testing multi-agent coordination features (daemon, queue, agents, locks):
+
+```bash
+# Run daemon integration tests
+python -m pytest tests/test_daemon_integration.py -v
+
+# Test specific scenario
+python -m pytest tests/test_daemon_integration.py::test_multi_agent_coordination -v
+```
+
+**Test structure:**
+- Use `pytest-asyncio` for async tests
+- Create temporary storage with `temp_storage` fixture
+- Test agent registry, command queue, and lock manager independently
+- Verify full coordination scenarios work end-to-end
+
+**What to test:**
+- Agent registration, heartbeat, status updates
+- Command queueing, priority ordering, assignment
+- Lock acquisition, release, timeout
+- Multi-agent coordination workflows
+- Data persistence across restarts
+
 ## Adding Dependencies
 
 Before adding any dependency:
@@ -63,6 +88,86 @@ Before adding any dependency:
 - Linter: `ruff`
 - Tests: `pytest`
 - Follow PEP 8
+
+## Version Management
+
+**CRITICAL: Single Source of Truth**
+
+IdlerGear uses `pyproject.toml` as the **single source of truth** for version numbers.
+
+### Version Number Strategy
+
+1. **Primary source**: `pyproject.toml` - This is the authoritative version
+2. **All code reads from package metadata**: Use `importlib.metadata.version("idlergear")`
+3. **Never hardcode versions** in Python files
+
+### Implementation Pattern
+
+```python
+# ✅ CORRECT: Read from package metadata
+try:
+    from importlib.metadata import version as get_version
+    __version__ = get_version("idlergear")
+except Exception:
+    # Fallback for development/editable installs
+    __version__ = "0.3.1"  # Match pyproject.toml
+```
+
+```python
+# ❌ WRONG: Hardcoded version
+__version__ = "0.2.0"
+```
+
+### When to Update Version
+
+1. **Update `pyproject.toml` only** - Change the `version = "X.Y.Z"` line
+2. **All other files auto-sync** - They read from package metadata
+3. **For templates**: Update fallback version to match current version
+
+### Files Affected by Version Changes
+
+- `pyproject.toml` - Primary source (update this)
+- `src/idlergear/__init__.py` - Reads from metadata (auto-syncs)
+- `src/idlergear/mcp_server.py` - Imports from `__init__.py` (auto-syncs)
+- `src/idlergear/templates/python.py` - Template pattern (uses same strategy)
+
+### Versioning Scheme
+
+IdlerGear follows [Semantic Versioning 2.0.0](https://semver.org/):
+
+- **MAJOR.MINOR.PATCH** (e.g., `0.3.1`)
+- **MAJOR**: Breaking API changes
+- **MINOR**: New features, backward compatible
+- **PATCH**: Bug fixes, backward compatible
+
+### Why This Matters
+
+**Previous problem**: Version numbers were hardcoded in multiple files:
+- `pyproject.toml`: 0.3.1
+- `__init__.py`: 0.1.0
+- `mcp_server.py`: 0.2.0
+
+This caused confusion and incorrect version reporting.
+
+**Current solution**: One version in `pyproject.toml`, all code reads from it.
+
+### Releasing a New Version
+
+```bash
+# 1. Update version in pyproject.toml
+vim pyproject.toml  # Change version = "0.3.2"
+
+# 2. Verify all code sees the new version
+pip install -e .
+python -c "import idlergear; print(idlergear.__version__)"  # Should print 0.3.2
+idlergear --version  # Should print 0.3.2
+
+# 3. Commit and tag
+git add pyproject.toml
+git commit -m "chore: bump version to 0.3.2"
+git tag v0.3.2
+git push && git push --tags
+```
 
 ## Security
 

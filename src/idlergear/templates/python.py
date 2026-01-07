@@ -119,7 +119,12 @@ idlergear plan show      # View current plan
 SRC_INIT = '''\
 """{project_name}."""
 
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import version as get_version
+    __version__ = get_version("{package_name}")
+except Exception:
+    # Fallback for development/editable installs
+    __version__ = "0.1.0"
 '''
 
 # tests/__init__.py
