@@ -59,6 +59,15 @@ class DaemonClient:
         self._connected = True
         self._receive_task = asyncio.create_task(self._receive_loop())
 
+    async def __aenter__(self) -> "DaemonClient":
+        """Async context manager entry."""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit."""
+        await self.disconnect()
+
     async def disconnect(self) -> None:
         """Disconnect from the daemon."""
         self._connected = False

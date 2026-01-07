@@ -26,25 +26,37 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.2.0)
+## Features (v0.3.0)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
 - **Notes** - Capture quick insights and learnings
-- **Explorations** - Document research and discoveries
 - **Vision** - Maintain project direction and goals
 - **Plans** - Organize work into phases
 - **References** - Store documentation and resources
+- **Session State** - Perfect continuity across AI sessions
+
+### Python-Native MCP Servers (Zero Node.js!)
+- **Filesystem** - 11 tools (read, write, tree, search, checksums)
+- **Git + Task Integration** - 18 tools (commit-task linking, status, diff, branches)
+- **Process Management** - 11 tools (list, monitor, IdlerGear runs integration)
+- **Environment Detection** - 4 tools (auto-detect Python/Node/Rust/.NET/venv)
+- **OpenTelemetry Logs** - 3 tools (query, stats, recent errors)
+- **Session Management** - 4 tools (start, save, end, status)
+
+**Total: 51 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - 35+ tools via Model Context Protocol (universal)
-- **Project Instructions** - CLAUDE.md, GEMINI.md, AGENTS.md, .goosehints
-- **Slash Commands** - `/ig-*` commands for Claude Code (planned)
-- **CLI Fallback** - Same commands work via shell for any assistant
+- **MCP Server** - **51 tools** via Model Context Protocol (universal)
+- **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
+- **Goose Integration** - CLI + GUI support with `.goosehints`
+- **Token Efficiency** - 97% context reduction (17K → 570 tokens!)
+- **Session Persistence** - Perfect state restoration across sessions
+- **Auto Error Capture** - OpenTelemetry errors → tasks/notes automatically
 
 ## Why Not Just AGENTS.md?
 
@@ -74,38 +86,250 @@ cd my-project
 idlergear init
 idlergear install  # Adds CLAUDE.md, AGENTS.md, .mcp.json
 
+# Set up AI assistant integration
+idlergear hooks install      # Claude Code lifecycle hooks
+idlergear goose init         # Generate .goosehints for Goose
+
 # Use it
 idlergear vision show
 idlergear task create "Implement feature X"
 idlergear task list
 idlergear note create "Found that API requires auth header"
-idlergear context  # Get full project context for AI
+idlergear context --mode minimal  # Get project context (97% token savings!)
+
+# Session management (via MCP or CLI)
+idlergear session-start      # Load context + previous state
+idlergear session-save       # Save progress during work
+idlergear session-end        # End with smart suggestions
+
+# Start collecting logs
+idlergear otel start         # ERROR logs → notes, FATAL → tasks automatically!
 ```
 
 ## Commands
 
+### Core Commands
 ```bash
-idlergear --version          # Show version
-idlergear init               # Initialize IdlerGear in project
-idlergear install            # Install AI integration files
-idlergear uninstall          # Remove AI integration files
+idlergear --version               # Show version
+idlergear init                    # Initialize IdlerGear in project
+idlergear install                 # Install AI integration files
+idlergear uninstall               # Remove AI integration files
 
-idlergear task create TEXT   # Create a task
-idlergear task list          # List all tasks
-idlergear task complete ID   # Mark task complete
+# Knowledge Management
+idlergear task create TEXT        # Create a task
+idlergear task list               # List all tasks
+idlergear task close ID           # Close a task
+idlergear task show ID            # Show task details
 
-idlergear note create TEXT   # Capture a note
-idlergear note list          # List all notes
-idlergear note promote ID    # Promote note to task
+idlergear note create TEXT        # Capture a note
+idlergear note list               # List all notes
+idlergear note promote ID --to task  # Promote note to task
 
-idlergear vision show        # Show project vision
-idlergear vision edit        # Edit vision (opens editor)
+idlergear vision show             # Show project vision
+idlergear vision edit             # Edit vision (opens editor)
 
-idlergear context            # Show full context for AI sessions
+idlergear reference add TITLE     # Add reference documentation
+idlergear reference list          # List all references
+idlergear reference show TITLE    # Show a reference
 
-idlergear config set KEY VAL # Configure settings
-idlergear config get KEY     # Get config value
+idlergear search QUERY            # Search across all knowledge types
+
+# Context Management (Token-Efficient!)
+idlergear context                 # Show context (default: minimal, ~570 tokens)
+idlergear context --mode standard # Standard verbosity (~7K tokens)
+idlergear context --mode detailed # Detailed (~11.5K tokens)
+idlergear context --mode full     # Full context (~17K tokens)
+
+# Session Management
+idlergear session-start           # Load context + previous state
+idlergear session-save            # Save current work state
+idlergear session-end             # End with smart suggestions
+idlergear session-status          # View current session state
+idlergear session-clear           # Clear session state
+
+# AI Assistant Integration
+idlergear hooks install           # Install Claude Code lifecycle hooks
+idlergear hooks test              # Test hooks work correctly
+idlergear hooks list              # List installed hooks
+
+idlergear goose init              # Generate .goosehints for Goose
+idlergear goose register          # Show Goose GUI registration instructions
+
+# OpenTelemetry Logging
+idlergear otel start              # Start OTel collector daemon
+idlergear otel stop               # Stop collector
+idlergear otel status             # Show collector status
+idlergear otel logs               # Query collected logs
+idlergear otel config             # Manage configuration
+
+# Configuration
+idlergear config set KEY VAL      # Configure settings
+idlergear config get KEY          # Get config value
 ```
+
+### MCP Tools (51 total - use via AI assistants)
+
+See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
+
+## MCP Tools Reference
+
+IdlerGear provides **51 MCP tools** across 6 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+
+### Session Management (4 tools) ⚡ **Start here!**
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_session_start` | **⚡ Call first!** Load context + previous state + recommendations |
+| `idlergear_session_save` | Save current work state (task ID, files, notes) |
+| `idlergear_session_end` | End session with smart suggestions for next time |
+| `idlergear_session_status` | View current session state |
+
+**Example:**
+```python
+# Start of EVERY AI session
+result = idlergear_session_start(context_mode="minimal")
+# Returns: vision, plan, tasks, notes + previous session state + recommendations
+```
+
+**Benefits**: Perfect continuity, ~570 tokens (vs 17K!), eliminates "where did we leave off?" questions
+
+---
+
+### Filesystem Operations (11 tools)
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_fs_read_file` | Read file contents |
+| `idlergear_fs_read_multiple` | Batch read multiple files |
+| `idlergear_fs_write_file` | Write file contents |
+| `idlergear_fs_create_directory` | Create directories |
+| `idlergear_fs_list_directory` | List directory contents |
+| `idlergear_fs_directory_tree` | Recursive tree structure (gitignore-aware) |
+| `idlergear_fs_move_file` | Move/rename files |
+| `idlergear_fs_search_files` | Pattern search (respects .gitignore) |
+| `idlergear_fs_file_info` | File metadata (size, modified, permissions) |
+| `idlergear_fs_file_checksum` | Calculate checksums (MD5, SHA1, SHA256) |
+| `idlergear_fs_allowed_directories` | View security boundaries |
+
+**Replaces**: `@modelcontextprotocol/server-filesystem` (Node.js)
+
+---
+
+### Git + Task Integration (18 tools) 🎯 **Unique to IdlerGear!**
+
+| Tool | Description |
+|------|-------------|
+| **Core Git Operations** | |
+| `idlergear_git_status` | Structured status (branch, staged, modified, untracked) |
+| `idlergear_git_diff` | Configurable diffs (staged/unstaged, context lines) |
+| `idlergear_git_log` | Commit history with filtering |
+| `idlergear_git_add` | Stage files or all changes |
+| `idlergear_git_commit` | Create commits |
+| `idlergear_git_reset` | Unstage files or hard reset |
+| `idlergear_git_show` | Show commit details with diff |
+| `idlergear_git_branch_list` | List branches |
+| `idlergear_git_branch_create` | Create branches |
+| `idlergear_git_branch_checkout` | Switch branches |
+| `idlergear_git_branch_delete` | Delete branches |
+| **IdlerGear-Specific** 🔥 | |
+| `idlergear_git_commit_task` | **Auto-link commits to tasks** |
+| `idlergear_git_status_for_task` | Filter status by task files |
+| `idlergear_git_task_commits` | Find all commits mentioning a task |
+| `idlergear_git_sync_tasks` | Update task status from commit messages |
+
+**Replaces**: `cyanheads/git-mcp-server` (Node.js)
+**Unique**: First MCP git server with automatic commit-task linking!
+
+**Example:**
+```python
+# Commit and link to task in one operation
+idlergear_git_commit_task(
+    task_id=42,
+    message="Fix authentication bug",
+    files=["auth.py"]
+)
+# Creates commit with "Task: #42" in message
+```
+
+---
+
+### Process Management (11 tools)
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_pm_list` | List running processes |
+| `idlergear_pm_get` | Get specific process info |
+| `idlergear_pm_kill` | Kill a process |
+| `idlergear_pm_run_start` | Start IdlerGear run |
+| `idlergear_pm_run_list` | List IdlerGear runs |
+| `idlergear_pm_run_status` | Get run status |
+| `idlergear_pm_run_logs` | Get run logs |
+| `idlergear_pm_run_stop` | Stop a run |
+| `idlergear_pm_system_info` | CPU, memory, disk usage |
+| `idlergear_pm_cpu_percent` | Current CPU usage |
+| `idlergear_pm_memory_info` | Memory usage breakdown |
+
+**Replaces**: `pm-mcp` (Node.js)
+**Integrates**: IdlerGear's existing `runs` system for task-aware process management
+
+---
+
+### Environment Detection (4 tools)
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_env_info` | **Consolidated environment snapshot** (Python, Node, venv, PATH) |
+| `idlergear_env_which` | Enhanced `which` showing ALL PATH matches |
+| `idlergear_env_detect` | Project type detection (Python, Node, Rust, .NET, Go, etc.) |
+| `idlergear_env_find_venv` | Find virtual environments (venv, poetry, conda) |
+
+**Fills Gap**: No other MCP server provides this!
+**Token Savings**: ~60% vs multiple shell commands
+
+**Example:**
+```python
+# One call instead of 10+ shell commands
+idlergear_env_info()
+# Returns: Python 3.11, venv active, Node 20.x, Rust 1.75, etc.
+```
+
+---
+
+### OpenTelemetry Logs (3 tools) 🔥 **Auto Error Capture!**
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_otel_query_logs` | Query logs with filters (severity, service, time range, full-text search) |
+| `idlergear_otel_stats` | Statistics breakdown by severity/service |
+| `idlergear_otel_recent_errors` | Quick error checking |
+
+**Killer Feature**: ERROR logs automatically become notes, FATAL logs become high-priority tasks!
+
+**Example:**
+```python
+# Start OTel collector (via CLI)
+$ idlergear otel start
+
+# Configure Goose to send logs
+$ export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
+
+# Run Goose - errors automatically create tasks!
+# ERROR logs → idlergear note create (tagged 'error', 'otel')
+# FATAL logs → idlergear task create (labeled 'bug', 'automated')
+
+# Query logs later
+idlergear_otel_query_logs(severity="ERROR", service="goose", limit=20)
+```
+
+---
+
+### Knowledge Management (built into all tools)
+
+All 51 MCP tools integrate with IdlerGear's knowledge system:
+- Context-aware operations
+- Task linkage where relevant
+- Automatic knowledge capture (OTel)
+- Token-efficient outputs
 
 ## Configuration
 

@@ -11,6 +11,43 @@ from pathlib import Path
 from typing import Any
 
 
+def truncate_text(text: str | None, max_chars: int | None, suffix: str = "...") -> str | None:
+    """Truncate text to max_chars, adding suffix if truncated.
+
+    Args:
+        text: Text to truncate
+        max_chars: Maximum characters (None = no limit)
+        suffix: Suffix to add when truncated
+
+    Returns:
+        Truncated text or None if input was None
+    """
+    if text is None or max_chars is None:
+        return text
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - len(suffix)] + suffix
+
+
+def truncate_lines(text: str | None, max_lines: int | None, suffix: str = "\n...") -> str | None:
+    """Truncate text to max_lines, adding suffix if truncated.
+
+    Args:
+        text: Text to truncate
+        max_lines: Maximum lines (None = no limit)
+        suffix: Suffix to add when truncated
+
+    Returns:
+        Truncated text or None if input was None
+    """
+    if text is None or max_lines is None:
+        return text
+    lines = text.split("\n")
+    if len(lines) <= max_lines:
+        return text
+    return "\n".join(lines[:max_lines]) + suffix
+
+
 @dataclass
 class ProjectContext:
     """Aggregated project context for AI consumption."""
@@ -31,6 +68,7 @@ def gather_context(
     max_tasks: int = 10,
     max_notes: int = 5,
     max_explorations: int = 5,
+    mode: str = "minimal",
 ) -> ProjectContext:
     """Gather all relevant project context.
 
@@ -40,10 +78,60 @@ def gather_context(
         max_tasks: Maximum number of tasks to include
         max_notes: Maximum number of recent notes to include
         max_explorations: Maximum number of explorations to include
+        mode: Context verbosity mode - "minimal", "standard", "detailed", or "full"
+              - minimal: ~750 tokens (session start, quick refresh)
+              - standard: ~2500 tokens (general dev work)
+              - detailed: ~7000 tokens (deep planning)
+              - full: ~17000+ tokens (no limits, rare use)
 
     Returns:
         ProjectContext with all gathered knowledge
     """
+    # Mode-based limits (override params if mode is specified)
+    mode_configs = {
+        "minimal": {
+            "max_tasks": 5,
+            "max_notes": 0,  # Count only
+            "max_explorations": 0,
+            "include_references": False,
+            "vision_chars": 200,
+            "plan_lines": 3,
+            "task_body_lines": 0,  # Title only
+        },
+        "standard": {
+            "max_tasks": 10,
+            "max_notes": 5,
+            "max_explorations": 3,
+            "include_references": False,  # Titles only
+            "vision_chars": 500,
+            "plan_lines": 10,
+            "task_body_lines": 1,
+        },
+        "detailed": {
+            "max_tasks": 15,
+            "max_notes": 8,
+            "max_explorations": 5,
+            "include_references": False,  # Just titles
+            "vision_chars": 1500,
+            "plan_lines": 50,
+            "task_body_lines": 5,
+        },
+        "full": {
+            "max_tasks": max_tasks,
+            "max_notes": max_notes,
+            "max_explorations": max_explorations,
+            "include_references": include_references,
+            "vision_chars": None,  # No limit
+            "plan_lines": None,
+            "task_body_lines": None,
+        },
+    }
+
+    config = mode_configs.get(mode, mode_configs["minimal"])
+    max_tasks = config["max_tasks"]
+    max_notes = config["max_notes"]
+    max_explorations = config["max_explorations"]
+    include_references = config["include_references"]
     from idlergear.backends.registry import get_backend, get_configured_backend_name
     from idlergear.config import find_idlergear_root
 
@@ -61,7 +149,9 @@ def gather_context(
     # Gather vision
     try:
         vision_backend = get_backend("vision", project_path=project_path)
-        ctx.vision = vision_backend.get()
+        vision = vision_backend.get()
+        # Truncate vision based on mode
+        ctx.vision = truncate_text(vision, config["vision_chars"])
     except Exception as e:
         ctx.errors.append(f"Vision: {e}")
 
@@ -81,6 +171,12 @@ def gather_context(
             # If no current plan, use first one if exists
             if ctx.current_plan is None and plans:
                 ctx.current_plan = plans[0]
+
+        # Truncate plan body based on mode
+        if ctx.current_plan and "body" in ctx.current_plan:
+            ctx.current_plan["body"] = truncate_lines(
+                ctx.current_plan["body"], config["plan_lines"]
+            )
     except Exception as e:
         ctx.errors.append(f"Plan: {e}")
 
@@ -92,6 +188,17 @@ def gather_context(
         priority_order = {"high": 0, "medium": 1, "low": 2, None: 3}
         tasks.sort(key=lambda t: priority_order.get(t.get("priority"), 3))
         ctx.open_tasks = tasks[:max_tasks]
+
+        # Truncate task bodies based on mode
+        task_body_lines = config["task_body_lines"]
+        if task_body_lines is not None:
+            for task in ctx.open_tasks:
+                if "body" in task and task["body"]:
+                    if task_body_lines == 0:
+                        # Remove body entirely in minimal mode
+                        task["body"] = None
+                    else:
+                        task["body"] = truncate_lines(task["body"], task_body_lines)
     except Exception as e:
         ctx.errors.append(f"Tasks: {e}")
 

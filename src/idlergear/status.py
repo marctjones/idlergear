@@ -304,15 +304,3 @@ def format_detailed_status(status: ProjectStatus) -> str:
     return "\n".join(lines)
 
 
-def show_status(detailed: bool = False, json_output: bool = False) -> None:
-    """Show project status."""
-    status = get_project_status()
-
-    if json_output:
-        typer.echo(json.dumps(status.to_dict(), indent=2))
-        return
-
-    if detailed:
-        typer.echo(format_detailed_status(status))
-    else:
-        typer.echo(status.summary())

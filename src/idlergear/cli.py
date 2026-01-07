@@ -1,10 +1,27 @@
 """IdlerGear CLI - Command-line interface."""
 
+import json
+import sys
+from enum import Enum
+from typing import Optional
+
 from importlib.metadata import version as get_version
 
 import typer
 
+from .display import display, is_interactive
+
 __version__ = get_version("idlergear")
+
+
+class OutputFormat(str, Enum):
+    HUMAN = "human"
+    JSON = "json"
+
+
+class State:
+    def __init__(self, output_format: OutputFormat):
+        self.output_format = output_format
 
 
 def version_callback(value: bool) -> None:
@@ -23,13 +40,25 @@ app = typer.Typer(
 
 @app.callback()
 def main(
+    ctx: typer.Context,
+    output: OutputFormat = typer.Option(
+        None, "--output", help="Output format (json or human). Auto-detects if not set."
+    ),
     version: bool = typer.Option(
         False, "--version", "-V", callback=version_callback, is_eager=True,
         help="Show version and exit."
     ),
 ) -> None:
     """IdlerGear - Knowledge management for AI-assisted development."""
-    pass
+    output_format = OutputFormat.HUMAN
+    if output == OutputFormat.JSON:
+        output_format = OutputFormat.JSON
+    elif not is_interactive() and output is None:
+        # Default to JSON for non-interactive sessions (pipes)
+        output_format = OutputFormat.JSON
+
+    ctx.obj = State(output_format=output_format)
+
 
 
 # Sub-command groups
@@ -44,6 +73,9 @@ config_app = typer.Typer(help="Configuration management")
 daemon_app = typer.Typer(help="Daemon control")
 mcp_app = typer.Typer(help="MCP server management")
 project_app = typer.Typer(help="Kanban project boards (→ GitHub Projects v2)")
+session_app = typer.Typer(help="Session state persistence")
+goose_app = typer.Typer(help="Goose integration and configuration")
+otel_app = typer.Typer(help="OpenTelemetry log collection")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -56,6 +88,9 @@ app.add_typer(config_app, name="config")
 app.add_typer(daemon_app, name="daemon")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(project_app, name="project")
+app.add_typer(session_app, name="session")
+app.add_typer(goose_app, name="goose")
+app.add_typer(otel_app, name="otel")
 
 
 @app.command()
@@ -108,6 +143,7 @@ def init(
 
 @app.command()
 def search(
+    ctx: typer.Context,
     query: str,
     types: list[str] = typer.Option(
         [],
@@ -126,44 +162,29 @@ def search(
 
     results = search_all(query, types=types if types else None)
 
-    if not results:
-        typer.echo(f"No results found for '{query}'.")
-        return
-
-    typer.echo(f"Found {len(results)} result(s) for '{query}':\n")
-
-    # Group by type
-    by_type: dict[str, list] = {}
-    for result in results:
-        t = result["type"]
-        if t not in by_type:
-            by_type[t] = []
-        by_type[t].append(result)
-
-    type_colors = {
-        "task": typer.colors.GREEN,
-        "note": typer.colors.YELLOW,
-        "reference": typer.colors.MAGENTA,
-        "plan": typer.colors.BLUE,
-    }
-
-    for type_name, items in by_type.items():
-        typer.secho(f"{type_name.upper()}S ({len(items)})", fg=type_colors.get(type_name, typer.colors.WHITE), bold=True)
-        for item in items:
-            id_str = f"#{item.get('id', item.get('name', '?'))}"
-            title = item.get("title", "")
-            preview = item.get("preview", "")[:60]
-            typer.echo(f"  {id_str:8}  {title}")
-            if preview and preview != title:
-                typer.echo(f"            {preview}")
-        typer.echo("")
+    # For human-readable output, pass the query along for a better title.
+    # For JSON, group into a dictionary.
+    if ctx.obj.output_format == "human":
+        if results:
+            results[0]["_query"] = query  # Hack to pass query to formatter
+        display(results, ctx.obj.output_format, "search")
+    else:
+        by_type: dict[str, list] = {}
+        for result in results:
+            t = result["type"]
+            if t not in by_type:
+                by_type[t] = []
+            by_type[t].append(result)
+        display(by_type, ctx.obj.output_format, "search")
 
 
 @app.command()
 def context(
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Include more detail"),
+    ctx: typer.Context,
+    mode: str = typer.Option("minimal", "--mode", "-m", help="Verbosity mode: minimal (~750 tokens), standard (~2500), detailed (~7000), full (no limits)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Include more detail (deprecated, use --mode)"),
     include_refs: bool = typer.Option(False, "--refs", "-r", help="Include reference documents"),
+    include_session: bool = typer.Option(False, "--session", "-s", help="Include session state"),
 ):
     """Show project context for AI session start.
 
@@ -173,35 +194,71 @@ def context(
     - Open tasks (prioritized)
     - Open explorations (research in progress)
     - Recent notes (quick captures)
+    - Session state (optional, with --session flag)
 
     Run this at the start of each AI session to understand the project.
 
-    Examples:
-        idlergear context           # Quick overview
-        idlergear context --json    # For programmatic consumption
-        idlergear context --refs    # Include reference documents
-    """
-    import json
+    Token-Efficient Modes:
+        minimal  (~750 tokens):  Top 5 tasks (titles only), no notes/explorations
+        standard (~2500 tokens): Top 10 tasks (1-line preview), 5 notes, 3 explorations
+        detailed (~7000 tokens): Top 15 tasks (5-line preview), 8 notes, 5 explorations
+        full (no limit):         All tasks/notes with full bodies
 
+    Examples:
+        idlergear context                     # Minimal mode (default, ~750 tokens)
+        idlergear context --mode standard     # Balanced mode (~2500 tokens)
+        idlergear context --mode full --refs  # Everything including references
+        idlergear context --output json       # JSON output for tools
+        idlergear context --session           # Include last saved session
+    """
     from idlergear.config import find_idlergear_root
-    from idlergear.context import format_context, format_context_json, gather_context
+    from idlergear.context import format_context_json, gather_context
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    ctx = gather_context(include_references=include_refs)
+    # Validate mode
+    valid_modes = ["minimal", "standard", "detailed", "full"]
+    if mode not in valid_modes:
+        typer.secho(f"Invalid mode '{mode}'. Choose from: {', '.join(valid_modes)}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
-    if json_output:
-        typer.echo(json.dumps(format_context_json(ctx), indent=2))
+    # Handle deprecated --verbose flag
+    if verbose and mode == "minimal":
+        mode = "detailed"
+
+    context_data = gather_context(include_references=include_refs, mode=mode)
+
+    # Add session state if requested
+    if include_session:
+        from idlergear.sessions import load_session
+
+        session = load_session()
+        if session:
+            # Add to the dataclass for consistent handling
+            context_data.session = session.to_dict()
+
+    if ctx.obj.output_format == "json":
+        json_data = format_context_json(context_data)
+        if include_session and hasattr(context_data, "session"):
+             json_data["session"] = context_data.session
+        display(json_data, "json", "context")
     else:
-        typer.echo(format_context(ctx, verbose=verbose))
+        # The session data needs special handling for the text format,
+        # as it's appended after the main block.
+        display(context_data, "human", "context", verbose=verbose)
+        if include_session and hasattr(context_data, "session"):
+            from idlergear.sessions import format_session_state, load_session
+            session = load_session()
+            if session:
+                typer.echo("\n\n" + format_session_state(session))
 
 
 @app.command()
 def status(
+    ctx: typer.Context,
     detailed: bool = typer.Option(False, "--detailed", "-d", help="Show detailed dashboard"),
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
     """Show unified project status dashboard.
 
@@ -210,16 +267,22 @@ def status(
     Examples:
         idlergear status              # One-line summary
         idlergear status --detailed   # Full dashboard
-        idlergear status --json       # JSON output for tools
+        idlergear status --output json # JSON output for tools
     """
     from idlergear.config import find_idlergear_root
-    from idlergear.status import show_status
+    from idlergear.status import get_project_status
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    show_status(detailed=detailed, json_output=json_output)
+    status_data = get_project_status()
+
+    if ctx.obj.output_format == "json":
+        display(status_data.to_dict(), "json", "status")
+    else:
+        data_type = "status" if detailed else "status_summary"
+        display(status_data, "human", data_type)
 
 
 @app.command()
@@ -894,6 +957,168 @@ def daemon_status():
         typer.echo(f"  Socket: {status.get('socket')}")
 
 
+@daemon_app.command("queue")
+def daemon_queue_command(
+    command: str = typer.Argument(..., help="Command to queue for execution"),
+    priority: int = typer.Option(5, "--priority", "-p", help="Priority (1-10, higher = more urgent)"),
+    wait: bool = typer.Option(False, "--wait", "-w", help="Wait for command to complete"),
+):
+    """Queue a command for execution by any available AI agent."""
+    import asyncio
+    from idlergear.config import find_idlergear_root
+    from idlergear.daemon.client import DaemonClient
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    async def queue_cmd():
+        async with DaemonClient(root) as client:
+            cmd_id = await client.queue_command(command, priority=priority)
+            typer.secho(f"Command queued: {cmd_id}", fg=typer.colors.GREEN)
+
+            if wait:
+                typer.echo("Waiting for command to complete...")
+                # Poll for result
+                while True:
+                    result = await client.get_command_result(cmd_id)
+                    if result:
+                        typer.echo("\nResult:")
+                        if result.get("success"):
+                            typer.secho(result.get("output", ""), fg=typer.colors.GREEN)
+                        else:
+                            typer.secho(f"Error: {result.get('error')}", fg=typer.colors.RED)
+                        break
+                    await asyncio.sleep(1)
+
+            return cmd_id
+
+    try:
+        asyncio.run(queue_cmd())
+    except Exception as e:
+        typer.secho(f"Failed to queue command: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@daemon_app.command("agents")
+def daemon_agents():
+    """List all active AI agents connected to the daemon."""
+    import asyncio
+    from idlergear.config import find_idlergear_root
+    from idlergear.daemon.client import DaemonClient
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    async def list_agents():
+        async with DaemonClient(root) as client:
+            agents = await client.list_agents()
+
+            if not agents:
+                typer.echo("No active agents.")
+                return
+
+            typer.echo(f"\nActive agents ({len(agents)}):\n")
+            for agent in agents:
+                status_color = {
+                    "active": typer.colors.GREEN,
+                    "idle": typer.colors.YELLOW,
+                    "busy": typer.colors.CYAN,
+                }.get(agent.get("status", "unknown"), typer.colors.WHITE)
+
+                typer.secho(f"  • {agent['name']}", fg=typer.colors.BRIGHT_WHITE, bold=True)
+                typer.echo(f"    ID:     {agent['agent_id']}")
+                typer.secho(f"    Status: {agent['status']}", fg=status_color)
+                typer.echo(f"    Type:   {agent.get('agent_type', 'unknown')}")
+                if agent.get("current_task"):
+                    typer.echo(f"    Task:   {agent['current_task']}")
+                typer.echo()
+
+    try:
+        asyncio.run(list_agents())
+    except Exception as e:
+        typer.secho(f"Failed to list agents: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@daemon_app.command("send")
+def daemon_send_message(
+    message: str = typer.Argument(..., help="Message to broadcast to all agents"),
+):
+    """Send a message to all active AI agents."""
+    import asyncio
+    from idlergear.config import find_idlergear_root
+    from idlergear.daemon.client import DaemonClient
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    async def send_msg():
+        async with DaemonClient(root) as client:
+            await client.broadcast_event({
+                "type": "user_message",
+                "message": message,
+                "timestamp": asyncio.get_event_loop().time(),
+            })
+            typer.secho("Message sent to all agents.", fg=typer.colors.GREEN)
+
+    try:
+        asyncio.run(send_msg())
+    except Exception as e:
+        typer.secho(f"Failed to send message: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@daemon_app.command("queue-list")
+def daemon_queue_list():
+    """List all queued commands."""
+    import asyncio
+    from idlergear.config import find_idlergear_root
+    from idlergear.daemon.client import DaemonClient
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    async def list_queue():
+        async with DaemonClient(root) as client:
+            commands = await client.list_queued_commands()
+
+            if not commands:
+                typer.echo("No queued commands.")
+                return
+
+            typer.echo(f"\nQueued commands ({len(commands)}):\n")
+            for cmd in commands:
+                status_color = {
+                    "pending": typer.colors.YELLOW,
+                    "assigned": typer.colors.CYAN,
+                    "running": typer.colors.BLUE,
+                    "completed": typer.colors.GREEN,
+                    "failed": typer.colors.RED,
+                }.get(cmd.get("status", "unknown"), typer.colors.WHITE)
+
+                typer.secho(f"  [{cmd['id'][:8]}]", fg=typer.colors.BRIGHT_WHITE, bold=True)
+                typer.secho(f"    Status:   {cmd['status']}", fg=status_color)
+                typer.echo(f"    Command:  {cmd['command'][:60]}...")
+                typer.echo(f"    Priority: {cmd.get('priority', 5)}")
+                if cmd.get("assigned_to"):
+                    typer.echo(f"    Agent:    {cmd['assigned_to']}")
+                typer.echo()
+
+    try:
+        asyncio.run(list_queue())
+    except Exception as e:
+        typer.secho(f"Failed to list queue: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 # MCP server commands
 @mcp_app.command("reload")
 def mcp_reload():
@@ -1214,10 +1439,20 @@ def task_create(
 
 @task_app.command("list")
 def task_list(
+    ctx: typer.Context,
     state: str = typer.Option("open", "--state", "-s", help="Filter by state: open, closed, all"),
     priority: str = typer.Option(None, "--priority", "-p", help="Filter by priority: high, medium, low"),
+    limit: int = typer.Option(None, "--limit", "-n", help="Limit number of results"),
+    preview: bool = typer.Option(False, "--preview", help="Show brief preview instead of full body (token-efficient)"),
 ):
-    """List tasks."""
+    """List tasks.
+
+    Examples:
+        idlergear task list                  # List all open tasks
+        idlergear task list --limit 5        # Top 5 tasks only
+        idlergear task list --preview        # Titles only (minimal tokens)
+        idlergear task list --state all      # Include closed tasks
+    """
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
 
@@ -1232,20 +1467,20 @@ def task_list(
     if priority:
         tasks = [t for t in tasks if t.get("priority") == priority]
 
-    if not tasks:
-        typer.echo(f"No {state} tasks found.")
-        return
+    # Apply limit if specified
+    if limit:
+        tasks = tasks[:limit]
 
-    for task in tasks:
-        state_icon = "o" if task["state"] == "open" else "x"
-        labels_str = f" [{', '.join(task['labels'])}]" if task.get("labels") else ""
-        priority_str = f" !{task['priority']}" if task.get("priority") else ""
-        due_str = f" @{task['due']}" if task.get("due") else ""
-        typer.echo(f"  [{state_icon}] #{task['id']:3d}  {task['title']}{priority_str}{due_str}{labels_str}")
+    # Strip task bodies if preview mode (token-efficient)
+    if preview:
+        for task in tasks:
+            task["body"] = None
+
+    display(tasks, ctx.obj.output_format, "tasks")
 
 
 @task_app.command("show")
-def task_show(task_id: int):
+def task_show(ctx: typer.Context, task_id: int):
     """Show a task."""
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
@@ -1256,30 +1491,12 @@ def task_show(task_id: int):
 
     backend = get_backend("task")
     task = backend.get(task_id)
-    if task is None:
+
+    if task is None and ctx.obj.output_format == "human":
         typer.secho(f"Task #{task_id} not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    state_color = typer.colors.GREEN if task["state"] == "open" else typer.colors.RED
-    typer.echo(f"Task #{task['id']}: {task['title']}")
-    typer.secho(f"State: {task['state']}", fg=state_color)
-    if task.get("priority"):
-        priority_colors = {"high": typer.colors.RED, "medium": typer.colors.YELLOW, "low": typer.colors.BLUE}
-        typer.secho(f"Priority: {task['priority']}", fg=priority_colors.get(task["priority"], typer.colors.WHITE))
-    if task.get("due"):
-        typer.echo(f"Due: {task['due']}")
-    if task.get("labels"):
-        typer.echo(f"Labels: {', '.join(task['labels'])}")
-    if task.get("assignees"):
-        typer.echo(f"Assignees: {', '.join(task['assignees'])}")
-    created = task.get("created") or task.get("created_at")
-    if created:
-        typer.echo(f"Created: {created}")
-    if task.get("github_issue"):
-        typer.echo(f"GitHub: #{task['github_issue']}")
-    typer.echo("")
-    if task.get("body"):
-        typer.echo(task["body"])
+    display(task, ctx.obj.output_format, "task")
 
 
 @task_app.command("close")
@@ -1362,6 +1579,7 @@ def note_create(
 
 @note_app.command("list")
 def note_list(
+    ctx: typer.Context,
     tag: str = typer.Option(None, "--tag", "-t", help="Filter by tag (e.g., explore, idea)"),
 ):
     """List notes."""
@@ -1373,23 +1591,11 @@ def note_list(
         raise typer.Exit(1)
 
     notes = list_notes(tag=tag)
-    if not notes:
-        if tag:
-            typer.echo(f"No notes with tag '{tag}' found.")
-        else:
-            typer.echo("No notes found.")
-        return
-
-    for note in notes:
-        preview = note["content"][:50].replace("\n", " ")
-        if len(note["content"]) > 50:
-            preview += "..."
-        tag_str = f" [{', '.join(note['tags'])}]" if note.get("tags") else ""
-        typer.echo(f"  #{note['id']:3d}{tag_str}  {preview}")
+    display(notes, ctx.obj.output_format, "notes")
 
 
 @note_app.command("show")
-def note_show(note_id: int):
+def note_show(ctx: typer.Context, note_id: int):
     """Show a note."""
     from idlergear.config import find_idlergear_root
     from idlergear.notes import get_note
@@ -1400,15 +1606,12 @@ def note_show(note_id: int):
 
     note = get_note(note_id)
     if note is None:
-        typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        # For JSON output, we want the display function to handle this.
+        if ctx.obj.output_format == "human":
+            typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
 
-    typer.echo(f"Note #{note['id']}")
-    if note.get("tags"):
-        typer.echo(f"Tags: {', '.join(note['tags'])}")
-    typer.echo(f"Created: {note['created']}")
-    typer.echo("")
-    typer.echo(note["content"])
+    display(note, ctx.obj.output_format, "note")
 
 
 @note_app.command("delete")
@@ -1547,7 +1750,7 @@ def explore_delete(note_id: int):
 
 # Vision commands
 @vision_app.command("show")
-def vision_show():
+def vision_show(ctx: typer.Context):
     """Show the project vision."""
     from idlergear.config import find_idlergear_root
     from idlergear.vision import get_vision
@@ -1557,11 +1760,7 @@ def vision_show():
         raise typer.Exit(1)
 
     vision = get_vision()
-    if vision is None or not vision.strip():
-        typer.echo("No vision set. Use 'idlergear vision edit' to set one.")
-        return
-
-    typer.echo(vision)
+    display(vision, ctx.obj.output_format, "vision")
 
 
 @vision_app.command("edit")
@@ -1638,7 +1837,7 @@ def plan_create(
 
 
 @plan_app.command("list")
-def plan_list():
+def plan_list(ctx: typer.Context):
     """List plans."""
     from idlergear.config import find_idlergear_root
     from idlergear.plans import get_current_plan, list_plans
@@ -1648,20 +1847,18 @@ def plan_list():
         raise typer.Exit(1)
 
     plans = list_plans()
-    if not plans:
-        typer.echo("No plans found.")
-        return
-
     current = get_current_plan()
     current_name = current["name"] if current else None
 
+    # Augment data for the display function
     for plan in plans:
-        marker = "*" if plan["name"] == current_name else " "
-        typer.echo(f"  {marker} {plan['name']}: {plan['title']}")
+        plan['is_current'] = (plan["name"] == current_name)
+
+    display(plans, ctx.obj.output_format, "plans")
 
 
 @plan_app.command("show")
-def plan_show(name: str = typer.Argument(None, help="Plan name (default: current)")):
+def plan_show(ctx: typer.Context, name: str = typer.Argument(None, help="Plan name (default: current)")):
     """Show a plan."""
     from idlergear.config import find_idlergear_root
     from idlergear.plans import get_current_plan, get_plan
@@ -1670,26 +1867,19 @@ def plan_show(name: str = typer.Argument(None, help="Plan name (default: current
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
+    plan = None
     if name is None:
         plan = get_current_plan()
-        if plan is None:
+        if plan is None and ctx.obj.output_format == "human":
             typer.echo("No current plan set. Use 'idlergear plan switch <name>' to set one.")
-            return
+            raise typer.Exit(0)
     else:
         plan = get_plan(name)
-        if plan is None:
+        if plan is None and ctx.obj.output_format == "human":
             typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
 
-    typer.echo(f"Plan: {plan['name']}")
-    typer.echo(f"Title: {plan['title']}")
-    typer.echo(f"State: {plan['state']}")
-    typer.echo(f"Created: {plan['created']}")
-    if plan.get("github_project"):
-        typer.echo(f"GitHub: Project #{plan['github_project']}")
-    typer.echo("")
-    if plan.get("body"):
-        typer.echo(plan["body"])
+    display(plan, ctx.obj.output_format, "plan")
 
 
 @plan_app.command("switch")
@@ -1736,7 +1926,7 @@ def reference_add(
 
 
 @reference_app.command("list")
-def reference_list():
+def reference_list(ctx: typer.Context):
     """List reference documents."""
     from idlergear.config import find_idlergear_root
     from idlergear.reference import list_references
@@ -1746,16 +1936,11 @@ def reference_list():
         raise typer.Exit(1)
 
     refs = list_references()
-    if not refs:
-        typer.echo("No reference documents found.")
-        return
-
-    for ref in refs:
-        typer.echo(f"  {ref['title']}")
+    display(refs, ctx.obj.output_format, "references")
 
 
 @reference_app.command("show")
-def reference_show(title: str):
+def reference_show(ctx: typer.Context, title: str):
     """Show a reference document."""
     from idlergear.config import find_idlergear_root
     from idlergear.reference import get_reference
@@ -1765,16 +1950,11 @@ def reference_show(title: str):
         raise typer.Exit(1)
 
     ref = get_reference(title)
-    if ref is None:
+    if ref is None and ctx.obj.output_format == "human":
         typer.secho(f"Reference '{title}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    typer.echo(f"Reference: {ref['title']}")
-    typer.echo(f"Created: {ref['created']}")
-    typer.echo(f"Updated: {ref['updated']}")
-    typer.echo("")
-    if ref.get("body"):
-        typer.echo(ref["body"])
+    display(ref, ctx.obj.output_format, "reference")
 
 
 @reference_app.command("edit")
@@ -1942,6 +2122,112 @@ def run_stop(name: str):
         typer.secho(f"Stopped run '{name}'", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Run '{name}' is not running or not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@run_app.command("generate-script")
+def run_generate_script(
+    script_name: str,
+    command: str,
+    output: str = typer.Option(None, "--output", "-o", help="Output file path (default: ./scripts/{name}.sh)"),
+    venv: str = typer.Option(None, "--venv", help="Virtualenv path"),
+    requirement: list[str] = typer.Option([], "--requirement", "-r", help="Python packages to install"),
+    env: list[str] = typer.Option([], "--env", "-e", help="Environment variables (KEY=VALUE)"),
+    agent_name: str = typer.Option(None, "--agent-name", help="Agent name for daemon (default: script name)"),
+    agent_type: str = typer.Option("dev-script", "--agent-type", help="Agent type"),
+    no_register: bool = typer.Option(False, "--no-register", help="Don't register with daemon"),
+    stream_logs: bool = typer.Option(False, "--stream-logs", help="Stream logs to daemon"),
+    template: str = typer.Option(None, "--template", "-t", help="Use template (pytest, django-dev, flask-dev, etc)"),
+):
+    """Generate a dev environment setup script that registers with IdlerGear daemon.
+
+    Examples:
+        # Generate a pytest runner
+        idlergear run generate-script test "pytest -v" --template pytest
+
+        # Custom Django dev server
+        idlergear run generate-script django-dev "python manage.py runserver" \\
+            --venv ./venv --requirement django --env DJANGO_SETTINGS_MODULE=settings
+
+        # With log streaming
+        idlergear run generate-script worker "celery worker" --stream-logs
+    """
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.script_generator import (
+        generate_dev_script,
+        generate_script_from_template,
+        save_script,
+    )
+
+    project_root = find_idlergear_root()
+    if project_root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Parse environment variables
+    env_vars = {}
+    for env_var in env:
+        if "=" not in env_var:
+            typer.secho(f"Invalid environment variable: {env_var} (use KEY=VALUE)", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        key, value = env_var.split("=", 1)
+        env_vars[key] = value
+
+    try:
+        # Generate from template or custom
+        if template:
+            script_content = generate_script_from_template(
+                template,
+                script_name,
+                venv_path=venv,
+                env_vars=env_vars if env_vars else None,
+                agent_name=agent_name,
+                agent_type=agent_type,
+                register_with_daemon=not no_register,
+                stream_logs=stream_logs,
+                project_path=project_root,
+            )
+        else:
+            script_content = generate_dev_script(
+                script_name,
+                command,
+                venv_path=venv,
+                requirements=list(requirement) if requirement else None,
+                env_vars=env_vars if env_vars else None,
+                agent_name=agent_name,
+                agent_type=agent_type,
+                register_with_daemon=not no_register,
+                stream_logs=stream_logs,
+                project_path=project_root,
+            )
+
+        # Determine output path
+        if output is None:
+            scripts_dir = project_root / "scripts"
+            scripts_dir.mkdir(exist_ok=True)
+            output = str(scripts_dir / f"{script_name}.sh")
+
+        output_path = Path(output)
+        save_script(script_content, output_path, make_executable=True)
+
+        typer.secho(f"✓ Generated script: {output_path}", fg=typer.colors.GREEN)
+        typer.echo(f"\nRun with: ./{output_path.relative_to(project_root)}")
+        typer.echo("\nFeatures:")
+        if not no_register:
+            typer.echo("  ✓ Auto-registers with IdlerGear daemon")
+        if stream_logs:
+            typer.echo("  ✓ Streams logs to daemon")
+        if venv:
+            typer.echo(f"  ✓ Activates virtualenv: {venv}")
+        if requirement:
+            typer.echo(f"  ✓ Installs packages: {', '.join(requirement)}")
+        if env_vars:
+            typer.echo(f"  ✓ Sets environment variables: {', '.join(env_vars.keys())}")
+
+    except Exception as e:
+        typer.secho(f"Error generating script: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
@@ -2205,6 +2491,664 @@ def project_link(name: str, github_project_number: int):
     except RuntimeError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
+
+
+# ============================================================================
+# Session Commands
+# ============================================================================
+
+
+@session_app.command("save")
+def session_save(
+    name: str = typer.Argument(None, help="Optional name for the session"),
+    next_steps: str = typer.Option(None, "--next", "-n", help="What to do next"),
+    blockers: str = typer.Option(None, "--blockers", "-b", help="What's blocking progress"),
+):
+    """Save current session state.
+
+    Examples:
+        idlergear session save                    # Auto-name with timestamp
+        idlergear session save fixing-parser      # Named session
+        idlergear session save --next "Run tests" # With next steps
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.sessions import format_session_state, save_session
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    session_file = save_session(name=name, next_steps=next_steps, blockers=blockers)
+    typer.secho(f"Session saved to: {session_file.name}", fg=typer.colors.GREEN)
+
+
+@session_app.command("restore")
+def session_restore(
+    name: str = typer.Argument(None, help="Session name or timestamp to restore"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+):
+    """Restore/view a saved session state.
+
+    Examples:
+        idlergear session restore                 # Most recent session
+        idlergear session restore fixing-parser   # By name
+        idlergear session restore 2026-01-01      # By timestamp
+    """
+    import json
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.sessions import format_session_state, load_session
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    state = load_session(name=name)
+    if state is None:
+        if name:
+            typer.secho(f"Session '{name}' not found.", fg=typer.colors.RED)
+        else:
+            typer.secho("No saved sessions found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if json_output:
+        typer.echo(json.dumps(state.to_dict(), indent=2))
+    else:
+        typer.echo(format_session_state(state))
+
+
+@session_app.command("list")
+def session_list(
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+):
+    """List all saved sessions.
+
+    Examples:
+        idlergear session list        # List all sessions
+        idlergear session list --json # JSON output
+    """
+    import json
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.sessions import list_sessions
+
+    if find_idlergear_root() is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    sessions = list_sessions()
+
+    if not sessions:
+        typer.secho("No saved sessions.", fg=typer.colors.YELLOW)
+        return
+
+    if json_output:
+        typer.echo(json.dumps(sessions, indent=2))
+    else:
+        typer.secho(f"Saved sessions ({len(sessions)}):", fg=typer.colors.CYAN, bold=True)
+        for session in sessions:
+            name = session["name"]
+            saved_at = session.get("saved_at", "unknown")
+            task = session.get("current_task")
+
+            # Parse saved_at to show relative time
+            try:
+                from datetime import datetime
+
+                dt = datetime.fromisoformat(saved_at.replace("Z", "+00:00"))
+                elapsed = datetime.now() - dt.replace(tzinfo=None)
+                hours = int(elapsed.total_seconds() / 3600)
+                if hours < 1:
+                    time_str = f"{int(elapsed.total_seconds() / 60)}m ago"
+                elif hours < 24:
+                    time_str = f"{hours}h ago"
+                else:
+                    time_str = f"{hours // 24}d ago"
+            except (ValueError, TypeError):
+                time_str = saved_at
+
+            task_str = f" - {task}" if task else ""
+            typer.echo(f"  {name:30s} {time_str:12s}{task_str}")
+
+
+# Goose commands
+@goose_app.command("init")
+def goose_init(
+    path: str = typer.Argument(".", help="Project directory"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing .goosehints"),
+):
+    """Generate .goosehints file with IdlerGear and MCP server recommendations."""
+    from pathlib import Path
+    from .goose import generate_goosehints
+
+    generate_goosehints(Path(path), force=force)
+
+
+@goose_app.command("register")
+def goose_register():
+    """Register IdlerGear as a Goose GUI extension.
+
+    Currently provides manual registration instructions.
+    Automatic registration will be implemented after researching Goose's extension API.
+    """
+    from .goose import register_goose_extension
+
+    register_goose_extension()
+
+
+# OTel commands
+@otel_app.command("start")
+def otel_start_cmd(
+    grpc_port: int = typer.Option(4317, help="gRPC port for OTLP receiver"),
+    http_port: int = typer.Option(4318, help="HTTP port for OTLP receiver"),
+    daemon: bool = typer.Option(False, help="Run in background as daemon"),
+):
+    """Start OpenTelemetry collector."""
+    from .otel import otel_start
+
+    otel_start(grpc_port=grpc_port, http_port=http_port, daemon=daemon)
+
+
+@otel_app.command("stop")
+def otel_stop_cmd():
+    """Stop OpenTelemetry collector."""
+    from .otel import otel_stop
+
+    otel_stop()
+
+
+@otel_app.command("status")
+def otel_status_cmd():
+    """Show OpenTelemetry collector status."""
+    from .otel import otel_status
+
+    otel_status()
+
+
+@otel_app.command("logs")
+def otel_logs_cmd(
+    tail: int = typer.Option(20, help="Show last N logs"),
+    service: str = typer.Option(None, help="Filter by service name"),
+    severity: str = typer.Option(None, help="Filter by severity"),
+    search: str = typer.Option(None, help="Full-text search"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Query and display collected logs."""
+    from .otel import otel_logs
+
+    otel_logs(tail=tail, service=service, severity=severity, search=search, json_output=json_output)
+
+
+@otel_app.command("config")
+def otel_config_cmd():
+    """Show OpenTelemetry configuration."""
+    from .otel import otel_config_show
+
+    otel_config_show()
+
+
+# ===== Session Management Commands =====
+@app.command()
+def session_start(
+    context_mode: str = "minimal",
+    no_state: bool = False,
+):
+    """Start a new session and load context + previous state.
+
+    This is the recommended first command in any AI assistant session.
+    """
+    from .session import start_session
+
+    result = start_session(
+        context_mode=context_mode,
+        load_state=not no_state,
+    )
+
+    # Display context
+    print("# Project Context")
+    print(json.dumps(result["context"], indent=2))
+    print()
+
+    # Display session state
+    if result.get("session_state"):
+        print("# Previous Session")
+        print(json.dumps(result["session_state"], indent=2))
+        print()
+
+    # Display recommendations
+    if result.get("recommendations"):
+        print("# Recommendations")
+        for rec in result["recommendations"]:
+            print(f"- {rec}")
+
+
+@app.command()
+def session_save(
+    task: Optional[int] = None,
+    files: Optional[str] = None,
+    notes: Optional[str] = None,
+):
+    """Save current session state."""
+    from .session import SessionState
+
+    working_files = files.split(",") if files else None
+
+    session = SessionState()
+    state = session.save(
+        current_task_id=task,
+        working_files=working_files,
+        notes=notes,
+    )
+
+    print("Session state saved:")
+    print(json.dumps(state, indent=2))
+
+
+@app.command()
+def session_end(
+    task: Optional[int] = None,
+    files: Optional[str] = None,
+    notes: Optional[str] = None,
+):
+    """End session and save state with suggestions."""
+    from .session import end_session
+
+    working_files = files.split(",") if files else None
+
+    result = end_session(
+        current_task_id=task,
+        working_files=working_files,
+        notes=notes,
+    )
+
+    print("Session ended:")
+    print(json.dumps(result, indent=2))
+
+
+@app.command()
+def session_status():
+    """Show current session state."""
+    from .session import SessionState
+
+    session = SessionState()
+    summary = session.get_summary()
+    print(summary)
+
+
+@app.command()
+def session_clear():
+    """Clear session state."""
+    from .session import SessionState
+
+    session = SessionState()
+    if session.clear():
+        print("Session state cleared")
+    else:
+        print("No session state to clear")
+
+
+# Hooks commands
+hooks_app = typer.Typer(help="Manage Claude Code hooks for IdlerGear enforcement")
+app.add_typer(hooks_app, name="hooks")
+
+
+@hooks_app.command("install")
+def hooks_install(
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing hooks"),
+):
+    """Install Claude Code hooks for automatic IdlerGear enforcement.
+
+    Installs three hooks:
+    - SessionStart: Auto-load project context (100% compliance)
+    - PreToolUse: Block forbidden files like TODO.md (0% violations)
+    - Stop: Prompt for knowledge capture before ending
+
+    Examples:
+        idlergear hooks install           # Install hooks (skip existing)
+        idlergear hooks install --force  # Overwrite existing hooks
+    """
+    from idlergear.hooks import install_hooks
+
+    results = install_hooks(force=force)
+
+    typer.echo("Installing Claude Code hooks...")
+    typer.echo()
+
+    for filename, installed in results.items():
+        if installed:
+            typer.secho(f"✓ Installed {filename}", fg=typer.colors.GREEN)
+        else:
+            typer.secho(f"- Skipped {filename} (already exists)", fg=typer.colors.YELLOW)
+
+    typer.echo()
+    typer.echo("Hooks installed in .claude/hooks/")
+    typer.echo()
+    typer.echo("Next steps:")
+    typer.echo("  1. Test hooks: idlergear hooks test")
+    typer.echo("  2. Restart Claude Code to activate")
+    typer.echo()
+    typer.echo("See docs/CLAUDE_CODE_HOOKS.md for details")
+
+
+@hooks_app.command("test")
+def hooks_test():
+    """Test installed hooks."""
+    from idlergear.hooks import test_hooks
+
+    typer.echo("Testing Claude Code hooks...")
+    typer.echo()
+
+    results = test_hooks()
+
+    all_passed = True
+
+    for hook_name, result in results.items():
+        if not result.get("exists"):
+            typer.secho(f"✗ {hook_name}: NOT INSTALLED", fg=typer.colors.RED)
+            all_passed = False
+            continue
+
+        if not result.get("executable"):
+            typer.secho(f"✗ {hook_name}: Not executable", fg=typer.colors.RED)
+            all_passed = False
+            continue
+
+        # Hook-specific tests
+        if hook_name == "session-start":
+            if result.get("exit_code") == 0 and result.get("output_length", 0) > 0:
+                typer.secho(f"✓ {hook_name}: PASSED", fg=typer.colors.GREEN)
+            else:
+                typer.secho(f"✗ {hook_name}: No output", fg=typer.colors.RED)
+                all_passed = False
+
+        elif hook_name == "pre-tool-use":
+            if result.get("blocks_forbidden"):
+                typer.secho(f"✓ {hook_name}: PASSED (blocks TODO.md)", fg=typer.colors.GREEN)
+            else:
+                typer.secho(f"✗ {hook_name}: Does not block forbidden files", fg=typer.colors.RED)
+                all_passed = False
+
+        elif hook_name == "stop":
+            if result.get("valid_json"):
+                typer.secho(f"✓ {hook_name}: PASSED", fg=typer.colors.GREEN)
+            else:
+                typer.secho(f"✗ {hook_name}: Invalid output", fg=typer.colors.RED)
+                all_passed = False
+
+    typer.echo()
+    if all_passed:
+        typer.secho("All hooks passed!", fg=typer.colors.GREEN, bold=True)
+    else:
+        typer.secho("Some hooks failed. See docs/CLAUDE_CODE_HOOKS.md for troubleshooting.", fg=typer.colors.YELLOW)
+
+
+@hooks_app.command("list")
+def hooks_list():
+    """List installed hooks."""
+    from idlergear.hooks import list_hooks
+    from datetime import datetime
+
+    hooks = list_hooks()
+
+    if not hooks:
+        typer.echo("No hooks installed.")
+        typer.echo()
+        typer.echo("Install hooks: idlergear hooks install")
+        return
+
+    typer.echo("Installed hooks:")
+    typer.echo()
+
+    for hook in hooks:
+        executable = "✓" if hook["executable"] else "✗"
+        modified = datetime.fromtimestamp(hook["modified"]).strftime("%Y-%m-%d %H:%M")
+        typer.echo(f"{executable} {hook['name']:<20} {hook['size']:>6}B  {modified}")
+
+    typer.echo()
+    typer.echo(f"Location: .claude/hooks/")
+
+
+# ===== Wiki Commands =====
+
+wiki_app = typer.Typer(help="GitHub Wiki synchronization commands")
+app.add_typer(wiki_app, name="wiki")
+
+
+@wiki_app.command("push")
+def wiki_push():
+    """Push IdlerGear references to GitHub Wiki."""
+    from idlergear.wiki import WikiSync
+
+    typer.echo("Pushing references to GitHub Wiki...")
+    typer.echo()
+
+    sync = WikiSync()
+    result = sync.push_references_to_wiki()
+
+    typer.echo(str(result))
+
+
+@wiki_app.command("pull")
+def wiki_pull(
+    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing references")
+):
+    """Pull GitHub Wiki pages into IdlerGear references."""
+    from idlergear.wiki import WikiSync
+
+    typer.echo("Pulling Wiki pages to references...")
+    typer.echo()
+
+    sync = WikiSync()
+    result = sync.pull_wiki_to_references(overwrite=overwrite)
+
+    typer.echo(str(result))
+
+
+@wiki_app.command("sync")
+def wiki_sync(
+    conflict_resolution: str = typer.Option(
+        "manual",
+        "--conflict",
+        help="Conflict resolution strategy (manual, local, remote)"
+    )
+):
+    """Bidirectional sync between IdlerGear and GitHub Wiki."""
+    from idlergear.wiki import WikiSync
+
+    typer.echo("Syncing IdlerGear ↔ GitHub Wiki...")
+    typer.echo()
+
+    sync = WikiSync()
+    result = sync.sync_bidirectional(conflict_resolution=conflict_resolution)
+
+    typer.echo(str(result))
+
+    if result.conflicts and conflict_resolution == "manual":
+        typer.echo()
+        typer.echo("To resolve conflicts:")
+        typer.echo("  --conflict local   # Use local (IdlerGear) version")
+        typer.echo("  --conflict remote  # Use remote (Wiki) version")
+
+
+@wiki_app.command("status")
+def wiki_status():
+    """Show GitHub Wiki sync status."""
+    from idlergear.wiki import WikiSync
+
+    sync = WikiSync()
+
+    if not sync.wiki_dir.exists():
+        typer.echo("❌ Wiki not cloned")
+        typer.echo()
+        typer.echo("Clone wiki: idlergear wiki pull")
+        return
+
+    # Get git status
+    returncode, stdout, stderr = sync._run_git("status", "--porcelain")
+
+    if returncode != 0:
+        typer.secho(f"Error: {stderr}", fg=typer.colors.RED)
+        return
+
+    # Check for changes
+    if not stdout.strip():
+        typer.secho("✓ Wiki is in sync", fg=typer.colors.GREEN)
+    else:
+        typer.secho("⚠️  Uncommitted changes in wiki:", fg=typer.colors.YELLOW)
+        typer.echo()
+        typer.echo(stdout)
+
+    # Show last commit
+    returncode, stdout, stderr = sync._run_git("log", "-1", "--oneline")
+    if returncode == 0:
+        typer.echo()
+        typer.echo(f"Last commit: {stdout.strip()}")
+
+
+@wiki_app.command("config")
+def wiki_config(
+    key: Optional[str] = typer.Argument(None, help="Config key"),
+    value: Optional[str] = typer.Argument(None, help="Config value")
+):
+    """Get or set wiki configuration."""
+    from idlergear.wiki import get_wiki_config, set_wiki_config
+
+    if not key:
+        # Show all config
+        config = get_wiki_config()
+        typer.echo("Wiki configuration:")
+        typer.echo()
+        for k, v in config.items():
+            typer.echo(f"  {k}: {v}")
+        return
+
+    if not value:
+        # Get specific value
+        config = get_wiki_config()
+        if key in config:
+            typer.echo(config[key])
+        else:
+            typer.secho(f"Unknown config key: {key}", fg=typer.colors.RED)
+        return
+
+    # Set value
+    set_wiki_config(key, value)
+    typer.secho(f"✓ Set wiki.{key} = {value}", fg=typer.colors.GREEN)
+
+
+# ===== Watch Commands =====
+
+watch_app = typer.Typer(help="Watch mode for proactive knowledge capture")
+app.add_typer(watch_app, name="watch")
+
+
+@watch_app.command("start")
+def watch_start(
+    interval: int = typer.Option(10, "--interval", "-i", help="Check interval in seconds")
+):
+    """Start watching for changes and prompting for knowledge capture."""
+    from idlergear.watch import FileWatcher, WatchConfig
+
+    config = WatchConfig.load()
+
+    if not config.enabled:
+        typer.secho("Watch mode is disabled", fg=typer.colors.YELLOW)
+        typer.echo()
+        typer.echo("Enable it with:")
+        typer.echo("  idlergear watch config enabled true")
+        typer.echo()
+        typer.echo("Or start anyway:")
+        typer.echo("  idlergear watch start --force")
+        return
+
+    watcher = FileWatcher(config=config)
+    watcher.watch(interval=interval)
+
+
+@watch_app.command("status")
+def watch_status():
+    """Show current watch statistics."""
+    from idlergear.watch import get_watch_stats
+
+    stats = get_watch_stats()
+
+    typer.echo("Watch Status:")
+    typer.echo()
+
+    if stats["changed_files"] > 0:
+        typer.secho(f"  Changed files: {stats['changed_files']}", fg=typer.colors.YELLOW)
+        typer.secho(f"  Changed lines: {stats['changed_lines']}", fg=typer.colors.YELLOW)
+    else:
+        typer.secho("  No uncommitted changes", fg=typer.colors.GREEN)
+
+    typer.echo()
+
+    if stats["todos"] > 0:
+        typer.secho(f"  TODO comments: {stats['todos']}", fg=typer.colors.YELLOW)
+    if stats["fixmes"] > 0:
+        typer.secho(f"  FIXME comments: {stats['fixmes']}", fg=typer.colors.RED)
+    if stats["hacks"] > 0:
+        typer.secho(f"  HACK comments: {stats['hacks']}", fg=typer.colors.MAGENTA)
+
+    if stats["todos"] == 0 and stats["fixmes"] == 0 and stats["hacks"] == 0:
+        typer.secho("  No code markers detected", fg=typer.colors.GREEN)
+
+
+@watch_app.command("config")
+def watch_config(
+    key: Optional[str] = typer.Argument(None, help="Config key"),
+    value: Optional[str] = typer.Argument(None, help="Config value")
+):
+    """Get or set watch configuration."""
+    from idlergear.watch import WatchConfig
+
+    config = WatchConfig.load()
+
+    if not key:
+        # Show all config
+        typer.echo("Watch configuration:")
+        typer.echo()
+        typer.echo(f"  enabled: {config.enabled}")
+        typer.echo(f"  debounce: {config.debounce}s")
+        typer.echo(f"  files_changed_threshold: {config.files_changed_threshold}")
+        typer.echo(f"  uncommitted_lines_threshold: {config.uncommitted_lines_threshold}")
+        typer.echo(f"  test_failures_threshold: {config.test_failures_threshold}")
+        typer.echo(f"  detect_todos: {config.detect_todos}")
+        typer.echo(f"  detect_fixmes: {config.detect_fixmes}")
+        typer.echo(f"  detect_hacks: {config.detect_hacks}")
+        return
+
+    if not value:
+        # Get specific value
+        if hasattr(config, key):
+            typer.echo(getattr(config, key))
+        else:
+            typer.secho(f"Unknown config key: {key}", fg=typer.colors.RED)
+        return
+
+    # Set value
+    if key == "enabled":
+        config.enabled = value.lower() == "true"
+    elif key == "debounce":
+        config.debounce = int(value)
+    elif key == "files_changed_threshold":
+        config.files_changed_threshold = int(value)
+    elif key == "uncommitted_lines_threshold":
+        config.uncommitted_lines_threshold = int(value)
+    elif key == "test_failures_threshold":
+        config.test_failures_threshold = int(value)
+    elif key == "detect_todos":
+        config.detect_todos = value.lower() == "true"
+    elif key == "detect_fixmes":
+        config.detect_fixmes = value.lower() == "true"
+    elif key == "detect_hacks":
+        config.detect_hacks = value.lower() == "true"
+    else:
+        typer.secho(f"Unknown config key: {key}", fg=typer.colors.RED)
+        return
+
+    config.save()
+    typer.secho(f"✓ Set watch.{key} = {value}", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":

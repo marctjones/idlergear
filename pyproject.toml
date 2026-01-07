@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "idlergear"
-version = "0.3.0"
+version = "0.3.2"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,12 @@ dependencies = [
     "tomli>=2.0.0;python_version<'3.11'",
     "tomli-w>=1.0.0",
     "mcp>=1.0.0",
+    "psutil>=5.9.0",
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-proto>=1.20.0",
+    "grpcio>=1.60.0",
+    "protobuf>=4.25.0",
 ]
 
 [project.optional-dependencies]

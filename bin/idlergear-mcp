@@ -8,7 +8,7 @@ VENV_DIR="$PROJECT_DIR/venv"
 
 if [ -f "$VENV_DIR/bin/activate" ]; then
     source "$VENV_DIR/bin/activate"
-    exec "$VENV_DIR/bin/idlergear-mcp" "$@"
+    exec "$VENV_DIR/bin/python" "$VENV_DIR/bin/idlergear-mcp" "$@"
 else
     echo "Error: venv not found at $VENV_DIR" >&2
     echo "Run: python -m venv venv && pip install -e ." >&2
