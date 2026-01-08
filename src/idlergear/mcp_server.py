@@ -899,15 +899,51 @@ async def list_tools() -> list[Tool]:
         # Cross-agent messaging tools (inbox-based, works without persistent connections)
         Tool(
             name="idlergear_message_send",
-            description="Send a message to another AI agent's inbox. The message will be delivered at the recipient's next session start. Use this when you need another agent to do something.",
+            description="""Send a message to another AI agent's inbox. Messages are routed by priority:
+- urgent: Injected into recipient's context immediately (interrupts their work)
+- normal (default): Converted to a task with [message] label (non-interrupting)
+- low: Queued for end-of-session review
+
+Use 'all' as to_agent to broadcast to all registered agents.""",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "to_agent": {"type": "string", "description": "Target agent ID (e.g., 'claude-code-abc123')"},
+                    "to_agent": {"type": "string", "description": "Target agent ID (e.g., 'claude-code-abc123') or 'all' to broadcast"},
                     "message": {"type": "string", "description": "Message content - can be a request, question, or information"},
+                    "priority": {
+                        "type": "string",
+                        "enum": ["urgent", "normal", "low"],
+                        "description": "Message priority: urgent=interrupt, normal=create task, low=defer (default: normal)",
+                    },
+                    "message_type": {
+                        "type": "string",
+                        "enum": ["info", "request", "alert", "question"],
+                        "description": "Message type: info, request, alert, or question (default: info)",
+                    },
+                    "action_requested": {"type": "boolean", "description": "Whether you need the recipient to DO something (default: false)"},
+                    "context": {
+                        "type": "object",
+                        "description": "Related context (e.g., {task_id: 45, files: ['api.py']})",
+                    },
                     "from_agent": {"type": "string", "description": "Your agent ID (optional, auto-detected if registered)"},
                 },
                 "required": ["to_agent", "message"],
+            },
+        ),
+        Tool(
+            name="idlergear_message_process",
+            description="""Process inbox messages and route by priority. Call this at session start to:
+- Inject urgent messages into context (returns them)
+- Convert normal messages to tasks with [message] label
+- Queue low-priority messages for later review
+
+This ensures messages don't derail your work - only urgent ones interrupt.""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Your agent ID (optional, auto-detected)"},
+                    "create_tasks": {"type": "boolean", "description": "Create tasks for normal-priority messages (default: true)"},
+                },
             },
         ),
         Tool(
@@ -944,6 +980,19 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "agent_id": {"type": "string", "description": "Your agent ID"},
                     "all_messages": {"type": "boolean", "description": "Clear all messages, not just read ones (default: false)"},
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_message_test",
+            description="Test messaging by sending a message to yourself and retrieving it. This exercises the full messaging pipeline: send_message() -> inbox storage -> list_messages(). Use this to verify messaging is working correctly.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "test_message": {
+                        "type": "string",
+                        "description": "Custom test message content (optional, defaults to a timestamp-based message)",
+                    },
                 },
             },
         ),
@@ -2032,13 +2081,74 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if not root:
                 raise ValueError("IdlerGear not initialized")
             idlergear_dir = root / ".idlergear"
+
+            # Auto-detect from_agent if not provided
+            from_agent = arguments.get("from_agent")
+            if not from_agent:
+                agents_dir = idlergear_dir / "agents"
+                if agents_dir.exists():
+                    for f in agents_dir.glob("*.json"):
+                        if f.name != "agents.json":
+                            from_agent = f.stem
+                            break
+
             result = send_message(
                 idlergear_dir,
                 to_agent=arguments["to_agent"],
                 message=arguments["message"],
-                from_agent=arguments.get("from_agent"),
+                from_agent=from_agent,
+                priority=arguments.get("priority", "normal"),
+                message_type=arguments.get("message_type", "info"),
+                action_requested=arguments.get("action_requested", False),
+                context=arguments.get("context"),
             )
             return _format_result(result)
+
+        elif name == "idlergear_message_process":
+            from idlergear.messaging import process_inbox, format_urgent_for_context
+            root = find_idlergear_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
+            idlergear_dir = root / ".idlergear"
+
+            # Auto-detect agent_id
+            agent_id = arguments.get("agent_id")
+            if not agent_id:
+                agents_dir = idlergear_dir / "agents"
+                if agents_dir.exists():
+                    for f in agents_dir.glob("*.json"):
+                        if f.name != "agents.json":
+                            agent_id = f.stem
+                            break
+            if not agent_id:
+                return _format_result({"error": "No agent_id provided or detected"})
+
+            # Create task callback if requested
+            create_tasks = arguments.get("create_tasks", True)
+            task_callback = None
+            if create_tasks:
+                from idlergear.tasks import create_task
+                def task_callback(title: str, body: str, labels: list[str]) -> int:
+                    task = create_task(title, body=body, labels=labels, project_path=root)
+                    return task.get("id") if isinstance(task, dict) else task.id
+
+            # Process inbox
+            results = process_inbox(idlergear_dir, agent_id, task_callback)
+
+            # Format urgent messages for context
+            urgent_context = ""
+            if results["urgent"]:
+                urgent_context = format_urgent_for_context(results["urgent"])
+
+            return _format_result({
+                "agent_id": agent_id,
+                "urgent_count": len(results["urgent"]),
+                "urgent_context": urgent_context,
+                "tasks_created": results["tasks_created"],
+                "queued_for_review": results["queued"],
+                "errors": results["errors"],
+                "note": "Urgent messages returned for immediate handling. Normal messages converted to tasks." if results["urgent"] else "No urgent messages. Normal messages converted to tasks.",
+            })
 
         elif name == "idlergear_message_list":
             from idlergear.messaging import list_messages, get_inbox_summary
@@ -2092,6 +2202,92 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             read_only = not arguments.get("all_messages", False)
             count = clear_inbox(idlergear_dir, agent_id, read_only=read_only)
             return _format_result({"cleared": count})
+
+        elif name == "idlergear_message_test":
+            # Test messaging round-trip: send to self, then retrieve
+            from datetime import datetime, timezone
+            from idlergear.messaging import send_message, list_messages, mark_as_read, get_inbox_summary
+
+            root = find_idlergear_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
+            idlergear_dir = root / ".idlergear"
+
+            # Step 1: Detect agent ID from presence files (same logic as message_list)
+            agent_id = None
+            agents_dir = idlergear_dir / "agents"
+            if agents_dir.exists():
+                for f in agents_dir.glob("*.json"):
+                    if f.name != "agents.json":
+                        agent_id = f.stem
+                        break
+
+            if not agent_id:
+                return _format_result({
+                    "success": False,
+                    "error": "No agent registered. Call idlergear_daemon_register_agent first.",
+                })
+
+            # Step 2: Create test message
+            test_content = arguments.get("test_message")
+            if not test_content:
+                timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+                test_content = f"[TEST] Self-test message sent at {timestamp}"
+
+            # Step 3: Send message to self using send_message()
+            send_result = send_message(
+                idlergear_dir,
+                to_agent=agent_id,
+                message=test_content,
+                from_agent=agent_id,  # From self
+                metadata={"test": True, "purpose": "messaging_self_test"},
+            )
+
+            # Step 4: Retrieve messages using list_messages()
+            messages = list_messages(idlergear_dir, agent_id, unread_only=False, limit=10)
+
+            # Step 5: Find our test message
+            test_message_found = None
+            for msg in messages:
+                if msg.get("id") == send_result["message_id"]:
+                    test_message_found = msg
+                    break
+
+            # Step 6: Get inbox summary using get_inbox_summary()
+            summary = get_inbox_summary(idlergear_dir, agent_id)
+
+            # Step 7: Mark test message as read using mark_as_read()
+            if test_message_found:
+                marked = mark_as_read(idlergear_dir, agent_id, [send_result["message_id"]])
+            else:
+                marked = 0
+
+            # Return comprehensive results
+            return _format_result({
+                "success": test_message_found is not None,
+                "agent_id": agent_id,
+                "steps": {
+                    "1_send": {
+                        "function": "send_message()",
+                        "result": send_result,
+                    },
+                    "2_list": {
+                        "function": "list_messages()",
+                        "messages_retrieved": len(messages),
+                        "test_message_found": test_message_found is not None,
+                    },
+                    "3_summary": {
+                        "function": "get_inbox_summary()",
+                        "result": summary,
+                    },
+                    "4_mark_read": {
+                        "function": "mark_as_read()",
+                        "marked_count": marked,
+                    },
+                },
+                "test_message": test_message_found,
+                "note": "All messaging functions exercised successfully" if test_message_found else "Test message not found after sending",
+            })
 
         # Script generation handlers
         elif name == "idlergear_generate_dev_script":

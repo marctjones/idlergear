@@ -348,6 +348,11 @@ HOOKS_CONFIG = {
                 "command": "./.claude/hooks/ig_user-prompt-submit.sh",
             },
         ],
+        "Notification": [
+            {
+                "command": "./.claude/hooks/ig_notification.sh",
+            },
+        ],
     }
 }
 
@@ -433,6 +438,7 @@ HOOK_SCRIPTS = [
     "ig_session-start.sh",
     "ig_stop.sh",
     "ig_user-prompt-submit.sh",
+    "ig_notification.sh",
 ]
 
 
@@ -566,7 +572,7 @@ def add_skill(project_path: Path | None = None) -> dict[str, str]:
         raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
 
     skill_dir = project_path / ".claude" / "skills" / "idlergear"
-    package_skill_dir = files("idlergear") / "skill"
+    package_skill_dir = files("idlergear") / "skills" / "idlergear"
     results = {}
 
     def copy_file(src, dst, executable=False):

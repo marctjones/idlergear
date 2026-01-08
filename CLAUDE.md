@@ -88,6 +88,68 @@ note → task or reference
 
 **NEVER modify `.idlergear/` files directly** - Use CLI commands only
 
+## CRITICAL: IdlerGear Development Rules
+
+**This section only applies when developing IdlerGear itself (this repository).**
+
+### Source Code Locations
+
+All IdlerGear features MUST be developed in `src/idlergear/`:
+
+| Feature Type | Source Location | Installed To |
+|--------------|-----------------|--------------|
+| Hooks | `src/idlergear/hooks/ig_*.sh` | `.claude/hooks/` |
+| Commands | `src/idlergear/commands/ig_*.md` | `.claude/commands/` |
+| Rules | `src/idlergear/rules/*.md` | `.claude/rules/` |
+| Skills | `src/idlergear/skills/idlergear/` | `.claude/skills/idlergear/` |
+| MCP Server | `src/idlergear/mcp_server.py` | via `.mcp.json` |
+
+### FORBIDDEN: Direct Editing of Installed Files
+
+**NEVER edit files directly in these directories:**
+- `.claude/hooks/` - Edit `src/idlergear/hooks/` instead
+- `.claude/commands/` - Edit `src/idlergear/commands/` instead
+- `.claude/rules/` - Edit `src/idlergear/rules/` instead
+- `.claude/skills/` - Edit `src/idlergear/skills/` instead
+- `.idlergear/` - Use CLI commands, never edit directly
+
+**WHY:** These directories contain installed/generated files. Edits there:
+1. Won't be tracked in git (or shouldn't be)
+2. Will be overwritten by `idlergear install`
+3. Won't benefit other users of IdlerGear
+
+### Correct Development Workflow
+
+```bash
+# 1. Edit source files
+vim src/idlergear/hooks/ig_user-prompt-submit.sh
+
+# 2. Reinstall to update .claude/ files
+idlergear install --upgrade
+
+# 3. Test the changes
+echo '{"prompt": "test"}' | .claude/hooks/ig_user-prompt-submit.sh
+
+# 4. Commit the SOURCE files (not .claude/)
+git add src/idlergear/hooks/ig_user-prompt-submit.sh
+git commit -m "feat: Add message checking to user-prompt-submit hook"
+```
+
+### What Goes Where
+
+| If you're adding... | Put it in... |
+|---------------------|--------------|
+| New hook | `src/idlergear/hooks/ig_<name>.sh` + update `HOOK_SCRIPTS` in `install.py` |
+| New slash command | `src/idlergear/commands/ig_<name>.md` |
+| New MCP tool | `src/idlergear/mcp_server.py` (in `list_tools` and `call_tool`) |
+| New skill reference | `src/idlergear/skills/idlergear/references/<name>.md` |
+| New CLI subcommand | `src/idlergear/cli.py` |
+
+### .gitignore Reminder
+
+The `.claude/` and `.idlergear/` directories should be in `.gitignore` for most projects.
+For the IdlerGear repository itself, we track `.claude/` as a reference but source of truth is `src/idlergear/`.
+
 ## Multi-Agent Coordination (Daemon)
 
 **IdlerGear daemon enables multiple AI assistants to work together on the same codebase.**

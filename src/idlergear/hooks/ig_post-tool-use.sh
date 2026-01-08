@@ -1,6 +1,7 @@
 #!/bin/bash
 # PostToolUse hook - Detect test failures and suggest bug task creation
 # Also tracks edit count and suggests commits after multiple edits
+# Periodically checks for messages from other agents
 
 INPUT=$(cat)
 TOOL=$(echo "$INPUT" | jq -r '.tool_name')
@@ -11,6 +12,43 @@ SUGGESTIONS=""
 
 # Track edit count for commit suggestions
 EDIT_COUNT_FILE="/tmp/idlergear-edit-count-${SESSION_ID}"
+MESSAGE_CHECK_FILE="/tmp/idlergear-msg-check-${SESSION_ID}"
+
+# ============================================
+# PERIODIC MESSAGE CHECK (every 10 tool uses)
+# ============================================
+TOOL_COUNT=$(cat "$MESSAGE_CHECK_FILE" 2>/dev/null || echo 0)
+TOOL_COUNT=$((TOOL_COUNT + 1))
+echo "$TOOL_COUNT" > "$MESSAGE_CHECK_FILE"
+
+# Check for messages every 10 tool uses (reduces overhead)
+if [ $((TOOL_COUNT % 10)) -eq 0 ] && [ -S ".idlergear/daemon.sock" ]; then
+    # Find our agent ID
+    AGENT_ID=""
+    if [ -d ".idlergear/agents" ]; then
+        for f in .idlergear/agents/*.json; do
+            [ -f "$f" ] || continue
+            [ "$(basename "$f")" = "agents.json" ] && continue
+            AGENT_ID=$(basename "$f" .json)
+            break
+        done
+    fi
+
+    # Check inbox
+    if [ -n "$AGENT_ID" ] && [ -d ".idlergear/inbox/$AGENT_ID" ]; then
+        MESSAGE_COUNT=0
+        for msg_file in ".idlergear/inbox/$AGENT_ID/"*.json; do
+            [ -f "$msg_file" ] || continue
+            if grep -q '"read": false' "$msg_file" 2>/dev/null || ! grep -q '"read":' "$msg_file" 2>/dev/null; then
+                MESSAGE_COUNT=$((MESSAGE_COUNT + 1))
+            fi
+        done
+
+        if [ "$MESSAGE_COUNT" -gt 0 ]; then
+            SUGGESTIONS="${SUGGESTIONS}📬 ${MESSAGE_COUNT} unread message(s) waiting. Use idlergear_message_list() to check.\n\n"
+        fi
+    fi
+fi
 
 # Count file edits
 if [[ "$TOOL" == "Edit" || "$TOOL" == "Write" ]]; then

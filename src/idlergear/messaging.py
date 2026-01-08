@@ -2,14 +2,30 @@
 
 Messages are stored in .idlergear/inbox/<agent_id>/*.json and delivered
 at session start via hooks or on-demand via MCP tools.
+
+Message Priority Levels:
+- urgent: Inject immediately into context (interrupts work)
+- normal: Create task with [message] label (non-interrupting)
+- low: Queue for end-of-session review (batch processing)
+
+Message Types:
+- info: Informational, no action needed
+- request: Sender wants recipient to do something
+- alert: Important notification about system/code state
+- question: Sender needs a response
 """
 
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 import uuid
+
+# Valid priority levels
+PRIORITY_LEVELS = ("urgent", "normal", "low")
+# Valid message types
+MESSAGE_TYPES = ("info", "request", "alert", "question")
 
 
 def get_inbox_dir(idlergear_root: Path, agent_id: str) -> Path:
@@ -22,20 +38,41 @@ def send_message(
     to_agent: str,
     message: str,
     from_agent: str | None = None,
+    priority: Literal["urgent", "normal", "low"] = "normal",
+    message_type: Literal["info", "request", "alert", "question"] = "info",
+    action_requested: bool = False,
+    context: dict[str, Any] | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Send a message to another agent's inbox.
 
     Args:
         idlergear_root: Path to .idlergear directory
-        to_agent: Target agent ID
+        to_agent: Target agent ID (or "all" for broadcast)
         message: Message content
         from_agent: Sender agent ID (optional)
+        priority: Message priority - urgent/normal/low (default: normal)
+        message_type: Message type - info/request/alert/question (default: info)
+        action_requested: Does sender want recipient to do something?
+        context: Related context (task_id, files, etc.)
         metadata: Additional metadata (optional)
 
     Returns:
         Dict with message_id and status
     """
+    # Validate priority and type
+    if priority not in PRIORITY_LEVELS:
+        priority = "normal"
+    if message_type not in MESSAGE_TYPES:
+        message_type = "info"
+
+    # Handle broadcast to all agents
+    if to_agent == "all":
+        return _broadcast_message(
+            idlergear_root, message, from_agent, priority, message_type,
+            action_requested, context, metadata
+        )
+
     inbox_dir = get_inbox_dir(idlergear_root, to_agent)
     inbox_dir.mkdir(parents=True, exist_ok=True)
 
@@ -48,7 +85,13 @@ def send_message(
         "to": to_agent,
         "message": message,
         "timestamp": timestamp,
+        "priority": priority,
+        "type": message_type,
+        "action_requested": action_requested,
+        "context": context or {},
         "read": False,
+        "processed": False,  # Whether routed to task/queue
+        "task_id": None,     # If converted to task
         "metadata": metadata or {},
     }
 
@@ -63,7 +106,48 @@ def send_message(
         "message_id": message_id,
         "sent_to": to_agent,
         "timestamp": timestamp,
+        "priority": priority,
+        "type": message_type,
         "status": "delivered",
+    }
+
+
+def _broadcast_message(
+    idlergear_root: Path,
+    message: str,
+    from_agent: str | None,
+    priority: str,
+    message_type: str,
+    action_requested: bool,
+    context: dict[str, Any] | None,
+    metadata: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Broadcast message to all registered agents."""
+    agents_file = idlergear_root / "agents" / "agents.json"
+
+    if not agents_file.exists():
+        return {"status": "no_agents", "delivered_to": []}
+
+    try:
+        with open(agents_file) as f:
+            agents = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {"status": "error", "delivered_to": []}
+
+    delivered = []
+    for agent_id in agents.keys():
+        if agent_id != from_agent:  # Don't send to self
+            result = send_message(
+                idlergear_root, agent_id, message, from_agent,
+                priority, message_type, action_requested, context, metadata
+            )
+            if result.get("status") == "delivered":
+                delivered.append(agent_id)
+
+    return {
+        "status": "broadcast",
+        "delivered_to": delivered,
+        "count": len(delivered),
     }
 
 
@@ -254,5 +338,231 @@ def format_messages_for_context(messages: list[dict[str, Any]]) -> str:
         lines.append("")
 
     lines.append("=== END MESSAGES ===")
+
+    return "\n".join(lines)
+
+
+def process_inbox(
+    idlergear_root: Path,
+    agent_id: str,
+    create_task_callback: Any = None,
+) -> dict[str, Any]:
+    """Process inbox messages and route by priority.
+
+    - urgent: Return for immediate injection into context
+    - normal: Create task with [message] label
+    - low: Queue for end-of-session review (just mark as processed)
+
+    Args:
+        idlergear_root: Path to .idlergear directory
+        agent_id: Agent ID
+        create_task_callback: Function(title, body, labels) -> task_id
+
+    Returns:
+        Dict with routing results
+    """
+    messages = list_messages(idlergear_root, agent_id, unread_only=True)
+
+    results = {
+        "urgent": [],      # Messages to inject NOW
+        "tasks_created": [],  # Messages converted to tasks
+        "queued": [],      # Low-priority, deferred
+        "errors": [],
+    }
+
+    for msg in messages:
+        msg_id = msg.get("id")
+        priority = msg.get("priority", "normal")
+        msg_path = msg.get("_path")
+
+        try:
+            if priority == "urgent":
+                # Keep for immediate injection
+                results["urgent"].append(msg)
+                _mark_message_processed(msg_path, task_id=None)
+
+            elif priority == "normal":
+                # Convert to task
+                task_id = None
+                if create_task_callback:
+                    task_id = _create_task_from_message(msg, create_task_callback)
+
+                if task_id:
+                    results["tasks_created"].append({
+                        "message_id": msg_id,
+                        "task_id": task_id,
+                        "from": msg.get("from"),
+                    })
+                    _mark_message_processed(msg_path, task_id=task_id)
+                else:
+                    # No callback, treat as urgent fallback
+                    results["urgent"].append(msg)
+
+            else:  # low priority
+                # Just mark as processed, queue for later review
+                results["queued"].append({
+                    "message_id": msg_id,
+                    "from": msg.get("from"),
+                    "preview": msg.get("message", "")[:50],
+                })
+                _mark_message_processed(msg_path, task_id=None)
+
+        except Exception as e:
+            results["errors"].append({
+                "message_id": msg_id,
+                "error": str(e),
+            })
+
+    return results
+
+
+def _mark_message_processed(msg_path: str | Path, task_id: int | None) -> None:
+    """Mark a message as processed."""
+    if not msg_path:
+        return
+
+    path = Path(msg_path)
+    if not path.exists():
+        return
+
+    try:
+        with open(path) as f:
+            msg = json.load(f)
+
+        msg["processed"] = True
+        msg["processed_at"] = datetime.now(timezone.utc).isoformat()
+        msg["read"] = True
+        msg["read_at"] = msg["processed_at"]
+        if task_id:
+            msg["task_id"] = task_id
+
+        with open(path, "w") as f:
+            json.dump(msg, f, indent=2)
+    except (json.JSONDecodeError, OSError):
+        pass
+
+
+def _create_task_from_message(
+    msg: dict[str, Any],
+    create_task_callback: Any,
+) -> int | None:
+    """Create a task from a message.
+
+    Args:
+        msg: Message dict
+        create_task_callback: Function(title, body, labels) -> task_id
+
+    Returns:
+        Task ID if created, None otherwise
+    """
+    from_agent = msg.get("from", "Unknown")
+    message = msg.get("message", "")
+    msg_type = msg.get("type", "info")
+    timestamp = msg.get("timestamp", "")
+    context = msg.get("context", {})
+
+    # Create task title
+    preview = message[:60] + "..." if len(message) > 60 else message
+    title = f"Message from {from_agent}: {preview}"
+
+    # Create task body
+    body_lines = [
+        f"**From:** {from_agent}",
+        f"**Type:** {msg_type}",
+        f"**Received:** {timestamp}",
+        "",
+        "**Message:**",
+        message,
+    ]
+
+    if context:
+        body_lines.extend(["", "**Context:**"])
+        if context.get("task_id"):
+            body_lines.append(f"- Related task: #{context['task_id']}")
+        if context.get("files"):
+            body_lines.append(f"- Files: {', '.join(context['files'])}")
+
+    if msg.get("action_requested"):
+        body_lines.extend(["", "**Action Requested:** Yes"])
+
+    body = "\n".join(body_lines)
+
+    # Labels for the task
+    labels = ["message", f"from:{from_agent}"]
+    if msg_type != "info":
+        labels.append(msg_type)
+    if msg.get("action_requested"):
+        labels.append("action-needed")
+
+    try:
+        task_id = create_task_callback(title, body, labels)
+        return task_id
+    except Exception:
+        return None
+
+
+def get_urgent_messages(
+    idlergear_root: Path,
+    agent_id: str,
+) -> list[dict[str, Any]]:
+    """Get only urgent unread messages (for hook injection).
+
+    Args:
+        idlergear_root: Path to .idlergear directory
+        agent_id: Agent ID
+
+    Returns:
+        List of urgent messages
+    """
+    messages = list_messages(idlergear_root, agent_id, unread_only=True)
+    return [m for m in messages if m.get("priority") == "urgent"]
+
+
+def get_pending_review(
+    idlergear_root: Path,
+    agent_id: str,
+) -> list[dict[str, Any]]:
+    """Get messages pending user review (processed but low priority).
+
+    Args:
+        idlergear_root: Path to .idlergear directory
+        agent_id: Agent ID
+
+    Returns:
+        List of low-priority processed messages
+    """
+    messages = list_messages(idlergear_root, agent_id)
+    return [
+        m for m in messages
+        if m.get("processed") and m.get("priority") == "low"
+    ]
+
+
+def format_urgent_for_context(messages: list[dict[str, Any]]) -> str:
+    """Format urgent messages for immediate context injection.
+
+    Args:
+        messages: List of urgent message dicts
+
+    Returns:
+        Formatted string for additionalContext
+    """
+    if not messages:
+        return ""
+
+    lines = ["🚨 URGENT MESSAGE(S) FROM OTHER AGENTS:", ""]
+
+    for msg in messages:
+        from_agent = msg.get("from", "Unknown")
+        content = msg.get("message", "")
+        msg_type = msg.get("type", "info")
+
+        lines.append(f"━━━ From: {from_agent} ({msg_type}) ━━━")
+        lines.append(content)
+        if msg.get("action_requested"):
+            lines.append("⚡ ACTION REQUESTED")
+        lines.append("")
+
+    lines.append("Handle these before continuing other work.")
 
     return "\n".join(lines)
