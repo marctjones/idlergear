@@ -896,6 +896,57 @@ async def list_tools() -> list[Tool]:
             description="List queued commands awaiting execution. Shows what work is pending across all agents.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        # Cross-agent messaging tools (inbox-based, works without persistent connections)
+        Tool(
+            name="idlergear_message_send",
+            description="Send a message to another AI agent's inbox. The message will be delivered at the recipient's next session start. Use this when you need another agent to do something.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "to_agent": {"type": "string", "description": "Target agent ID (e.g., 'claude-code-abc123')"},
+                    "message": {"type": "string", "description": "Message content - can be a request, question, or information"},
+                    "from_agent": {"type": "string", "description": "Your agent ID (optional, auto-detected if registered)"},
+                },
+                "required": ["to_agent", "message"],
+            },
+        ),
+        Tool(
+            name="idlergear_message_list",
+            description="Check your inbox for messages from other AI agents. Call this at session start to see if other agents have sent you requests.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Your agent ID (optional, uses registered ID if available)"},
+                    "unread_only": {"type": "boolean", "description": "Only show unread messages (default: true)", "default": True},
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_message_mark_read",
+            description="Mark messages as read after processing them.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Your agent ID"},
+                    "message_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Message IDs to mark as read (omit to mark all)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_message_clear",
+            description="Clear read messages from your inbox.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {"type": "string", "description": "Your agent ID"},
+                    "all_messages": {"type": "boolean", "description": "Clear all messages, not just read ones (default: false)"},
+                },
+            },
+        ),
         # Script generation tools
         Tool(
             name="idlergear_generate_dev_script",
@@ -1973,6 +2024,74 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             from idlergear.daemon.mcp_handlers import handle_list_queue
             result = handle_list_queue()
             return _format_result(result)
+
+        # Cross-agent messaging handlers (inbox-based)
+        elif name == "idlergear_message_send":
+            from idlergear.messaging import send_message
+            root = find_idlergear_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
+            idlergear_dir = root / ".idlergear"
+            result = send_message(
+                idlergear_dir,
+                to_agent=arguments["to_agent"],
+                message=arguments["message"],
+                from_agent=arguments.get("from_agent"),
+            )
+            return _format_result(result)
+
+        elif name == "idlergear_message_list":
+            from idlergear.messaging import list_messages, get_inbox_summary
+            root = find_idlergear_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
+            idlergear_dir = root / ".idlergear"
+            agent_id = arguments.get("agent_id")
+            if not agent_id:
+                # Try to find agent_id from presence files
+                agents_dir = idlergear_dir / "agents"
+                if agents_dir.exists():
+                    for f in agents_dir.glob("*.json"):
+                        if f.name != "agents.json":
+                            agent_id = f.stem
+                            break
+            if not agent_id:
+                return _format_result({"messages": [], "note": "No agent_id provided or detected"})
+
+            unread_only = arguments.get("unread_only", True)
+            messages = list_messages(idlergear_dir, agent_id, unread_only=unread_only)
+            summary = get_inbox_summary(idlergear_dir, agent_id)
+            return _format_result({
+                "messages": messages,
+                "summary": summary,
+                "agent_id": agent_id,
+            })
+
+        elif name == "idlergear_message_mark_read":
+            from idlergear.messaging import mark_as_read
+            root = find_idlergear_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
+            idlergear_dir = root / ".idlergear"
+            agent_id = arguments.get("agent_id")
+            if not agent_id:
+                raise ValueError("agent_id is required")
+            message_ids = arguments.get("message_ids")
+            count = mark_as_read(idlergear_dir, agent_id, message_ids)
+            return _format_result({"marked_read": count})
+
+        elif name == "idlergear_message_clear":
+            from idlergear.messaging import clear_inbox
+            root = find_idlergear_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
+            idlergear_dir = root / ".idlergear"
+            agent_id = arguments.get("agent_id")
+            if not agent_id:
+                raise ValueError("agent_id is required")
+            read_only = not arguments.get("all_messages", False)
+            count = clear_inbox(idlergear_dir, agent_id, read_only=read_only)
+            return _format_result({"cleared": count})
 
         # Script generation handlers
         elif name == "idlergear_generate_dev_script":
