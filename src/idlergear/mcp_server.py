@@ -19,6 +19,10 @@ from idlergear.pm import ProcessManager
 # Global flag for reload request
 _reload_requested = False
 
+# Registered agent ID for this MCP server session
+# Set when idlergear_daemon_register_agent is called successfully
+_registered_agent_id: str | None = None
+
 # PID file for external reload triggers
 def _get_pid_file() -> Path:
     """Get path to PID file for this MCP server."""
@@ -2045,8 +2049,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Daemon coordination handlers
         elif name == "idlergear_daemon_register_agent":
+            global _registered_agent_id
             from idlergear.daemon.mcp_handlers import handle_register_agent
             result = handle_register_agent(arguments)
+            # Store the agent_id for use in message operations
+            if "agent_id" in result:
+                _registered_agent_id = result["agent_id"]
             return _format_result(result)
 
         elif name == "idlergear_daemon_list_agents":
@@ -2085,6 +2093,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Auto-detect from_agent if not provided
             from_agent = arguments.get("from_agent")
             if not from_agent:
+                # Use registered agent_id if available
+                from_agent = _registered_agent_id
+            if not from_agent:
+                # Fallback: try to find from presence files
                 agents_dir = idlergear_dir / "agents"
                 if agents_dir.exists():
                     for f in agents_dir.glob("*.json"):
@@ -2114,6 +2126,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Auto-detect agent_id
             agent_id = arguments.get("agent_id")
             if not agent_id:
+                # Use registered agent_id if available
+                agent_id = _registered_agent_id
+            if not agent_id:
+                # Fallback: try to find from presence files
                 agents_dir = idlergear_dir / "agents"
                 if agents_dir.exists():
                     for f in agents_dir.glob("*.json"):
@@ -2121,7 +2137,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             agent_id = f.stem
                             break
             if not agent_id:
-                return _format_result({"error": "No agent_id provided or detected"})
+                return _format_result({"error": "No agent_id provided or detected. Call idlergear_daemon_register_agent first."})
 
             # Create task callback if requested
             should_create_tasks = arguments.get("create_tasks", True)
@@ -2158,7 +2174,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             idlergear_dir = root / ".idlergear"
             agent_id = arguments.get("agent_id")
             if not agent_id:
-                # Try to find agent_id from presence files
+                # Use registered agent_id if available
+                agent_id = _registered_agent_id
+            if not agent_id:
+                # Fallback: try to find agent_id from presence files
                 agents_dir = idlergear_dir / "agents"
                 if agents_dir.exists():
                     for f in agents_dir.glob("*.json"):
@@ -2166,7 +2185,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             agent_id = f.stem
                             break
             if not agent_id:
-                return _format_result({"messages": [], "note": "No agent_id provided or detected"})
+                return _format_result({"messages": [], "note": "No agent_id provided or detected. Call idlergear_daemon_register_agent first."})
 
             unread_only = arguments.get("unread_only", True)
             messages = list_messages(idlergear_dir, agent_id, unread_only=unread_only)
@@ -2185,7 +2204,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             idlergear_dir = root / ".idlergear"
             agent_id = arguments.get("agent_id")
             if not agent_id:
-                raise ValueError("agent_id is required")
+                # Use registered agent_id if available
+                agent_id = _registered_agent_id
+            if not agent_id:
+                raise ValueError("agent_id is required. Call idlergear_daemon_register_agent first.")
             message_ids = arguments.get("message_ids")
             count = mark_as_read(idlergear_dir, agent_id, message_ids)
             return _format_result({"marked_read": count})
@@ -2198,7 +2220,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             idlergear_dir = root / ".idlergear"
             agent_id = arguments.get("agent_id")
             if not agent_id:
-                raise ValueError("agent_id is required")
+                # Use registered agent_id if available
+                agent_id = _registered_agent_id
+            if not agent_id:
+                raise ValueError("agent_id is required. Call idlergear_daemon_register_agent first.")
             read_only = not arguments.get("all_messages", False)
             count = clear_inbox(idlergear_dir, agent_id, read_only=read_only)
             return _format_result({"cleared": count})
@@ -2213,14 +2238,16 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 raise ValueError("IdlerGear not initialized")
             idlergear_dir = root / ".idlergear"
 
-            # Step 1: Detect agent ID from presence files (same logic as message_list)
-            agent_id = None
-            agents_dir = idlergear_dir / "agents"
-            if agents_dir.exists():
-                for f in agents_dir.glob("*.json"):
-                    if f.name != "agents.json":
-                        agent_id = f.stem
-                        break
+            # Step 1: Use registered agent_id or detect from presence files
+            agent_id = _registered_agent_id
+            if not agent_id:
+                # Fallback: try to find from presence files
+                agents_dir = idlergear_dir / "agents"
+                if agents_dir.exists():
+                    for f in agents_dir.glob("*.json"):
+                        if f.name != "agents.json":
+                            agent_id = f.stem
+                            break
 
             if not agent_id:
                 return _format_result({
