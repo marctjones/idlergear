@@ -374,7 +374,8 @@ class TestAddSkill:
         from idlergear.install import add_skill
 
         result = add_skill()
-        assert result is True
+        assert isinstance(result, dict)
+        assert all(v == "created" for v in result.values())
 
         skill_dir = initialized_project / ".claude" / "skills" / "idlergear"
         assert skill_dir.exists()
@@ -422,7 +423,22 @@ class TestAddSkill:
         add_skill()
         result = add_skill()
 
-        assert result is False  # Already present
+        # All unchanged on second run
+        assert all(v == "unchanged" for v in result.values())
+
+    def test_add_skill_updates_changed_files(self, initialized_project):
+        from idlergear.install import add_skill
+
+        add_skill()
+
+        # Modify a file
+        skill_md = initialized_project / ".claude" / "skills" / "idlergear" / "SKILL.md"
+        skill_md.write_text("modified content")
+
+        result = add_skill()
+
+        # SKILL.md should be updated, others unchanged
+        assert result.get("SKILL.md") == "updated"
 
 
 class TestRemoveSkill:

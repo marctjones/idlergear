@@ -800,7 +800,6 @@ def install(
     skip_claude: bool = typer.Option(False, "--skip-claude", help="Skip CLAUDE.md update"),
     skip_rules: bool = typer.Option(False, "--skip-rules", help="Skip .claude/rules/ creation"),
     skip_hooks: bool = typer.Option(False, "--skip-hooks", help="Skip .claude/hooks.json creation"),
-    skip_commands: bool = typer.Option(False, "--skip-commands", help="Skip /start command creation"),
     skip_skill: bool = typer.Option(False, "--skip-skill", help="Skip .claude/skills/idlergear/ creation"),
     auto_version: bool = typer.Option(False, "--auto-version", help="Install git hook to auto-bump patch version on commit"),
 ):
@@ -813,7 +812,6 @@ def install(
     - AGENTS.md - AI agent instructions
     - .claude/rules/idlergear.md - Enforcement rules
     - .claude/hooks.json - Enforcement hooks
-    - .claude/commands/ig_start.md - /ig_start slash command
 
     Optional:
     - .git/hooks/pre-commit - Auto-increment patch version (--auto-version)
@@ -823,17 +821,20 @@ def install(
         add_agents_md_section,
         add_auto_version_hook,
         add_claude_md_section,
+        add_commands,
         add_hooks_config,
         add_rules_file,
         add_skill,
-        add_start_command,
         install_hook_scripts,
         install_mcp_server,
     )
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
-        raise typer.Exit(1)
+        # Auto-initialize if not already initialized
+        from idlergear.init import init_project
+        typer.secho("No .idlergear/ found, initializing...", fg=typer.colors.YELLOW)
+        init_project(".")
+        typer.echo("")
 
     # Install MCP server
     if install_mcp_server():
@@ -842,11 +843,22 @@ def install(
         typer.echo(".mcp.json already has idlergear configured")
 
     # Create skill (RECOMMENDED - auto-triggering)
+    def report_results(results: dict[str, str], component: str):
+        """Report created/updated/unchanged files."""
+        created = [k for k, v in results.items() if v == "created"]
+        updated = [k for k, v in results.items() if v == "updated"]
+        unchanged = [k for k, v in results.items() if v == "unchanged"]
+        if created:
+            typer.secho(f"Created {component}: {', '.join(created)}", fg=typer.colors.GREEN)
+        if updated:
+            typer.secho(f"Updated {component}: {', '.join(updated)}", fg=typer.colors.YELLOW)
+        if unchanged and not created and not updated:
+            typer.echo(f"{component} unchanged")
+
+    # Create/update skill
     if not skip_skill:
-        if add_skill():
-            typer.secho("Created .claude/skills/idlergear/ (auto-triggering enabled)", fg=typer.colors.GREEN)
-        else:
-            typer.echo(".claude/skills/idlergear/ already exists")
+        skill_results = add_skill()
+        report_results(skill_results, "skill files")
 
     # Add CLAUDE.md section
     if not skip_claude:
@@ -875,17 +887,12 @@ def install(
             typer.secho("Added hooks to .claude/hooks.json", fg=typer.colors.GREEN)
         else:
             typer.echo(".claude/hooks.json already has IdlerGear hooks")
-        if install_hook_scripts():
-            typer.secho("Installed hook scripts to .claude/hooks/", fg=typer.colors.GREEN)
-        else:
-            typer.echo(".claude/hooks/ scripts already exist")
+        hook_results = install_hook_scripts()
+        report_results(hook_results, "hook scripts")
 
-    # Create /start command
-    if not skip_commands:
-        if add_start_command():
-            typer.secho("Created .claude/commands/ig_start.md", fg=typer.colors.GREEN)
-        else:
-            typer.echo(".claude/commands/ig_start.md already exists")
+    # Install slash commands
+    cmd_results = add_commands()
+    report_results(cmd_results, "slash commands")
 
     # Install auto-version git hook (optional)
     if auto_version:
@@ -896,8 +903,8 @@ def install(
 
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
-    typer.echo("The IdlerGear skill auto-triggers when you mention tasks, notes, or project status.")
-    typer.echo("Use /ig_start at session beginning to load project context.")
+    typer.echo("IdlerGear auto-starts at session beginning via hooks and skill.")
+    typer.echo("Available commands: /ig_start (refresh context), /ig_status (diagnostics)")
     typer.echo("Restart Claude Code or run /mcp to verify.")
 
 

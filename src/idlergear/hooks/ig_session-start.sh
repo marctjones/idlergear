@@ -7,6 +7,11 @@ if [ ! -d ".idlergear" ]; then
     exit 0  # Silent exit if not an IdlerGear project
 fi
 
+# Start daemon if not running (background, no output)
+if command -v idlergear &>/dev/null; then
+    idlergear daemon start &>/dev/null &
+fi
+
 # Build context by reading files directly (no Python startup overhead)
 CONTEXT=""
 

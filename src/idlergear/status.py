@@ -40,6 +40,12 @@ class ProjectStatus:
     project_name: str | None
     last_release: str | None
 
+    # Daemon/Agents
+    daemon_running: bool = False
+    daemon_pid: int | None = None
+    agents_count: int = 0
+    agents_list: list[dict[str, Any]] | None = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON output."""
         return {
@@ -57,6 +63,12 @@ class ProjectStatus:
                 "last_commit": self.git_last_commit,
             },
             "project": {"name": self.project_name, "last_release": self.last_release},
+            "daemon": {
+                "running": self.daemon_running,
+                "pid": self.daemon_pid,
+                "agents": self.agents_count,
+                "agents_list": self.agents_list,
+            },
         }
 
     def summary(self) -> str:
@@ -71,6 +83,8 @@ class ProjectStatus:
             parts.append(f"{self.runs_active} runs active")
         if self.git_uncommitted > 0:
             parts.append(f"{self.git_uncommitted} uncommitted files")
+        if self.agents_count > 0:
+            parts.append(f"{self.agents_count} agents")
 
         if not parts:
             return "All clear"
@@ -125,6 +139,9 @@ def get_project_status() -> ProjectStatus:
     project_name = schema.root.name if schema.root else None
     last_release = get_last_release()
 
+    # Daemon/Agent status
+    daemon_running, daemon_pid, agents_list = get_daemon_status(schema)
+
     return ProjectStatus(
         tasks_open=len(open_tasks),
         tasks_high_priority=len(high_priority_tasks),
@@ -139,7 +156,56 @@ def get_project_status() -> ProjectStatus:
         git_last_commit=git_last_commit,
         project_name=project_name,
         last_release=last_release,
+        daemon_running=daemon_running,
+        daemon_pid=daemon_pid,
+        agents_count=len(agents_list) if agents_list else 0,
+        agents_list=agents_list,
     )
+
+
+def get_daemon_status(
+    schema: IdlerGearSchema,
+) -> tuple[bool, int | None, list[dict[str, Any]] | None]:
+    """Get daemon status and agent list.
+
+    Returns: (daemon_running, daemon_pid, agents_list)
+    """
+    idlergear_dir = schema.root / ".idlergear" if schema.root else None
+    if not idlergear_dir or not idlergear_dir.exists():
+        return False, None, None
+
+    # Check daemon PID file
+    pid_file = idlergear_dir / "daemon.pid"
+    daemon_running = False
+    daemon_pid = None
+
+    if pid_file.exists():
+        try:
+            import os
+
+            pid = int(pid_file.read_text().strip())
+            os.kill(pid, 0)  # Check if process exists
+            daemon_running = True
+            daemon_pid = pid
+        except (ValueError, ProcessLookupError, PermissionError):
+            pass
+
+    # Read agent presence files
+    agents_dir = idlergear_dir / "agents"
+    agents_list = []
+
+    if agents_dir.exists():
+        for presence_file in agents_dir.glob("*.json"):
+            # Skip the daemon's internal registry file
+            if presence_file.name == "agents.json":
+                continue
+            try:
+                data = json.loads(presence_file.read_text())
+                agents_list.append(data)
+            except (json.JSONDecodeError, OSError):
+                continue
+
+    return daemon_running, daemon_pid, agents_list if agents_list else None
 
 
 def get_git_status() -> tuple[list[dict[str, str]], str | None, str | None]:
@@ -277,6 +343,22 @@ def format_detailed_status(status: ProjectStatus) -> str:
         lines.append("")
     else:
         lines.append("Runs: None active")
+        lines.append("")
+
+    # Daemon/Agents
+    if status.daemon_running:
+        agent_info = f", {status.agents_count} agents" if status.agents_count > 0 else ""
+        lines.append(f"Daemon: Running (PID {status.daemon_pid}{agent_info})")
+        if status.agents_list:
+            for agent in status.agents_list[:5]:  # Show max 5 agents
+                agent_id = agent.get("agent_id", "unknown")
+                agent_type = agent.get("agent_type", "unknown")
+                lines.append(f"  ● {agent_id} ({agent_type})")
+            if len(status.agents_list) > 5:
+                lines.append(f"  ... and {len(status.agents_list) - 5} more")
+        lines.append("")
+    else:
+        lines.append("Daemon: Not running")
         lines.append("")
 
     # Git

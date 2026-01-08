@@ -436,11 +436,11 @@ HOOK_SCRIPTS = [
 ]
 
 
-def install_hook_scripts(project_path: Path | None = None) -> bool:
+def install_hook_scripts(project_path: Path | None = None) -> dict[str, str]:
     """Install Claude Code hook scripts from the idlergear package.
 
     Copies hook scripts from src/idlergear/hooks/ to .claude/hooks/.
-    Returns True if any scripts were installed, False if all already exist.
+    Returns dict of {script_name: action} where action is 'created', 'updated', or 'unchanged'.
     """
     from importlib.resources import files
 
@@ -453,21 +453,30 @@ def install_hook_scripts(project_path: Path | None = None) -> bool:
     hooks_dir.mkdir(parents=True, exist_ok=True)
 
     package_hooks_dir = files("idlergear") / "hooks"
-    installed_any = False
+    results = {}
 
     for script_name in HOOK_SCRIPTS:
         src_file = package_hooks_dir / script_name
         dst_file = hooks_dir / script_name
 
+        if not src_file.is_file():
+            continue
+
+        src_content = src_file.read_text()
+
         if dst_file.exists():
-            continue  # Skip if already exists
+            if dst_file.read_text() == src_content:
+                results[script_name] = "unchanged"
+            else:
+                dst_file.write_text(src_content)
+                dst_file.chmod(0o755)
+                results[script_name] = "updated"
+        else:
+            dst_file.write_text(src_content)
+            dst_file.chmod(0o755)
+            results[script_name] = "created"
 
-        if src_file.is_file():
-            dst_file.write_text(src_file.read_text())
-            dst_file.chmod(0o755)  # Make executable
-            installed_any = True
-
-    return installed_any
+    return results
 
 
 def remove_hook_scripts(project_path: Path | None = None) -> bool:
@@ -499,11 +508,11 @@ def remove_hook_scripts(project_path: Path | None = None) -> bool:
     return removed_any
 
 
-def add_start_command(project_path: Path | None = None) -> bool:
-    """Create .claude/commands/ig_start.md slash command.
+def add_commands(project_path: Path | None = None) -> dict[str, str]:
+    """Install all IdlerGear slash commands.
 
-    Copies the command file from src/idlergear/commands/.
-    Returns True if created, False if already exists.
+    Copies command files from src/idlergear/commands/.
+    Returns dict of {command_name: action} where action is 'created', 'updated', or 'unchanged'.
     """
     from importlib.resources import files
 
@@ -513,28 +522,42 @@ def add_start_command(project_path: Path | None = None) -> bool:
         raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
 
     commands_dir = project_path / ".claude" / "commands"
-    command_file = commands_dir / "ig_start.md"
-
-    if command_file.exists():
-        return False
-
-    # Read from package source
-    package_command = files("idlergear") / "commands" / "ig_start.md"
-    if not package_command.is_file():
-        raise RuntimeError("idlergear start command file not found in package")
-
     commands_dir.mkdir(parents=True, exist_ok=True)
-    command_file.write_text(package_command.read_text())
-    return True
+
+    package_commands = files("idlergear") / "commands"
+    results = {}
+
+    # Install all .md files from the commands directory
+    for item in package_commands.iterdir():
+        if item.is_file() and item.name.endswith(".md"):
+            dest_file = commands_dir / item.name
+            src_content = item.read_text()
+
+            if dest_file.exists():
+                if dest_file.read_text() == src_content:
+                    results[item.name] = "unchanged"
+                else:
+                    dest_file.write_text(src_content)
+                    results[item.name] = "updated"
+            else:
+                dest_file.write_text(src_content)
+                results[item.name] = "created"
+
+    return results
 
 
-def add_skill(project_path: Path | None = None) -> bool:
-    """Create .claude/skills/idlergear/ skill directory.
+def add_start_command(project_path: Path | None = None) -> bool:
+    """Create .claude/commands/ig_start.md slash command (legacy wrapper)."""
+    results = add_commands(project_path)
+    return results.get("ig_start.md", False)
+
+
+def add_skill(project_path: Path | None = None) -> dict[str, str]:
+    """Create or update .claude/skills/idlergear/ skill directory.
 
     Copies the skill files from the idlergear package.
-    Returns True if created, False if already exists.
+    Returns dict of {file_path: action} where action is 'created', 'updated', or 'unchanged'.
     """
-    import shutil
     from importlib.resources import files
 
     if project_path is None:
@@ -543,42 +566,51 @@ def add_skill(project_path: Path | None = None) -> bool:
         raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
 
     skill_dir = project_path / ".claude" / "skills" / "idlergear"
-
-    if skill_dir.exists():
-        return False
-
-    # Get the skill directory from the package
     package_skill_dir = files("idlergear") / "skill"
+    results = {}
 
-    # Create the skill directory structure
-    skill_dir.mkdir(parents=True, exist_ok=True)
+    def copy_file(src, dst, executable=False):
+        """Copy file and return action taken."""
+        if not src.is_file():
+            return None
+        src_content = src.read_text()
+        if dst.exists():
+            if dst.read_text() == src_content:
+                return "unchanged"
+            else:
+                dst.write_text(src_content)
+                if executable:
+                    dst.chmod(0o755)
+                return "updated"
+        else:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_text(src_content)
+            if executable:
+                dst.chmod(0o755)
+            return "created"
 
     # Copy SKILL.md
-    skill_md = package_skill_dir / "SKILL.md"
-    if skill_md.is_file():
-        (skill_dir / "SKILL.md").write_text(skill_md.read_text())
+    action = copy_file(package_skill_dir / "SKILL.md", skill_dir / "SKILL.md")
+    if action:
+        results["SKILL.md"] = action
 
     # Copy references/
     refs_src = package_skill_dir / "references"
     refs_dst = skill_dir / "references"
-    refs_dst.mkdir(exist_ok=True)
     for ref_file in ["knowledge-types.md", "mcp-tools.md", "multi-agent.md"]:
-        src_file = refs_src / ref_file
-        if src_file.is_file():
-            (refs_dst / ref_file).write_text(src_file.read_text())
+        action = copy_file(refs_src / ref_file, refs_dst / ref_file)
+        if action:
+            results[f"references/{ref_file}"] = action
 
     # Copy scripts/
     scripts_src = package_skill_dir / "scripts"
     scripts_dst = skill_dir / "scripts"
-    scripts_dst.mkdir(exist_ok=True)
     for script_file in ["context.sh", "status.sh", "session-start.sh"]:
-        src_file = scripts_src / script_file
-        if src_file.is_file():
-            dst_file = scripts_dst / script_file
-            dst_file.write_text(src_file.read_text())
-            dst_file.chmod(0o755)  # Make executable
+        action = copy_file(scripts_src / script_file, scripts_dst / script_file, executable=True)
+        if action:
+            results[f"scripts/{script_file}"] = action
 
-    return True
+    return results
 
 
 def remove_skill(project_path: Path | None = None) -> bool:
