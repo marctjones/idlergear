@@ -131,6 +131,9 @@ class DaemonServer:
         self.register_method("lock.is_locked", self._handle_lock_is_locked)
         self.register_method("lock.list", self._handle_lock_list)
 
+        # Message methods
+        self.register_method("message.broadcast", self._handle_message_broadcast)
+
     def register_method(self, name: str, handler: MethodHandler) -> None:
         """Register a method handler."""
         self._methods[name] = handler
@@ -444,6 +447,15 @@ class DaemonServer:
         """Handle listing locks."""
         locks = await self.locks.list_locks(agent_id=params.get("agent_id"))
         return {"locks": [lock.__dict__ for lock in locks]}
+
+    async def _handle_message_broadcast(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle broadcasting a message to all agents."""
+        event = params.get("event", "message")
+        data = params.get("data", {})
+        await self.broadcast(event, data)
+        return {"broadcasted": True, "event": event, "connections": len(self._connections)}
 
     async def broadcast(self, event: str, data: dict[str, Any]) -> None:
         """Broadcast an event to all subscribed connections."""

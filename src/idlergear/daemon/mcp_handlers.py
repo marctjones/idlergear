@@ -319,7 +319,7 @@ def handle_send_message(arguments: dict[str, Any]) -> dict[str, Any]:
     # Ensure daemon is running
     _ensure_daemon()
 
-    result = _run_async(_call_daemon("broadcast", {
+    result = _run_async(_call_daemon("message.broadcast", {
         "event": "message",
         "data": {"message": message, "timestamp": datetime.now(timezone.utc).isoformat()},
     }))
