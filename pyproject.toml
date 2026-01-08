@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "idlergear"
-version = "0.3.10"
+version = "0.3.11"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -49,6 +49,7 @@ include = ["src/idlergear"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "-m 'not slow'"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "claude_integration: marks tests that require claude CLI and API access",

@@ -25,7 +25,10 @@ def temp_storage():
 def daemon_server(temp_storage):
     """Create and start a daemon server for testing."""
     socket_path = temp_storage / "daemon.sock"
-    server = DaemonServer(str(socket_path), str(temp_storage))
+    pid_path = temp_storage / "daemon.pid"
+    storage_path = temp_storage / "storage"
+    storage_path.mkdir(exist_ok=True)
+    server = DaemonServer(socket_path, pid_path, storage_path)
 
     # Start server in background thread
     server_thread = Thread(target=server.serve_forever, daemon=True)

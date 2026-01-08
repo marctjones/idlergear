@@ -67,7 +67,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             async def test_handler(params, conn):
                 return {"test": True}
@@ -82,7 +84,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
             result = await server._handle_ping({}, conn)
@@ -95,7 +99,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
             result = await server._handle_status({}, conn)
@@ -110,7 +116,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
             conn.subscriptions = set()
@@ -126,7 +134,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
 
@@ -139,7 +149,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
             conn.subscriptions = {"test.event"}
@@ -155,7 +167,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
 
@@ -168,7 +182,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             async def test_handler(params, conn):
                 return {"value": params["x"] * 2}
@@ -186,7 +202,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             conn = MagicMock()
 
@@ -199,7 +217,9 @@ class TestDaemonServerMethods:
         with tempfile.TemporaryDirectory() as tmpdir:
             socket_path = Path(tmpdir) / "daemon.sock"
             pid_path = Path(tmpdir) / "daemon.pid"
-            server = DaemonServer(socket_path, pid_path)
+            storage_path = Path(tmpdir) / "storage"
+            storage_path.mkdir()
+            server = DaemonServer(socket_path, pid_path, storage_path)
 
             # Create mock connections
             conn1 = MagicMock()
@@ -229,7 +249,9 @@ class TestHandlersRegistration:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -260,7 +282,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -283,7 +307,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -301,7 +327,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -320,7 +348,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -339,7 +369,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -358,7 +390,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -377,7 +411,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -395,7 +431,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -413,7 +451,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -438,7 +478,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -463,7 +505,9 @@ class TestHandlersExecution:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -510,7 +554,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -531,7 +577,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -555,7 +603,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -576,7 +626,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -597,7 +649,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -620,7 +674,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -642,7 +698,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -663,7 +721,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -684,7 +744,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -708,7 +770,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -729,7 +793,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -751,7 +817,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -772,7 +840,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -796,7 +866,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -817,7 +889,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -838,7 +912,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
         server.broadcast = AsyncMock()
 
         register_handlers(server)
@@ -862,7 +938,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -886,7 +964,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -909,7 +989,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -932,7 +1014,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
@@ -955,7 +1039,9 @@ class TestAllHandlers:
 
         socket_path = temp_project / ".idlergear" / "daemon.sock"
         pid_path = temp_project / ".idlergear" / "daemon.pid"
-        server = DaemonServer(socket_path, pid_path)
+        storage_path = temp_project / ".idlergear" / "storage"
+        storage_path.mkdir(exist_ok=True)
+        server = DaemonServer(socket_path, pid_path, storage_path)
 
         register_handlers(server)
 
