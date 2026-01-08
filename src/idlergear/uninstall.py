@@ -193,6 +193,7 @@ def uninstall_idlergear(
         "claude_md": False,
         "rules_file": False,
         "skill": False,
+        "hook_scripts": False,
         "claude_settings": False,
         "idlergear_data": False,
     }
@@ -203,6 +204,7 @@ def uninstall_idlergear(
     claude_file = project_path / "CLAUDE.md"
     rules_file = project_path / ".claude" / "rules" / "idlergear.md"
     skill_dir = project_path / ".claude" / "skills" / "idlergear"
+    hooks_dir = project_path / ".claude" / "hooks"
     settings_file = project_path / ".claude" / "settings.json"
     idlergear_dir = project_path / ".idlergear"
 
@@ -230,6 +232,14 @@ def uninstall_idlergear(
 
     if skill_dir.exists():
         results["skill"] = True
+
+    # Check for hook scripts installed by idlergear
+    from idlergear.install import HOOK_SCRIPTS
+    if hooks_dir.exists():
+        for script_name in HOOK_SCRIPTS:
+            if (hooks_dir / script_name).exists():
+                results["hook_scripts"] = True
+                break
 
     if settings_file.exists():
         try:
@@ -265,6 +275,10 @@ def uninstall_idlergear(
     if results["skill"]:
         from idlergear.install import remove_skill
         results["skill"] = remove_skill(project_path)
+
+    if results["hook_scripts"]:
+        from idlergear.install import remove_hook_scripts
+        results["hook_scripts"] = remove_hook_scripts(project_path)
 
     if results["claude_settings"]:
         results["claude_settings"] = remove_claude_settings(project_path)

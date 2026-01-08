@@ -126,8 +126,8 @@ name = "{name}"
     # .claude/rules/idlergear.md
     (claude_path / "rules" / "idlergear.md").write_text(CLAUDE_RULES_IDLERGEAR)
 
-    # .claude/commands/context.md - /context slash command
-    (claude_path / "commands" / "context.md").write_text(CLAUDE_COMMAND_CONTEXT)
+    # .claude/commands/ig_context.md - /ig_context slash command
+    (claude_path / "commands" / "ig_context.md").write_text(CLAUDE_COMMAND_CONTEXT)
 
     # Root CLAUDE.md (Claude Code also looks here)
     (project_path / "CLAUDE.md").write_text(claude_md_content)
@@ -194,8 +194,8 @@ def _create_python_structure(
     (tests_path / "__init__.py").write_text(TESTS_INIT.format(project_name=name))
     (tests_path / "test_placeholder.py").write_text(TEST_PLACEHOLDER)
 
-    # .claude/rules/python.md
-    (project_path / ".claude" / "rules" / "python.md").write_text(CLAUDE_RULES_PYTHON)
+    # .claude/rules/ig_python.md
+    (project_path / ".claude" / "rules" / "ig_python.md").write_text(CLAUDE_RULES_PYTHON)
 
     # Create venv
     if init_venv:
@@ -225,7 +225,7 @@ def _create_python_structure(
         # Add SessionStart hook for venv activation
         hooks_dir = project_path / ".claude" / "hooks"
         hooks_dir.mkdir(exist_ok=True)
-        activate_script = hooks_dir / "activate-venv.sh"
+        activate_script = hooks_dir / "ig_activate-venv.sh"
         activate_script.write_text(VENV_ACTIVATE_HOOK)
         activate_script.chmod(0o755)
 
@@ -236,7 +236,7 @@ def _create_python_structure(
                     "hooks": [
                         {
                             "type": "command",
-                            "command": "./.claude/hooks/activate-venv.sh",
+                            "command": "./.claude/hooks/ig_activate-venv.sh",
                         }
                     ],
                 }

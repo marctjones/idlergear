@@ -1,6 +1,6 @@
 """Base project template - common files for all project types."""
 
-# .claude/commands/context.md - slash command for getting context
+# .claude/commands/ig_context.md - slash command for getting context
 CLAUDE_COMMAND_CONTEXT = """\
 Run `idlergear context` to get the current project context, then summarize:
 1. The project vision (1-2 sentences)

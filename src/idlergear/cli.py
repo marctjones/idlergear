@@ -745,6 +745,8 @@ def uninstall(
         typer.echo("  • IdlerGear section from AGENTS.md")
     if results["rules_file"]:
         typer.echo("  • .claude/rules/idlergear.md")
+    if results.get("hook_scripts"):
+        typer.echo("  • Hook scripts from .claude/hooks/")
     if results["claude_settings"]:
         typer.echo("  • Protected paths from .claude/settings.json")
     if results["idlergear_data"]:
@@ -779,6 +781,8 @@ def uninstall(
         typer.secho("  ✓ IdlerGear section from AGENTS.md", fg=typer.colors.GREEN)
     if results["rules_file"]:
         typer.secho("  ✓ .claude/rules/idlergear.md", fg=typer.colors.GREEN)
+    if results.get("hook_scripts"):
+        typer.secho("  ✓ Hook scripts from .claude/hooks/", fg=typer.colors.GREEN)
     if results["claude_settings"]:
         typer.secho("  ✓ Protected paths from .claude/settings.json", fg=typer.colors.GREEN)
     if results["idlergear_data"]:
@@ -809,7 +813,7 @@ def install(
     - AGENTS.md - AI agent instructions
     - .claude/rules/idlergear.md - Enforcement rules
     - .claude/hooks.json - Enforcement hooks
-    - .claude/commands/start.md - /start slash command
+    - .claude/commands/ig_start.md - /ig_start slash command
 
     Optional:
     - .git/hooks/pre-commit - Auto-increment patch version (--auto-version)
@@ -823,6 +827,7 @@ def install(
         add_rules_file,
         add_skill,
         add_start_command,
+        install_hook_scripts,
         install_mcp_server,
     )
 
@@ -864,19 +869,23 @@ def install(
         else:
             typer.echo(".claude/rules/idlergear.md already exists")
 
-    # Create hooks config
+    # Create hooks config and install hook scripts
     if not skip_hooks:
         if add_hooks_config():
             typer.secho("Added hooks to .claude/hooks.json", fg=typer.colors.GREEN)
         else:
             typer.echo(".claude/hooks.json already has IdlerGear hooks")
+        if install_hook_scripts():
+            typer.secho("Installed hook scripts to .claude/hooks/", fg=typer.colors.GREEN)
+        else:
+            typer.echo(".claude/hooks/ scripts already exist")
 
     # Create /start command
     if not skip_commands:
         if add_start_command():
-            typer.secho("Created .claude/commands/start.md", fg=typer.colors.GREEN)
+            typer.secho("Created .claude/commands/ig_start.md", fg=typer.colors.GREEN)
         else:
-            typer.echo(".claude/commands/start.md already exists")
+            typer.echo(".claude/commands/ig_start.md already exists")
 
     # Install auto-version git hook (optional)
     if auto_version:
@@ -888,7 +897,7 @@ def install(
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
     typer.echo("The IdlerGear skill auto-triggers when you mention tasks, notes, or project status.")
-    typer.echo("Use /start at session beginning to load project context.")
+    typer.echo("Use /ig_start at session beginning to load project context.")
     typer.echo("Restart Claude Code or run /mcp to verify.")
 
 

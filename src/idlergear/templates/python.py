@@ -140,7 +140,7 @@ def test_placeholder():
     assert True
 """
 
-# .claude/rules/python.md - Python-specific rules
+# .claude/rules/ig_python.md - Python-specific rules
 CLAUDE_RULES_PYTHON = """\
 ---
 description: Python development conventions

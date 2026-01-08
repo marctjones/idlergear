@@ -322,144 +322,46 @@ def remove_claude_md_section(project_path: Path | None = None) -> bool:
     return True
 
 
-# Claude Code rules file content - stronger enforcement language
-RULES_FILE_CONTENT = """\
----
-description: MANDATORY IdlerGear knowledge management rules - MUST follow
-alwaysApply: true
----
-
-# IdlerGear Usage Rules (MANDATORY)
-
-## CRITICAL: Session Start (REQUIRED)
-
-**Before responding to ANY user request, you MUST run:**
-
-```bash
-idlergear context
-```
-
-This is NOT optional. Do NOT skip this step. Do NOT proceed without running this command first.
-If you have not run `idlergear context` in this session, STOP and run it now.
-
-## MANDATORY: Bug Discovery
-
-When you identify ANY bug, error, or issue, you MUST IMMEDIATELY run:
-
-```bash
-idlergear task create "Bug: <description>" --label bug
-```
-
-Do NOT continue working until the task is created. Do NOT just mention the bug in conversation.
-
-## MANDATORY: Design Decisions
-
-When making ANY architectural choice or design decision, you MUST IMMEDIATELY run:
-
-```bash
-idlergear task create "Decision: <what you decided>" --label decision
-```
-
-Record the decision BEFORE implementing it.
-
-## MANDATORY: Technical Debt
-
-When you write code that could be improved later, you MUST run:
-
-```bash
-idlergear task create "<what needs improvement>" --label tech-debt
-```
-
-Do NOT write `// TODO:` comments. Do NOT skip this step.
-
-## FORBIDDEN: File-Based Knowledge (WILL BE BLOCKED)
-
-You are PROHIBITED from creating these files:
-- `TODO.md`, `TODO.txt`, `TASKS.md`
-- `NOTES.md`, `SESSION_*.md`, `SCRATCH.md`
-- `FEATURE_IDEAS.md`, `RESEARCH.md`, `BACKLOG.md`
-- Any markdown file for tracking work or capturing thoughts
-
-These files will be REJECTED by hooks. Use IdlerGear commands instead.
-
-## FORBIDDEN: Inline TODOs (WILL BE BLOCKED)
-
-You are PROHIBITED from writing these comments:
-- `// TODO: ...`
-- `# TODO: ...`
-- `# FIXME: ...`
-- `/* HACK: ... */`
-- `<!-- TODO: ... -->`
-
-These comments will be REJECTED by hooks. Create tasks instead:
-`idlergear task create "..." --label tech-debt`
-
-## REQUIRED: Use IdlerGear Commands
-
-| When you... | You MUST run... |
-|-------------|-----------------|
-| Find a bug | `idlergear task create "Bug: ..." --label bug` |
-| Have an idea | `idlergear note create "..."` |
-| Make a decision | `idlergear task create "Decision: ..." --label decision` |
-| Leave tech debt | `idlergear task create "..." --label tech-debt` |
-| Complete work | `idlergear task close <id>` |
-| Research something | `idlergear explore create "..."` |
-| Document findings | `idlergear reference add "..." --body "..."` |
-
-## Data Protection
-
-**NEVER modify `.idlergear/` files directly** - Use CLI commands only
-**NEVER modify `.claude/` or `.mcp.json`** - These are protected
-
-## Enforcement
-
-Hooks are configured to:
-1. Block commits with TODO comments
-2. Block creation of forbidden files
-3. Remind you to run `idlergear context` at session start
-"""
+# Rules and commands are stored as files in src/idlergear/rules/ and src/idlergear/commands/
+# They are read at install time using importlib.resources
 
 
 # Hooks configuration for enforcement
+# All IdlerGear hooks use ig_ prefix for identification
 HOOKS_CONFIG = {
     "hooks": {
         "PostToolUse": [
             {
                 "matcher": "Write|Edit",
                 "command": "idlergear check --file \"$TOOL_INPUT_PATH\" --quiet",
-            }
+            },
+            {
+                "matcher": "Bash|Write|Edit",
+                "command": "./.claude/hooks/ig_post-tool-use.sh",
+            },
         ],
         "UserPromptSubmit": [
             {
                 "command": "idlergear check --context-reminder",
-            }
+            },
+            {
+                "command": "./.claude/hooks/ig_user-prompt-submit.sh",
+            },
         ],
     }
 }
 
-# Slash command for session start
-START_COMMAND_CONTENT = """\
----
-description: Start IdlerGear session - run context and show project state
----
-
-Run `idlergear context` to show the project vision, current plan, open tasks, and recent notes.
-
-After running the command, summarize:
-1. The project vision (what is this project for?)
-2. Current plan if any
-3. Number of open tasks and their priorities
-4. Any open explorations
-
-This gives you the full context to start working effectively.
-"""
+# Slash commands are stored in src/idlergear/commands/ and read at install time
 
 
 def add_rules_file(project_path: Path | None = None) -> bool:
     """Create .claude/rules/idlergear.md for Claude Code.
 
+    Copies the rules file from src/idlergear/rules/.
     Returns True if created, False if already exists.
     """
+    from importlib.resources import files
+
     if project_path is None:
         project_path = find_idlergear_root()
     if project_path is None:
@@ -471,8 +373,13 @@ def add_rules_file(project_path: Path | None = None) -> bool:
     if rules_file.exists():
         return False
 
+    # Read from package source
+    package_rules = files("idlergear") / "rules" / "idlergear.md"
+    if not package_rules.is_file():
+        raise RuntimeError("idlergear rules file not found in package")
+
     rules_dir.mkdir(parents=True, exist_ok=True)
-    rules_file.write_text(RULES_FILE_CONTENT)
+    rules_file.write_text(package_rules.read_text())
     return True
 
 
@@ -518,24 +425,106 @@ def add_hooks_config(project_path: Path | None = None) -> bool:
     return True
 
 
-def add_start_command(project_path: Path | None = None) -> bool:
-    """Create .claude/commands/start.md slash command.
+# List of hook scripts to install from the package
+# All hooks use ig_ prefix for identification and to avoid name conflicts
+HOOK_SCRIPTS = [
+    "ig_pre-tool-use.sh",
+    "ig_post-tool-use.sh",
+    "ig_session-start.sh",
+    "ig_stop.sh",
+    "ig_user-prompt-submit.sh",
+]
 
+
+def install_hook_scripts(project_path: Path | None = None) -> bool:
+    """Install Claude Code hook scripts from the idlergear package.
+
+    Copies hook scripts from src/idlergear/hooks/ to .claude/hooks/.
+    Returns True if any scripts were installed, False if all already exist.
+    """
+    from importlib.resources import files
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    hooks_dir = project_path / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+
+    package_hooks_dir = files("idlergear") / "hooks"
+    installed_any = False
+
+    for script_name in HOOK_SCRIPTS:
+        src_file = package_hooks_dir / script_name
+        dst_file = hooks_dir / script_name
+
+        if dst_file.exists():
+            continue  # Skip if already exists
+
+        if src_file.is_file():
+            dst_file.write_text(src_file.read_text())
+            dst_file.chmod(0o755)  # Make executable
+            installed_any = True
+
+    return installed_any
+
+
+def remove_hook_scripts(project_path: Path | None = None) -> bool:
+    """Remove Claude Code hook scripts installed by idlergear.
+
+    Returns True if any scripts were removed, False if none existed.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    hooks_dir = project_path / ".claude" / "hooks"
+    removed_any = False
+
+    for script_name in HOOK_SCRIPTS:
+        script_file = hooks_dir / script_name
+        if script_file.exists():
+            script_file.unlink()
+            removed_any = True
+
+    # Clean up empty hooks directory
+    try:
+        if hooks_dir.exists() and not any(hooks_dir.iterdir()):
+            hooks_dir.rmdir()
+    except OSError:
+        pass
+
+    return removed_any
+
+
+def add_start_command(project_path: Path | None = None) -> bool:
+    """Create .claude/commands/ig_start.md slash command.
+
+    Copies the command file from src/idlergear/commands/.
     Returns True if created, False if already exists.
     """
+    from importlib.resources import files
+
     if project_path is None:
         project_path = find_idlergear_root()
     if project_path is None:
         raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
 
     commands_dir = project_path / ".claude" / "commands"
-    command_file = commands_dir / "start.md"
+    command_file = commands_dir / "ig_start.md"
 
     if command_file.exists():
         return False
 
+    # Read from package source
+    package_command = files("idlergear") / "commands" / "ig_start.md"
+    if not package_command.is_file():
+        raise RuntimeError("idlergear start command file not found in package")
+
     commands_dir.mkdir(parents=True, exist_ok=True)
-    command_file.write_text(START_COMMAND_CONTENT)
+    command_file.write_text(package_command.read_text())
     return True
 
 

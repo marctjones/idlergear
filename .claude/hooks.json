@@ -4,11 +4,18 @@
       {
         "matcher": "Write|Edit",
         "command": "idlergear check --file \"$TOOL_INPUT_PATH\" --quiet"
+      },
+      {
+        "matcher": "Bash|Write|Edit",
+        "command": "./.claude/hooks/ig_post-tool-use.sh"
       }
     ],
     "UserPromptSubmit": [
       {
         "command": "idlergear check --context-reminder"
+      },
+      {
+        "command": "./.claude/hooks/ig_user-prompt-submit.sh"
       }
     ]
   }
