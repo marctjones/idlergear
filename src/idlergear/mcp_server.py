@@ -230,6 +230,20 @@ async def list_tools() -> list[Tool]:
                         "description": "Filter by state",
                         "default": "open",
                     },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit number of results (for token efficiency)",
+                    },
+                    "preview": {
+                        "type": "boolean",
+                        "description": "Strip task bodies for token efficiency (default: false)",
+                        "default": False,
+                    },
+                    "priority": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "Filter by priority",
+                    },
                 },
             },
         ),
@@ -1530,6 +1544,18 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_task_list":
             result = list_tasks(state=arguments.get("state", "open"))
+            # Filter by priority if specified
+            priority = arguments.get("priority")
+            if priority:
+                result = [t for t in result if t.get("priority") == priority]
+            # Apply limit if specified
+            limit = arguments.get("limit")
+            if limit:
+                result = result[:limit]
+            # Strip bodies if preview mode (token-efficient)
+            if arguments.get("preview", False):
+                for task in result:
+                    task["body"] = None
             return _format_result(result)
 
         elif name == "idlergear_task_show":
