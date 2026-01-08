@@ -367,6 +367,96 @@ class TestRemoveRulesFile:
             assert list(claude_dir.iterdir()), ".claude dir should have files or not exist"
 
 
+class TestAddSkill:
+    """Tests for add_skill."""
+
+    def test_add_skill(self, initialized_project):
+        from idlergear.install import add_skill
+
+        result = add_skill()
+        assert result is True
+
+        skill_dir = initialized_project / ".claude" / "skills" / "idlergear"
+        assert skill_dir.exists()
+
+        # Check SKILL.md
+        skill_md = skill_dir / "SKILL.md"
+        assert skill_md.exists()
+        content = skill_md.read_text()
+        assert content.startswith("---")  # Has frontmatter
+        assert "name: idlergear" in content
+        assert "description:" in content
+
+    def test_add_skill_creates_references(self, initialized_project):
+        from idlergear.install import add_skill
+
+        add_skill()
+
+        refs_dir = initialized_project / ".claude" / "skills" / "idlergear" / "references"
+        assert refs_dir.exists()
+
+        # Check reference files exist
+        assert (refs_dir / "knowledge-types.md").exists()
+        assert (refs_dir / "mcp-tools.md").exists()
+        assert (refs_dir / "multi-agent.md").exists()
+
+    def test_add_skill_creates_scripts(self, initialized_project):
+        from idlergear.install import add_skill
+        import stat
+
+        add_skill()
+
+        scripts_dir = initialized_project / ".claude" / "skills" / "idlergear" / "scripts"
+        assert scripts_dir.exists()
+
+        # Check script files exist and are executable
+        for script in ["context.sh", "status.sh", "session-start.sh"]:
+            script_path = scripts_dir / script
+            assert script_path.exists(), f"{script} should exist"
+            mode = script_path.stat().st_mode
+            assert mode & stat.S_IXUSR, f"{script} should be executable"
+
+    def test_add_skill_already_exists(self, initialized_project):
+        from idlergear.install import add_skill
+
+        add_skill()
+        result = add_skill()
+
+        assert result is False  # Already present
+
+
+class TestRemoveSkill:
+    """Tests for remove_skill."""
+
+    def test_remove_skill(self, initialized_project):
+        from idlergear.install import add_skill, remove_skill
+
+        add_skill()
+        result = remove_skill()
+
+        assert result is True
+
+        skill_dir = initialized_project / ".claude" / "skills" / "idlergear"
+        assert not skill_dir.exists()
+
+    def test_remove_skill_not_present(self, initialized_project):
+        from idlergear.install import remove_skill
+
+        result = remove_skill()
+        assert result is False
+
+    def test_remove_skill_cleans_empty_dirs(self, initialized_project):
+        from idlergear.install import add_skill, remove_skill
+
+        add_skill()
+        remove_skill()
+
+        # Empty skills directory should be cleaned up
+        skills_dir = initialized_project / ".claude" / "skills"
+        if skills_dir.exists():
+            assert list(skills_dir.iterdir()), "skills dir should have files or not exist"
+
+
 class TestFullUninstall:
     """Tests for uninstall_idlergear function."""
 
@@ -375,6 +465,7 @@ class TestFullUninstall:
             add_agents_md_section,
             add_claude_md_section,
             add_rules_file,
+            add_skill,
             install_mcp_server,
         )
         from idlergear.uninstall import uninstall_idlergear
@@ -384,6 +475,7 @@ class TestFullUninstall:
         add_agents_md_section()
         add_claude_md_section()
         add_rules_file()
+        add_skill()
 
         # Uninstall
         results = uninstall_idlergear(initialized_project)

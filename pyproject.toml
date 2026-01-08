@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "idlergear"
-version = "0.3.2"
+version = "0.3.3"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -33,10 +33,15 @@ dev = [
 
 [project.scripts]
 idlergear = "idlergear.cli:app"
+ig = "idlergear.cli:app"  # Short alias
 idlergear-mcp = "idlergear.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/idlergear"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/idlergear/skill" = "idlergear/skill"
+"src/idlergear/hooks" = "idlergear/hooks"
 
 [tool.hatch.build.targets.sdist]
 include = ["src/idlergear"]

@@ -1,6 +1,8 @@
 """Install IdlerGear into a project for Claude Code integration."""
 
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 
@@ -534,6 +536,179 @@ def add_start_command(project_path: Path | None = None) -> bool:
 
     commands_dir.mkdir(parents=True, exist_ok=True)
     command_file.write_text(START_COMMAND_CONTENT)
+    return True
+
+
+def add_skill(project_path: Path | None = None) -> bool:
+    """Create .claude/skills/idlergear/ skill directory.
+
+    Copies the skill files from the idlergear package.
+    Returns True if created, False if already exists.
+    """
+    import shutil
+    from importlib.resources import files
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    skill_dir = project_path / ".claude" / "skills" / "idlergear"
+
+    if skill_dir.exists():
+        return False
+
+    # Get the skill directory from the package
+    package_skill_dir = files("idlergear") / "skill"
+
+    # Create the skill directory structure
+    skill_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy SKILL.md
+    skill_md = package_skill_dir / "SKILL.md"
+    if skill_md.is_file():
+        (skill_dir / "SKILL.md").write_text(skill_md.read_text())
+
+    # Copy references/
+    refs_src = package_skill_dir / "references"
+    refs_dst = skill_dir / "references"
+    refs_dst.mkdir(exist_ok=True)
+    for ref_file in ["knowledge-types.md", "mcp-tools.md", "multi-agent.md"]:
+        src_file = refs_src / ref_file
+        if src_file.is_file():
+            (refs_dst / ref_file).write_text(src_file.read_text())
+
+    # Copy scripts/
+    scripts_src = package_skill_dir / "scripts"
+    scripts_dst = skill_dir / "scripts"
+    scripts_dst.mkdir(exist_ok=True)
+    for script_file in ["context.sh", "status.sh", "session-start.sh"]:
+        src_file = scripts_src / script_file
+        if src_file.is_file():
+            dst_file = scripts_dst / script_file
+            dst_file.write_text(src_file.read_text())
+            dst_file.chmod(0o755)  # Make executable
+
+    return True
+
+
+def remove_skill(project_path: Path | None = None) -> bool:
+    """Remove .claude/skills/idlergear/ skill directory.
+
+    Returns True if removed, False if not present.
+    """
+    import shutil
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    skill_dir = project_path / ".claude" / "skills" / "idlergear"
+
+    if not skill_dir.exists():
+        return False
+
+    shutil.rmtree(skill_dir)
+
+    # Clean up empty parent directories
+    skills_dir = skill_dir.parent
+    claude_dir = skills_dir.parent
+    try:
+        if skills_dir.exists() and not any(skills_dir.iterdir()):
+            skills_dir.rmdir()
+    except OSError:
+        pass
+
+    return True
+
+
+def add_auto_version_hook(project_path: Path | None = None) -> bool:
+    """Install git pre-commit hook for automatic version bumping.
+
+    The hook increments the patch version in pyproject.toml on each commit.
+    Manual major/minor version bumps are detected and respected.
+    Use [skip-version] in commit message to bypass.
+
+    Returns True if installed, False if already exists or not a git repo.
+    """
+    from importlib.resources import files
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    # Check if this is a git repository
+    git_dir = project_path / ".git"
+    if not git_dir.exists():
+        return False
+
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(exist_ok=True)
+
+    pre_commit = hooks_dir / "pre-commit"
+
+    # Check if pre-commit hook already exists
+    if pre_commit.exists():
+        content = pre_commit.read_text()
+        if "IdlerGear auto-version" in content:
+            return False  # Already installed
+        # Append to existing hook
+        hook_source = files("idlergear") / "hooks" / "auto_version.sh"
+        hook_content = hook_source.read_text()
+        # Add as a separate section
+        with open(pre_commit, "a") as f:
+            f.write("\n\n# --- IdlerGear auto-version hook ---\n")
+            # Skip the shebang if appending
+            lines = hook_content.split("\n")
+            if lines[0].startswith("#!"):
+                lines = lines[1:]
+            f.write("\n".join(lines))
+        return True
+
+    # Create new pre-commit hook
+    hook_source = files("idlergear") / "hooks" / "auto_version.sh"
+    pre_commit.write_text(hook_source.read_text())
+    pre_commit.chmod(0o755)
+
+    return True
+
+
+def remove_auto_version_hook(project_path: Path | None = None) -> bool:
+    """Remove the auto-version pre-commit hook.
+
+    Returns True if removed, False if not present.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    pre_commit = project_path / ".git" / "hooks" / "pre-commit"
+
+    if not pre_commit.exists():
+        return False
+
+    content = pre_commit.read_text()
+
+    if "IdlerGear auto-version" not in content:
+        return False
+
+    # Check if the entire file is our hook or if we appended to existing
+    if content.strip().startswith("#!/bin/bash\n# IdlerGear auto-version"):
+        # Entire file is our hook, remove it
+        pre_commit.unlink()
+    else:
+        # We appended to an existing hook, remove our section
+        marker = "\n\n# --- IdlerGear auto-version hook ---\n"
+        if marker in content:
+            new_content = content.split(marker)[0]
+            pre_commit.write_text(new_content)
+        else:
+            # Can't cleanly remove, leave it
+            return False
+
     return True
 
 

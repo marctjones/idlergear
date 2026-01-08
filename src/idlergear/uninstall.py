@@ -192,6 +192,7 @@ def uninstall_idlergear(
         "agents_md": False,
         "claude_md": False,
         "rules_file": False,
+        "skill": False,
         "claude_settings": False,
         "idlergear_data": False,
     }
@@ -201,6 +202,7 @@ def uninstall_idlergear(
     agents_file = project_path / "AGENTS.md"
     claude_file = project_path / "CLAUDE.md"
     rules_file = project_path / ".claude" / "rules" / "idlergear.md"
+    skill_dir = project_path / ".claude" / "skills" / "idlergear"
     settings_file = project_path / ".claude" / "settings.json"
     idlergear_dir = project_path / ".idlergear"
 
@@ -225,6 +227,9 @@ def uninstall_idlergear(
 
     if rules_file.exists():
         results["rules_file"] = True
+
+    if skill_dir.exists():
+        results["skill"] = True
 
     if settings_file.exists():
         try:
@@ -256,6 +261,10 @@ def uninstall_idlergear(
     if results["rules_file"]:
         from idlergear.install import remove_rules_file
         results["rules_file"] = remove_rules_file(project_path)
+
+    if results["skill"]:
+        from idlergear.install import remove_skill
+        results["skill"] = remove_skill(project_path)
 
     if results["claude_settings"]:
         results["claude_settings"] = remove_claude_settings(project_path)

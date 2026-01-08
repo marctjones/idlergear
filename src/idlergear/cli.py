@@ -797,23 +797,31 @@ def install(
     skip_rules: bool = typer.Option(False, "--skip-rules", help="Skip .claude/rules/ creation"),
     skip_hooks: bool = typer.Option(False, "--skip-hooks", help="Skip .claude/hooks.json creation"),
     skip_commands: bool = typer.Option(False, "--skip-commands", help="Skip /start command creation"),
+    skip_skill: bool = typer.Option(False, "--skip-skill", help="Skip .claude/skills/idlergear/ creation"),
+    auto_version: bool = typer.Option(False, "--auto-version", help="Install git hook to auto-bump patch version on commit"),
 ):
     """Install IdlerGear integration for Claude Code.
 
     Creates:
     - .mcp.json - MCP server registration
+    - .claude/skills/idlergear/ - Skill with auto-triggering (RECOMMENDED)
     - CLAUDE.md - Usage instructions
     - AGENTS.md - AI agent instructions
     - .claude/rules/idlergear.md - Enforcement rules
     - .claude/hooks.json - Enforcement hooks
     - .claude/commands/start.md - /start slash command
+
+    Optional:
+    - .git/hooks/pre-commit - Auto-increment patch version (--auto-version)
     """
     from idlergear.config import find_idlergear_root
     from idlergear.install import (
         add_agents_md_section,
+        add_auto_version_hook,
         add_claude_md_section,
         add_hooks_config,
         add_rules_file,
+        add_skill,
         add_start_command,
         install_mcp_server,
     )
@@ -827,6 +835,13 @@ def install(
         typer.secho("Added idlergear to .mcp.json", fg=typer.colors.GREEN)
     else:
         typer.echo(".mcp.json already has idlergear configured")
+
+    # Create skill (RECOMMENDED - auto-triggering)
+    if not skip_skill:
+        if add_skill():
+            typer.secho("Created .claude/skills/idlergear/ (auto-triggering enabled)", fg=typer.colors.GREEN)
+        else:
+            typer.echo(".claude/skills/idlergear/ already exists")
 
     # Add CLAUDE.md section
     if not skip_claude:
@@ -863,8 +878,16 @@ def install(
         else:
             typer.echo(".claude/commands/start.md already exists")
 
+    # Install auto-version git hook (optional)
+    if auto_version:
+        if add_auto_version_hook():
+            typer.secho("Installed .git/hooks/pre-commit (auto-version)", fg=typer.colors.GREEN)
+        else:
+            typer.echo(".git/hooks/pre-commit already has auto-version hook (or not a git repo)")
+
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
+    typer.echo("The IdlerGear skill auto-triggers when you mention tasks, notes, or project status.")
     typer.echo("Use /start at session beginning to load project context.")
     typer.echo("Restart Claude Code or run /mcp to verify.")
 
