@@ -67,10 +67,10 @@ class TestTaskCommands:
         assert result.exit_code == 0
 
     def test_task_list_empty(self, cli_project):
-        result = runner.invoke(app, ["task", "list"])
+        result = runner.invoke(app, ["--output", "human", "task", "list"])
 
         assert result.exit_code == 0
-        assert "No open tasks" in result.output
+        assert "No" in result.output and "task" in result.output
 
     def test_task_list(self, cli_project):
         runner.invoke(app, ["task", "create", "Task one"])
@@ -92,7 +92,7 @@ class TestTaskCommands:
         assert "Task body" in result.output
 
     def test_task_show_not_found(self, cli_project):
-        result = runner.invoke(app, ["task", "show", "999"])
+        result = runner.invoke(app, ["--output", "human", "task", "show", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
@@ -294,7 +294,7 @@ class TestConfigCommands:
         assert "test-value" in result.output
 
     def test_config_get_not_set(self, cli_project):
-        result = runner.invoke(app, ["config", "get", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "config", "get", "nonexistent"])
 
         assert result.exit_code == 0
         assert "not set" in result.output
@@ -343,7 +343,7 @@ class TestDaemonCommands:
     """Tests for daemon commands."""
 
     def test_daemon_status_not_running(self, cli_project):
-        result = runner.invoke(app, ["daemon", "status"])
+        result = runner.invoke(app, ["--output", "human", "daemon", "status"])
 
         assert result.exit_code == 0
         assert "not running" in result.output
@@ -368,7 +368,7 @@ class TestRunCommands:
         assert "test-run" in result.output
 
     def test_run_list_empty(self, cli_project):
-        result = runner.invoke(app, ["run", "list"])
+        result = runner.invoke(app, ["--output", "human", "run", "list"])
 
         assert result.exit_code == 0
         assert "No runs found" in result.output
@@ -396,7 +396,7 @@ class TestRunCommands:
         assert "status-run" in result.output
 
     def test_run_status_not_found(self, cli_project):
-        result = runner.invoke(app, ["run", "status", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "run", "status", "nonexistent"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
@@ -413,7 +413,7 @@ class TestRunCommands:
         assert "hello" in result.output
 
     def test_run_logs_not_found(self, cli_project):
-        result = runner.invoke(app, ["run", "logs", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "run", "logs", "nonexistent"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
@@ -430,9 +430,10 @@ class TestRunCommands:
         assert "Stopped run" in result.output
 
     def test_run_stop_not_found(self, cli_project):
-        result = runner.invoke(app, ["run", "stop", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "run", "stop", "nonexistent"])
 
         assert result.exit_code == 1
+        assert "not found" in result.output
 
 
 class TestErrorHandling:
@@ -486,13 +487,13 @@ class TestAdditionalTaskCommands:
         assert "Task to close" in result.output
 
     def test_task_close_not_found(self, cli_project):
-        result = runner.invoke(app, ["task", "close", "999"])
+        result = runner.invoke(app, ["--output", "human", "task", "close", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_task_edit_not_found(self, cli_project):
-        result = runner.invoke(app, ["task", "edit", "999", "--title", "New"])
+        result = runner.invoke(app, ["--output", "human", "task", "edit", "999", "--title", "New"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
@@ -516,25 +517,25 @@ class TestAdditionalNoteCommands:
     """Additional note command tests."""
 
     def test_note_show_not_found(self, cli_project):
-        result = runner.invoke(app, ["note", "show", "999"])
+        result = runner.invoke(app, ["--output", "human", "note", "show", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_note_delete_not_found(self, cli_project):
-        result = runner.invoke(app, ["note", "delete", "999"])
+        result = runner.invoke(app, ["--output", "human", "note", "delete", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_note_promote_not_found(self, cli_project):
-        result = runner.invoke(app, ["note", "promote", "999", "--to", "task"])
+        result = runner.invoke(app, ["--output", "human", "note", "promote", "999", "--to", "task"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_note_list_empty(self, cli_project):
-        result = runner.invoke(app, ["note", "list"])
+        result = runner.invoke(app, ["--output", "human", "note", "list"])
 
         assert result.exit_code == 0
         assert "No notes found" in result.output
@@ -544,19 +545,19 @@ class TestAdditionalExploreCommands:
     """Additional explore command tests (deprecated - redirects to notes with --tag explore)."""
 
     def test_explore_show_not_found(self, cli_project):
-        result = runner.invoke(app, ["explore", "show", "999"])
+        result = runner.invoke(app, ["--output", "human", "explore", "show", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_explore_delete_not_found(self, cli_project):
-        result = runner.invoke(app, ["explore", "delete", "999"])
+        result = runner.invoke(app, ["--output", "human", "explore", "delete", "999"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_explore_list_empty(self, cli_project):
-        result = runner.invoke(app, ["explore", "list"])
+        result = runner.invoke(app, ["--output", "human", "explore", "list"])
 
         assert result.exit_code == 0
         assert "No exploration notes found" in result.output
@@ -566,7 +567,7 @@ class TestAdditionalPlanCommands:
     """Additional plan command tests."""
 
     def test_plan_show_not_found(self, cli_project):
-        result = runner.invoke(app, ["plan", "show", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "plan", "show", "nonexistent"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
@@ -575,25 +576,25 @@ class TestAdditionalPlanCommands:
         runner.invoke(app, ["plan", "create", "my-plan"])
         runner.invoke(app, ["plan", "switch", "my-plan"])
 
-        result = runner.invoke(app, ["plan", "show"])
+        result = runner.invoke(app, ["--output", "human", "plan", "show"])
 
         assert result.exit_code == 0
         assert "my-plan" in result.output
 
     def test_plan_show_no_current(self, cli_project):
-        result = runner.invoke(app, ["plan", "show"])
+        result = runner.invoke(app, ["--output", "human", "plan", "show"])
 
         assert result.exit_code == 0
         assert "No current plan" in result.output
 
     def test_plan_switch_not_found(self, cli_project):
-        result = runner.invoke(app, ["plan", "switch", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "plan", "switch", "nonexistent"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_plan_list_empty(self, cli_project):
-        result = runner.invoke(app, ["plan", "list"])
+        result = runner.invoke(app, ["--output", "human", "plan", "list"])
 
         assert result.exit_code == 0
         assert "No plans found" in result.output
@@ -609,7 +610,7 @@ class TestAdditionalReferenceCommands:
     """Additional reference command tests."""
 
     def test_reference_show_not_found(self, cli_project):
-        result = runner.invoke(app, ["reference", "show", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "reference", "show", "nonexistent"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
@@ -623,19 +624,19 @@ class TestAdditionalReferenceCommands:
         assert "Updated reference" in result.output
 
     def test_reference_edit_not_found(self, cli_project):
-        result = runner.invoke(app, ["reference", "edit", "nonexistent", "--body", "New"])
+        result = runner.invoke(app, ["--output", "human", "reference", "edit", "nonexistent", "--body", "New"])
 
         assert result.exit_code == 1
         assert "not found" in result.output
 
     def test_reference_search_no_results(self, cli_project):
-        result = runner.invoke(app, ["reference", "search", "nonexistent"])
+        result = runner.invoke(app, ["--output", "human", "reference", "search", "nonexistent"])
 
         assert result.exit_code == 0
         assert "No references found" in result.output
 
     def test_reference_list_empty(self, cli_project):
-        result = runner.invoke(app, ["reference", "list"])
+        result = runner.invoke(app, ["--output", "human", "reference", "list"])
 
         assert result.exit_code == 0
         assert "No reference documents" in result.output

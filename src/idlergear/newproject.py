@@ -186,7 +186,7 @@ def _create_python_structure(
     # src/<package>/
     src_path = project_path / "src" / package_name
     src_path.mkdir(parents=True)
-    (src_path / "__init__.py").write_text(SRC_INIT.format(project_name=name))
+    (src_path / "__init__.py").write_text(SRC_INIT.format(project_name=name, package_name=package_name))
 
     # tests/
     tests_path = project_path / "tests"

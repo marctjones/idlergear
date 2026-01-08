@@ -54,7 +54,7 @@ class TestCreateProject:
                 init_git=False,
             )
 
-            vision_path = Path(tmpdir) / "test-project" / ".idlergear" / "vision.md"
+            vision_path = Path(tmpdir) / "test-project" / ".idlergear" / "vision" / "VISION.md"
             assert "Build the best thing" in vision_path.read_text()
 
     def test_create_with_description(self):
@@ -95,14 +95,13 @@ class TestCreateProject:
             )
 
             idlergear = project_path / ".idlergear"
-            assert (idlergear / "tasks").is_dir()
+            assert (idlergear / "issues").is_dir()  # renamed from tasks
             assert (idlergear / "notes").is_dir()
-            assert (idlergear / "explorations").is_dir()
             assert (idlergear / "plans").is_dir()
-            assert (idlergear / "reference").is_dir()
+            assert (idlergear / "wiki").is_dir()  # renamed from reference
             assert (idlergear / "runs").is_dir()
             assert (idlergear / "config.toml").exists()
-            assert (idlergear / "vision.md").exists()
+            assert (idlergear / "vision" / "VISION.md").exists()  # moved to vision/
 
     def test_create_claude_structure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -181,7 +180,7 @@ class TestCreatePythonProject:
                 init_venv=False,
             )
 
-            python_rules = project_path / ".claude" / "rules" / "python.md"
+            python_rules = project_path / ".claude" / "rules" / "ig_python.md"
             assert python_rules.exists()
 
     def test_python_with_venv(self):
@@ -198,7 +197,7 @@ class TestCreatePythonProject:
             # venv may or may not exist depending on python availability
             # but hooks should be created if venv was created
             if venv_path.exists():
-                hooks_path = project_path / ".claude" / "hooks" / "activate-venv.sh"
+                hooks_path = project_path / ".claude" / "hooks" / "ig_activate-venv.sh"
                 assert hooks_path.exists()
 
 

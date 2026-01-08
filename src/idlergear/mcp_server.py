@@ -2124,12 +2124,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 return _format_result({"error": "No agent_id provided or detected"})
 
             # Create task callback if requested
-            create_tasks = arguments.get("create_tasks", True)
+            should_create_tasks = arguments.get("create_tasks", True)
             task_callback = None
-            if create_tasks:
-                from idlergear.tasks import create_task
+            if should_create_tasks:
+                from idlergear.tasks import create_task as _create_task_for_callback
                 def task_callback(title: str, body: str, labels: list[str]) -> int:
-                    task = create_task(title, body=body, labels=labels, project_path=root)
+                    task = _create_task_for_callback(title, body=body, labels=labels, project_path=root)
                     return task.get("id") if isinstance(task, dict) else task.id
 
             # Process inbox
