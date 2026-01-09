@@ -327,6 +327,15 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Filter by tag (e.g., 'explore', 'idea')",
                     },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit number of results (for token efficiency)",
+                    },
+                    "preview": {
+                        "type": "boolean",
+                        "description": "Strip note content for token efficiency (default: false)",
+                        "default": False,
+                    },
                 },
             },
         ),
@@ -431,7 +440,12 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="idlergear_plan_list",
             description="List all plans",
-            inputSchema={"type": "object", "properties": {}},
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Limit number of results"},
+                },
+            },
         ),
         Tool(
             name="idlergear_plan_show",
@@ -470,7 +484,13 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="idlergear_reference_list",
             description="List all reference documents",
-            inputSchema={"type": "object", "properties": {}},
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Limit number of results"},
+                    "preview": {"type": "boolean", "default": False, "description": "Strip bodies for token efficiency (default: false)"},
+                },
+            },
         ),
         Tool(
             name="idlergear_reference_show",
@@ -510,7 +530,12 @@ async def list_tools() -> list[Tool]:
         Tool(
             name="idlergear_run_list",
             description="List all runs",
-            inputSchema={"type": "object", "properties": {}},
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "description": "Limit number of results"},
+                },
+            },
         ),
         Tool(
             name="idlergear_run_status",
@@ -611,46 +636,6 @@ async def list_tools() -> list[Tool]:
                     },
                 },
             },
-        ),
-        # Session tools - save and restore work state
-        Tool(
-            name="idlergear_session_save",
-            description="Save current session state for later restoration. Captures current task, recent notes, uncommitted files, and active runs.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Optional name for the session (defaults to timestamp)",
-                    },
-                    "next_steps": {
-                        "type": "string",
-                        "description": "Optional description of what to do next",
-                    },
-                    "blockers": {
-                        "type": "string",
-                        "description": "Optional description of what's blocking progress",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="idlergear_session_restore",
-            description="Restore/view a saved session state. Returns session info including current task, notes, and next steps.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Session name to restore (omit for most recent)",
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="idlergear_session_list",
-            description="List all saved sessions with metadata.",
-            inputSchema={"type": "object", "properties": {}},
         ),
         # Search tool
         Tool(
@@ -869,12 +854,18 @@ async def list_tools() -> list[Tool]:
             },
         ),
         Tool(
-            name="idlergear_daemon_send_message",
-            description="Broadcast a message to all active AI agents. Use this to coordinate work across multiple AI assistants.",
+            name="idlergear_daemon_broadcast",
+            description="Broadcast a message to all active AI agents. Use this to coordinate work across multiple AI assistants. For sending to a specific agent, use idlergear_message_send instead.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "message": {"type": "string", "description": "Message to broadcast"},
+                    "message": {"type": "string", "description": "Message to broadcast to all agents"},
+                    "delivery": {
+                        "type": "string",
+                        "enum": ["context", "notification", "deferred"],
+                        "description": "Delivery type for all recipients (default: notification)",
+                        "default": "notification",
+                    },
                 },
                 "required": ["message"],
             },
@@ -958,6 +949,20 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {
                     "agent_id": {"type": "string", "description": "Your agent ID (optional, uses registered ID if available)"},
                     "unread_only": {"type": "boolean", "description": "Only show unread messages (default: true)", "default": True},
+                    "delivery": {
+                        "type": "string",
+                        "enum": ["context", "notification", "deferred"],
+                        "description": "Filter by delivery type",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit number of results (for token efficiency)",
+                    },
+                    "preview": {
+                        "type": "boolean",
+                        "description": "Strip message content, show only metadata (default: false)",
+                        "default": False,
+                    },
                 },
             },
         ),
@@ -1697,6 +1702,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_note_list":
             result = list_notes(tag=arguments.get("tag"))
+            limit = arguments.get("limit")
+            preview = arguments.get("preview", False)
+            if limit and len(result) > limit:
+                result = result[:limit]
+            if preview:
+                result = [{"id": n.get("id"), "tags": n.get("tags", []), "created": n.get("created")} for n in result]
             return _format_result(result)
 
         elif name == "idlergear_note_show":
@@ -1765,6 +1776,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_plan_list":
             result = list_plans()
+            # Apply limit if specified
+            limit = arguments.get("limit")
+            if limit:
+                result = result[:limit]
             return _format_result(result)
 
         elif name == "idlergear_plan_show":
@@ -1791,6 +1806,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_reference_list":
             result = list_references()
+            # Apply limit if specified
+            limit = arguments.get("limit")
+            if limit:
+                result = result[:limit]
+            # Strip bodies if preview mode (token-efficient)
+            if arguments.get("preview", False):
+                for ref in result:
+                    ref["body"] = None
             return _format_result(result)
 
         elif name == "idlergear_reference_show":
@@ -1813,6 +1836,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_run_list":
             result = list_runs()
+            # Apply limit if specified
+            limit = arguments.get("limit")
+            if limit:
+                result = result[:limit]
             return _format_result(result)
 
         elif name == "idlergear_run_status":
@@ -1870,39 +1897,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "summary": status.summary(),
                     **status.to_dict()
                 })
-
-        # Session handlers
-        elif name == "idlergear_session_save":
-            from idlergear.sessions import save_session
-
-            session_file = save_session(
-                name=arguments.get("name"),
-                next_steps=arguments.get("next_steps"),
-                blockers=arguments.get("blockers"),
-            )
-            return _format_result({
-                "saved": True,
-                "file": str(session_file),
-                "name": session_file.stem,
-            })
-
-        elif name == "idlergear_session_restore":
-            from idlergear.sessions import load_session
-
-            state = load_session(name=arguments.get("name"))
-            if state is None:
-                name = arguments.get("name")
-                if name:
-                    raise ValueError(f"Session '{name}' not found")
-                else:
-                    raise ValueError("No saved sessions found")
-            return _format_result(state.to_dict())
-
-        elif name == "idlergear_session_list":
-            from idlergear.sessions import list_sessions
-
-            sessions = list_sessions()
-            return _format_result({"sessions": sessions, "count": len(sessions)})
 
         # Search handler
         elif name == "idlergear_search":
@@ -2067,7 +2061,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             result = handle_queue_command(arguments)
             return _format_result(result)
 
-        elif name == "idlergear_daemon_send_message":
+        elif name == "idlergear_daemon_broadcast":
             from idlergear.daemon.mcp_handlers import handle_send_message
             result = handle_send_message(arguments)
             return _format_result(result)
@@ -2167,7 +2161,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             })
 
         elif name == "idlergear_message_list":
-            from idlergear.messaging import list_messages, get_inbox_summary
+            from idlergear.messaging import list_messages, get_inbox_summary, _get_delivery_type
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2189,6 +2183,28 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             unread_only = arguments.get("unread_only", True)
             messages = list_messages(idlergear_dir, agent_id, unread_only=unread_only)
+
+            # Filter by delivery type if specified
+            delivery_filter = arguments.get("delivery")
+            if delivery_filter:
+                messages = [m for m in messages if _get_delivery_type(m) == delivery_filter]
+
+            # Apply limit
+            limit = arguments.get("limit")
+            if limit and len(messages) > limit:
+                messages = messages[:limit]
+
+            # Apply preview mode
+            preview = arguments.get("preview", False)
+            if preview:
+                messages = [{
+                    "id": m.get("id"),
+                    "from": m.get("from"),
+                    "delivery": _get_delivery_type(m),
+                    "timestamp": m.get("timestamp"),
+                    "read": m.get("read", False),
+                } for m in messages]
+
             summary = get_inbox_summary(idlergear_dir, agent_id)
             return _format_result({
                 "messages": messages,
