@@ -311,7 +311,7 @@ class TestAddRulesFile:
         from idlergear.install import add_rules_file
 
         result = add_rules_file()
-        assert result is True
+        assert result == "created"
 
         rules_path = initialized_project / ".claude" / "rules" / "idlergear.md"
         assert rules_path.exists()
@@ -327,7 +327,18 @@ class TestAddRulesFile:
         add_rules_file()
         result = add_rules_file()
 
-        assert result is False  # Already exists
+        assert result == "unchanged"  # Content identical
+
+    def test_add_updates_when_different(self, initialized_project):
+        from idlergear.install import add_rules_file
+
+        add_rules_file()
+        rules_path = initialized_project / ".claude" / "rules" / "idlergear.md"
+        rules_path.write_text("old content")
+
+        result = add_rules_file()
+        assert result == "updated"
+        assert "IdlerGear" in rules_path.read_text()
 
 
 class TestRemoveRulesFile:

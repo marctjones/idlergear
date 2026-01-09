@@ -359,11 +359,11 @@ HOOKS_CONFIG = {
 # Slash commands are stored in src/idlergear/commands/ and read at install time
 
 
-def add_rules_file(project_path: Path | None = None) -> bool:
-    """Create .claude/rules/idlergear.md for Claude Code.
+def add_rules_file(project_path: Path | None = None) -> str:
+    """Create or update .claude/rules/idlergear.md for Claude Code.
 
     Copies the rules file from src/idlergear/rules/.
-    Returns True if created, False if already exists.
+    Returns 'created', 'updated', or 'unchanged'.
     """
     from importlib.resources import files
 
@@ -375,17 +375,23 @@ def add_rules_file(project_path: Path | None = None) -> bool:
     rules_dir = project_path / ".claude" / "rules"
     rules_file = rules_dir / "idlergear.md"
 
-    if rules_file.exists():
-        return False
-
     # Read from package source
     package_rules = files("idlergear") / "rules" / "idlergear.md"
     if not package_rules.is_file():
         raise RuntimeError("idlergear rules file not found in package")
 
+    src_content = package_rules.read_text()
     rules_dir.mkdir(parents=True, exist_ok=True)
-    rules_file.write_text(package_rules.read_text())
-    return True
+
+    if rules_file.exists():
+        if rules_file.read_text() == src_content:
+            return "unchanged"
+        else:
+            rules_file.write_text(src_content)
+            return "updated"
+    else:
+        rules_file.write_text(src_content)
+        return "created"
 
 
 def add_hooks_config(project_path: Path | None = None) -> bool:

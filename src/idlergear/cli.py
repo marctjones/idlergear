@@ -876,10 +876,13 @@ def install(
 
     # Create rules file
     if not skip_rules:
-        if add_rules_file():
+        rules_result = add_rules_file()
+        if rules_result == "created":
             typer.secho("Created .claude/rules/idlergear.md", fg=typer.colors.GREEN)
+        elif rules_result == "updated":
+            typer.secho("Updated .claude/rules/idlergear.md", fg=typer.colors.YELLOW)
         else:
-            typer.echo(".claude/rules/idlergear.md already exists")
+            typer.echo(".claude/rules/idlergear.md unchanged")
 
     # Create hooks config and install hook scripts
     if not skip_hooks:
