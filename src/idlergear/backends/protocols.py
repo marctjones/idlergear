@@ -60,12 +60,16 @@ class TaskBackend(Protocol):
 class NoteBackend(Protocol):
     """Protocol for note management backends."""
 
-    def create(self, content: str) -> dict[str, Any]:
-        """Create a new note."""
+    def create(
+        self,
+        content: str,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new note with optional tags."""
         ...
 
-    def list(self) -> list[dict[str, Any]]:
-        """List all notes."""
+    def list(self, tag: str | None = None) -> list[dict[str, Any]]:
+        """List notes, optionally filtered by tag."""
         ...
 
     def get(self, note_id: int) -> dict[str, Any] | None:

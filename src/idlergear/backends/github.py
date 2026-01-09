@@ -424,9 +424,29 @@ class GitHubNoteBackend:
         except GitHubBackendError:
             pass  # Label might already exist
 
-    def create(self, content: str) -> dict[str, Any]:
-        """Create a new note as a GitHub issue."""
+    def _ensure_tag_labels_exist(self, tags: list[str]) -> None:
+        """Ensure tag labels exist (tag:explore, tag:idea, etc.)."""
+        for tag in tags:
+            label_name = f"tag:{tag}"
+            try:
+                _run_gh_command([
+                    "label", "create", label_name,
+                    "--description", f"IdlerGear note tag: {tag}",
+                    "--color", "C2E0C6",  # Light green
+                    "--force",
+                ])
+            except GitHubBackendError:
+                pass  # Label might already exist
+
+    def create(
+        self,
+        content: str,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new note as a GitHub issue with optional tags."""
         self._ensure_label_exists()
+        if tags:
+            self._ensure_tag_labels_exist(tags)
 
         # Use first line as title, rest as body
         lines = content.strip().split('\n', 1)
@@ -440,23 +460,31 @@ class GitHubNoteBackend:
             "--body", body,
         ]
 
+        # Add tag labels
+        for tag in (tags or []):
+            args.extend(["--label", f"tag:{tag}"])
+
         output = _run_gh_command(args)
 
         issue_number = _extract_issue_number_from_url(output)
         if issue_number is None:
             raise GitHubBackendError(f"Could not parse issue number from: {output}")
 
-        return self.get(issue_number) or {"id": issue_number, "content": content}
+        return self.get(issue_number) or {"id": issue_number, "content": content, "tags": tags or []}
 
-    def list(self) -> list[dict[str, Any]]:
-        """List all notes (open issues with note label)."""
+    def list(self, tag: str | None = None) -> list[dict[str, Any]]:
+        """List notes, optionally filtered by tag."""
         args = [
             "issue", "list",
             "--state", "open",
             "--label", self.NOTE_LABEL,
-            "--json", "number,title,body,createdAt,updatedAt",
+            "--json", "number,title,body,labels,createdAt,updatedAt",
             "--limit", "100",
         ]
+
+        # Filter by tag if specified
+        if tag:
+            args.extend(["--label", f"tag:{tag}"])
 
         output = _run_gh_command(args)
         issues = _parse_json(output) or []
@@ -467,7 +495,7 @@ class GitHubNoteBackend:
         try:
             args = [
                 "issue", "view", str(note_id),
-                "--json", "number,title,body,state,createdAt,updatedAt",
+                "--json", "number,title,body,state,labels,createdAt,updatedAt",
             ]
             output = _run_gh_command(args)
             issue = _parse_json(output)
@@ -523,9 +551,18 @@ class GitHubNoteBackend:
         body = issue.get("body", "")
         content = f"{title}\n{body}".strip() if body else title
 
+        # Extract tags from labels (format: tag:explore, tag:idea, etc.)
+        tags = []
+        if issue.get("labels"):
+            for label in issue["labels"]:
+                label_name = label.get("name", label) if isinstance(label, dict) else label
+                if label_name.startswith("tag:"):
+                    tags.append(label_name[4:])  # Remove "tag:" prefix
+
         return {
             "id": issue.get("number"),
             "content": content,
+            "tags": tags,
             "created_at": issue.get("createdAt", ""),
             "updated_at": issue.get("updatedAt", ""),
         }
@@ -535,12 +572,26 @@ class GitHubVisionBackend:
     """GitHub repository file as vision backend.
 
     Syncs vision content to/from VISION.md in the repository root.
+    Auto-commit behavior is configurable via github.vision_auto_commit config.
     """
 
     VISION_FILE = "VISION.md"
 
     def __init__(self, project_path: Path | None = None):
         self.project_path = project_path
+
+    def _should_auto_commit(self) -> bool:
+        """Check if auto-commit is enabled (default: True for backward compat)."""
+        try:
+            from idlergear.config import get_config
+            value = get_config("github.vision_auto_commit", project_path=self.project_path)
+            if value is None:
+                return True  # Default to auto-commit for backward compatibility
+            if isinstance(value, bool):
+                return value
+            return str(value).lower() in ("true", "1", "yes")
+        except Exception:
+            return True  # Default to auto-commit
 
     def get(self) -> str | None:
         """Get the vision from GitHub (VISION.md in repo)."""
@@ -569,9 +620,10 @@ class GitHubVisionBackend:
         return None
 
     def set(self, content: str) -> None:
-        """Set the vision (write to local VISION.md and commit).
+        """Set the vision (write to local VISION.md and optionally commit).
 
         Note: This writes locally. Use git push to sync to GitHub.
+        Auto-commit can be disabled via config: github.vision_auto_commit = false
         """
         if not self.project_path:
             raise GitHubBackendError("Project path required to set vision")
@@ -579,22 +631,23 @@ class GitHubVisionBackend:
         vision_path = self.project_path / self.VISION_FILE
         vision_path.write_text(content)
 
-        # Optionally commit the change
-        try:
-            subprocess.run(
-                ["git", "add", self.VISION_FILE],
-                cwd=self.project_path,
-                capture_output=True,
-                check=True,
-            )
-            subprocess.run(
-                ["git", "commit", "-m", "Update project vision"],
-                cwd=self.project_path,
-                capture_output=True,
-                check=False,  # Don't fail if nothing to commit
-            )
-        except subprocess.CalledProcessError:
-            pass  # Git operations are optional
+        # Only commit if auto-commit is enabled
+        if self._should_auto_commit():
+            try:
+                subprocess.run(
+                    ["git", "add", self.VISION_FILE],
+                    cwd=self.project_path,
+                    capture_output=True,
+                    check=True,
+                )
+                subprocess.run(
+                    ["git", "commit", "-m", "Update project vision"],
+                    cwd=self.project_path,
+                    capture_output=True,
+                    check=False,  # Don't fail if nothing to commit
+                )
+            except subprocess.CalledProcessError:
+                pass  # Git operations are optional
 
 
 class GitHubReferenceBackend:
@@ -688,11 +741,29 @@ class GitHubPlanBackend:
     """GitHub Projects (v2) as plan backend.
 
     Uses gh api to manage GitHub Projects.
+    Current plan selection is persisted to config.
     """
 
     def __init__(self, project_path: Path | None = None):
         self.project_path = project_path
-        self._current_plan: str | None = None
+
+    def _get_current_plan_from_config(self) -> str | None:
+        """Get current plan from IdlerGear config."""
+        try:
+            from idlergear.config import get_config
+            return get_config("github.current_plan", project_path=self.project_path)
+        except Exception:
+            return None
+
+    def _set_current_plan_in_config(self, plan_name: str | None) -> None:
+        """Save current plan to IdlerGear config."""
+        try:
+            from idlergear.config import set_config
+            if plan_name:
+                set_config("github.current_plan", plan_name, project_path=self.project_path)
+            # Note: We don't clear the config if plan_name is None
+        except Exception:
+            pass  # Config operations are optional
 
     def _get_owner_repo(self) -> tuple[str, str]:
         """Get owner and repo from current directory."""
@@ -794,13 +865,16 @@ class GitHubPlanBackend:
             if isinstance(projects, dict) and "projects" in projects:
                 projects = projects["projects"]
 
+            current_plan = self._get_current_plan_from_config()
+
             for p in projects:
+                plan_name = p.get("title", "").lower().replace(" ", "-")
                 result.append({
-                    "name": p.get("title", "").lower().replace(" ", "-"),
+                    "name": plan_name,
                     "title": p.get("title", ""),
                     "id": p.get("number"),
                     "body": "",
-                    "current": p.get("title", "").lower().replace(" ", "-") == self._current_plan,
+                    "current": plan_name == current_plan,
                     "url": p.get("url", ""),
                 })
 
@@ -819,15 +893,17 @@ class GitHubPlanBackend:
 
     def get_current(self) -> dict[str, Any] | None:
         """Get the current active plan."""
-        if not self._current_plan:
+        current_plan = self._get_current_plan_from_config()
+        if not current_plan:
             return None
-        return self.get(self._current_plan)
+        return self.get(current_plan)
 
     def switch(self, name: str) -> dict[str, Any] | None:
-        """Switch to a plan."""
+        """Switch to a plan and persist the selection."""
         plan = self.get(name)
         if plan:
-            self._current_plan = plan.get("name")
+            plan_name = plan.get("name")
+            self._set_current_plan_in_config(plan_name)
             plan["current"] = True
             return plan
         return None

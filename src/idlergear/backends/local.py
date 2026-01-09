@@ -89,15 +89,19 @@ class LocalNoteBackend:
     def __init__(self, project_path: Path | None = None):
         self.project_path = project_path
 
-    def create(self, content: str) -> dict[str, Any]:
+    def create(
+        self,
+        content: str,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
         from idlergear.notes import create_note
 
-        return create_note(content, project_path=self.project_path)
+        return create_note(content, tags=tags, project_path=self.project_path)
 
-    def list(self) -> list[dict[str, Any]]:
+    def list(self, tag: str | None = None) -> list[dict[str, Any]]:
         from idlergear.notes import list_notes
 
-        return list_notes(project_path=self.project_path)
+        return list_notes(tag=tag, project_path=self.project_path)
 
     def get(self, note_id: int) -> dict[str, Any] | None:
         from idlergear.notes import get_note

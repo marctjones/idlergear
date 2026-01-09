@@ -82,7 +82,7 @@ def _do_reload() -> None:
     os.execv(python, [python, "-m", "idlergear.mcp_server"] + sys.argv[1:])
 
 
-from idlergear.notes import create_note, delete_note, get_note, list_notes, promote_note
+# Notes now use backend system via get_backend("note")
 from idlergear.projects import (
     add_task_to_project,
     create_project,
@@ -95,19 +95,8 @@ from idlergear.projects import (
     remove_task_from_project,
     sync_project_to_github,
 )
-from idlergear.plans import (
-    create_plan,
-    get_current_plan,
-    get_plan,
-    list_plans,
-    switch_plan,
-)
-from idlergear.reference import (
-    add_reference,
-    get_reference,
-    list_references,
-    search_references,
-)
+# Plans now use backend system via get_backend("plan")
+# References now use backend system via get_backend("reference")
 from idlergear.runs import get_run_logs, get_run_status, list_runs, start_run, stop_run
 from idlergear.search import search_all
 from idlergear.backends.registry import get_backend
@@ -118,7 +107,7 @@ from idlergear.env import (
     which_enhanced,
 )
 from idlergear.fs import FilesystemServer
-from idlergear.vision import get_vision, set_vision
+# Vision now uses backend system via get_backend("vision")
 
 # Initialize filesystem server
 fs_server = None
@@ -1697,16 +1686,18 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 raise ValueError(f"Task #{arguments['id']} not found")
             return _format_result(result)
 
-        # Note handlers
+        # Note handlers (using backend)
         elif name == "idlergear_note_create":
-            result = create_note(
+            backend = get_backend("note")
+            result = backend.create(
                 arguments["content"],
                 tags=arguments.get("tags"),
             )
             return _format_result(result)
 
         elif name == "idlergear_note_list":
-            result = list_notes(tag=arguments.get("tag"))
+            backend = get_backend("note")
+            result = backend.list(tag=arguments.get("tag"))
             limit = arguments.get("limit")
             preview = arguments.get("preview", False)
             if limit and len(result) > limit:
@@ -1716,18 +1707,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_note_show":
-            result = get_note(arguments["id"])
+            backend = get_backend("note")
+            result = backend.get(arguments["id"])
             if result is None:
                 raise ValueError(f"Note #{arguments['id']} not found")
             return _format_result(result)
 
         elif name == "idlergear_note_delete":
-            if not delete_note(arguments["id"]):
+            backend = get_backend("note")
+            if not backend.delete(arguments["id"]):
                 raise ValueError(f"Note #{arguments['id']} not found")
             return _format_result({"deleted": True, "id": arguments["id"]})
 
         elif name == "idlergear_note_promote":
-            result = promote_note(arguments["id"], arguments["to"])
+            backend = get_backend("note")
+            result = backend.promote(arguments["id"], arguments["to"])
             if result is None:
                 raise ValueError(f"Note #{arguments['id']} not found")
             return _format_result(result)
@@ -1738,12 +1732,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             content = arguments["title"]
             if arguments.get("body"):
                 content = f"{content}\n\n{arguments['body']}"
-            result = create_note(content, tags=["explore"])
+            backend = get_backend("note")
+            result = backend.create(content, tags=["explore"])
             result["deprecated"] = "Use idlergear_note_create with tags=['explore'] instead"
             return _format_result(result)
 
         elif name == "idlergear_explore_list":
-            notes = list_notes(tag="explore")
+            backend = get_backend("note")
+            notes = backend.list(tag="explore")
             result = {
                 "notes": notes,
                 "deprecated": "Use idlergear_note_list with tag='explore' instead",
@@ -1752,7 +1748,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_explore_delete":
             note_id = arguments["id"]
-            success = delete_note(note_id)
+            backend = get_backend("note")
+            success = backend.delete(note_id)
             result = {
                 "deleted": success,
                 "deprecated": "Use idlergear_note_delete instead",
@@ -1761,18 +1758,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 result["error"] = f"Note #{note_id} not found"
             return _format_result(result)
 
-        # Vision handlers
+        # Vision handlers (using backend)
         elif name == "idlergear_vision_show":
-            result = get_vision()
+            backend = get_backend("vision")
+            result = backend.get()
             return _format_result({"content": result})
 
         elif name == "idlergear_vision_edit":
-            set_vision(arguments["content"])
+            backend = get_backend("vision")
+            backend.set(arguments["content"])
             return _format_result({"updated": True})
 
-        # Plan handlers
+        # Plan handlers (using backend)
         elif name == "idlergear_plan_create":
-            result = create_plan(
+            backend = get_backend("plan")
+            result = backend.create(
                 arguments["name"],
                 title=arguments.get("title"),
                 body=arguments.get("body"),
@@ -1780,7 +1780,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_plan_list":
-            result = list_plans()
+            backend = get_backend("plan")
+            result = backend.list()
             # Apply limit if specified
             limit = arguments.get("limit")
             if limit:
@@ -1788,29 +1789,33 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_plan_show":
+            backend = get_backend("plan")
             name_arg = arguments.get("name")
             if name_arg:
-                result = get_plan(name_arg)
+                result = backend.get(name_arg)
             else:
-                result = get_current_plan()
+                result = backend.get_current()
             return _format_result(result)
 
         elif name == "idlergear_plan_switch":
-            result = switch_plan(arguments["name"])
+            backend = get_backend("plan")
+            result = backend.switch(arguments["name"])
             if result is None:
                 raise ValueError(f"Plan '{arguments['name']}' not found")
             return _format_result(result)
 
-        # Reference handlers
+        # Reference handlers (using backend)
         elif name == "idlergear_reference_add":
-            result = add_reference(
+            backend = get_backend("reference")
+            result = backend.add(
                 arguments["title"],
                 body=arguments.get("body"),
             )
             return _format_result(result)
 
         elif name == "idlergear_reference_list":
-            result = list_references()
+            backend = get_backend("reference")
+            result = backend.list()
             # Apply limit if specified
             limit = arguments.get("limit")
             if limit:
@@ -1822,13 +1827,15 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_reference_show":
-            result = get_reference(arguments["title"])
+            backend = get_backend("reference")
+            result = backend.get(arguments["title"])
             if result is None:
                 raise ValueError(f"Reference '{arguments['title']}' not found")
             return _format_result(result)
 
         elif name == "idlergear_reference_search":
-            result = search_references(arguments["query"])
+            backend = get_backend("reference")
+            result = backend.search(arguments["query"])
             return _format_result(result)
 
         # Run handlers
