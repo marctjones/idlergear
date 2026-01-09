@@ -903,10 +903,10 @@ async def list_tools() -> list[Tool]:
         # Cross-agent messaging tools (inbox-based, works without persistent connections)
         Tool(
             name="idlergear_message_send",
-            description="""Send a message to another AI agent's inbox. Messages are routed by priority:
-- urgent: Injected into recipient's context immediately (interrupts their work)
-- normal (default): Converted to a task with [message] label (non-interrupting)
-- low: Queued for end-of-session review
+            description="""Send a message to another AI agent's inbox. Messages are routed by delivery type:
+- context: Injected into recipient's context (they will see and act on it)
+- notification (default): Converted to a task with [message] label (informational)
+- deferred: Queued for end-of-session review
 
 Use 'all' as to_agent to broadcast to all registered agents.""",
             inputSchema={
@@ -914,10 +914,10 @@ Use 'all' as to_agent to broadcast to all registered agents.""",
                 "properties": {
                     "to_agent": {"type": "string", "description": "Target agent ID (e.g., 'claude-code-abc123') or 'all' to broadcast"},
                     "message": {"type": "string", "description": "Message content - can be a request, question, or information"},
-                    "priority": {
+                    "delivery": {
                         "type": "string",
-                        "enum": ["urgent", "normal", "low"],
-                        "description": "Message priority: urgent=interrupt, normal=create task, low=defer (default: normal)",
+                        "enum": ["context", "notification", "deferred"],
+                        "description": "Delivery type: context=inject into context, notification=create task, deferred=queue for later (default: notification)",
                     },
                     "message_type": {
                         "type": "string",
@@ -936,12 +936,12 @@ Use 'all' as to_agent to broadcast to all registered agents.""",
         ),
         Tool(
             name="idlergear_message_process",
-            description="""Process inbox messages and route by priority. Call this at session start to:
-- Inject urgent messages into context (returns them)
-- Convert normal messages to tasks with [message] label
-- Queue low-priority messages for later review
+            description="""Process inbox messages and route by delivery type. Call this at session start to:
+- Inject context messages into your context (returns them)
+- Convert notification messages to tasks with [message] label
+- Queue deferred messages for later review
 
-This ensures messages don't derail your work - only urgent ones interrupt.""",
+This ensures messages don't derail your work - only context ones are shown immediately.""",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2109,7 +2109,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 to_agent=arguments["to_agent"],
                 message=arguments["message"],
                 from_agent=from_agent,
-                priority=arguments.get("priority", "normal"),
+                delivery=arguments.get("delivery"),
                 message_type=arguments.get("message_type", "info"),
                 action_requested=arguments.get("action_requested", False),
                 context=arguments.get("context"),
@@ -2117,7 +2117,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_message_process":
-            from idlergear.messaging import process_inbox, format_urgent_for_context
+            from idlergear.messaging import process_inbox, format_context_for_injection
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2151,19 +2151,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Process inbox
             results = process_inbox(idlergear_dir, agent_id, task_callback)
 
-            # Format urgent messages for context
-            urgent_context = ""
-            if results["urgent"]:
-                urgent_context = format_urgent_for_context(results["urgent"])
+            # Format context messages for injection
+            context_text = ""
+            if results["context"]:
+                context_text = format_context_for_injection(results["context"])
 
             return _format_result({
                 "agent_id": agent_id,
-                "urgent_count": len(results["urgent"]),
-                "urgent_context": urgent_context,
+                "context_count": len(results["context"]),
+                "context_messages": context_text,
                 "tasks_created": results["tasks_created"],
                 "queued_for_review": results["queued"],
                 "errors": results["errors"],
-                "note": "Urgent messages returned for immediate handling. Normal messages converted to tasks." if results["urgent"] else "No urgent messages. Normal messages converted to tasks.",
+                "note": "Context messages returned for immediate handling. Notification messages converted to tasks." if results["context"] else "No context messages. Notification messages converted to tasks.",
             })
 
         elif name == "idlergear_message_list":
