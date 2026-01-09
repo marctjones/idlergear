@@ -48,6 +48,9 @@ def main(
         False, "--version", "-V", callback=version_callback, is_eager=True,
         help="Show version and exit."
     ),
+    no_upgrade: bool = typer.Option(
+        False, "--no-upgrade", help="Skip automatic upgrade check."
+    ),
 ) -> None:
     """IdlerGear - Knowledge management for AI-assisted development."""
     output_format = OutputFormat.HUMAN
@@ -58,6 +61,14 @@ def main(
         output_format = OutputFormat.JSON
 
     ctx.obj = State(output_format=output_format)
+
+    # Check for upgrade (skip for init/install commands and when --no-upgrade)
+    if not no_upgrade and ctx.invoked_subcommand not in ("init", "install", None):
+        from idlergear.upgrade import check_and_prompt_upgrade
+        try:
+            check_and_prompt_upgrade()
+        except Exception:
+            pass  # Don't let upgrade check break normal operation
 
 
 
@@ -903,6 +914,11 @@ def install(
             typer.secho("Installed .git/hooks/pre-commit (auto-version)", fg=typer.colors.GREEN)
         else:
             typer.echo(".git/hooks/pre-commit already has auto-version hook (or not a git repo)")
+
+    # Store IdlerGear version for future upgrade detection
+    from idlergear.upgrade import set_project_version
+    from idlergear import __version__
+    set_project_version(__version__)
 
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
