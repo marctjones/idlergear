@@ -110,7 +110,7 @@ from idlergear.reference import (
 )
 from idlergear.runs import get_run_logs, get_run_status, list_runs, start_run, stop_run
 from idlergear.search import search_all
-from idlergear.tasks import close_task, create_task, get_task, list_tasks, update_task
+from idlergear.backends.registry import get_backend
 from idlergear.env import (
     detect_project_type,
     find_virtualenv,
@@ -1640,9 +1640,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     try:
         _check_initialized()
 
-        # Task handlers
+        # Task handlers - use configured backend
         if name == "idlergear_task_create":
-            result = create_task(
+            backend = get_backend("task")
+            result = backend.create(
                 arguments["title"],
                 body=arguments.get("body"),
                 labels=arguments.get("labels"),
@@ -1652,7 +1653,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_task_list":
-            result = list_tasks(state=arguments.get("state", "open"))
+            backend = get_backend("task")
+            result = backend.list(state=arguments.get("state", "open"))
             # Filter by priority if specified
             priority = arguments.get("priority")
             if priority:
@@ -1668,19 +1670,22 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_task_show":
-            result = get_task(arguments["id"])
+            backend = get_backend("task")
+            result = backend.get(arguments["id"])
             if result is None:
                 raise ValueError(f"Task #{arguments['id']} not found")
             return _format_result(result)
 
         elif name == "idlergear_task_close":
-            result = close_task(arguments["id"])
+            backend = get_backend("task")
+            result = backend.close(arguments["id"])
             if result is None:
                 raise ValueError(f"Task #{arguments['id']} not found")
             return _format_result(result)
 
         elif name == "idlergear_task_update":
-            result = update_task(
+            backend = get_backend("task")
+            result = backend.update(
                 arguments["id"],
                 title=arguments.get("title"),
                 body=arguments.get("body"),
