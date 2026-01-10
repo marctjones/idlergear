@@ -1620,6 +1620,43 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {},
             },
         ),
+        # === Watch Mode Tools ===
+        Tool(
+            name="idlergear_watch_check",
+            description="Analyze project for issues: TODO/FIXME/HACK comments in diff, uncommitted changes, stale references. Returns suggestions for knowledge capture. Use --act to automatically create tasks from TODOs.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "act": {
+                        "type": "boolean",
+                        "description": "Automatically create tasks from TODO/FIXME/HACK comments (default: false)",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_watch_act",
+            description="Execute action for a specific suggestion from watch_check. Use this to selectively act on individual suggestions (e.g., create a task from a specific TODO comment).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "suggestion_id": {
+                        "type": "string",
+                        "description": "Suggestion ID from watch_check results (e.g., 's1', 's2')",
+                    },
+                },
+                "required": ["suggestion_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_watch_stats",
+            description="Get quick watch statistics: changed files/lines, TODO/FIXME/HACK counts, time since last commit.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
 
 
@@ -2844,6 +2881,50 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 "summary": summary,
                 "state": state,
             })
+
+        # === Watch Mode Handlers ===
+        elif name == "idlergear_watch_check":
+            from idlergear.watch import analyze, analyze_and_act
+
+            if arguments.get("act", False):
+                status, actions = analyze_and_act(auto_create_tasks=True)
+                return _format_result({
+                    "status": status.to_dict(),
+                    "actions": [a.to_dict() for a in actions],
+                })
+            else:
+                status = analyze()
+                return _format_result(status.to_dict())
+
+        elif name == "idlergear_watch_act":
+            from idlergear.watch import analyze, act_on_suggestion
+
+            suggestion_id = arguments["suggestion_id"]
+
+            # Get current suggestions
+            status = analyze()
+
+            # Find the suggestion by ID
+            suggestion = None
+            for s in status.suggestions:
+                if s.id == suggestion_id:
+                    suggestion = s
+                    break
+
+            if suggestion is None:
+                return _format_result({
+                    "success": False,
+                    "error": f"Suggestion '{suggestion_id}' not found. Available: {[s.id for s in status.suggestions]}",
+                })
+
+            result = act_on_suggestion(suggestion)
+            return _format_result(result.to_dict())
+
+        elif name == "idlergear_watch_stats":
+            from idlergear.watch import get_watch_stats
+
+            stats = get_watch_stats()
+            return _format_result(stats)
 
         else:
             raise ValueError(f"Unknown tool: {name}")

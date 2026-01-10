@@ -168,6 +168,9 @@ idlergear note create "Could cache AST to improve performance" --tag idea
 
 **INSTEAD:** `idlergear task create "..." --label technical-debt`
 
+> **Note:** `idlergear watch check` scans for these patterns and will flag them.
+> If you see a TODO in a diff, convert it to a task immediately.
+
 ## PREFER: IdlerGear Search Over File Search
 
 **Before searching files for project context, try:**
@@ -196,7 +199,8 @@ This searches tasks, notes, references, and plans - structured knowledge that pe
 4. **Had an idea**: `idlergear note create "..." --tag idea`
 5. **Research question**: `idlergear note create "..." --tag explore`
 6. **Completed work**: `idlergear task close <id>`
-7. **Session end**: Consider what should be noted for next time
+7. **Before committing**: Run `idlergear watch check` to catch any TODOs or issues
+8. **Session end**: Consider what should be noted for next time
 
 ## Knowledge Promotion Flow
 
@@ -290,6 +294,9 @@ This searches tasks, notes, references, and plans - structured knowledge that pe
 - `/* HACK: ... */`
 
 **INSTEAD:** `idlergear task create "..." --label technical-debt`
+
+> **Note:** `idlergear watch check` scans for these patterns and will flag them.
+> If you see a TODO in a diff, convert it to a task immediately.
 
 ### REQUIRED: Use IdlerGear Commands
 

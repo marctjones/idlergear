@@ -373,6 +373,60 @@ class TestCallToolRuns:
         assert "hello world" in data["logs"]
 
 
+class TestCallToolWatch:
+    """Tests for watch-related tool calls."""
+
+    @pytest.mark.asyncio
+    async def test_watch_check(self, mcp_project):
+        """Test watch check returns status."""
+        result = await call_tool("idlergear_watch_check", {})
+
+        data = json.loads(result[0].text)
+        assert "files_changed" in data
+        assert "lines_added" in data
+        assert "suggestions" in data
+
+    @pytest.mark.asyncio
+    async def test_watch_check_with_act(self, mcp_project):
+        """Test watch check with act flag."""
+        result = await call_tool("idlergear_watch_check", {"act": True})
+
+        data = json.loads(result[0].text)
+        assert "status" in data
+        assert "actions" in data
+
+    @pytest.mark.asyncio
+    async def test_watch_act_not_found(self, mcp_project):
+        """Test watch act with unknown suggestion ID."""
+        result = await call_tool("idlergear_watch_act", {"suggestion_id": "unknown"})
+
+        data = json.loads(result[0].text)
+        assert data["success"] is False
+        assert "not found" in data["error"]
+
+    @pytest.mark.asyncio
+    async def test_watch_stats(self, mcp_project):
+        """Test watch stats."""
+        result = await call_tool("idlergear_watch_stats", {})
+
+        data = json.loads(result[0].text)
+        assert "changed_files" in data
+        assert "changed_lines" in data
+        assert "todos" in data
+        assert "fixmes" in data
+        assert "hacks" in data
+
+    @pytest.mark.asyncio
+    async def test_list_tools_includes_watch(self):
+        """Test that list_tools includes watch tools."""
+        tools = await list_tools()
+        tool_names = [t.name for t in tools]
+
+        assert "idlergear_watch_check" in tool_names
+        assert "idlergear_watch_act" in tool_names
+        assert "idlergear_watch_stats" in tool_names
+
+
 class TestCallToolUnknown:
     """Tests for unknown tool calls."""
 

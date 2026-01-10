@@ -2181,10 +2181,158 @@ def reference_search(query: str):
 
 
 @reference_app.command("sync")
-def reference_sync(target: str = typer.Argument("github")):
-    """Sync references with remote."""
-    typer.echo(f"Syncing references to {target}...")
-    # TODO: Implement GitHub Wiki sync
+def reference_sync(
+    ctx: typer.Context,
+    push: bool = typer.Option(False, "--push", help="Push local references to GitHub Wiki"),
+    pull: bool = typer.Option(False, "--pull", help="Pull GitHub Wiki pages to local references"),
+    status: bool = typer.Option(False, "--status", "-s", help="Show sync status without making changes"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force overwrite on conflicts (with --pull: use remote, with --push: use local)"),
+    ours: bool = typer.Option(False, "--ours", help="On conflict, keep local version"),
+    theirs: bool = typer.Option(False, "--theirs", help="On conflict, keep remote version"),
+):
+    """Sync references with GitHub Wiki.
+
+    By default, performs bidirectional sync - pushing local changes and pulling remote changes.
+    Conflicts are reported and must be resolved manually unless --ours or --theirs is specified.
+
+    Examples:
+        idlergear reference sync                # Bidirectional sync
+        idlergear reference sync --push         # Push local to wiki
+        idlergear reference sync --pull         # Pull wiki to local
+        idlergear reference sync --status       # Check what needs syncing
+        idlergear reference sync --ours         # On conflict, keep local
+        idlergear reference sync --theirs       # On conflict, keep remote
+    """
+    from idlergear.wiki import WikiSync
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    sync = WikiSync()
+
+    # Status only
+    if status:
+        # Check what would be synced
+        if output_format == OutputFormat.JSON:
+            # Get counts
+            from idlergear.reference import list_references
+            refs = list_references()
+
+            if sync.wiki_dir.exists():
+                sync.pull_wiki()
+                wiki_pages = sync.list_wiki_pages()
+            else:
+                wiki_pages = []
+
+            ref_titles = {r["title"] for r in refs}
+            wiki_titles = {p.title for p in wiki_pages}
+
+            typer.echo(json.dumps({
+                "local_only": list(ref_titles - wiki_titles),
+                "remote_only": list(wiki_titles - ref_titles),
+                "both": list(ref_titles & wiki_titles),
+                "local_count": len(refs),
+                "remote_count": len(wiki_pages),
+            }))
+        else:
+            from idlergear.reference import list_references
+            refs = list_references()
+
+            typer.echo("Sync Status:")
+            typer.echo(f"  Local references: {len(refs)}")
+
+            if sync.wiki_dir.exists() or sync.wiki_exists():
+                sync.pull_wiki()
+                wiki_pages = sync.list_wiki_pages()
+                typer.echo(f"  Wiki pages: {len(wiki_pages)}")
+
+                ref_titles = {r["title"] for r in refs}
+                wiki_titles = {p.title for p in wiki_pages}
+
+                local_only = ref_titles - wiki_titles
+                remote_only = wiki_titles - ref_titles
+
+                if local_only:
+                    typer.echo()
+                    typer.echo("  Local only (will be pushed):")
+                    for title in local_only:
+                        typer.echo(f"    + {title}")
+
+                if remote_only:
+                    typer.echo()
+                    typer.echo("  Remote only (will be pulled):")
+                    for title in remote_only:
+                        typer.echo(f"    + {title}")
+
+                if not local_only and not remote_only:
+                    typer.secho("\n  ✓ Already in sync", fg=typer.colors.GREEN)
+            else:
+                typer.echo("  Wiki: Not initialized")
+                typer.echo()
+                typer.echo("  Run 'idlergear reference sync --push' to initialize and push references.")
+        return
+
+    # Determine conflict resolution
+    conflict_resolution = "manual"
+    if ours or (push and force):
+        conflict_resolution = "local"
+    elif theirs or (pull and force):
+        conflict_resolution = "remote"
+
+    # Push only
+    if push and not pull:
+        if output_format != OutputFormat.JSON:
+            typer.echo("Pushing references to GitHub Wiki...")
+
+        result = sync.push_references_to_wiki()
+
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({
+                "pushed": result.pushed,
+                "conflicts": result.conflicts,
+                "errors": result.errors,
+            }))
+        else:
+            typer.echo(str(result))
+        return
+
+    # Pull only
+    if pull and not push:
+        if output_format != OutputFormat.JSON:
+            typer.echo("Pulling GitHub Wiki to references...")
+
+        result = sync.pull_wiki_to_references(overwrite=force)
+
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({
+                "pulled": result.pulled,
+                "conflicts": result.conflicts,
+                "errors": result.errors,
+            }))
+        else:
+            typer.echo(str(result))
+        return
+
+    # Bidirectional sync (default)
+    if output_format != OutputFormat.JSON:
+        typer.echo("Syncing references with GitHub Wiki...")
+
+    result = sync.sync_bidirectional(conflict_resolution=conflict_resolution)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({
+            "pushed": result.pushed,
+            "pulled": result.pulled,
+            "conflicts": result.conflicts,
+            "errors": result.errors,
+        }))
+    else:
+        typer.echo(str(result))
+
+        if result.conflicts:
+            typer.echo()
+            typer.echo("To resolve conflicts, use:")
+            typer.echo("  --ours   : Keep local version")
+            typer.echo("  --theirs : Keep remote version")
 
 
 # Run commands
@@ -3226,23 +3374,34 @@ app.add_typer(watch_app, name="watch")
 @watch_app.command("check")
 def watch_check(
     ctx: typer.Context,
+    act: bool = typer.Option(False, "--act", "-a", help="Automatically create tasks from TODO/FIXME comments"),
 ):
     """One-shot analysis of project state with suggestions.
 
     Analyzes git status, scans for TODO/FIXME comments in diff,
     checks for stale references, and returns actionable suggestions.
 
+    With --act, automatically creates tasks from detected TODO comments.
+
     Examples:
-        idlergear watch check              # Human-readable output
+        idlergear watch check              # Analyze and show suggestions
+        idlergear watch check --act        # Analyze AND auto-create tasks from TODOs
         idlergear --output json watch check  # JSON output for AI agents
     """
-    from idlergear.watch import analyze
+    from idlergear.watch import analyze, analyze_and_act
 
-    status = analyze()
+    if act:
+        status, actions = analyze_and_act(auto_create_tasks=True)
+    else:
+        status = analyze()
+        actions = []
     output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
 
     if output_format == OutputFormat.JSON:
-        typer.echo(json.dumps(status.to_dict(), indent=2))
+        result = status.to_dict()
+        if actions:
+            result["actions"] = [a.to_dict() for a in actions]
+        typer.echo(json.dumps(result, indent=2))
         return
 
     # Human-readable output
@@ -3289,17 +3448,40 @@ def watch_check(
     else:
         typer.secho("No suggestions - project looks good!", fg=typer.colors.GREEN)
 
+    # Show actions taken
+    if actions:
+        typer.echo()
+        typer.secho("Actions Taken:", bold=True)
+        for action in actions:
+            if action.success:
+                typer.secho(f"  ✓ {action.message}", fg=typer.colors.GREEN)
+            else:
+                typer.secho(f"  ✗ {action.message}", fg=typer.colors.RED)
+
 
 @watch_app.command("start")
 def watch_start(
-    interval: int = typer.Option(10, "--interval", "-i", help="Check interval in seconds")
+    interval: int = typer.Option(10, "--interval", "-i", help="Check interval in seconds"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Only show critical suggestions"),
+    polling: bool = typer.Option(False, "--polling", "-p", help="Use polling instead of file system events"),
+    force: bool = typer.Option(False, "--force", "-f", help="Start even if watch mode is disabled"),
 ):
-    """Start watching for changes and prompting for knowledge capture."""
-    from idlergear.watch import FileWatcher, WatchConfig
+    """Start watching for changes and prompting for knowledge capture.
+
+    This runs in the foreground and monitors file changes in real-time.
+    Press Ctrl+C to stop.
+
+    Examples:
+        idlergear watch start                # Start with defaults
+        idlergear watch start -q             # Only show critical suggestions
+        idlergear watch start -i 5           # Check every 5 seconds
+        idlergear watch start --polling      # Use polling mode (no watchdog)
+    """
+    from idlergear.watch import WatchConfig, run_interactive_watch
 
     config = WatchConfig.load()
 
-    if not config.enabled:
+    if not config.enabled and not force:
         typer.secho("Watch mode is disabled", fg=typer.colors.YELLOW)
         typer.echo()
         typer.echo("Enable it with:")
@@ -3309,8 +3491,11 @@ def watch_start(
         typer.echo("  idlergear watch start --force")
         return
 
-    watcher = FileWatcher(config=config)
-    watcher.watch(interval=interval)
+    # Update config with interval if provided
+    if interval != 10:
+        config.poll_interval = interval
+
+    run_interactive_watch(quiet=quiet, use_polling=polling)
 
 
 @watch_app.command("status")
@@ -3397,6 +3582,129 @@ def watch_config(
 
     config.save()
     typer.secho(f"✓ Set watch.{key} = {value}", fg=typer.colors.GREEN)
+
+
+# Self-update commands
+@app.command()
+def update(
+    ctx: typer.Context,
+    check: bool = typer.Option(False, "--check", "-c", help="Only check for updates, don't install"),
+    version: Optional[str] = typer.Option(None, "--version", "-v", help="Install specific version"),
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without doing it"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Skip version cache, always query GitHub"),
+):
+    """Check for updates and upgrade IdlerGear itself.
+
+    Examples:
+        idlergear update --check    # Check for available updates
+        idlergear update            # Upgrade to latest version
+        idlergear update -v 0.3.20  # Install specific version
+        idlergear update --dry-run  # Show what would happen
+    """
+    from idlergear.selfupdate import (
+        get_latest_version,
+        detect_install_method,
+        do_self_update,
+    )
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    # Get version info
+    version_info = get_latest_version(use_cache=not no_cache)
+
+    if version_info.error:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": version_info.error}))
+        else:
+            typer.secho(f"Error checking version: {version_info.error}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Get install info
+    install_info = detect_install_method()
+
+    if check:
+        # Just show version info
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({
+                "current_version": version_info.current,
+                "latest_version": version_info.latest,
+                "update_available": version_info.update_available,
+                "install_method": install_info.method.value,
+                "can_upgrade": install_info.can_upgrade,
+                "upgrade_command": install_info.upgrade_command,
+            }))
+        else:
+            typer.echo(f"Current version: {version_info.current}")
+            typer.echo(f"Latest version:  {version_info.latest}")
+            typer.echo()
+            if version_info.update_available:
+                typer.secho("Update available!", fg=typer.colors.GREEN)
+            else:
+                typer.echo("Already at latest version.")
+            typer.echo()
+            typer.echo(f"Install method:  {install_info.method.value}")
+            if install_info.can_upgrade:
+                typer.echo(f"Upgrade command: {install_info.upgrade_command}")
+            else:
+                typer.secho(f"Note: {install_info.message}", fg=typer.colors.YELLOW)
+        return
+
+    # Perform update
+    if not version_info.update_available and version is None:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({
+                "success": True,
+                "message": "Already at latest version",
+                "current_version": version_info.current,
+            }))
+        else:
+            typer.echo(f"Already at latest version ({version_info.current})")
+        return
+
+    if not install_info.can_upgrade:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({
+                "success": False,
+                "error": install_info.message,
+                "install_method": install_info.method.value,
+            }))
+        else:
+            typer.secho(f"Cannot auto-upgrade: {install_info.message}", fg=typer.colors.RED)
+            typer.echo()
+            typer.echo(f"Manual upgrade: {install_info.upgrade_command}")
+        raise typer.Exit(1)
+
+    target_version = version or version_info.latest
+
+    if dry_run:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({
+                "dry_run": True,
+                "current_version": version_info.current,
+                "target_version": target_version,
+                "upgrade_command": install_info.upgrade_command,
+            }))
+        else:
+            typer.echo(f"Would upgrade: {version_info.current} -> {target_version}")
+            typer.echo(f"Command: {install_info.upgrade_command}")
+        return
+
+    # Confirm and run upgrade
+    if output_format != OutputFormat.JSON:
+        typer.echo(f"Upgrading IdlerGear: {version_info.current} -> {target_version}")
+        typer.echo(f"Install method: {install_info.method.value}")
+        typer.echo()
+
+    result = do_self_update(version=version, dry_run=False)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(result))
+    else:
+        if result["success"]:
+            typer.secho(f"✓ {result['message']}", fg=typer.colors.GREEN)
+        else:
+            typer.secho(f"✗ {result['message']}", fg=typer.colors.RED)
+            raise typer.Exit(1)
 
 
 if __name__ == "__main__":

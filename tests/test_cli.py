@@ -642,7 +642,8 @@ class TestAdditionalReferenceCommands:
         assert "No reference documents" in result.output
 
     def test_reference_sync(self, cli_project):
-        result = runner.invoke(app, ["reference", "sync"])
+        # Test with --status since full sync requires GitHub access
+        result = runner.invoke(app, ["--output", "human", "reference", "sync", "--status"])
 
         assert result.exit_code == 0
-        assert "Syncing references" in result.output
+        assert "Sync Status" in result.output

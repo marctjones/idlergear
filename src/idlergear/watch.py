@@ -436,8 +436,172 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
 
 
 # ============================================================================
-# Stub implementations for CLI backward compatibility
-# These will be implemented properly in Phase 2 (continuous watch mode)
+# Suggestion Actions - Execute suggestions automatically
+# ============================================================================
+
+
+@dataclass
+class ActionResult:
+    """Result of executing a suggestion action."""
+
+    success: bool
+    action: str
+    message: str
+    created_id: int | None = None  # ID of created task/note if applicable
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "success": self.success,
+            "action": self.action,
+            "message": self.message,
+            "created_id": self.created_id,
+        }
+
+
+def act_on_suggestion(suggestion: Suggestion) -> ActionResult:
+    """Execute the action for a suggestion.
+
+    Args:
+        suggestion: The suggestion to act on
+
+    Returns:
+        ActionResult with details of what was done
+    """
+    if suggestion.category == "todo":
+        return _create_task_from_todo(suggestion)
+    elif suggestion.category == "commit":
+        # Commit suggestions are informational - user/AI must commit manually
+        return ActionResult(
+            success=True,
+            action="inform",
+            message="Commit suggestion noted. Use git to commit when ready.",
+        )
+    elif suggestion.category == "reference":
+        # Stale reference - just flag it, user must update
+        return ActionResult(
+            success=True,
+            action="inform",
+            message=f"Reference flagged as stale: {suggestion.context.get('reference', 'unknown')}",
+        )
+    elif suggestion.category == "test":
+        return ActionResult(
+            success=True,
+            action="inform",
+            message="Test files changed. Run tests before committing.",
+        )
+    elif suggestion.category == "docs":
+        return ActionResult(
+            success=True,
+            action="inform",
+            message="Documentation changed. Consider syncing to wiki.",
+        )
+    else:
+        return ActionResult(
+            success=False,
+            action="unknown",
+            message=f"Unknown suggestion category: {suggestion.category}",
+        )
+
+
+def _create_task_from_todo(suggestion: Suggestion) -> ActionResult:
+    """Create a task from a TODO/FIXME/HACK comment."""
+    from idlergear.tasks import create_task
+
+    context = suggestion.context
+    todo_type = context.get("type", "TODO").upper()
+    todo_text = context.get("text", "").strip()
+    todo_file = context.get("file", "unknown")
+
+    if not todo_text:
+        return ActionResult(
+            success=False,
+            action="create_task",
+            message="No TODO text found",
+        )
+
+    # Build task title
+    title = todo_text
+    if len(title) > 100:
+        title = title[:97] + "..."
+
+    # Build task body with context
+    body = f"Auto-created from {todo_type} comment in `{todo_file}`\n\n"
+    body += f"Original comment: {todo_text}"
+
+    # Determine label based on type
+    if todo_type == "FIXME":
+        labels = ["bug", "from-code-comment"]
+    elif todo_type == "HACK":
+        labels = ["technical-debt", "from-code-comment"]
+    else:  # TODO, XXX
+        labels = ["technical-debt", "from-code-comment"]
+
+    try:
+        task = create_task(title=title, body=body, labels=labels)
+        task_id = task.get("id") or task.get("number")
+
+        return ActionResult(
+            success=True,
+            action="create_task",
+            message=f"Created task #{task_id}: {title}",
+            created_id=task_id,
+        )
+    except Exception as e:
+        return ActionResult(
+            success=False,
+            action="create_task",
+            message=f"Failed to create task: {e}",
+        )
+
+
+def act_on_all_suggestions(status: WatchStatus, categories: list[str] | None = None) -> list[ActionResult]:
+    """Execute actions for all suggestions in a WatchStatus.
+
+    Args:
+        status: WatchStatus containing suggestions
+        categories: Optional list of categories to act on (default: ["todo"])
+
+    Returns:
+        List of ActionResults
+    """
+    if categories is None:
+        categories = ["todo"]  # By default, only auto-act on TODOs
+
+    results = []
+    for suggestion in status.suggestions:
+        if suggestion.category in categories:
+            result = act_on_suggestion(suggestion)
+            results.append(result)
+
+    return results
+
+
+def analyze_and_act(
+    project_root: Path | None = None,
+    auto_create_tasks: bool = True,
+) -> tuple[WatchStatus, list[ActionResult]]:
+    """Analyze project and automatically act on actionable suggestions.
+
+    This is the main entry point for automated watch mode.
+
+    Args:
+        project_root: Project root directory
+        auto_create_tasks: If True, automatically create tasks from TODOs
+
+    Returns:
+        Tuple of (WatchStatus, list of ActionResults)
+    """
+    status = analyze(project_root)
+
+    actions = []
+    if auto_create_tasks:
+        actions = act_on_all_suggestions(status, categories=["todo"])
+
+    return status, actions
+
+
+# ============================================================================
+# Phase 2: Continuous Watch Mode
 # ============================================================================
 
 
@@ -453,6 +617,7 @@ class WatchConfig:
     detect_todos: bool = True
     detect_fixmes: bool = True
     detect_hacks: bool = True
+    poll_interval: int = 10  # Seconds between polls (fallback mode)
 
     @classmethod
     def load(cls) -> "WatchConfig":
@@ -466,6 +631,7 @@ class WatchConfig:
             detect_todos = get_config_value("watch.detect_todos")
             detect_fixmes = get_config_value("watch.detect_fixmes")
             detect_hacks = get_config_value("watch.detect_hacks")
+            poll_interval = get_config_value("watch.poll_interval")
 
             return cls(
                 enabled=str(enabled).lower() == "true" if enabled else False,
@@ -484,6 +650,7 @@ class WatchConfig:
                 detect_hacks=str(detect_hacks).lower() != "false"
                 if detect_hacks
                 else True,
+                poll_interval=int(poll_interval) if poll_interval else 10,
             )
         except Exception:
             return cls()
@@ -506,21 +673,268 @@ class WatchConfig:
         set_config_value("watch.detect_todos", str(self.detect_todos).lower())
         set_config_value("watch.detect_fixmes", str(self.detect_fixmes).lower())
         set_config_value("watch.detect_hacks", str(self.detect_hacks).lower())
+        set_config_value("watch.poll_interval", str(self.poll_interval))
+
+
+@dataclass
+class WatchEvent:
+    """A file system event detected by the watcher."""
+
+    event_type: str  # created, modified, deleted, moved
+    path: str
+    is_directory: bool
+    timestamp: datetime = field(default_factory=datetime.now)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "path": self.path,
+            "is_directory": self.is_directory,
+            "timestamp": self.timestamp.isoformat(),
+        }
 
 
 class FileWatcher:
-    """File watcher for continuous monitoring (Phase 2)."""
+    """File watcher for continuous monitoring.
 
-    def __init__(self, config: WatchConfig | None = None):
+    Uses watchdog if available, otherwise falls back to polling.
+    """
+
+    def __init__(
+        self,
+        config: WatchConfig | None = None,
+        project_root: Path | None = None,
+    ):
         self.config = config or WatchConfig.load()
+        self.project_root = project_root or find_idlergear_root()
+        self._running = False
+        self._last_status: WatchStatus | None = None
+        self._events: list[WatchEvent] = []
+        self._debounce_timer: float = 0
+        self._callbacks: list[callable] = []
+        self._use_watchdog = False
+        self._observer = None
 
-    def watch(self, interval: int = 10) -> None:
-        """Start watching for changes. Placeholder for Phase 2."""
-        import sys
+        # Check if watchdog is available
+        try:
+            import importlib.util
+            self._use_watchdog = importlib.util.find_spec("watchdog") is not None
+        except ImportError:
+            self._use_watchdog = False
 
-        print("Watch mode (continuous) is not yet implemented.")
-        print("Use 'idlergear watch check' for one-shot analysis.")
+    def add_callback(self, callback: callable) -> None:
+        """Add a callback to be called when suggestions are generated."""
+        self._callbacks.append(callback)
+
+    def _notify_callbacks(self, status: WatchStatus) -> None:
+        """Notify all callbacks of new suggestions."""
+        for callback in self._callbacks:
+            try:
+                callback(status)
+            except Exception:
+                pass
+
+    def _should_ignore(self, path: str) -> bool:
+        """Check if a path should be ignored."""
+        ignore_patterns = [
+            ".git",
+            ".idlergear",
+            "__pycache__",
+            ".pytest_cache",
+            "node_modules",
+            "venv",
+            ".venv",
+            "*.pyc",
+            "*.pyo",
+            ".DS_Store",
+        ]
+        for pattern in ignore_patterns:
+            if pattern.startswith("*"):
+                if path.endswith(pattern[1:]):
+                    return True
+            elif pattern in path:
+                return True
+        return False
+
+    def _on_file_change(self, event_type: str, path: str, is_dir: bool) -> None:
+        """Handle a file change event."""
+        if self._should_ignore(path):
+            return
+
+        event = WatchEvent(
+            event_type=event_type,
+            path=path,
+            is_directory=is_dir,
+        )
+        self._events.append(event)
+        self._debounce_timer = self.config.debounce
+
+    def _check_and_notify(self) -> None:
+        """Check for changes and notify if there are suggestions."""
+        if self.project_root is None:
+            return
+
+        status = analyze(self.project_root)
+
+        # Only notify if there are new/different suggestions
+        if self._last_status is None or self._has_changes(status):
+            self._last_status = status
+            if status.suggestions:
+                self._notify_callbacks(status)
+
+    def _has_changes(self, new_status: WatchStatus) -> bool:
+        """Check if there are meaningful changes from last status."""
+        if self._last_status is None:
+            return True
+
+        # Compare key metrics
+        if new_status.files_changed != self._last_status.files_changed:
+            return True
+        if len(new_status.suggestions) != len(self._last_status.suggestions):
+            return True
+
+        # Compare suggestion IDs
+        old_ids = {s.id for s in self._last_status.suggestions}
+        new_ids = {s.id for s in new_status.suggestions}
+        return old_ids != new_ids
+
+    def watch_with_watchdog(self) -> None:
+        """Start watching using watchdog (inotify/fsevents)."""
+        from watchdog.observers import Observer
+        from watchdog.events import FileSystemEventHandler
+
+        class Handler(FileSystemEventHandler):
+            def __init__(self, watcher: "FileWatcher"):
+                self.watcher = watcher
+
+            def on_created(self, event):
+                self.watcher._on_file_change("created", event.src_path, event.is_directory)
+
+            def on_modified(self, event):
+                self.watcher._on_file_change("modified", event.src_path, event.is_directory)
+
+            def on_deleted(self, event):
+                self.watcher._on_file_change("deleted", event.src_path, event.is_directory)
+
+            def on_moved(self, event):
+                self.watcher._on_file_change("moved", event.dest_path, event.is_directory)
+
+        observer = Observer()
+        handler = Handler(self)
+        observer.schedule(handler, str(self.project_root), recursive=True)
+        observer.start()
+        self._observer = observer
+
+        try:
+            import time
+            while self._running:
+                time.sleep(1)
+                if self._debounce_timer > 0:
+                    self._debounce_timer -= 1
+                    if self._debounce_timer <= 0:
+                        self._check_and_notify()
+                        self._events.clear()
+        finally:
+            observer.stop()
+            observer.join()
+
+    def watch_with_polling(self, interval: int | None = None) -> None:
+        """Start watching using polling (fallback mode)."""
+        import time
+
+        poll_interval = interval or self.config.poll_interval
+
+        while self._running:
+            self._check_and_notify()
+            time.sleep(poll_interval)
+
+    def watch(self, interval: int | None = None, use_polling: bool = False) -> None:
+        """Start watching for changes.
+
+        Args:
+            interval: Override poll interval (seconds)
+            use_polling: Force polling mode even if watchdog is available
+        """
+        if self.project_root is None:
+            print("Error: Not in an IdlerGear project")
+            return
+
+        self._running = True
+
+        if self._use_watchdog and not use_polling:
+            self.watch_with_watchdog()
+        else:
+            self.watch_with_polling(interval)
+
+    def stop(self) -> None:
+        """Stop watching."""
+        self._running = False
+        if self._observer:
+            self._observer.stop()
+
+
+def run_interactive_watch(
+    project_root: Path | None = None,
+    quiet: bool = False,
+    use_polling: bool = False,
+) -> None:
+    """Run watch mode interactively with terminal output.
+
+    Args:
+        project_root: Project root directory
+        quiet: Only show critical suggestions
+        use_polling: Force polling mode
+    """
+    import sys
+
+    config = WatchConfig.load()
+    watcher = FileWatcher(config=config, project_root=project_root)
+
+    if watcher.project_root is None:
+        print("Error: Not in an IdlerGear project")
         sys.exit(1)
+
+    # Track what we've shown to avoid duplicates
+    shown_suggestions: set[str] = set()
+
+    def on_suggestions(status: WatchStatus):
+        """Handle new suggestions."""
+        for suggestion in status.suggestions:
+            # Skip if already shown
+            suggestion_key = f"{suggestion.category}:{suggestion.message}"
+            if suggestion_key in shown_suggestions:
+                continue
+            shown_suggestions.add(suggestion_key)
+
+            # Skip info-level in quiet mode
+            if quiet and suggestion.severity == "info":
+                continue
+
+            # Color based on severity
+            if suggestion.severity == "action":
+                prefix = "\033[33m⚡\033[0m"  # Yellow
+            elif suggestion.severity == "warning":
+                prefix = "\033[31m⚠\033[0m"  # Red
+            else:
+                prefix = "\033[34mℹ\033[0m"  # Blue
+
+            print(f"{prefix} [{suggestion.category}] {suggestion.message}")
+
+    watcher.add_callback(on_suggestions)
+
+    mode = "polling" if use_polling or not watcher._use_watchdog else "watchdog"
+    print(f"Watching for changes ({mode} mode)...")
+    print("Press Ctrl+C to stop\n")
+
+    # Do an initial check
+    status = analyze(watcher.project_root)
+    on_suggestions(status)
+
+    try:
+        watcher.watch(use_polling=use_polling)
+    except KeyboardInterrupt:
+        print("\nStopped watching")
+        watcher.stop()
 
 
 def get_watch_stats() -> dict[str, Any]:
