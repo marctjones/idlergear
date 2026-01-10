@@ -80,7 +80,7 @@ def init_project(path: str = ".") -> None:
     # Create config file
     schema.config_file.write_text(DEFAULT_CONFIG)
 
-    # Create vision file in vision/ directory
+    # Create VISION.md in project root (committed to git)
     schema.vision_file.write_text(DEFAULT_VISION)
 
     # Create empty index files
@@ -112,6 +112,7 @@ def init_project(path: str = ".") -> None:
     typer.echo(f"  Created: {schema.idlergear_dir}")
     typer.echo("")
     typer.echo("Directory structure:")
+    typer.echo("  VISION.md             # Project vision (committed to git)")
     typer.echo("  .idlergear/")
     typer.echo("  ├── config.toml       # Configuration")
     typer.echo("  ├── issues/           # Local issue tracking")
@@ -119,7 +120,6 @@ def init_project(path: str = ".") -> None:
     typer.echo("  ├── notes/            # Quick notes")
     typer.echo("  ├── plans/            # Implementation plans")
     typer.echo("  ├── runs/             # Script execution logs")
-    typer.echo("  ├── vision/           # Project vision")
     typer.echo("  ├── projects/         # Kanban boards")
     typer.echo("  └── sync/             # External sync state")
     typer.echo("")

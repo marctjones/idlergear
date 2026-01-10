@@ -461,7 +461,7 @@ def upgrade_schema(
     Performs the following migrations:
     - tasks/ → issues/
     - reference/ → wiki/
-    - vision.md → vision/VISION.md
+    - .idlergear/vision.md → VISION.md (repo root)
     - Removes empty explorations/ (notes use tags now)
     - Creates missing directories (sync/, projects/)
 
@@ -495,9 +495,9 @@ def upgrade_schema(
     if schema.legacy_reference_dir.exists() and not schema.wiki_dir.exists():
         actions.append(("rename", schema.legacy_reference_dir, schema.wiki_dir, "reference/ → wiki/"))
 
-    # Check vision.md → vision/VISION.md
+    # Check .idlergear/vision.md → VISION.md (repo root)
     if schema.legacy_vision_file.exists() and not schema.vision_file.exists():
-        actions.append(("move", schema.legacy_vision_file, schema.vision_file, "vision.md → vision/VISION.md"))
+        actions.append(("move", schema.legacy_vision_file, schema.vision_file, ".idlergear/vision.md → VISION.md"))
 
     # Check explorations/ (if empty, remove; otherwise prompt)
     if schema.legacy_explorations_dir.exists():

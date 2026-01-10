@@ -45,8 +45,8 @@ def temp_project():
 name = "test-project"
 """)
 
-            # Create empty vision file
-            vision_path = idlergear_path / "vision.md"
+            # Create VISION.md in project root (not .idlergear)
+            vision_path = project_path / "VISION.md"
             vision_path.write_text("# Project Vision\n\n")
 
             # Change to project directory

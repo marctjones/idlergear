@@ -1,10 +1,8 @@
 """Create new projects with IdlerGear integration."""
 
 import json
-import os
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from idlergear.templates.base import (
     AGENTS_MD,
@@ -105,7 +103,7 @@ name = "{name}"
 """
     schema.config_file.write_text(config_content)
 
-    # .idlergear/vision/VISION.md
+    # VISION.md in repo root (committed to git)
     schema.vision_file.write_text(vision)
 
     # .claude/ directory
@@ -186,7 +184,9 @@ def _create_python_structure(
     # src/<package>/
     src_path = project_path / "src" / package_name
     src_path.mkdir(parents=True)
-    (src_path / "__init__.py").write_text(SRC_INIT.format(project_name=name, package_name=package_name))
+    (src_path / "__init__.py").write_text(
+        SRC_INIT.format(project_name=name, package_name=package_name)
+    )
 
     # tests/
     tests_path = project_path / "tests"
@@ -195,7 +195,9 @@ def _create_python_structure(
     (tests_path / "test_placeholder.py").write_text(TEST_PLACEHOLDER)
 
     # .claude/rules/ig_python.md
-    (project_path / ".claude" / "rules" / "ig_python.md").write_text(CLAUDE_RULES_PYTHON)
+    (project_path / ".claude" / "rules" / "ig_python.md").write_text(
+        CLAUDE_RULES_PYTHON
+    )
 
     # Create venv
     if init_venv:

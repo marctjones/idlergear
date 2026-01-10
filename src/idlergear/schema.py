@@ -72,9 +72,9 @@ class IdlerGearSchema:
         return self.idlergear_dir / "runs"
 
     @property
-    def vision_dir(self) -> Path:
-        """Project vision: .idlergear/vision/"""
-        return self.idlergear_dir / "vision"
+    def vision_file(self) -> Path:
+        """Project vision: VISION.md in repo root (committed to git)."""
+        return self.root / "VISION.md"
 
     @property
     def projects_dir(self) -> Path:
@@ -87,11 +87,6 @@ class IdlerGearSchema:
         return self.idlergear_dir / "sync"
 
     # === Specific files ===
-
-    @property
-    def vision_file(self) -> Path:
-        """Main vision document: .idlergear/vision/VISION.md"""
-        return self.vision_dir / "VISION.md"
 
     @property
     def issues_index(self) -> Path:
@@ -141,7 +136,6 @@ class IdlerGearSchema:
             self.notes_dir,
             self.plans_dir,
             self.runs_dir,
-            self.vision_dir,
             self.projects_dir,
             self.sync_dir,
         ]
@@ -204,14 +198,15 @@ class IdlerGearSchema:
     def needs_migration(self) -> bool:
         """Check if the project needs migration from v0.2 to v0.3."""
         return (
-            self.legacy_tasks_dir.exists() or
-            self.legacy_reference_dir.exists() or
-            self.legacy_explorations_dir.exists() or
-            (self.legacy_vision_file.exists() and not self.vision_file.exists())
+            self.legacy_tasks_dir.exists()
+            or self.legacy_reference_dir.exists()
+            or self.legacy_explorations_dir.exists()
+            or (self.legacy_vision_file.exists() and not self.vision_file.exists())
         )
 
 
 # === Index file schemas ===
+
 
 def create_empty_index() -> dict[str, Any]:
     """Create an empty index.json structure."""
@@ -232,8 +227,10 @@ MISPLACED_FILE_PATTERNS = {
     "TASKS.md": {"type": "issue", "action": "Convert to issues"},
     "BACKLOG.md": {"type": "issue", "action": "Convert to issues"},
     "IDEAS.md": {"type": "issue", "action": "Convert to issues with 'idea' label"},
-    "FEATURE_IDEAS.md": {"type": "issue", "action": "Convert to issues with 'enhancement' label"},
-
+    "FEATURE_IDEAS.md": {
+        "type": "issue",
+        "action": "Convert to issues with 'enhancement' label",
+    },
     # Note-like files
     "NOTES.md": {"type": "note", "action": "Convert to notes"},
     "SCRATCH.md": {"type": "note", "action": "Convert to notes"},
@@ -253,29 +250,35 @@ def detect_misplaced_files(project_root: Path) -> list[dict[str, Any]]:
     for name, info in MISPLACED_FILE_PATTERNS.items():
         file_path = project_root / name
         if file_path.exists():
-            results.append({
-                "path": file_path,
-                "name": name,
-                "type": info["type"],
-                "action": info["action"],
-            })
+            results.append(
+                {
+                    "path": file_path,
+                    "name": name,
+                    "type": info["type"],
+                    "action": info["action"],
+                }
+            )
 
     # Check for SESSION_*.md files
     for f in project_root.glob("SESSION_*.md"):
-        results.append({
-            "path": f,
-            "name": f.name,
-            "type": "note",
-            "action": "Convert to notes",
-        })
+        results.append(
+            {
+                "path": f,
+                "name": f.name,
+                "type": "note",
+                "action": "Convert to notes",
+            }
+        )
 
     # Check for *-notes.md files
     for f in project_root.glob("*-notes.md"):
-        results.append({
-            "path": f,
-            "name": f.name,
-            "type": "note",
-            "action": "Convert to notes",
-        })
+        results.append(
+            {
+                "path": f,
+                "name": f.name,
+                "type": "note",
+                "action": "Convert to notes",
+            }
+        )
 
     return results

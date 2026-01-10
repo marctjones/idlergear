@@ -11,8 +11,9 @@ class TestGetVisionPath:
     def test_get_vision_path(self, temp_project):
         path = get_vision_path()
         assert path is not None
-        assert path.name == "vision.md"
-        assert ".idlergear" in str(path)
+        assert path.name == "VISION.md"
+        # Vision is in repo root, not .idlergear
+        assert path.parent == temp_project
 
     def test_get_vision_path_with_project_path(self, temp_project):
         path = get_vision_path(temp_project)

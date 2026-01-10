@@ -15,9 +15,9 @@ fi
 # Build context by reading files directly (no Python startup overhead)
 CONTEXT=""
 
-# Read vision
-if [ -f ".idlergear/vision/VISION.md" ]; then
-    VISION=$(cat ".idlergear/vision/VISION.md" 2>/dev/null | head -20)
+# Read vision (VISION.md in repo root)
+if [ -f "VISION.md" ]; then
+    VISION=$(cat "VISION.md" 2>/dev/null | head -20)
     if [ -n "$VISION" ]; then
         CONTEXT="${CONTEXT}## Vision\n${VISION}\n\n"
     fi

@@ -21,8 +21,8 @@ class TestInitProject:
             idlergear_path = Path(tmpdir) / ".idlergear"
             assert idlergear_path.exists()
             assert (idlergear_path / "config.toml").exists()
-            # v0.3: vision is now in vision/VISION.md
-            assert (idlergear_path / "vision" / "VISION.md").exists()
+            # Vision is in project root, not .idlergear
+            assert (Path(tmpdir) / "VISION.md").exists()
             # v0.3: tasks renamed to issues
             assert (idlergear_path / "issues").is_dir()
             assert (idlergear_path / "notes").is_dir()
@@ -73,8 +73,8 @@ class TestInitProject:
 
             init_project(".")
 
-            # v0.3: vision is now in vision/VISION.md
-            vision_path = Path(tmpdir) / ".idlergear" / "vision" / "VISION.md"
+            # Vision is in repo root, not .idlergear
+            vision_path = Path(tmpdir) / "VISION.md"
             content = vision_path.read_text()
 
             assert "Project Vision" in content

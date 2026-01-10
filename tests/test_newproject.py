@@ -54,7 +54,8 @@ class TestCreateProject:
                 init_git=False,
             )
 
-            vision_path = Path(tmpdir) / "test-project" / ".idlergear" / "vision" / "VISION.md"
+            # Vision is in project root, not .idlergear
+            vision_path = Path(tmpdir) / "test-project" / "VISION.md"
             assert "Build the best thing" in vision_path.read_text()
 
     def test_create_with_description(self):
@@ -101,7 +102,8 @@ class TestCreateProject:
             assert (idlergear / "wiki").is_dir()  # renamed from reference
             assert (idlergear / "runs").is_dir()
             assert (idlergear / "config.toml").exists()
-            assert (idlergear / "vision" / "VISION.md").exists()  # moved to vision/
+            # Vision is in project root, not .idlergear
+            assert (project_path / "VISION.md").exists()
 
     def test_create_claude_structure(self):
         with tempfile.TemporaryDirectory() as tmpdir:
