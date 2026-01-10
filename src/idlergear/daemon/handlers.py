@@ -14,7 +14,7 @@ def register_handlers(server: DaemonServer) -> None:
     async def task_create(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
         from idlergear.tasks import create_task
 
-        return create_task(
+        result = create_task(
             title=params["title"],
             body=params.get("body"),
             labels=params.get("labels"),
@@ -22,6 +22,8 @@ def register_handlers(server: DaemonServer) -> None:
             priority=params.get("priority"),
             due=params.get("due"),
         )
+        await server.broadcast("task.created", {"id": result.get("id"), "title": params["title"]})
+        return result
 
     async def task_list(params: dict[str, Any], conn: Connection) -> list[dict]:
         from idlergear.tasks import list_tasks
@@ -60,7 +62,9 @@ def register_handlers(server: DaemonServer) -> None:
     async def note_create(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
         from idlergear.notes import create_note
 
-        return create_note(params["content"])
+        result = create_note(params["content"], tags=params.get("tags"))
+        await server.broadcast("note.created", {"id": result.get("id")})
+        return result
 
     async def note_list(params: dict[str, Any], conn: Connection) -> list[dict]:
         from idlergear.notes import list_notes
@@ -89,7 +93,9 @@ def register_handlers(server: DaemonServer) -> None:
     async def explore_create(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
         from idlergear.explorations import create_exploration
 
-        return create_exploration(params["title"], body=params.get("body"))
+        result = create_exploration(params["title"], body=params.get("body"))
+        await server.broadcast("explore.created", {"id": result.get("id"), "title": params["title"]})
+        return result
 
     async def explore_list(params: dict[str, Any], conn: Connection) -> list[dict]:
         from idlergear.explorations import list_explorations
@@ -126,11 +132,13 @@ def register_handlers(server: DaemonServer) -> None:
     async def plan_create(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
         from idlergear.plans import create_plan
 
-        return create_plan(
+        result = create_plan(
             params["name"],
             title=params.get("title"),
             body=params.get("body"),
         )
+        await server.broadcast("plan.created", {"name": params["name"]})
+        return result
 
     async def plan_list(params: dict[str, Any], conn: Connection) -> list[dict]:
         from idlergear.plans import list_plans
@@ -159,7 +167,9 @@ def register_handlers(server: DaemonServer) -> None:
     async def reference_add(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
         from idlergear.reference import add_reference
 
-        return add_reference(params["title"], body=params.get("body"))
+        result = add_reference(params["title"], body=params.get("body"))
+        await server.broadcast("reference.added", {"id": result.get("id"), "title": params["title"]})
+        return result
 
     async def reference_list(params: dict[str, Any], conn: Connection) -> list[dict]:
         from idlergear.reference import list_references

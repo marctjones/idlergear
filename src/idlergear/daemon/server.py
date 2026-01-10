@@ -457,8 +457,28 @@ class DaemonServer:
         await self.broadcast(event, data)
         return {"broadcasted": True, "event": event, "connections": len(self._connections)}
 
+    def _matches_subscription(self, event: str, subscription: str) -> bool:
+        """Check if an event matches a subscription pattern.
+
+        Supports wildcards:
+        - "task.*" matches "task.created", "task.closed", etc.
+        - "*" matches all events
+        - "task.created" matches exactly "task.created"
+        """
+        if subscription == "*":
+            return True
+        if subscription == event:
+            return True
+        if subscription.endswith(".*"):
+            prefix = subscription[:-2]
+            return event.startswith(prefix + ".")
+        return False
+
     async def broadcast(self, event: str, data: dict[str, Any]) -> None:
-        """Broadcast an event to all subscribed connections."""
+        """Broadcast an event to all subscribed connections.
+
+        Supports wildcard subscriptions like "task.*" or "*".
+        """
         notification = Notification(
             method="event",
             params={"event": event, "data": data},
@@ -466,8 +486,10 @@ class DaemonServer:
         message = notification.to_json()
 
         for conn in list(self._connections.values()):
-            if event in conn.subscriptions:
-                await conn.send(message)
+            for subscription in conn.subscriptions:
+                if self._matches_subscription(event, subscription):
+                    await conn.send(message)
+                    break  # Only send once per connection
 
     async def _handle_client(
         self,
