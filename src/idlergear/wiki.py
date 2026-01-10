@@ -116,8 +116,151 @@ class WikiSync:
 
         return wiki_url
 
+    def wiki_exists(self) -> bool:
+        """Check if the GitHub Wiki repository exists.
+
+        GitHub wikis don't exist until the first page is created.
+        This checks if the wiki repo can be accessed.
+
+        Returns:
+            True if wiki exists and is accessible, False otherwise
+        """
+        wiki_url = self._get_wiki_url()
+        if not wiki_url:
+            return False
+
+        # Try to ls-remote the wiki repo
+        result = subprocess.run(
+            ["git", "ls-remote", wiki_url],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        return result.returncode == 0
+
+    def initialize_wiki(self) -> bool:
+        """Initialize GitHub Wiki by creating the first page via API.
+
+        GitHub wikis don't exist until the first page is created via
+        the web UI or API. This creates a Home page to initialize the wiki.
+
+        Returns:
+            True if wiki was initialized successfully, False otherwise
+        """
+        # Check if wiki already exists
+        if self.wiki_exists():
+            return True
+
+        # Get owner and repo from git remote
+        returncode, stdout, stderr = self._run_git(
+            "remote", "get-url", "origin", cwd=self.project_root
+        )
+        if returncode != 0:
+            return False
+
+        origin_url = stdout.strip()
+
+        # Parse owner/repo from URL
+        # https://github.com/owner/repo.git or git@github.com:owner/repo.git
+        import re
+        match = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", origin_url)
+        if not match:
+            return False
+
+        owner, repo = match.groups()
+        if repo.endswith(".git"):
+            repo = repo[:-4]
+
+        # Create initial wiki page via GitHub API
+        # GitHub doesn't have a direct wiki API, but we can use gh to create it
+        try:
+            # First, check if wiki is enabled for the repo
+            result = subprocess.run(
+                ["gh", "api", f"/repos/{owner}/{repo}", "--jq", ".has_wiki"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0 or result.stdout.strip().lower() != "true":
+                return False
+
+            # Unfortunately, GitHub API doesn't support creating wiki pages directly.
+            # We need to init locally and push.
+            # Create a local wiki repo with Home.md
+            import shutil
+            if self.wiki_dir.exists():
+                shutil.rmtree(self.wiki_dir)
+
+            self.wiki_dir.mkdir(parents=True)
+
+            # Init git repo
+            subprocess.run(
+                ["git", "init"],
+                cwd=str(self.wiki_dir),
+                capture_output=True,
+                check=True,
+            )
+
+            # Create Home.md
+            home_page = self.wiki_dir / "Home.md"
+            home_page.write_text(
+                "# Welcome to the Wiki\n\n"
+                "This wiki was auto-initialized by IdlerGear.\n\n"
+                "## Getting Started\n\n"
+                "Add your project documentation here.\n"
+            )
+
+            # Add and commit
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=str(self.wiki_dir),
+                capture_output=True,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "Initialize wiki"],
+                cwd=str(self.wiki_dir),
+                capture_output=True,
+                check=True,
+            )
+
+            # Add remote and push
+            wiki_url = self._get_wiki_url()
+            subprocess.run(
+                ["git", "remote", "add", "origin", wiki_url],
+                cwd=str(self.wiki_dir),
+                capture_output=True,
+                check=True,
+            )
+
+            # Push to master (GitHub wikis use master)
+            result = subprocess.run(
+                ["git", "push", "-u", "origin", "master"],
+                cwd=str(self.wiki_dir),
+                capture_output=True,
+                text=True,
+            )
+
+            # If push fails, try creating with HEAD:master
+            if result.returncode != 0:
+                result = subprocess.run(
+                    ["git", "push", "-u", "origin", "HEAD:master"],
+                    cwd=str(self.wiki_dir),
+                    capture_output=True,
+                    text=True,
+                )
+
+            return result.returncode == 0
+
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+
     def clone_wiki(self) -> bool:
         """Clone GitHub Wiki repository.
+
+        If wiki doesn't exist, attempts to initialize it first.
 
         Returns:
             True if successful, False otherwise
@@ -137,7 +280,14 @@ class WikiSync:
             cwd=self.project_root
         )
 
-        return returncode == 0
+        # If clone failed, try to initialize the wiki
+        if returncode != 0:
+            if "not found" in stderr.lower() or "does not exist" in stderr.lower():
+                if self.initialize_wiki():
+                    return True  # initialize_wiki already creates the local repo
+            return False
+
+        return True
 
     def pull_wiki(self) -> bool:
         """Pull latest changes from GitHub Wiki.
