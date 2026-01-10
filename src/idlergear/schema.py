@@ -238,9 +238,7 @@ MISPLACED_FILE_PATTERNS = {
     "NOTES.md": {"type": "note", "action": "Convert to notes"},
     "SCRATCH.md": {"type": "note", "action": "Convert to notes"},
     "RESEARCH.md": {"type": "note", "action": "Convert to notes with 'research' tag"},
-
-    # Documentation files
-    "AGENTS.md": {"type": "forbidden", "action": "Use IdlerGear instead"},
+    # Note: AGENTS.md is NOT forbidden - it's created by IdlerGear for AI assistant compatibility
 }
 
 
