@@ -653,12 +653,30 @@ class GitHubVisionBackend:
 class GitHubReferenceBackend:
     """GitHub Wiki as reference backend.
 
-    Uses gh api to manage wiki pages.
+    Uses WikiSync to clone/pull wiki repo and manage pages locally.
+    Changes are automatically pushed to GitHub.
     """
 
     def __init__(self, project_path: Path | None = None):
-        self.project_path = project_path
+        self.project_path = project_path or Path.cwd()
         self._wiki_enabled: bool | None = None
+        self._wiki_sync = None
+        self._title_to_id: dict[str, int] = {}
+        self._next_id = 1
+
+    def _get_wiki_sync(self):
+        """Get or create WikiSync instance."""
+        if self._wiki_sync is None:
+            from idlergear.wiki import WikiSync
+            self._wiki_sync = WikiSync(self.project_path)
+        return self._wiki_sync
+
+    def _ensure_wiki_cloned(self) -> bool:
+        """Ensure wiki repo is cloned and up to date."""
+        wiki_sync = self._get_wiki_sync()
+        if not wiki_sync.wiki_dir.exists():
+            return wiki_sync.clone_wiki()
+        return wiki_sync.pull_wiki()
 
     def _check_wiki_enabled(self) -> bool:
         """Check if wiki is enabled for the repository."""
@@ -676,50 +694,119 @@ class GitHubReferenceBackend:
 
         return self._wiki_enabled
 
-    def add(self, title: str, body: str | None = None) -> dict[str, Any]:
-        """Add a new reference document.
+    def _get_id_for_title(self, title: str) -> int:
+        """Get or create a stable ID for a title."""
+        if title not in self._title_to_id:
+            self._title_to_id[title] = self._next_id
+            self._next_id += 1
+        return self._title_to_id[title]
 
-        Note: GitHub Wiki API is limited. This creates a local wiki page
-        that must be pushed manually.
+    def add(self, title: str, body: str | None = None) -> dict[str, Any]:
+        """Add a new reference document to GitHub Wiki.
+
+        Creates the wiki page locally and pushes to GitHub.
         """
-        # Wiki operations require cloning the wiki repo
-        # For now, create locally and provide instructions
         if not self._check_wiki_enabled():
             raise GitHubBackendError(
                 "Wiki not enabled for this repository. "
                 "Enable it in Settings → Features → Wiki"
             )
 
-        # Sanitize title for filename
-        filename = title.replace(" ", "-").replace("/", "-") + ".md"
-        content = f"# {title}\n\n{body or ''}"
+        if not self._ensure_wiki_cloned():
+            raise GitHubBackendError("Failed to clone/pull wiki repository")
 
+        wiki_sync = self._get_wiki_sync()
+
+        # Create wiki page
+        filename = title.replace(" ", "-").replace("/", "-") + ".md"
+        wiki_path = wiki_sync.wiki_dir / filename
+        content = f"# {title}\n\n{body or ''}"
+        wiki_path.write_text(content, encoding="utf-8")
+
+        # Push to GitHub
+        if not wiki_sync.push_wiki():
+            raise GitHubBackendError("Failed to push wiki changes to GitHub")
+
+        ref_id = self._get_id_for_title(title)
         return {
-            "id": hash(title) % 10000,  # Fake ID
+            "id": ref_id,
             "title": title,
             "body": body or "",
-            "filename": filename,
-            "content": content,
-            "note": "Wiki page created. Clone wiki repo and push to sync.",
+            "path": str(wiki_path),
         }
 
     def list(self) -> list[dict[str, Any]]:
-        """List reference documents from wiki.
+        """List reference documents from GitHub Wiki."""
+        if not self._check_wiki_enabled():
+            return []
 
-        Note: GitHub API doesn't provide wiki listing.
-        This returns empty for now.
-        """
-        # GitHub doesn't have a wiki list API
-        # Would need to clone wiki repo to list pages
-        return []
+        if not self._ensure_wiki_cloned():
+            return []
+
+        wiki_sync = self._get_wiki_sync()
+        pages = wiki_sync.list_wiki_pages()
+
+        results = []
+        for page in pages:
+            ref_id = self._get_id_for_title(page.title)
+            # Extract body (skip the header line if present)
+            body = page.content
+            if body.startswith(f"# {page.title}"):
+                body = body[len(f"# {page.title}"):].strip()
+
+            results.append({
+                "id": ref_id,
+                "title": page.title,
+                "body": body,
+                "path": str(page.path),
+            })
+
+        return sorted(results, key=lambda r: r.get("title", "").lower())
 
     def get(self, title: str) -> dict[str, Any] | None:
-        """Get a reference by title."""
-        # Would need to clone wiki repo to get content
-        return None
+        """Get a reference by title from GitHub Wiki."""
+        if not self._check_wiki_enabled():
+            return None
+
+        if not self._ensure_wiki_cloned():
+            return None
+
+        wiki_sync = self._get_wiki_sync()
+
+        # Look for matching page
+        filename = title.replace(" ", "-").replace("/", "-") + ".md"
+        wiki_path = wiki_sync.wiki_dir / filename
+
+        if not wiki_path.exists():
+            # Try case-insensitive search
+            for page in wiki_sync.list_wiki_pages():
+                if page.title.lower() == title.lower():
+                    wiki_path = page.path
+                    title = page.title
+                    break
+            else:
+                return None
+
+        content = wiki_path.read_text(encoding="utf-8")
+        # Extract body (skip the header line if present)
+        body = content
+        if body.startswith(f"# {title}"):
+            body = body[len(f"# {title}"):].strip()
+
+        ref_id = self._get_id_for_title(title)
+        return {
+            "id": ref_id,
+            "title": title,
+            "body": body,
+            "path": str(wiki_path),
+        }
 
     def get_by_id(self, ref_id: int) -> dict[str, Any] | None:
         """Get a reference by ID."""
+        # Search through title-to-id mapping
+        for title, tid in self._title_to_id.items():
+            if tid == ref_id:
+                return self.get(title)
         return None
 
     def update(
@@ -728,13 +815,73 @@ class GitHubReferenceBackend:
         new_title: str | None = None,
         body: str | None = None,
     ) -> dict[str, Any] | None:
-        """Update a reference document."""
-        return None
+        """Update a reference document in GitHub Wiki."""
+        if not self._check_wiki_enabled():
+            return None
+
+        if not self._ensure_wiki_cloned():
+            return None
+
+        wiki_sync = self._get_wiki_sync()
+
+        # Find existing page
+        filename = title.replace(" ", "-").replace("/", "-") + ".md"
+        wiki_path = wiki_sync.wiki_dir / filename
+
+        if not wiki_path.exists():
+            return None
+
+        # Read existing content
+        existing_content = wiki_path.read_text(encoding="utf-8")
+
+        # Update content
+        final_title = new_title or title
+        if body is not None:
+            content = f"# {final_title}\n\n{body}"
+        else:
+            # Keep existing body, just update title if changed
+            if existing_content.startswith(f"# {title}"):
+                content = f"# {final_title}" + existing_content[len(f"# {title}"):]
+            else:
+                content = existing_content
+
+        # Handle rename
+        if new_title and new_title != title:
+            wiki_path.unlink()
+            new_filename = new_title.replace(" ", "-").replace("/", "-") + ".md"
+            wiki_path = wiki_sync.wiki_dir / new_filename
+            # Update ID mapping
+            if title in self._title_to_id:
+                self._title_to_id[new_title] = self._title_to_id.pop(title)
+
+        wiki_path.write_text(content, encoding="utf-8")
+
+        # Push changes
+        if not wiki_sync.push_wiki():
+            raise GitHubBackendError("Failed to push wiki changes to GitHub")
+
+        ref_id = self._get_id_for_title(final_title)
+        return {
+            "id": ref_id,
+            "title": final_title,
+            "body": body or "",
+            "path": str(wiki_path),
+        }
 
     def search(self, query: str) -> list[dict[str, Any]]:
-        """Search reference documents."""
-        # GitHub code search could work here, but requires authentication
-        return []
+        """Search reference documents in GitHub Wiki."""
+        all_refs = self.list()
+        query_lower = query.lower()
+
+        results = []
+        for ref in all_refs:
+            title_match = query_lower in ref.get("title", "").lower()
+            body_match = ref.get("body") and query_lower in ref["body"].lower()
+
+            if title_match or body_match:
+                results.append(ref)
+
+        return results
 
 
 class GitHubPlanBackend:
