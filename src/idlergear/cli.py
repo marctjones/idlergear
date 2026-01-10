@@ -1,7 +1,6 @@
 """IdlerGear CLI - Command-line interface."""
 
 import json
-import sys
 from enum import Enum
 from typing import Optional
 
@@ -470,7 +469,6 @@ def upgrade_schema(
         idlergear upgrade-schema --dry-run   # Preview changes
         idlergear upgrade-schema             # Perform migration
     """
-    from pathlib import Path
     import shutil
 
     from idlergear.config import find_idlergear_root
@@ -1578,7 +1576,7 @@ def migrate(
         if dry_run:
             typer.echo(f"\nDry run: {stats['total']} {backend_type}(s) would be migrated.")
         else:
-            typer.echo(f"\nMigration complete:")
+            typer.echo("\nMigration complete:")
             typer.echo(f"  Total: {stats['total']}")
             typer.secho(f"  Migrated: {stats['migrated']}", fg=typer.colors.GREEN)
             if stats["errors"]:
@@ -2695,7 +2693,7 @@ def session_save(
         idlergear session save --next "Run tests" # With next steps
     """
     from idlergear.config import find_idlergear_root
-    from idlergear.sessions import format_session_state, save_session
+    from idlergear.sessions import save_session
 
     if find_idlergear_root() is None:
         typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
@@ -3088,7 +3086,7 @@ def hooks_list():
         typer.echo(f"{executable} {hook['name']:<20} {hook['size']:>6}B  {modified}")
 
     typer.echo()
-    typer.echo(f"Location: .claude/hooks/")
+    typer.echo("Location: .claude/hooks/")
 
 
 # ===== Wiki Commands =====
@@ -3223,6 +3221,73 @@ def wiki_config(
 
 watch_app = typer.Typer(help="Watch mode for proactive knowledge capture")
 app.add_typer(watch_app, name="watch")
+
+
+@watch_app.command("check")
+def watch_check(
+    ctx: typer.Context,
+):
+    """One-shot analysis of project state with suggestions.
+
+    Analyzes git status, scans for TODO/FIXME comments in diff,
+    checks for stale references, and returns actionable suggestions.
+
+    Examples:
+        idlergear watch check              # Human-readable output
+        idlergear --output json watch check  # JSON output for AI agents
+    """
+    from idlergear.watch import analyze
+
+    status = analyze()
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(status.to_dict(), indent=2))
+        return
+
+    # Human-readable output
+    typer.echo("Watch Analysis")
+    typer.echo("=" * 40)
+    typer.echo()
+
+    # Git status summary
+    typer.secho("Git Status:", bold=True)
+    typer.echo(f"  Files changed: {status.files_changed}")
+    typer.echo(f"  Lines added: {status.lines_added}")
+    typer.echo(f"  Lines deleted: {status.lines_deleted}")
+    if status.minutes_since_commit is not None:
+        typer.echo(f"  Time since commit: {status.minutes_since_commit} min")
+    typer.echo()
+
+    # Suggestions
+    if status.suggestions:
+        typer.secho(f"Suggestions ({len(status.suggestions)}):", bold=True)
+        typer.echo()
+
+        for suggestion in status.suggestions:
+            # Color based on severity
+            if suggestion.severity == "action":
+                color = typer.colors.RED
+                icon = "!"
+            elif suggestion.severity == "warning":
+                color = typer.colors.YELLOW
+                icon = "?"
+            else:
+                color = typer.colors.CYAN
+                icon = "i"
+
+            typer.secho(f"  [{icon}] {suggestion.message}", fg=color)
+
+            # Show context for certain categories
+            if suggestion.category == "todo" and suggestion.context.get("file"):
+                typer.echo(f"      File: {suggestion.context['file']}")
+                typer.echo(f"      Text: {suggestion.context.get('text', '')}")
+            elif suggestion.category == "reference" and suggestion.context.get("related_file"):
+                typer.echo(f"      Related: {suggestion.context['related_file']}")
+
+        typer.echo()
+    else:
+        typer.secho("No suggestions - project looks good!", fg=typer.colors.GREEN)
 
 
 @watch_app.command("start")
