@@ -340,13 +340,13 @@ def check(
             result = schema.validate()
 
             if result["missing"]:
-                violations.append("Missing directories (run 'idlergear migrate' to fix):")
+                violations.append("Missing directories (run 'idlergear upgrade-schema' to fix):")
                 for d in result["missing"]:
                     violations.append(f"  {d}")
 
             if result["legacy"]:
                 if not quiet:
-                    typer.secho("Legacy directories found (run 'idlergear migrate'):", fg=typer.colors.YELLOW)
+                    typer.secho("Legacy directories found (run 'idlergear upgrade-schema'):", fg=typer.colors.YELLOW)
                     for d in result["legacy"]:
                         typer.echo(f"  {d}")
 
@@ -453,11 +453,11 @@ def check(
         typer.secho("No violations found.", fg=typer.colors.GREEN)
 
 
-@app.command()
-def migrate(
+@app.command("upgrade-schema")
+def upgrade_schema(
     dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without making changes"),
 ):
-    """Migrate .idlergear/ to v0.3 schema.
+    """Upgrade .idlergear/ to v0.3 schema.
 
     Performs the following migrations:
     - tasks/ → issues/
@@ -467,8 +467,8 @@ def migrate(
     - Creates missing directories (sync/, projects/)
 
     Examples:
-        idlergear migrate --dry-run   # Preview changes
-        idlergear migrate             # Perform migration
+        idlergear upgrade-schema --dry-run   # Preview changes
+        idlergear upgrade-schema             # Perform migration
     """
     from pathlib import Path
     import shutil
@@ -556,6 +556,131 @@ def migrate(
 
     typer.echo("")
     typer.secho(f"Migration to v{SCHEMA_VERSION} complete!", fg=typer.colors.GREEN)
+
+
+@app.command()
+def organize(
+    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without making changes"),
+    auto: bool = typer.Option(False, "--auto", "-y", help="Automatically organize without prompting"),
+):
+    """Organize misplaced files into IdlerGear structure.
+
+    Finds files like TODO.md, NOTES.md, SESSION_*.md in the project root
+    and offers to convert them into IdlerGear tasks/notes.
+
+    Examples:
+        idlergear organize --dry-run   # Preview what would be organized
+        idlergear organize             # Interactive organization
+        idlergear organize --auto      # Auto-organize without prompts
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.schema import detect_misplaced_files
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    misplaced = detect_misplaced_files(root)
+
+    if not misplaced:
+        typer.secho("No misplaced files found. Project is organized!", fg=typer.colors.GREEN)
+        return
+
+    typer.echo(f"Found {len(misplaced)} misplaced file(s):\n")
+
+    for item in misplaced:
+        typer.echo(f"  {item['name']}")
+        typer.secho(f"    → {item['action']}", fg=typer.colors.CYAN)
+
+    if dry_run:
+        typer.echo("")
+        typer.secho("Dry run - no changes made.", fg=typer.colors.CYAN)
+        return
+
+    typer.echo("")
+
+    if not auto:
+        proceed = typer.confirm("Organize these files?")
+        if not proceed:
+            typer.secho("Cancelled.", fg=typer.colors.YELLOW)
+            return
+
+    # Process each misplaced file
+    from idlergear.task import create_task
+    from idlergear.notes import create_note
+
+    organized_count = 0
+    for item in misplaced:
+        file_path = item["path"]
+        file_type = item["type"]
+
+        try:
+            content = file_path.read_text()
+
+            if file_type == "issue":
+                # Parse content for task-like items
+                lines = [l.strip() for l in content.split("\n") if l.strip()]
+                tasks_created = 0
+
+                for line in lines:
+                    # Skip headers and empty lines
+                    if line.startswith("#") or not line:
+                        continue
+                    # Skip common markdown patterns
+                    if line.startswith("---") or line.startswith("==="):
+                        continue
+
+                    # Clean up list markers
+                    task_text = line.lstrip("-*•[] ").strip()
+                    if not task_text or len(task_text) < 3:
+                        continue
+
+                    # Determine labels based on file name
+                    labels = []
+                    if "bug" in item["name"].lower():
+                        labels.append("bug")
+                    elif "idea" in item["name"].lower():
+                        labels.append("idea")
+                    elif "feature" in item["name"].lower():
+                        labels.append("enhancement")
+
+                    create_task(task_text[:200], labels=labels if labels else None)
+                    tasks_created += 1
+
+                if tasks_created > 0:
+                    typer.secho(f"  ✓ {item['name']}: Created {tasks_created} task(s)", fg=typer.colors.GREEN)
+                    # Archive the file
+                    archive_path = root / ".idlergear" / "archive" / item["name"]
+                    archive_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.rename(archive_path)
+                    organized_count += 1
+                else:
+                    typer.secho(f"  ! {item['name']}: No tasks found in file", fg=typer.colors.YELLOW)
+
+            elif file_type == "note":
+                # Determine tags based on file name
+                tags = []
+                if "research" in item["name"].lower():
+                    tags.append("research")
+                elif "session" in item["name"].lower():
+                    tags.append("session")
+
+                # Create as single note with full content
+                create_note(content[:2000], tags=tags if tags else None)
+                typer.secho(f"  ✓ {item['name']}: Created note", fg=typer.colors.GREEN)
+
+                # Archive the file
+                archive_path = root / ".idlergear" / "archive" / item["name"]
+                archive_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.rename(archive_path)
+                organized_count += 1
+
+        except Exception as e:
+            typer.secho(f"  ✗ {item['name']}: {e}", fg=typer.colors.RED)
+
+    typer.echo("")
+    typer.secho(f"Organized {organized_count} file(s). Originals archived to .idlergear/archive/", fg=typer.colors.GREEN)
 
 
 @app.command()
