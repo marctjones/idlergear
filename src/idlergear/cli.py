@@ -44,8 +44,12 @@ def main(
         None, "--output", help="Output format (json or human). Auto-detects if not set."
     ),
     version: bool = typer.Option(
-        False, "--version", "-V", callback=version_callback, is_eager=True,
-        help="Show version and exit."
+        False,
+        "--version",
+        "-V",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit.",
     ),
     no_upgrade: bool = typer.Option(
         False, "--no-upgrade", help="Skip automatic upgrade check."
@@ -61,14 +65,19 @@ def main(
 
     ctx.obj = State(output_format=output_format)
 
-    # Check for upgrade (skip for init/install commands and when --no-upgrade)
-    if not no_upgrade and ctx.invoked_subcommand not in ("init", "install", None):
+    # Check for upgrade (skip for init/install/doctor commands and when --no-upgrade)
+    if not no_upgrade and ctx.invoked_subcommand not in (
+        "init",
+        "install",
+        "doctor",
+        None,
+    ):
         from idlergear.upgrade import check_and_prompt_upgrade
+
         try:
             check_and_prompt_upgrade()
         except Exception:
             pass  # Don't let upgrade check break normal operation
-
 
 
 # Sub-command groups
@@ -106,7 +115,9 @@ app.add_typer(otel_app, name="otel")
 @app.command()
 def init(
     path: str = typer.Argument(".", help="Project directory to initialize"),
-    skip_github: bool = typer.Option(False, "--skip-github", help="Skip GitHub detection"),
+    skip_github: bool = typer.Option(
+        False, "--skip-github", help="Skip GitHub detection"
+    ),
 ):
     """Initialize IdlerGear in an existing project directory.
 
@@ -130,7 +141,9 @@ def init(
 
     if features.is_github_repo and not features.error:
         typer.echo("")
-        typer.secho(f"Detected GitHub repository: {features.repo_name}", fg=typer.colors.CYAN)
+        typer.secho(
+            f"Detected GitHub repository: {features.repo_name}", fg=typer.colors.CYAN
+        )
 
         recommendations = get_recommended_backends(features)
         if recommendations:
@@ -145,10 +158,18 @@ def init(
 
             if typer.confirm("Use GitHub for tasks and explorations?", default=True):
                 for backend_type, backend_name in recommendations.items():
-                    set_config_value(f"backends.{backend_type}", backend_name, project_path=project_path)
-                    typer.secho(f"  ✓ {backend_type} → {backend_name}", fg=typer.colors.GREEN)
+                    set_config_value(
+                        f"backends.{backend_type}",
+                        backend_name,
+                        project_path=project_path,
+                    )
+                    typer.secho(
+                        f"  ✓ {backend_type} → {backend_name}", fg=typer.colors.GREEN
+                    )
             else:
-                typer.echo("Using local backends. Run 'idlergear setup-github' anytime to reconfigure.")
+                typer.echo(
+                    "Using local backends. Run 'idlergear setup-github' anytime to reconfigure."
+                )
 
 
 @app.command()
@@ -167,7 +188,10 @@ def search(
     from idlergear.search import search_all
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     results = search_all(query, types=types if types else None)
@@ -191,10 +215,21 @@ def search(
 @app.command()
 def context(
     ctx: typer.Context,
-    mode: str = typer.Option("minimal", "--mode", "-m", help="Verbosity mode: minimal (~750 tokens), standard (~2500), detailed (~7000), full (no limits)"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Include more detail (deprecated, use --mode)"),
-    include_refs: bool = typer.Option(False, "--refs", "-r", help="Include reference documents"),
-    include_session: bool = typer.Option(False, "--session", "-s", help="Include session state"),
+    mode: str = typer.Option(
+        "minimal",
+        "--mode",
+        "-m",
+        help="Verbosity mode: minimal (~750 tokens), standard (~2500), detailed (~7000), full (no limits)",
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Include more detail (deprecated, use --mode)"
+    ),
+    include_refs: bool = typer.Option(
+        False, "--refs", "-r", help="Include reference documents"
+    ),
+    include_session: bool = typer.Option(
+        False, "--session", "-s", help="Include session state"
+    ),
 ):
     """Show project context for AI session start.
 
@@ -225,13 +260,19 @@ def context(
     from idlergear.context import format_context_json, gather_context
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     # Validate mode
     valid_modes = ["minimal", "standard", "detailed", "full"]
     if mode not in valid_modes:
-        typer.secho(f"Invalid mode '{mode}'. Choose from: {', '.join(valid_modes)}", fg=typer.colors.RED)
+        typer.secho(
+            f"Invalid mode '{mode}'. Choose from: {', '.join(valid_modes)}",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     # Handle deprecated --verbose flag
@@ -252,7 +293,7 @@ def context(
     if ctx.obj.output_format == "json":
         json_data = format_context_json(context_data)
         if include_session and hasattr(context_data, "session"):
-             json_data["session"] = context_data.session
+            json_data["session"] = context_data.session
         display(json_data, "json", "context")
     else:
         # The session data needs special handling for the text format,
@@ -260,6 +301,7 @@ def context(
         display(context_data, "human", "context", verbose=verbose)
         if include_session and hasattr(context_data, "session"):
             from idlergear.sessions import format_session_state, load_session
+
             session = load_session()
             if session:
                 typer.echo("\n\n" + format_session_state(session))
@@ -268,7 +310,9 @@ def context(
 @app.command()
 def status(
     ctx: typer.Context,
-    detailed: bool = typer.Option(False, "--detailed", "-d", help="Show detailed dashboard"),
+    detailed: bool = typer.Option(
+        False, "--detailed", "-d", help="Show detailed dashboard"
+    ),
 ):
     """Show unified project status dashboard.
 
@@ -283,7 +327,10 @@ def status(
     from idlergear.status import get_project_status
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     status_data = get_project_status()
@@ -299,11 +346,21 @@ def status(
 def check(
     file: str = typer.Option(None, "--file", "-f", help="File to check for violations"),
     no_todos: bool = typer.Option(False, "--no-todos", help="Check for TODO comments"),
-    no_forbidden: bool = typer.Option(False, "--no-forbidden", help="Check for forbidden files"),
-    context_reminder: bool = typer.Option(False, "--context-reminder", help="Remind to run context at session start"),
-    structure: bool = typer.Option(False, "--structure", help="Check .idlergear/ directory structure"),
-    files: bool = typer.Option(False, "--files", help="Check for misplaced files in project root"),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Only output on violations"),
+    no_forbidden: bool = typer.Option(
+        False, "--no-forbidden", help="Check for forbidden files"
+    ),
+    context_reminder: bool = typer.Option(
+        False, "--context-reminder", help="Remind to run context at session start"
+    ),
+    structure: bool = typer.Option(
+        False, "--structure", help="Check .idlergear/ directory structure"
+    ),
+    files: bool = typer.Option(
+        False, "--files", help="Check for misplaced files in project root"
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Only output on violations"
+    ),
 ):
     """Check for IdlerGear policy violations and structure issues.
 
@@ -339,13 +396,18 @@ def check(
             result = schema.validate()
 
             if result["missing"]:
-                violations.append("Missing directories (run 'idlergear upgrade-schema' to fix):")
+                violations.append(
+                    "Missing directories (run 'idlergear upgrade-schema' to fix):"
+                )
                 for d in result["missing"]:
                     violations.append(f"  {d}")
 
             if result["legacy"]:
                 if not quiet:
-                    typer.secho("Legacy directories found (run 'idlergear upgrade-schema'):", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        "Legacy directories found (run 'idlergear upgrade-schema'):",
+                        fg=typer.colors.YELLOW,
+                    )
                     for d in result["legacy"]:
                         typer.echo(f"  {d}")
 
@@ -372,49 +434,61 @@ def check(
                 content = file_path.read_text()
                 # Check for TODO patterns
                 todo_patterns = [
-                    r'//\s*TODO:',
-                    r'#\s*TODO:',
-                    r'/\*\s*TODO:',
-                    r'//\s*FIXME:',
-                    r'#\s*FIXME:',
-                    r'/\*\s*FIXME:',
-                    r'//\s*HACK:',
-                    r'#\s*HACK:',
-                    r'/\*\s*HACK:',
-                    r'<!--\s*TODO:',
+                    r"//\s*TODO:",
+                    r"#\s*TODO:",
+                    r"/\*\s*TODO:",
+                    r"//\s*FIXME:",
+                    r"#\s*FIXME:",
+                    r"/\*\s*FIXME:",
+                    r"//\s*HACK:",
+                    r"#\s*HACK:",
+                    r"/\*\s*HACK:",
+                    r"<!--\s*TODO:",
                 ]
                 for pattern in todo_patterns:
                     if re.search(pattern, content, re.IGNORECASE):
                         violations.append(f"TODO/FIXME/HACK comment found in {file}")
-                        violations.append("Use: idlergear task create \"...\" --label tech-debt")
+                        violations.append(
+                            'Use: idlergear task create "..." --label tech-debt'
+                        )
                         break
             except Exception:
                 pass  # Can't read file, skip
 
         # Check for forbidden file names
         forbidden_files = [
-            "TODO.md", "TODO.txt", "TASKS.md",
-            "NOTES.md", "SCRATCH.md", "BACKLOG.md",
-            "FEATURE_IDEAS.md", "RESEARCH.md",
+            "TODO.md",
+            "TODO.txt",
+            "TASKS.md",
+            "NOTES.md",
+            "SCRATCH.md",
+            "BACKLOG.md",
+            "FEATURE_IDEAS.md",
+            "RESEARCH.md",
         ]
         if file_path.name in forbidden_files:
             violations.append(f"Forbidden file: {file_path.name}")
             violations.append("Use IdlerGear commands instead:")
-            violations.append("  idlergear task create \"...\"")
-            violations.append("  idlergear note create \"...\"")
+            violations.append('  idlergear task create "..."')
+            violations.append('  idlergear note create "..."')
 
         if file_path.name.startswith("SESSION_") and file_path.suffix == ".md":
             violations.append(f"Forbidden file pattern: {file_path.name}")
-            violations.append("Use: idlergear note create \"...\"")
+            violations.append('Use: idlergear note create "..."')
 
     # Check for forbidden files in project
     if no_forbidden:
         from idlergear.config import find_idlergear_root
+
         root = find_idlergear_root()
         if root:
             forbidden = [
-                "TODO.md", "TODO.txt", "TASKS.md",
-                "NOTES.md", "SCRATCH.md", "BACKLOG.md",
+                "TODO.md",
+                "TODO.txt",
+                "TASKS.md",
+                "NOTES.md",
+                "SCRATCH.md",
+                "BACKLOG.md",
             ]
             for f in forbidden:
                 if (root / f).exists():
@@ -423,25 +497,43 @@ def check(
     # Grep for TODO comments in project
     if no_todos:
         from idlergear.config import find_idlergear_root
+
         root = find_idlergear_root()
         if root:
             import subprocess
+
             result = subprocess.run(
-                ["grep", "-rn", "-E", r"(//|#|/\*)\s*(TODO|FIXME|HACK):", str(root),
-                 "--include=*.py", "--include=*.js", "--include=*.ts", "--include=*.go",
-                 "--include=*.rs", "--include=*.java", "--include=*.c", "--include=*.cpp"],
-                capture_output=True, text=True
+                [
+                    "grep",
+                    "-rn",
+                    "-E",
+                    r"(//|#|/\*)\s*(TODO|FIXME|HACK):",
+                    str(root),
+                    "--include=*.py",
+                    "--include=*.js",
+                    "--include=*.ts",
+                    "--include=*.go",
+                    "--include=*.rs",
+                    "--include=*.java",
+                    "--include=*.c",
+                    "--include=*.cpp",
+                ],
+                capture_output=True,
+                text=True,
             )
             if result.returncode == 0 and result.stdout.strip():
                 violations.append("TODO/FIXME/HACK comments found:")
                 for line in result.stdout.strip().split("\n")[:5]:
                     violations.append(f"  {line}")
-                violations.append("Use: idlergear task create \"...\" --label tech-debt")
+                violations.append('Use: idlergear task create "..." --label tech-debt')
 
     # Context reminder
     if context_reminder:
         if not quiet:
-            typer.secho("REMINDER: Run 'idlergear context' at session start", fg=typer.colors.CYAN)
+            typer.secho(
+                "REMINDER: Run 'idlergear context' at session start",
+                fg=typer.colors.CYAN,
+            )
 
     # Report violations
     if violations:
@@ -452,9 +544,66 @@ def check(
         typer.secho("No violations found.", fg=typer.colors.GREEN)
 
 
+@app.command()
+def doctor(
+    ctx: typer.Context,
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show all checks including passed ones"
+    ),
+    fix: bool = typer.Option(
+        False, "--fix", help="Automatically fix issues by running install --upgrade"
+    ),
+):
+    """Check IdlerGear installation health and suggest fixes.
+
+    Checks for:
+    - Configuration health (initialized, version current)
+    - File installation status (MCP, hooks, rules, skills)
+    - Legacy files from older versions
+    - Unmanaged knowledge files (TODO.md, NOTES.md, etc.)
+
+    Examples:
+        idlergear doctor              # Run health checks
+        idlergear doctor -v           # Show all checks including passed
+        idlergear doctor --fix        # Auto-fix by running install --upgrade
+    """
+    from idlergear.doctor import run_doctor, format_report
+
+    report = run_doctor()
+
+    if ctx.obj.output_format == "json":
+        display(report.to_dict(), "json", "doctor")
+    else:
+        typer.echo(format_report(report, verbose=verbose))
+
+    # Auto-fix if requested
+    if fix and not report.is_healthy:
+        typer.echo("")
+        typer.secho(
+            "Running auto-fix (idlergear install --upgrade)...", fg=typer.colors.YELLOW
+        )
+        from idlergear.upgrade import do_upgrade
+
+        result = do_upgrade()
+        if "error" in result:
+            typer.secho(f"Error: {result['error']}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        else:
+            typer.secho(
+                "Upgrade complete. Run 'idlergear doctor' again to verify.",
+                fg=typer.colors.GREEN,
+            )
+
+    # Exit with error code if unhealthy (for CI/scripts)
+    if report.has_errors:
+        raise typer.Exit(1)
+
+
 @app.command("upgrade-schema")
 def upgrade_schema(
-    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without making changes"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be done without making changes"
+    ),
 ):
     """Upgrade .idlergear/ to v0.3 schema.
 
@@ -476,37 +625,72 @@ def upgrade_schema(
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     schema = IdlerGearSchema(root)
 
     if not schema.needs_migration():
-        typer.secho(f"Already on v{SCHEMA_VERSION} schema. Nothing to migrate.", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Already on v{SCHEMA_VERSION} schema. Nothing to migrate.",
+            fg=typer.colors.GREEN,
+        )
         return
 
     actions = []
 
     # Check tasks/ → issues/
     if schema.legacy_tasks_dir.exists() and not schema.issues_dir.exists():
-        actions.append(("rename", schema.legacy_tasks_dir, schema.issues_dir, "tasks/ → issues/"))
+        actions.append(
+            ("rename", schema.legacy_tasks_dir, schema.issues_dir, "tasks/ → issues/")
+        )
 
     # Check reference/ → wiki/
     if schema.legacy_reference_dir.exists() and not schema.wiki_dir.exists():
-        actions.append(("rename", schema.legacy_reference_dir, schema.wiki_dir, "reference/ → wiki/"))
+        actions.append(
+            (
+                "rename",
+                schema.legacy_reference_dir,
+                schema.wiki_dir,
+                "reference/ → wiki/",
+            )
+        )
 
     # Check .idlergear/vision.md → VISION.md (repo root)
     if schema.legacy_vision_file.exists() and not schema.vision_file.exists():
-        actions.append(("move", schema.legacy_vision_file, schema.vision_file, ".idlergear/vision.md → VISION.md"))
+        actions.append(
+            (
+                "move",
+                schema.legacy_vision_file,
+                schema.vision_file,
+                ".idlergear/vision.md → VISION.md",
+            )
+        )
 
     # Check explorations/ (if empty, remove; otherwise prompt)
     if schema.legacy_explorations_dir.exists():
         exploration_files = list(schema.legacy_explorations_dir.glob("*.md"))
         if not exploration_files:
-            actions.append(("remove", schema.legacy_explorations_dir, None, "Remove empty explorations/"))
+            actions.append(
+                (
+                    "remove",
+                    schema.legacy_explorations_dir,
+                    None,
+                    "Remove empty explorations/",
+                )
+            )
         else:
-            actions.append(("warn", schema.legacy_explorations_dir, None,
-                           f"explorations/ has {len(exploration_files)} files - convert to notes with 'explore' tag"))
+            actions.append(
+                (
+                    "warn",
+                    schema.legacy_explorations_dir,
+                    None,
+                    f"explorations/ has {len(exploration_files)} files - convert to notes with 'explore' tag",
+                )
+            )
 
     # Create missing v0.3 directories
     for dir_path in schema.get_all_directories():
@@ -514,7 +698,10 @@ def upgrade_schema(
             actions.append(("create", dir_path, None, f"Create {dir_path.name}/"))
 
     if not actions:
-        typer.secho(f"Already on v{SCHEMA_VERSION} schema. Nothing to migrate.", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Already on v{SCHEMA_VERSION} schema. Nothing to migrate.",
+            fg=typer.colors.GREEN,
+        )
         return
 
     # Show planned actions
@@ -558,8 +745,12 @@ def upgrade_schema(
 
 @app.command()
 def organize(
-    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without making changes"),
-    auto: bool = typer.Option(False, "--auto", "-y", help="Automatically organize without prompting"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be done without making changes"
+    ),
+    auto: bool = typer.Option(
+        False, "--auto", "-y", help="Automatically organize without prompting"
+    ),
 ):
     """Organize misplaced files into IdlerGear structure.
 
@@ -576,13 +767,18 @@ def organize(
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     misplaced = detect_misplaced_files(root)
 
     if not misplaced:
-        typer.secho("No misplaced files found. Project is organized!", fg=typer.colors.GREEN)
+        typer.secho(
+            "No misplaced files found. Project is organized!", fg=typer.colors.GREEN
+        )
         return
 
     typer.echo(f"Found {len(misplaced)} misplaced file(s):\n")
@@ -647,14 +843,20 @@ def organize(
                     tasks_created += 1
 
                 if tasks_created > 0:
-                    typer.secho(f"  ✓ {item['name']}: Created {tasks_created} task(s)", fg=typer.colors.GREEN)
+                    typer.secho(
+                        f"  ✓ {item['name']}: Created {tasks_created} task(s)",
+                        fg=typer.colors.GREEN,
+                    )
                     # Archive the file
                     archive_path = root / ".idlergear" / "archive" / item["name"]
                     archive_path.parent.mkdir(parents=True, exist_ok=True)
                     file_path.rename(archive_path)
                     organized_count += 1
                 else:
-                    typer.secho(f"  ! {item['name']}: No tasks found in file", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        f"  ! {item['name']}: No tasks found in file",
+                        fg=typer.colors.YELLOW,
+                    )
 
             elif file_type == "note":
                 # Determine tags based on file name
@@ -678,19 +880,32 @@ def organize(
             typer.secho(f"  ✗ {item['name']}: {e}", fg=typer.colors.RED)
 
     typer.echo("")
-    typer.secho(f"Organized {organized_count} file(s). Originals archived to .idlergear/archive/", fg=typer.colors.GREEN)
+    typer.secho(
+        f"Organized {organized_count} file(s). Originals archived to .idlergear/archive/",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.command()
 def new(
     name: str = typer.Argument(..., help="Project name"),
-    path: str = typer.Option(None, "--path", "-p", help="Parent directory (default: current)"),
-    template: str = typer.Option("base", "--template", "-t", help="Template: base, python"),
-    python: bool = typer.Option(False, "--python", help="Shortcut for --template python"),
+    path: str = typer.Option(
+        None, "--path", "-p", help="Parent directory (default: current)"
+    ),
+    template: str = typer.Option(
+        "base", "--template", "-t", help="Template: base, python"
+    ),
+    python: bool = typer.Option(
+        False, "--python", help="Shortcut for --template python"
+    ),
     vision: str = typer.Option("", "--vision", "-v", help="Initial project vision"),
-    description: str = typer.Option("", "--description", "-d", help="Short description"),
+    description: str = typer.Option(
+        "", "--description", "-d", help="Short description"
+    ),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git initialization"),
-    no_venv: bool = typer.Option(False, "--no-venv", help="Skip venv creation (Python only)"),
+    no_venv: bool = typer.Option(
+        False, "--no-venv", help="Skip venv creation (Python only)"
+    ),
 ):
     """Create a new project with full IdlerGear + Claude Code integration.
 
@@ -736,8 +951,12 @@ def new(
 
 @app.command("setup-github")
 def setup_github(
-    auto_yes: bool = typer.Option(False, "--yes", "-y", help="Auto-accept all recommendations"),
-    check_only: bool = typer.Option(False, "--check", help="Only check, don't configure"),
+    auto_yes: bool = typer.Option(
+        False, "--yes", "-y", help="Auto-accept all recommendations"
+    ),
+    check_only: bool = typer.Option(
+        False, "--check", help="Only check, don't configure"
+    ),
 ):
     """Detect GitHub features and configure backends.
 
@@ -758,7 +977,10 @@ def setup_github(
     )
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     typer.echo("Detecting GitHub features...")
@@ -800,12 +1022,17 @@ def setup_github(
     if apply:
         for backend_type, backend_name in recommendations.items():
             set_config_value(f"backends.{backend_type}", backend_name)
-            typer.secho(f"  ✓ Set {backend_type} backend to {backend_name}", fg=typer.colors.GREEN)
+            typer.secho(
+                f"  ✓ Set {backend_type} backend to {backend_name}",
+                fg=typer.colors.GREEN,
+            )
         typer.echo("")
         typer.secho("GitHub backends configured!", fg=typer.colors.GREEN)
         typer.echo("Your tasks and explorations will now sync with GitHub Issues.")
     else:
-        typer.echo("No changes made. You can run 'idlergear config backend' to configure manually.")
+        typer.echo(
+            "No changes made. You can run 'idlergear config backend' to configure manually."
+        )
 
 
 @app.command()
@@ -859,7 +1086,9 @@ def uninstall(
     idlergear_dir = project_path / ".idlergear"
 
     if not idlergear_dir.exists():
-        typer.secho("No IdlerGear installation found in this directory.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "No IdlerGear installation found in this directory.", fg=typer.colors.YELLOW
+        )
         raise typer.Exit(0)
 
     # Check what would be removed
@@ -884,7 +1113,9 @@ def uninstall(
     if results["claude_settings"]:
         typer.echo("  • Protected paths from .claude/settings.json")
     if results["idlergear_data"]:
-        typer.secho("  • .idlergear/ directory (ALL DATA)", fg=typer.colors.RED, bold=True)
+        typer.secho(
+            "  • .idlergear/ directory (ALL DATA)", fg=typer.colors.RED, bold=True
+        )
 
     if dry_run:
         raise typer.Exit(0)
@@ -918,24 +1149,42 @@ def uninstall(
     if results.get("hook_scripts"):
         typer.secho("  ✓ Hook scripts from .claude/hooks/", fg=typer.colors.GREEN)
     if results["claude_settings"]:
-        typer.secho("  ✓ Protected paths from .claude/settings.json", fg=typer.colors.GREEN)
+        typer.secho(
+            "  ✓ Protected paths from .claude/settings.json", fg=typer.colors.GREEN
+        )
     if results["idlergear_data"]:
         typer.secho("  ✓ .idlergear/ directory", fg=typer.colors.GREEN)
 
     typer.echo("")
     if not remove_data and idlergear_dir.exists():
-        typer.echo("Note: .idlergear/ directory preserved. Use --remove-data to delete it.")
+        typer.echo(
+            "Note: .idlergear/ directory preserved. Use --remove-data to delete it."
+        )
     typer.secho("IdlerGear uninstalled.", fg=typer.colors.GREEN)
 
 
 @app.command()
 def install(
-    skip_agents: bool = typer.Option(False, "--skip-agents", help="Skip AGENTS.md update"),
-    skip_claude: bool = typer.Option(False, "--skip-claude", help="Skip CLAUDE.md update"),
-    skip_rules: bool = typer.Option(False, "--skip-rules", help="Skip .claude/rules/ creation"),
-    skip_hooks: bool = typer.Option(False, "--skip-hooks", help="Skip .claude/hooks.json creation"),
-    skip_skill: bool = typer.Option(False, "--skip-skill", help="Skip .claude/skills/idlergear/ creation"),
-    auto_version: bool = typer.Option(False, "--auto-version", help="Install git hook to auto-bump patch version on commit"),
+    skip_agents: bool = typer.Option(
+        False, "--skip-agents", help="Skip AGENTS.md update"
+    ),
+    skip_claude: bool = typer.Option(
+        False, "--skip-claude", help="Skip CLAUDE.md update"
+    ),
+    skip_rules: bool = typer.Option(
+        False, "--skip-rules", help="Skip .claude/rules/ creation"
+    ),
+    skip_hooks: bool = typer.Option(
+        False, "--skip-hooks", help="Skip .claude/hooks.json creation"
+    ),
+    skip_skill: bool = typer.Option(
+        False, "--skip-skill", help="Skip .claude/skills/idlergear/ creation"
+    ),
+    auto_version: bool = typer.Option(
+        False,
+        "--auto-version",
+        help="Install git hook to auto-bump patch version on commit",
+    ),
 ):
     """Install IdlerGear integration for Claude Code.
 
@@ -961,11 +1210,13 @@ def install(
         add_skill,
         install_hook_scripts,
         install_mcp_server,
+        install_scripts,
     )
 
     if find_idlergear_root() is None:
         # Auto-initialize if not already initialized
         from idlergear.init import init_project
+
         typer.secho("No .idlergear/ found, initializing...", fg=typer.colors.YELLOW)
         init_project(".")
         typer.echo("")
@@ -983,9 +1234,13 @@ def install(
         updated = [k for k, v in results.items() if v == "updated"]
         unchanged = [k for k, v in results.items() if v == "unchanged"]
         if created:
-            typer.secho(f"Created {component}: {', '.join(created)}", fg=typer.colors.GREEN)
+            typer.secho(
+                f"Created {component}: {', '.join(created)}", fg=typer.colors.GREEN
+            )
         if updated:
-            typer.secho(f"Updated {component}: {', '.join(updated)}", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"Updated {component}: {', '.join(updated)}", fg=typer.colors.YELLOW
+            )
         if unchanged and not created and not updated:
             typer.echo(f"{component} unchanged")
 
@@ -1027,6 +1282,10 @@ def install(
         hook_results = install_hook_scripts()
         report_results(hook_results, "hook scripts")
 
+    # Install utility scripts (ig-askpass, ig-sudo, etc.)
+    script_results = install_scripts()
+    report_results(script_results, "utility scripts")
+
     # Install slash commands
     cmd_results = add_commands()
     report_results(cmd_results, "slash commands")
@@ -1034,26 +1293,35 @@ def install(
     # Install auto-version git hook (optional)
     if auto_version:
         if add_auto_version_hook():
-            typer.secho("Installed .git/hooks/pre-commit (auto-version)", fg=typer.colors.GREEN)
+            typer.secho(
+                "Installed .git/hooks/pre-commit (auto-version)", fg=typer.colors.GREEN
+            )
         else:
-            typer.echo(".git/hooks/pre-commit already has auto-version hook (or not a git repo)")
+            typer.echo(
+                ".git/hooks/pre-commit already has auto-version hook (or not a git repo)"
+            )
 
     # Store IdlerGear version for future upgrade detection
     from idlergear.upgrade import set_project_version
     from idlergear import __version__
+
     set_project_version(__version__)
 
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
     typer.echo("IdlerGear auto-starts at session beginning via hooks and skill.")
-    typer.echo("Available commands: /ig_start (refresh context), /ig_status (diagnostics)")
+    typer.echo(
+        "Available commands: /ig_start (refresh context), /ig_status (diagnostics)"
+    )
     typer.echo("Restart Claude Code or run /mcp to verify.")
 
 
 # Daemon commands
 @daemon_app.command("start")
 def daemon_start(
-    foreground: bool = typer.Option(False, "--foreground", "-f", help="Run in foreground"),
+    foreground: bool = typer.Option(
+        False, "--foreground", "-f", help="Run in foreground"
+    ),
 ):
     """Start the IdlerGear daemon."""
     from idlergear.config import find_idlergear_root
@@ -1061,7 +1329,10 @@ def daemon_start(
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     lifecycle = DaemonLifecycle(root)
@@ -1073,6 +1344,7 @@ def daemon_start(
     if foreground:
         typer.echo("Starting daemon in foreground...")
         from idlergear.daemon.server import run_daemon
+
         run_daemon(root)
     else:
         typer.echo("Starting daemon...")
@@ -1092,7 +1364,10 @@ def daemon_stop():
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     lifecycle = DaemonLifecycle(root)
@@ -1119,7 +1394,10 @@ def daemon_status():
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     lifecycle = DaemonLifecycle(root)
@@ -1132,7 +1410,10 @@ def daemon_status():
         if status.get("connections") is not None:
             typer.echo(f"  Connections: {status.get('connections')}")
         if not status.get("healthy", True):
-            typer.secho(f"  Warning: {status.get('error', 'Not healthy')}", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"  Warning: {status.get('error', 'Not healthy')}",
+                fg=typer.colors.YELLOW,
+            )
     else:
         typer.secho("Daemon: not running", fg=typer.colors.YELLOW)
         typer.echo(f"  Socket: {status.get('socket')}")
@@ -1141,8 +1422,12 @@ def daemon_status():
 @daemon_app.command("queue")
 def daemon_queue_command(
     command: str = typer.Argument(..., help="Command to queue for execution"),
-    priority: int = typer.Option(5, "--priority", "-p", help="Priority (1-10, higher = more urgent)"),
-    wait: bool = typer.Option(False, "--wait", "-w", help="Wait for command to complete"),
+    priority: int = typer.Option(
+        5, "--priority", "-p", help="Priority (1-10, higher = more urgent)"
+    ),
+    wait: bool = typer.Option(
+        False, "--wait", "-w", help="Wait for command to complete"
+    ),
 ):
     """Queue a command for execution by any available AI agent."""
     import asyncio
@@ -1151,7 +1436,10 @@ def daemon_queue_command(
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     async def queue_cmd():
@@ -1169,7 +1457,9 @@ def daemon_queue_command(
                         if result.get("success"):
                             typer.secho(result.get("output", ""), fg=typer.colors.GREEN)
                         else:
-                            typer.secho(f"Error: {result.get('error')}", fg=typer.colors.RED)
+                            typer.secho(
+                                f"Error: {result.get('error')}", fg=typer.colors.RED
+                            )
                         break
                     await asyncio.sleep(1)
 
@@ -1191,7 +1481,10 @@ def daemon_agents():
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     async def list_agents():
@@ -1210,7 +1503,9 @@ def daemon_agents():
                     "busy": typer.colors.CYAN,
                 }.get(agent.get("status", "unknown"), typer.colors.WHITE)
 
-                typer.secho(f"  • {agent['name']}", fg=typer.colors.BRIGHT_WHITE, bold=True)
+                typer.secho(
+                    f"  • {agent['name']}", fg=typer.colors.BRIGHT_WHITE, bold=True
+                )
                 typer.echo(f"    ID:     {agent['agent_id']}")
                 typer.secho(f"    Status: {agent['status']}", fg=status_color)
                 typer.echo(f"    Type:   {agent.get('agent_type', 'unknown')}")
@@ -1236,16 +1531,21 @@ def daemon_send_message(
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     async def send_msg():
         async with DaemonClient(root) as client:
-            await client.broadcast_event({
-                "type": "user_message",
-                "message": message,
-                "timestamp": asyncio.get_event_loop().time(),
-            })
+            await client.broadcast_event(
+                {
+                    "type": "user_message",
+                    "message": message,
+                    "timestamp": asyncio.get_event_loop().time(),
+                }
+            )
             typer.secho("Message sent to all agents.", fg=typer.colors.GREEN)
 
     try:
@@ -1264,7 +1564,10 @@ def daemon_queue_list():
 
     root = find_idlergear_root()
     if root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     async def list_queue():
@@ -1285,7 +1588,9 @@ def daemon_queue_list():
                     "failed": typer.colors.RED,
                 }.get(cmd.get("status", "unknown"), typer.colors.WHITE)
 
-                typer.secho(f"  [{cmd['id'][:8]}]", fg=typer.colors.BRIGHT_WHITE, bold=True)
+                typer.secho(
+                    f"  [{cmd['id'][:8]}]", fg=typer.colors.BRIGHT_WHITE, bold=True
+                )
                 typer.secho(f"    Status:   {cmd['status']}", fg=status_color)
                 typer.echo(f"    Command:  {cmd['command'][:60]}...")
                 typer.echo(f"    Priority: {cmd.get('priority', 5)}")
@@ -1322,7 +1627,9 @@ def mcp_reload():
 
     if not pid_files:
         typer.secho("No running MCP server found.", fg=typer.colors.YELLOW)
-        typer.echo("The MCP server may not be running, or was started without PID tracking.")
+        typer.echo(
+            "The MCP server may not be running, or was started without PID tracking."
+        )
         raise typer.Exit(1)
 
     reloaded = 0
@@ -1335,7 +1642,9 @@ def mcp_reload():
 
             # Send reload signal
             os.kill(pid, signal.SIGUSR1)
-            typer.secho(f"Sent reload signal to MCP server (PID {pid})", fg=typer.colors.GREEN)
+            typer.secho(
+                f"Sent reload signal to MCP server (PID {pid})", fg=typer.colors.GREEN
+            )
             reloaded += 1
 
         except (ValueError, FileNotFoundError):
@@ -1350,15 +1659,22 @@ def mcp_reload():
                 os.unlink(pid_file)
             except Exception:
                 pass
-            typer.secho(f"Cleaned up stale PID file: {pid_file}", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"Cleaned up stale PID file: {pid_file}", fg=typer.colors.YELLOW
+            )
         except PermissionError:
-            typer.secho(f"Permission denied sending signal to PID from {pid_file}", fg=typer.colors.RED)
+            typer.secho(
+                f"Permission denied sending signal to PID from {pid_file}",
+                fg=typer.colors.RED,
+            )
 
     if reloaded == 0:
         typer.secho("No active MCP servers found to reload.", fg=typer.colors.YELLOW)
         raise typer.Exit(1)
     else:
-        typer.echo(f"\nReloaded {reloaded} MCP server(s). New code will be active for next tool call.")
+        typer.echo(
+            f"\nReloaded {reloaded} MCP server(s). New code will be active for next tool call."
+        )
 
 
 @mcp_app.command("status")
@@ -1373,7 +1689,9 @@ def mcp_status():
 
     if not pid_files:
         typer.secho("No running MCP servers found.", fg=typer.colors.YELLOW)
-        typer.echo("The MCP server may not be running, or was started without PID tracking.")
+        typer.echo(
+            "The MCP server may not be running, or was started without PID tracking."
+        )
         return
 
     typer.echo(f"IdlerGear MCP Server version: {__version__}")
@@ -1412,7 +1730,10 @@ def config_get(key: str):
     from idlergear.config import find_idlergear_root, get_config_value
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     value = get_config_value(key)
@@ -1428,7 +1749,10 @@ def config_set(key: str, value: str):
     from idlergear.config import find_idlergear_root, set_config_value
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     set_config_value(key, value)
@@ -1461,7 +1785,10 @@ def config_backend(
     from idlergear.config import find_idlergear_root, set_config_value
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     all_types = ["task", "note", "reference", "plan", "vision"]
@@ -1537,7 +1864,10 @@ def migrate(
     from idlergear.migration import migrate_backend
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     valid_types = ["task", "reference", "note"]
@@ -1547,7 +1877,9 @@ def migrate(
         raise typer.Exit(1)
 
     if source == target:
-        typer.secho("Source and target backends must be different.", fg=typer.colors.RED)
+        typer.secho(
+            "Source and target backends must be different.", fg=typer.colors.RED
+        )
         raise typer.Exit(1)
 
     typer.echo(f"Migrating {backend_type}s from {source} to {target}...")
@@ -1560,7 +1892,9 @@ def migrate(
 
     def on_error(item: dict, error: Exception) -> None:
         title = item.get("title", item.get("content", "")[:40])
-        typer.secho(f"  ✗ #{item.get('id', '?')}: {title} - {error}", fg=typer.colors.RED)
+        typer.secho(
+            f"  ✗ #{item.get('id', '?')}: {title} - {error}", fg=typer.colors.RED
+        )
 
     try:
         stats = migrate_backend(
@@ -1574,7 +1908,9 @@ def migrate(
         )
 
         if dry_run:
-            typer.echo(f"\nDry run: {stats['total']} {backend_type}(s) would be migrated.")
+            typer.echo(
+                f"\nDry run: {stats['total']} {backend_type}(s) would be migrated."
+            )
         else:
             typer.echo("\nMigration complete:")
             typer.echo(f"  Total: {stats['total']}")
@@ -1596,7 +1932,9 @@ def task_create(
     title: str,
     body: str = typer.Option(None, "--body", "-b", help="Task body/description"),
     labels: list[str] = typer.Option([], "--label", "-l", help="Labels"),
-    priority: str = typer.Option(None, "--priority", "-p", help="Priority: high, medium, low"),
+    priority: str = typer.Option(
+        None, "--priority", "-p", help="Priority: high, medium, low"
+    ),
     due: str = typer.Option(None, "--due", "-d", help="Due date (YYYY-MM-DD)"),
 ):
     """Create a new task."""
@@ -1604,7 +1942,10 @@ def task_create(
     from idlergear.config import find_idlergear_root
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     backend = get_backend("task")
@@ -1621,10 +1962,18 @@ def task_create(
 @task_app.command("list")
 def task_list(
     ctx: typer.Context,
-    state: str = typer.Option("open", "--state", "-s", help="Filter by state: open, closed, all"),
-    priority: str = typer.Option(None, "--priority", "-p", help="Filter by priority: high, medium, low"),
+    state: str = typer.Option(
+        "open", "--state", "-s", help="Filter by state: open, closed, all"
+    ),
+    priority: str = typer.Option(
+        None, "--priority", "-p", help="Filter by priority: high, medium, low"
+    ),
     limit: int = typer.Option(None, "--limit", "-n", help="Limit number of results"),
-    preview: bool = typer.Option(False, "--preview", help="Show brief preview instead of full body (token-efficient)"),
+    preview: bool = typer.Option(
+        False,
+        "--preview",
+        help="Show brief preview instead of full body (token-efficient)",
+    ),
 ):
     """List tasks.
 
@@ -1638,7 +1987,10 @@ def task_list(
     from idlergear.config import find_idlergear_root
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     backend = get_backend("task")
@@ -1667,7 +2019,10 @@ def task_show(ctx: typer.Context, task_id: int):
     from idlergear.config import find_idlergear_root
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     backend = get_backend("task")
@@ -1687,7 +2042,10 @@ def task_close(task_id: int):
     from idlergear.config import find_idlergear_root
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     backend = get_backend("task")
@@ -1705,15 +2063,22 @@ def task_edit(
     title: str = typer.Option(None, "--title", "-t", help="New title"),
     body: str = typer.Option(None, "--body", "-b", help="New body"),
     add_label: list[str] = typer.Option([], "--add-label", help="Add label"),
-    priority: str = typer.Option(None, "--priority", "-p", help="Priority: high, medium, low (empty to clear)"),
-    due: str = typer.Option(None, "--due", "-d", help="Due date (YYYY-MM-DD, empty to clear)"),
+    priority: str = typer.Option(
+        None, "--priority", "-p", help="Priority: high, medium, low (empty to clear)"
+    ),
+    due: str = typer.Option(
+        None, "--due", "-d", help="Due date (YYYY-MM-DD, empty to clear)"
+    ),
 ):
     """Edit a task."""
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     backend = get_backend("task")
@@ -1728,7 +2093,9 @@ def task_edit(
     if add_label:
         labels = list(set(current.get("labels", []) + list(add_label)))
 
-    task = backend.update(task_id, title=title, body=body, labels=labels, priority=priority, due=due)
+    task = backend.update(
+        task_id, title=title, body=body, labels=labels, priority=priority, due=due
+    )
     typer.secho(f"Updated task #{task_id}", fg=typer.colors.GREEN)
 
 
@@ -1750,7 +2117,10 @@ def note_create(
     from idlergear.notes import create_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     note = create_note(content, tags=list(tag) if tag else None)
@@ -1761,14 +2131,19 @@ def note_create(
 @note_app.command("list")
 def note_list(
     ctx: typer.Context,
-    tag: str = typer.Option(None, "--tag", "-t", help="Filter by tag (e.g., explore, idea)"),
+    tag: str = typer.Option(
+        None, "--tag", "-t", help="Filter by tag (e.g., explore, idea)"
+    ),
 ):
     """List notes."""
     from idlergear.config import find_idlergear_root
     from idlergear.notes import list_notes
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     notes = list_notes(tag=tag)
@@ -1782,7 +2157,10 @@ def note_show(ctx: typer.Context, note_id: int):
     from idlergear.notes import get_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     note = get_note(note_id)
@@ -1802,7 +2180,10 @@ def note_delete(note_id: int):
     from idlergear.notes import delete_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     if delete_note(note_id):
@@ -1822,7 +2203,10 @@ def note_promote(
     from idlergear.notes import promote_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
@@ -1830,7 +2214,9 @@ def note_promote(
         if result is None:
             typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
-        typer.secho(f"Promoted note #{note_id} to {to} #{result['id']}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Promoted note #{note_id} to {to} #{result['id']}", fg=typer.colors.GREEN
+        )
     except ValueError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -1854,7 +2240,10 @@ def explore_create(
     from idlergear.notes import create_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     # Combine title and body into note content
@@ -1874,7 +2263,10 @@ def explore_list():
     from idlergear.notes import list_notes
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     notes = list_notes(tag="explore")
@@ -1896,7 +2288,10 @@ def explore_show(note_id: int):
     from idlergear.notes import get_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     note = get_note(note_id)
@@ -1919,7 +2314,10 @@ def explore_delete(note_id: int):
     from idlergear.notes import delete_note
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     if delete_note(note_id):
@@ -1937,7 +2335,10 @@ def vision_show(ctx: typer.Context):
     from idlergear.vision import get_vision
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     vision = get_vision()
@@ -1957,7 +2358,10 @@ def vision_edit(
     from idlergear.vision import get_vision, set_vision
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     if content is not None:
@@ -2006,7 +2410,10 @@ def plan_create(
     from idlergear.plans import create_plan
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
@@ -2024,7 +2431,10 @@ def plan_list(ctx: typer.Context):
     from idlergear.plans import get_current_plan, list_plans
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     plans = list_plans()
@@ -2033,26 +2443,34 @@ def plan_list(ctx: typer.Context):
 
     # Augment data for the display function
     for plan in plans:
-        plan['is_current'] = (plan["name"] == current_name)
+        plan["is_current"] = plan["name"] == current_name
 
     display(plans, ctx.obj.output_format, "plans")
 
 
 @plan_app.command("show")
-def plan_show(ctx: typer.Context, name: str = typer.Argument(None, help="Plan name (default: current)")):
+def plan_show(
+    ctx: typer.Context,
+    name: str = typer.Argument(None, help="Plan name (default: current)"),
+):
     """Show a plan."""
     from idlergear.config import find_idlergear_root
     from idlergear.plans import get_current_plan, get_plan
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     plan = None
     if name is None:
         plan = get_current_plan()
         if plan is None and ctx.obj.output_format == "human":
-            typer.echo("No current plan set. Use 'idlergear plan switch <name>' to set one.")
+            typer.echo(
+                "No current plan set. Use 'idlergear plan switch <name>' to set one."
+            )
             raise typer.Exit(0)
     else:
         plan = get_plan(name)
@@ -2070,7 +2488,10 @@ def plan_switch(name: str):
     from idlergear.plans import switch_plan
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     plan = switch_plan(name)
@@ -2099,7 +2520,10 @@ def reference_add(
     from idlergear.reference import add_reference
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     ref = add_reference(title, body=body)
@@ -2113,7 +2537,10 @@ def reference_list(ctx: typer.Context):
     from idlergear.reference import list_references
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     refs = list_references()
@@ -2127,7 +2554,10 @@ def reference_show(ctx: typer.Context, title: str):
     from idlergear.reference import get_reference
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     ref = get_reference(title)
@@ -2149,7 +2579,10 @@ def reference_edit(
     from idlergear.reference import update_reference
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     ref = update_reference(title, new_title=new_title, body=body)
@@ -2167,7 +2600,10 @@ def reference_search(query: str):
     from idlergear.reference import search_references
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     results = search_references(query)
@@ -2183,12 +2619,25 @@ def reference_search(query: str):
 @reference_app.command("sync")
 def reference_sync(
     ctx: typer.Context,
-    push: bool = typer.Option(False, "--push", help="Push local references to GitHub Wiki"),
-    pull: bool = typer.Option(False, "--pull", help="Pull GitHub Wiki pages to local references"),
-    status: bool = typer.Option(False, "--status", "-s", help="Show sync status without making changes"),
-    force: bool = typer.Option(False, "--force", "-f", help="Force overwrite on conflicts (with --pull: use remote, with --push: use local)"),
+    push: bool = typer.Option(
+        False, "--push", help="Push local references to GitHub Wiki"
+    ),
+    pull: bool = typer.Option(
+        False, "--pull", help="Pull GitHub Wiki pages to local references"
+    ),
+    status: bool = typer.Option(
+        False, "--status", "-s", help="Show sync status without making changes"
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Force overwrite on conflicts (with --pull: use remote, with --push: use local)",
+    ),
     ours: bool = typer.Option(False, "--ours", help="On conflict, keep local version"),
-    theirs: bool = typer.Option(False, "--theirs", help="On conflict, keep remote version"),
+    theirs: bool = typer.Option(
+        False, "--theirs", help="On conflict, keep remote version"
+    ),
 ):
     """Sync references with GitHub Wiki.
 
@@ -2215,6 +2664,7 @@ def reference_sync(
         if output_format == OutputFormat.JSON:
             # Get counts
             from idlergear.reference import list_references
+
             refs = list_references()
 
             if sync.wiki_dir.exists():
@@ -2226,15 +2676,20 @@ def reference_sync(
             ref_titles = {r["title"] for r in refs}
             wiki_titles = {p.title for p in wiki_pages}
 
-            typer.echo(json.dumps({
-                "local_only": list(ref_titles - wiki_titles),
-                "remote_only": list(wiki_titles - ref_titles),
-                "both": list(ref_titles & wiki_titles),
-                "local_count": len(refs),
-                "remote_count": len(wiki_pages),
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "local_only": list(ref_titles - wiki_titles),
+                        "remote_only": list(wiki_titles - ref_titles),
+                        "both": list(ref_titles & wiki_titles),
+                        "local_count": len(refs),
+                        "remote_count": len(wiki_pages),
+                    }
+                )
+            )
         else:
             from idlergear.reference import list_references
+
             refs = list_references()
 
             typer.echo("Sync Status:")
@@ -2268,7 +2723,9 @@ def reference_sync(
             else:
                 typer.echo("  Wiki: Not initialized")
                 typer.echo()
-                typer.echo("  Run 'idlergear reference sync --push' to initialize and push references.")
+                typer.echo(
+                    "  Run 'idlergear reference sync --push' to initialize and push references."
+                )
         return
 
     # Determine conflict resolution
@@ -2286,11 +2743,15 @@ def reference_sync(
         result = sync.push_references_to_wiki()
 
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({
-                "pushed": result.pushed,
-                "conflicts": result.conflicts,
-                "errors": result.errors,
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "pushed": result.pushed,
+                        "conflicts": result.conflicts,
+                        "errors": result.errors,
+                    }
+                )
+            )
         else:
             typer.echo(str(result))
         return
@@ -2303,11 +2764,15 @@ def reference_sync(
         result = sync.pull_wiki_to_references(overwrite=force)
 
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({
-                "pulled": result.pulled,
-                "conflicts": result.conflicts,
-                "errors": result.errors,
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "pulled": result.pulled,
+                        "conflicts": result.conflicts,
+                        "errors": result.errors,
+                    }
+                )
+            )
         else:
             typer.echo(str(result))
         return
@@ -2319,12 +2784,16 @@ def reference_sync(
     result = sync.sync_bidirectional(conflict_resolution=conflict_resolution)
 
     if output_format == OutputFormat.JSON:
-        typer.echo(json.dumps({
-            "pushed": result.pushed,
-            "pulled": result.pulled,
-            "conflicts": result.conflicts,
-            "errors": result.errors,
-        }))
+        typer.echo(
+            json.dumps(
+                {
+                    "pushed": result.pushed,
+                    "pulled": result.pulled,
+                    "conflicts": result.conflicts,
+                    "errors": result.errors,
+                }
+            )
+        )
     else:
         typer.echo(str(result))
 
@@ -2346,12 +2815,17 @@ def run_start(
     from idlergear.runs import start_run
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
         run = start_run(command, name=name)
-        typer.secho(f"Started run '{run['name']}' (PID {run['pid']})", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Started run '{run['name']}' (PID {run['pid']})", fg=typer.colors.GREEN
+        )
         typer.echo(f"  Command: {run['command']}")
         typer.echo(f"  Logs: idlergear run logs {run['name']}")
     except RuntimeError as e:
@@ -2366,7 +2840,10 @@ def run_list():
     from idlergear.runs import list_runs
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     runs = list_runs()
@@ -2375,7 +2852,9 @@ def run_list():
         return
 
     for run in runs:
-        status_color = typer.colors.GREEN if run["status"] == "running" else typer.colors.WHITE
+        status_color = (
+            typer.colors.GREEN if run["status"] == "running" else typer.colors.WHITE
+        )
         typer.echo(f"  {run['name']}", nl=False)
         typer.secho(f"  [{run['status']}]", fg=status_color, nl=False)
         if run.get("pid") and run["status"] == "running":
@@ -2390,7 +2869,10 @@ def run_status(name: str):
     from idlergear.runs import get_run_status
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     status = get_run_status(name)
@@ -2398,7 +2880,9 @@ def run_status(name: str):
         typer.secho(f"Run '{name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    status_color = typer.colors.GREEN if status["status"] == "running" else typer.colors.WHITE
+    status_color = (
+        typer.colors.GREEN if status["status"] == "running" else typer.colors.WHITE
+    )
     typer.echo(f"Run: {status['name']}")
     typer.secho(f"Status: {status['status']}", fg=status_color)
     if status.get("command"):
@@ -2413,14 +2897,19 @@ def run_status(name: str):
 def run_logs(
     name: str,
     tail: int = typer.Option(None, "--tail", "-t", help="Show last N lines"),
-    stderr: bool = typer.Option(False, "--stderr", "-e", help="Show stderr instead of stdout"),
+    stderr: bool = typer.Option(
+        False, "--stderr", "-e", help="Show stderr instead of stdout"
+    ),
 ):
     """Show run logs."""
     from idlergear.config import find_idlergear_root
     from idlergear.runs import get_run_logs
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     stream = "stderr" if stderr else "stdout"
@@ -2444,7 +2933,10 @@ def run_stop(name: str):
     from idlergear.runs import stop_run
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     if stop_run(name):
@@ -2458,15 +2950,32 @@ def run_stop(name: str):
 def run_generate_script(
     script_name: str,
     command: str,
-    output: str = typer.Option(None, "--output", "-o", help="Output file path (default: ./scripts/{name}.sh)"),
+    output: str = typer.Option(
+        None, "--output", "-o", help="Output file path (default: ./scripts/{name}.sh)"
+    ),
     venv: str = typer.Option(None, "--venv", help="Virtualenv path"),
-    requirement: list[str] = typer.Option([], "--requirement", "-r", help="Python packages to install"),
-    env: list[str] = typer.Option([], "--env", "-e", help="Environment variables (KEY=VALUE)"),
-    agent_name: str = typer.Option(None, "--agent-name", help="Agent name for daemon (default: script name)"),
+    requirement: list[str] = typer.Option(
+        [], "--requirement", "-r", help="Python packages to install"
+    ),
+    env: list[str] = typer.Option(
+        [], "--env", "-e", help="Environment variables (KEY=VALUE)"
+    ),
+    agent_name: str = typer.Option(
+        None, "--agent-name", help="Agent name for daemon (default: script name)"
+    ),
     agent_type: str = typer.Option("dev-script", "--agent-type", help="Agent type"),
-    no_register: bool = typer.Option(False, "--no-register", help="Don't register with daemon"),
-    stream_logs: bool = typer.Option(False, "--stream-logs", help="Stream logs to daemon"),
-    template: str = typer.Option(None, "--template", "-t", help="Use template (pytest, django-dev, flask-dev, etc)"),
+    no_register: bool = typer.Option(
+        False, "--no-register", help="Don't register with daemon"
+    ),
+    stream_logs: bool = typer.Option(
+        False, "--stream-logs", help="Stream logs to daemon"
+    ),
+    template: str = typer.Option(
+        None,
+        "--template",
+        "-t",
+        help="Use template (pytest, django-dev, flask-dev, etc)",
+    ),
 ):
     """Generate a dev environment setup script that registers with IdlerGear daemon.
 
@@ -2492,14 +3001,20 @@ def run_generate_script(
 
     project_root = find_idlergear_root()
     if project_root is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     # Parse environment variables
     env_vars = {}
     for env_var in env:
         if "=" not in env_var:
-            typer.secho(f"Invalid environment variable: {env_var} (use KEY=VALUE)", fg=typer.colors.RED)
+            typer.secho(
+                f"Invalid environment variable: {env_var} (use KEY=VALUE)",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(1)
         key, value = env_var.split("=", 1)
         env_vars[key] = value
@@ -2570,14 +3085,19 @@ def project_create(
         "-c",
         help="Custom columns (default: Backlog, In Progress, Review, Done)",
     ),
-    github: bool = typer.Option(False, "--github", "-g", help="Also create on GitHub Projects v2"),
+    github: bool = typer.Option(
+        False, "--github", "-g", help="Also create on GitHub Projects v2"
+    ),
 ):
     """Create a new project board."""
     from idlergear.config import find_idlergear_root
     from idlergear.projects import create_project
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
@@ -2598,26 +3118,37 @@ def project_create(
 
 @project_app.command("list")
 def project_list(
-    github: bool = typer.Option(False, "--github", "-g", help="Also list GitHub Projects"),
+    github: bool = typer.Option(
+        False, "--github", "-g", help="Also list GitHub Projects"
+    ),
 ):
     """List project boards."""
     from idlergear.config import find_idlergear_root
     from idlergear.projects import list_github_projects, list_projects
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     projects = list_projects()
 
     if not projects and not github:
-        typer.echo("No projects found. Create one with 'idlergear project create <title>'")
+        typer.echo(
+            "No projects found. Create one with 'idlergear project create <title>'"
+        )
         return
 
     if projects:
         typer.echo("Local Projects:")
         for proj in projects:
-            gh_link = f" (GitHub #{proj['github_project_number']})" if proj.get("github_project_number") else ""
+            gh_link = (
+                f" (GitHub #{proj['github_project_number']})"
+                if proj.get("github_project_number")
+                else ""
+            )
             typer.echo(f"  {proj['title']}{gh_link}")
             task_count = sum(len(tasks) for tasks in proj["tasks"].values())
             typer.echo(f"    {task_count} tasks across {len(proj['columns'])} columns")
@@ -2630,7 +3161,9 @@ def project_list(
             typer.echo("  No GitHub Projects found (or gh CLI not authenticated)")
         else:
             for proj in gh_projects:
-                typer.echo(f"  #{proj.get('number', '?')}: {proj.get('title', 'Untitled')}")
+                typer.echo(
+                    f"  #{proj.get('number', '?')}: {proj.get('title', 'Untitled')}"
+                )
 
 
 @project_app.command("show")
@@ -2641,7 +3174,10 @@ def project_show(name: str):
     from idlergear.projects import get_project
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     project = get_project(name)
@@ -2671,14 +3207,18 @@ def project_show(name: str):
                     title = task.get("title", "(no title)")[:50]
                     typer.echo(f"  #{task_id}: {title}")
                 else:
-                    typer.secho(f"  #{task_id}: (task not found)", fg=typer.colors.YELLOW)
+                    typer.secho(
+                        f"  #{task_id}: (task not found)", fg=typer.colors.YELLOW
+                    )
         typer.echo("")
 
 
 @project_app.command("delete")
 def project_delete(
     name: str,
-    github: bool = typer.Option(False, "--github", "-g", help="Also delete from GitHub"),
+    github: bool = typer.Option(
+        False, "--github", "-g", help="Also delete from GitHub"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ):
     """Delete a project board."""
@@ -2686,7 +3226,10 @@ def project_delete(
     from idlergear.projects import delete_project, get_project
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     project = get_project(name)
@@ -2697,7 +3240,9 @@ def project_delete(
     if not force:
         confirm_msg = f"Delete project '{project['title']}'?"
         if github and project.get("github_project_number"):
-            confirm_msg = f"Delete project '{project['title']}' locally AND from GitHub?"
+            confirm_msg = (
+                f"Delete project '{project['title']}' locally AND from GitHub?"
+            )
         if not typer.confirm(confirm_msg):
             typer.echo("Cancelled.")
             raise typer.Exit(0)
@@ -2713,14 +3258,19 @@ def project_delete(
 def project_add_task(
     project_name: str,
     task_id: int,
-    column: str = typer.Option(None, "--column", "-c", help="Target column (default: first column)"),
+    column: str = typer.Option(
+        None, "--column", "-c", help="Target column (default: first column)"
+    ),
 ):
     """Add a task to a project board."""
     from idlergear.config import find_idlergear_root
     from idlergear.projects import add_task_to_project
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
@@ -2730,7 +3280,10 @@ def project_add_task(
             raise typer.Exit(1)
 
         target_col = column or project["columns"][0]
-        typer.secho(f"Added task #{task_id} to '{project['title']}' → {target_col}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Added task #{task_id} to '{project['title']}' → {target_col}",
+            fg=typer.colors.GREEN,
+        )
     except ValueError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2743,7 +3296,10 @@ def project_remove_task(project_name: str, task_id: int):
     from idlergear.projects import remove_task_from_project
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     project = remove_task_from_project(project_name, str(task_id))
@@ -2751,7 +3307,9 @@ def project_remove_task(project_name: str, task_id: int):
         typer.secho(f"Project '{project_name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    typer.secho(f"Removed task #{task_id} from '{project['title']}'", fg=typer.colors.GREEN)
+    typer.secho(
+        f"Removed task #{task_id} from '{project['title']}'", fg=typer.colors.GREEN
+    )
 
 
 @project_app.command("move")
@@ -2761,7 +3319,10 @@ def project_move_task(project_name: str, task_id: int, column: str):
     from idlergear.projects import move_task
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
@@ -2783,7 +3344,10 @@ def project_sync(name: str):
     from idlergear.projects import sync_project_to_github
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     typer.echo(f"Syncing project '{name}' to GitHub...")
@@ -2794,7 +3358,10 @@ def project_sync(name: str):
             typer.secho(f"Project '{name}' not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
 
-        typer.secho(f"Synced project to GitHub Projects #{project['github_project_number']}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Synced project to GitHub Projects #{project['github_project_number']}",
+            fg=typer.colors.GREEN,
+        )
     except RuntimeError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2807,7 +3374,10 @@ def project_link(name: str, github_project_number: int):
     from idlergear.projects import link_to_github_project
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     try:
@@ -2816,7 +3386,10 @@ def project_link(name: str, github_project_number: int):
             typer.secho(f"Local project '{name}' not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
 
-        typer.secho(f"Linked '{project['title']}' to GitHub Project #{github_project_number}", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Linked '{project['title']}' to GitHub Project #{github_project_number}",
+            fg=typer.colors.GREEN,
+        )
     except RuntimeError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2831,7 +3404,9 @@ def project_link(name: str, github_project_number: int):
 def session_save(
     name: str = typer.Argument(None, help="Optional name for the session"),
     next_steps: str = typer.Option(None, "--next", "-n", help="What to do next"),
-    blockers: str = typer.Option(None, "--blockers", "-b", help="What's blocking progress"),
+    blockers: str = typer.Option(
+        None, "--blockers", "-b", help="What's blocking progress"
+    ),
 ):
     """Save current session state.
 
@@ -2844,7 +3419,10 @@ def session_save(
     from idlergear.sessions import save_session
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     session_file = save_session(name=name, next_steps=next_steps, blockers=blockers)
@@ -2869,7 +3447,10 @@ def session_restore(
     from idlergear.sessions import format_session_state, load_session
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     state = load_session(name=name)
@@ -2902,7 +3483,10 @@ def session_list(
     from idlergear.sessions import list_sessions
 
     if find_idlergear_root() is None:
-        typer.secho("Not in an IdlerGear project. Run 'idlergear init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     sessions = list_sessions()
@@ -2914,7 +3498,9 @@ def session_list(
     if json_output:
         typer.echo(json.dumps(sessions, indent=2))
     else:
-        typer.secho(f"Saved sessions ({len(sessions)}):", fg=typer.colors.CYAN, bold=True)
+        typer.secho(
+            f"Saved sessions ({len(sessions)}):", fg=typer.colors.CYAN, bold=True
+        )
         for session in sessions:
             name = session["name"]
             saved_at = session.get("saved_at", "unknown")
@@ -3005,7 +3591,13 @@ def otel_logs_cmd(
     """Query and display collected logs."""
     from .otel import otel_logs
 
-    otel_logs(tail=tail, service=service, severity=severity, search=search, json_output=json_output)
+    otel_logs(
+        tail=tail,
+        service=service,
+        severity=severity,
+        search=search,
+        json_output=json_output,
+    )
 
 
 @otel_app.command("config")
@@ -3147,7 +3739,9 @@ def hooks_install(
         if installed:
             typer.secho(f"✓ Installed {filename}", fg=typer.colors.GREEN)
         else:
-            typer.secho(f"- Skipped {filename} (already exists)", fg=typer.colors.YELLOW)
+            typer.secho(
+                f"- Skipped {filename} (already exists)", fg=typer.colors.YELLOW
+            )
 
     typer.echo()
     typer.echo("Hooks installed in .claude/hooks/")
@@ -3192,9 +3786,14 @@ def hooks_test():
 
         elif hook_name == "pre-tool-use":
             if result.get("blocks_forbidden"):
-                typer.secho(f"✓ {hook_name}: PASSED (blocks TODO.md)", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"✓ {hook_name}: PASSED (blocks TODO.md)", fg=typer.colors.GREEN
+                )
             else:
-                typer.secho(f"✗ {hook_name}: Does not block forbidden files", fg=typer.colors.RED)
+                typer.secho(
+                    f"✗ {hook_name}: Does not block forbidden files",
+                    fg=typer.colors.RED,
+                )
                 all_passed = False
 
         elif hook_name == "stop":
@@ -3208,7 +3807,10 @@ def hooks_test():
     if all_passed:
         typer.secho("All hooks passed!", fg=typer.colors.GREEN, bold=True)
     else:
-        typer.secho("Some hooks failed. See docs/CLAUDE_CODE_HOOKS.md for troubleshooting.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "Some hooks failed. See docs/CLAUDE_CODE_HOOKS.md for troubleshooting.",
+            fg=typer.colors.YELLOW,
+        )
 
 
 @hooks_app.command("list")
@@ -3259,7 +3861,9 @@ def wiki_push():
 
 @wiki_app.command("pull")
 def wiki_pull(
-    overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing references")
+    overwrite: bool = typer.Option(
+        False, "--overwrite", help="Overwrite existing references"
+    ),
 ):
     """Pull GitHub Wiki pages into IdlerGear references."""
     from idlergear.wiki import WikiSync
@@ -3278,8 +3882,8 @@ def wiki_sync(
     conflict_resolution: str = typer.Option(
         "manual",
         "--conflict",
-        help="Conflict resolution strategy (manual, local, remote)"
-    )
+        help="Conflict resolution strategy (manual, local, remote)",
+    ),
 ):
     """Bidirectional sync between IdlerGear and GitHub Wiki."""
     from idlergear.wiki import WikiSync
@@ -3337,7 +3941,7 @@ def wiki_status():
 @wiki_app.command("config")
 def wiki_config(
     key: Optional[str] = typer.Argument(None, help="Config key"),
-    value: Optional[str] = typer.Argument(None, help="Config value")
+    value: Optional[str] = typer.Argument(None, help="Config value"),
 ):
     """Get or set wiki configuration."""
     from idlergear.wiki import get_wiki_config, set_wiki_config
@@ -3374,7 +3978,9 @@ app.add_typer(watch_app, name="watch")
 @watch_app.command("check")
 def watch_check(
     ctx: typer.Context,
-    act: bool = typer.Option(False, "--act", "-a", help="Automatically create tasks from TODO/FIXME comments"),
+    act: bool = typer.Option(
+        False, "--act", "-a", help="Automatically create tasks from TODO/FIXME comments"
+    ),
 ):
     """One-shot analysis of project state with suggestions.
 
@@ -3441,7 +4047,9 @@ def watch_check(
             if suggestion.category == "todo" and suggestion.context.get("file"):
                 typer.echo(f"      File: {suggestion.context['file']}")
                 typer.echo(f"      Text: {suggestion.context.get('text', '')}")
-            elif suggestion.category == "reference" and suggestion.context.get("related_file"):
+            elif suggestion.category == "reference" and suggestion.context.get(
+                "related_file"
+            ):
                 typer.echo(f"      Related: {suggestion.context['related_file']}")
 
         typer.echo()
@@ -3461,10 +4069,18 @@ def watch_check(
 
 @watch_app.command("start")
 def watch_start(
-    interval: int = typer.Option(10, "--interval", "-i", help="Check interval in seconds"),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Only show critical suggestions"),
-    polling: bool = typer.Option(False, "--polling", "-p", help="Use polling instead of file system events"),
-    force: bool = typer.Option(False, "--force", "-f", help="Start even if watch mode is disabled"),
+    interval: int = typer.Option(
+        10, "--interval", "-i", help="Check interval in seconds"
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", "-q", help="Only show critical suggestions"
+    ),
+    polling: bool = typer.Option(
+        False, "--polling", "-p", help="Use polling instead of file system events"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Start even if watch mode is disabled"
+    ),
 ):
     """Start watching for changes and prompting for knowledge capture.
 
@@ -3509,8 +4125,12 @@ def watch_status():
     typer.echo()
 
     if stats["changed_files"] > 0:
-        typer.secho(f"  Changed files: {stats['changed_files']}", fg=typer.colors.YELLOW)
-        typer.secho(f"  Changed lines: {stats['changed_lines']}", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"  Changed files: {stats['changed_files']}", fg=typer.colors.YELLOW
+        )
+        typer.secho(
+            f"  Changed lines: {stats['changed_lines']}", fg=typer.colors.YELLOW
+        )
     else:
         typer.secho("  No uncommitted changes", fg=typer.colors.GREEN)
 
@@ -3530,7 +4150,7 @@ def watch_status():
 @watch_app.command("config")
 def watch_config(
     key: Optional[str] = typer.Argument(None, help="Config key"),
-    value: Optional[str] = typer.Argument(None, help="Config value")
+    value: Optional[str] = typer.Argument(None, help="Config value"),
 ):
     """Get or set watch configuration."""
     from idlergear.watch import WatchConfig
@@ -3544,7 +4164,9 @@ def watch_config(
         typer.echo(f"  enabled: {config.enabled}")
         typer.echo(f"  debounce: {config.debounce}s")
         typer.echo(f"  files_changed_threshold: {config.files_changed_threshold}")
-        typer.echo(f"  uncommitted_lines_threshold: {config.uncommitted_lines_threshold}")
+        typer.echo(
+            f"  uncommitted_lines_threshold: {config.uncommitted_lines_threshold}"
+        )
         typer.echo(f"  test_failures_threshold: {config.test_failures_threshold}")
         typer.echo(f"  detect_todos: {config.detect_todos}")
         typer.echo(f"  detect_fixmes: {config.detect_fixmes}")
@@ -3588,10 +4210,18 @@ def watch_config(
 @app.command()
 def update(
     ctx: typer.Context,
-    check: bool = typer.Option(False, "--check", "-c", help="Only check for updates, don't install"),
-    version: Optional[str] = typer.Option(None, "--version", "-v", help="Install specific version"),
-    dry_run: bool = typer.Option(False, "--dry-run", "-n", help="Show what would be done without doing it"),
-    no_cache: bool = typer.Option(False, "--no-cache", help="Skip version cache, always query GitHub"),
+    check: bool = typer.Option(
+        False, "--check", "-c", help="Only check for updates, don't install"
+    ),
+    version: Optional[str] = typer.Option(
+        None, "--version", "-v", help="Install specific version"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be done without doing it"
+    ),
+    no_cache: bool = typer.Option(
+        False, "--no-cache", help="Skip version cache, always query GitHub"
+    ),
 ):
     """Check for updates and upgrade IdlerGear itself.
 
@@ -3616,7 +4246,9 @@ def update(
         if output_format == OutputFormat.JSON:
             typer.echo(json.dumps({"error": version_info.error}))
         else:
-            typer.secho(f"Error checking version: {version_info.error}", fg=typer.colors.RED)
+            typer.secho(
+                f"Error checking version: {version_info.error}", fg=typer.colors.RED
+            )
         raise typer.Exit(1)
 
     # Get install info
@@ -3625,14 +4257,18 @@ def update(
     if check:
         # Just show version info
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({
-                "current_version": version_info.current,
-                "latest_version": version_info.latest,
-                "update_available": version_info.update_available,
-                "install_method": install_info.method.value,
-                "can_upgrade": install_info.can_upgrade,
-                "upgrade_command": install_info.upgrade_command,
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "current_version": version_info.current,
+                        "latest_version": version_info.latest,
+                        "update_available": version_info.update_available,
+                        "install_method": install_info.method.value,
+                        "can_upgrade": install_info.can_upgrade,
+                        "upgrade_command": install_info.upgrade_command,
+                    }
+                )
+            )
         else:
             typer.echo(f"Current version: {version_info.current}")
             typer.echo(f"Latest version:  {version_info.latest}")
@@ -3652,24 +4288,34 @@ def update(
     # Perform update
     if not version_info.update_available and version is None:
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({
-                "success": True,
-                "message": "Already at latest version",
-                "current_version": version_info.current,
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": True,
+                        "message": "Already at latest version",
+                        "current_version": version_info.current,
+                    }
+                )
+            )
         else:
             typer.echo(f"Already at latest version ({version_info.current})")
         return
 
     if not install_info.can_upgrade:
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({
-                "success": False,
-                "error": install_info.message,
-                "install_method": install_info.method.value,
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": install_info.message,
+                        "install_method": install_info.method.value,
+                    }
+                )
+            )
         else:
-            typer.secho(f"Cannot auto-upgrade: {install_info.message}", fg=typer.colors.RED)
+            typer.secho(
+                f"Cannot auto-upgrade: {install_info.message}", fg=typer.colors.RED
+            )
             typer.echo()
             typer.echo(f"Manual upgrade: {install_info.upgrade_command}")
         raise typer.Exit(1)
@@ -3678,12 +4324,16 @@ def update(
 
     if dry_run:
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({
-                "dry_run": True,
-                "current_version": version_info.current,
-                "target_version": target_version,
-                "upgrade_command": install_info.upgrade_command,
-            }))
+            typer.echo(
+                json.dumps(
+                    {
+                        "dry_run": True,
+                        "current_version": version_info.current,
+                        "target_version": target_version,
+                        "upgrade_command": install_info.upgrade_command,
+                    }
+                )
+            )
         else:
             typer.echo(f"Would upgrade: {version_info.current} -> {target_version}")
             typer.echo(f"Command: {install_info.upgrade_command}")

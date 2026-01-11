@@ -59,11 +59,9 @@ class TestInstallMcpServer:
 
         # Create existing .mcp.json with another server
         mcp_path = initialized_project / ".mcp.json"
-        mcp_path.write_text(json.dumps({
-            "mcpServers": {
-                "other-server": {"command": "other"}
-            }
-        }))
+        mcp_path.write_text(
+            json.dumps({"mcpServers": {"other-server": {"command": "other"}}})
+        )
 
         install_mcp_server()
 
@@ -98,16 +96,20 @@ class TestUninstallMcpServer:
         assert result is False
 
     def test_uninstall_preserves_others(self, initialized_project):
-        from idlergear.install import install_mcp_server, uninstall_mcp_server
+        from idlergear.install import uninstall_mcp_server
 
         # Create .mcp.json with idlergear and another server
         mcp_path = initialized_project / ".mcp.json"
-        mcp_path.write_text(json.dumps({
-            "mcpServers": {
-                "other-server": {"command": "other"},
-                "idlergear": {"command": "idlergear-mcp"}
-            }
-        }))
+        mcp_path.write_text(
+            json.dumps(
+                {
+                    "mcpServers": {
+                        "other-server": {"command": "other"},
+                        "idlergear": {"command": "idlergear-mcp"},
+                    }
+                }
+            )
+        )
 
         uninstall_mcp_server()
 
@@ -193,7 +195,9 @@ class TestRemoveAgentsMdSection:
 
         # Create AGENTS.md with other content
         agents_path = initialized_project / "AGENTS.md"
-        agents_path.write_text("# Agent Instructions\n\n## Other Section\n\nKeep this.\n")
+        agents_path.write_text(
+            "# Agent Instructions\n\n## Other Section\n\nKeep this.\n"
+        )
 
         add_agents_md_section()
         remove_agents_md_section()
@@ -375,7 +379,9 @@ class TestRemoveRulesFile:
         if rules_dir.exists():
             assert list(rules_dir.iterdir()), "rules dir should have files or not exist"
         if claude_dir.exists():
-            assert list(claude_dir.iterdir()), ".claude dir should have files or not exist"
+            assert list(claude_dir.iterdir()), (
+                ".claude dir should have files or not exist"
+            )
 
 
 class TestAddSkill:
@@ -404,7 +410,9 @@ class TestAddSkill:
 
         add_skill()
 
-        refs_dir = initialized_project / ".claude" / "skills" / "idlergear" / "references"
+        refs_dir = (
+            initialized_project / ".claude" / "skills" / "idlergear" / "references"
+        )
         assert refs_dir.exists()
 
         # Check reference files exist
@@ -418,7 +426,9 @@ class TestAddSkill:
 
         add_skill()
 
-        scripts_dir = initialized_project / ".claude" / "skills" / "idlergear" / "scripts"
+        scripts_dir = (
+            initialized_project / ".claude" / "skills" / "idlergear" / "scripts"
+        )
         assert scripts_dir.exists()
 
         # Check script files exist and are executable
@@ -481,7 +491,93 @@ class TestRemoveSkill:
         # Empty skills directory should be cleaned up
         skills_dir = initialized_project / ".claude" / "skills"
         if skills_dir.exists():
-            assert list(skills_dir.iterdir()), "skills dir should have files or not exist"
+            assert list(skills_dir.iterdir()), (
+                "skills dir should have files or not exist"
+            )
+
+
+class TestInstallScripts:
+    """Tests for install_scripts and remove_scripts."""
+
+    def test_install_scripts(self, initialized_project):
+        from idlergear.install import install_scripts
+
+        results = install_scripts()
+
+        assert "ig-askpass" in results
+        assert "ig-sudo" in results
+        assert results["ig-askpass"] == "created"
+        assert results["ig-sudo"] == "created"
+
+        scripts_dir = initialized_project / ".claude" / "scripts"
+        assert scripts_dir.exists()
+        assert (scripts_dir / "ig-askpass").exists()
+        assert (scripts_dir / "ig-sudo").exists()
+
+    def test_install_scripts_executable(self, initialized_project):
+        import stat
+        from idlergear.install import install_scripts
+
+        install_scripts()
+
+        scripts_dir = initialized_project / ".claude" / "scripts"
+        askpass = scripts_dir / "ig-askpass"
+        sudo = scripts_dir / "ig-sudo"
+
+        # Check executable bit is set
+        assert askpass.stat().st_mode & stat.S_IXUSR
+        assert sudo.stat().st_mode & stat.S_IXUSR
+
+    def test_install_scripts_unchanged(self, initialized_project):
+        from idlergear.install import install_scripts
+
+        install_scripts()
+        results = install_scripts()
+
+        assert results["ig-askpass"] == "unchanged"
+        assert results["ig-sudo"] == "unchanged"
+
+    def test_install_scripts_updated(self, initialized_project):
+        from idlergear.install import install_scripts
+
+        install_scripts()
+
+        # Modify one script
+        scripts_dir = initialized_project / ".claude" / "scripts"
+        (scripts_dir / "ig-askpass").write_text("old content")
+
+        results = install_scripts()
+
+        assert results["ig-askpass"] == "updated"
+        assert results["ig-sudo"] == "unchanged"
+
+    def test_remove_scripts(self, initialized_project):
+        from idlergear.install import install_scripts, remove_scripts
+
+        install_scripts()
+        result = remove_scripts()
+
+        assert result is True
+
+        scripts_dir = initialized_project / ".claude" / "scripts"
+        assert not (scripts_dir / "ig-askpass").exists()
+        assert not (scripts_dir / "ig-sudo").exists()
+
+    def test_remove_scripts_not_present(self, initialized_project):
+        from idlergear.install import remove_scripts
+
+        result = remove_scripts()
+        assert result is False
+
+    def test_remove_scripts_cleans_empty_dir(self, initialized_project):
+        from idlergear.install import install_scripts, remove_scripts
+
+        install_scripts()
+        remove_scripts()
+
+        scripts_dir = initialized_project / ".claude" / "scripts"
+        # Empty scripts directory should be cleaned up
+        assert not scripts_dir.exists()
 
 
 class TestFullUninstall:

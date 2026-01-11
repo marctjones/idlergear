@@ -1,12 +1,8 @@
 """Install IdlerGear into a project for Claude Code integration."""
 
 import json
-import os
-import stat
-import sys
 from pathlib import Path
 
-import typer
 
 from idlergear.config import find_idlergear_root
 
@@ -266,7 +262,6 @@ def add_claude_md_section(project_path: Path | None = None) -> bool:
 
     Returns True if added, False if already present.
     """
-    import re
 
     if project_path is None:
         project_path = find_idlergear_root()
@@ -330,10 +325,16 @@ def remove_claude_md_section(project_path: Path | None = None) -> bool:
 # All IdlerGear hooks use ig_ prefix for identification
 HOOKS_CONFIG = {
     "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Bash|Write|Edit",
+                "command": "./.claude/hooks/ig_pre-tool-use.sh",
+            },
+        ],
         "PostToolUse": [
             {
                 "matcher": "Write|Edit",
-                "command": "idlergear check --file \"$TOOL_INPUT_PATH\" --quiet",
+                "command": 'idlergear check --file "$TOOL_INPUT_PATH" --quiet',
             },
             {
                 "matcher": "Bash|Write|Edit",
@@ -520,6 +521,86 @@ def remove_hook_scripts(project_path: Path | None = None) -> bool:
     return removed_any
 
 
+# List of utility scripts to install from the package
+# These are installed to .claude/scripts/ for use by hooks and commands
+UTILITY_SCRIPTS = [
+    "ig-askpass",
+    "ig-sudo",
+]
+
+
+def install_scripts(project_path: Path | None = None) -> dict[str, str]:
+    """Install IdlerGear utility scripts.
+
+    Copies scripts from src/idlergear/scripts/ to .claude/scripts/.
+    Returns dict of {script_name: action} where action is 'created', 'updated', or 'unchanged'.
+    """
+    from importlib.resources import files
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    scripts_dir = project_path / ".claude" / "scripts"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+
+    package_scripts_dir = files("idlergear") / "scripts"
+    results = {}
+
+    for script_name in UTILITY_SCRIPTS:
+        src_file = package_scripts_dir / script_name
+        dst_file = scripts_dir / script_name
+
+        if not src_file.is_file():
+            continue
+
+        src_content = src_file.read_text()
+
+        if dst_file.exists():
+            if dst_file.read_text() == src_content:
+                results[script_name] = "unchanged"
+            else:
+                dst_file.write_text(src_content)
+                dst_file.chmod(0o755)
+                results[script_name] = "updated"
+        else:
+            dst_file.write_text(src_content)
+            dst_file.chmod(0o755)
+            results[script_name] = "created"
+
+    return results
+
+
+def remove_scripts(project_path: Path | None = None) -> bool:
+    """Remove IdlerGear utility scripts.
+
+    Returns True if any scripts were removed, False if none existed.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    scripts_dir = project_path / ".claude" / "scripts"
+    removed_any = False
+
+    for script_name in UTILITY_SCRIPTS:
+        script_file = scripts_dir / script_name
+        if script_file.exists():
+            script_file.unlink()
+            removed_any = True
+
+    # Clean up empty scripts directory
+    try:
+        if scripts_dir.exists() and not any(scripts_dir.iterdir()):
+            scripts_dir.rmdir()
+    except OSError:
+        pass
+
+    return removed_any
+
+
 def add_commands(project_path: Path | None = None) -> dict[str, str]:
     """Install all IdlerGear slash commands.
 
@@ -618,7 +699,9 @@ def add_skill(project_path: Path | None = None) -> dict[str, str]:
     scripts_src = package_skill_dir / "scripts"
     scripts_dst = skill_dir / "scripts"
     for script_file in ["context.sh", "status.sh", "session-start.sh"]:
-        action = copy_file(scripts_src / script_file, scripts_dst / script_file, executable=True)
+        action = copy_file(
+            scripts_src / script_file, scripts_dst / script_file, executable=True
+        )
         if action:
             results[f"scripts/{script_file}"] = action
 
