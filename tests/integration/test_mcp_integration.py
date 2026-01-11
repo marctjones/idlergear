@@ -15,9 +15,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
-import pytest
 
 from .conftest import run_idlergear
 
@@ -38,10 +36,14 @@ class TestMcpConfiguration:
 
         # Verify structure
         assert "mcpServers" in config, ".mcp.json needs mcpServers key"
-        assert "idlergear" in config["mcpServers"], "idlergear server should be configured"
+        assert "idlergear" in config["mcpServers"], (
+            "idlergear server should be configured"
+        )
 
         server_config = config["mcpServers"]["idlergear"]
-        assert server_config["command"] == "idlergear-mcp", "Command should be idlergear-mcp"
+        assert server_config["command"] == "idlergear-mcp", (
+            "Command should be idlergear-mcp"
+        )
         assert server_config["type"] == "stdio", "Type should be stdio"
         assert server_config.get("args", []) == [], "Args should be empty list"
 
@@ -69,16 +71,21 @@ class TestMcpConfiguration:
 
         # The MCP server uses stdio, so we need to send it a proper init message
         # and check that it doesn't crash immediately
-        init_message = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "test", "version": "1.0.0"}
-            }
-        }) + "\n"
+        init_message = (
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "1.0.0"},
+                    },
+                }
+            )
+            + "\n"
+        )
 
         result = subprocess.run(
             ["idlergear-mcp"],
@@ -91,7 +98,11 @@ class TestMcpConfiguration:
 
         # Server should respond with something (not crash)
         # Even if it times out reading more input, stdout should have response
-        assert result.stdout or result.returncode == 0 or "initialize" in result.stderr.lower(), (
+        assert (
+            result.stdout
+            or result.returncode == 0
+            or "initialize" in result.stderr.lower()
+        ), (
             f"MCP server should start and respond.\n"
             f"stdout: {result.stdout}\n"
             f"stderr: {result.stderr}"
@@ -107,22 +118,21 @@ class TestMcpToolDiscovery:
 
         # Send tools/list request
         messages = [
-            json.dumps({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "initialize",
-                "params": {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {},
-                    "clientInfo": {"name": "test", "version": "1.0.0"}
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "1.0.0"},
+                    },
                 }
-            }),
-            json.dumps({
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "tools/list",
-                "params": {}
-            }),
+            ),
+            json.dumps(
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+            ),
         ]
         input_data = "\n".join(messages) + "\n"
 
@@ -138,9 +148,14 @@ class TestMcpToolDiscovery:
         # Should have tool definitions in output
         output = result.stdout
         expected_tools = [
-            "task_create", "task_list", "task_show", "task_close",
-            "note_create", "note_list",
-            "explore_create", "explore_list",
+            "task_create",
+            "task_list",
+            "task_show",
+            "task_close",
+            "note_create",
+            "note_list",
+            "explore_create",
+            "explore_list",
             "context",
             "vision_show",
         ]

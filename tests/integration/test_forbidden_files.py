@@ -167,8 +167,14 @@ class TestForbiddenFileRules:
             note_result = run_idlergear(project, "note", "list")
             explore_result = run_idlergear(project, "explore", "list")
 
-            in_notes = "rate" in note_result.stdout.lower() or "limit" in note_result.stdout.lower()
-            in_explore = "rate" in explore_result.stdout.lower() or "limit" in explore_result.stdout.lower()
+            in_notes = (
+                "rate" in note_result.stdout.lower()
+                or "limit" in note_result.stdout.lower()
+            )
+            in_explore = (
+                "rate" in explore_result.stdout.lower()
+                or "limit" in explore_result.stdout.lower()
+            )
 
             assert in_notes or in_explore, (
                 f"Claude should capture ideas in IdlerGear.\n"
@@ -235,8 +241,8 @@ def validate_input(data):
             note_result = run_idlergear(project, "note", "list")
 
             has_tracking = (
-                len(task_result.stdout.strip()) > 0 or
-                len(note_result.stdout.strip()) > 0
+                len(task_result.stdout.strip()) > 0
+                or len(note_result.stdout.strip()) > 0
             )
 
             # Note: This assertion is informational - Claude may not always

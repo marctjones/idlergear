@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from idlergear.mcp_server import _check_initialized, _format_result, call_tool, list_tools
+from idlergear.mcp_server import (
+    _check_initialized,
+    _format_result,
+    call_tool,
+    list_tools,
+)
 
 
 @pytest.fixture
@@ -199,7 +204,9 @@ class TestCallToolExplore:
     @pytest.mark.asyncio
     async def test_explore_create(self, mcp_project):
         """Deprecated explore_create now creates a note with 'explore' tag."""
-        result = await call_tool("idlergear_explore_create", {"title": "Test exploration"})
+        result = await call_tool(
+            "idlergear_explore_create", {"title": "Test exploration"}
+        )
 
         data = json.loads(result[0].text)
         # Now creates a note with content = title
@@ -329,7 +336,9 @@ class TestCallToolConfig:
 
     @pytest.mark.asyncio
     async def test_config_set_get(self, mcp_project):
-        await call_tool("idlergear_config_set", {"key": "test.key", "value": "test-value"})
+        await call_tool(
+            "idlergear_config_set", {"key": "test.key", "value": "test-value"}
+        )
 
         result = await call_tool("idlergear_config_get", {"key": "test.key"})
 
@@ -342,7 +351,9 @@ class TestCallToolRuns:
 
     @pytest.mark.asyncio
     async def test_run_start(self, mcp_project):
-        result = await call_tool("idlergear_run_start", {"command": "echo hello", "name": "test-run"})
+        result = await call_tool(
+            "idlergear_run_start", {"command": "echo hello", "name": "test-run"}
+        )
 
         data = json.loads(result[0].text)
         assert data["name"] == "test-run"
@@ -352,7 +363,9 @@ class TestCallToolRuns:
     async def test_run_list(self, mcp_project):
         import time
 
-        await call_tool("idlergear_run_start", {"command": "echo test", "name": "run-1"})
+        await call_tool(
+            "idlergear_run_start", {"command": "echo test", "name": "run-1"}
+        )
         time.sleep(0.3)
 
         result = await call_tool("idlergear_run_list", {})
@@ -364,7 +377,9 @@ class TestCallToolRuns:
     async def test_run_logs(self, mcp_project):
         import time
 
-        await call_tool("idlergear_run_start", {"command": "echo 'hello world'", "name": "log-test"})
+        await call_tool(
+            "idlergear_run_start", {"command": "echo 'hello world'", "name": "log-test"}
+        )
         time.sleep(0.5)
 
         result = await call_tool("idlergear_run_logs", {"name": "log-test"})

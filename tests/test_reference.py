@@ -1,7 +1,5 @@
 """Tests for reference document management."""
 
-import pytest
-
 from idlergear.reference import (
     add_reference,
     get_reference,

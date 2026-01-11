@@ -1,11 +1,6 @@
 """Tests for IdlerGear daemon functionality."""
 
-import asyncio
 import json
-import os
-import signal
-import time
-from pathlib import Path
 
 import pytest
 
@@ -471,6 +466,7 @@ class TestDaemonIntegration:
 
             # Wait for command to complete
             import time
+
             time.sleep(0.5)
 
             # List runs
@@ -605,4 +601,485 @@ class TestDaemonIntegration:
             assert result["title"] == "Note title"
         finally:
             await client.disconnect()
+            daemon_lifecycle.stop()
+
+
+class TestMultiClientDaemon:
+    """Tests for multiple clients connecting to daemon simultaneously."""
+
+    @pytest.fixture
+    def daemon_lifecycle(self, temp_project):
+        """Get a lifecycle manager for the temp project."""
+        root = temp_project / ".idlergear"
+        return DaemonLifecycle(root)
+
+    @pytest.mark.asyncio
+    async def test_multiple_clients_connect(self, daemon_lifecycle):
+        """Test multiple clients can connect simultaneously."""
+        daemon_lifecycle.start(wait=True)
+
+        clients = []
+        try:
+            # Connect multiple clients
+            for i in range(5):
+                client = DaemonClient(daemon_lifecycle.socket_path)
+                await client.connect()
+                clients.append(client)
+
+            # All clients should be able to ping
+            for client in clients:
+                result = await client.ping()
+                assert result is True
+
+            # Check daemon status shows correct connection count
+            status = await clients[0].status()
+            assert status["connections"] == 5
+        finally:
+            for client in clients:
+                await client.disconnect()
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_requests(self, daemon_lifecycle):
+        """Test multiple clients making concurrent requests."""
+        import asyncio
+
+        daemon_lifecycle.start(wait=True)
+
+        clients = []
+        try:
+            # Connect multiple clients
+            for _ in range(3):
+                client = DaemonClient(daemon_lifecycle.socket_path)
+                await client.connect()
+                clients.append(client)
+
+            # Make concurrent task creation requests
+            async def create_task(client, title):
+                return await client.call("task.create", {"title": title})
+
+            results = await asyncio.gather(
+                create_task(clients[0], "Task from client 1"),
+                create_task(clients[1], "Task from client 2"),
+                create_task(clients[2], "Task from client 3"),
+            )
+
+            # All tasks should be created with unique IDs
+            task_ids = [r["id"] for r in results]
+            assert len(set(task_ids)) == 3
+
+            # Verify all tasks exist
+            tasks = await clients[0].call("task.list", {"state": "open"})
+            assert len(tasks) == 3
+        finally:
+            for client in clients:
+                await client.disconnect()
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_client_disconnect_cleanup(self, daemon_lifecycle):
+        """Test that disconnecting clients are cleaned up properly."""
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            # Connect first client
+            client1 = DaemonClient(daemon_lifecycle.socket_path)
+            await client1.connect()
+
+            status = await client1.status()
+            assert status["connections"] == 1
+
+            # Connect second client
+            client2 = DaemonClient(daemon_lifecycle.socket_path)
+            await client2.connect()
+
+            status = await client1.status()
+            assert status["connections"] == 2
+
+            # Disconnect second client
+            await client2.disconnect()
+
+            # Give daemon time to process disconnect
+            import asyncio
+
+            await asyncio.sleep(0.1)
+
+            status = await client1.status()
+            assert status["connections"] == 1
+
+            await client1.disconnect()
+        finally:
+            daemon_lifecycle.stop()
+
+
+class TestAgentCoordination:
+    """Tests for multi-agent coordination via daemon."""
+
+    @pytest.fixture
+    def daemon_lifecycle(self, temp_project):
+        """Get a lifecycle manager for the temp project."""
+        root = temp_project / ".idlergear"
+        return DaemonLifecycle(root)
+
+    @pytest.mark.asyncio
+    async def test_multiple_agents_register(self, daemon_lifecycle):
+        """Test multiple agents can register and be listed."""
+        daemon_lifecycle.start(wait=True)
+
+        clients = []
+        try:
+            # Register multiple agents with different types
+            agents = [
+                ("agent-1", "claude-code"),
+                ("agent-2", "goose"),
+                ("agent-3", "aider"),
+            ]
+
+            for agent_id, agent_type in agents:
+                client = DaemonClient(daemon_lifecycle.socket_path)
+                await client.connect()
+                clients.append(client)
+
+                result = await client.call(
+                    "agent.register",
+                    {"agent_id": agent_id, "agent_type": agent_type},
+                )
+                assert result["agent_id"] == agent_id
+                assert result["agent_type"] == agent_type
+
+            # List all agents
+            result = await clients[0].call("agent.list", {})
+            assert len(result["agents"]) == 3
+
+            # Filter by type
+            result = await clients[0].call("agent.list", {"agent_type": "claude-code"})
+            assert len(result["agents"]) == 1
+            assert result["agents"][0]["agent_id"] == "agent-1"
+        finally:
+            for client in clients:
+                await client.disconnect()
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_agent_status_updates(self, daemon_lifecycle):
+        """Test agents can update their status."""
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            client = DaemonClient(daemon_lifecycle.socket_path)
+            await client.connect()
+
+            # Register agent
+            await client.call(
+                "agent.register",
+                {"agent_id": "test-agent", "agent_type": "claude-code"},
+            )
+
+            # Update status to busy
+            result = await client.call(
+                "agent.update_status",
+                {"agent_id": "test-agent", "status": "busy", "current_task": "task-123"},
+            )
+            assert result["success"] is True
+
+            # Verify status changed
+            agents = await client.call("agent.list", {})
+            agent = agents["agents"][0]
+            assert agent["status"] == "busy"
+            assert agent["current_task"] == "task-123"
+
+            # Update back to idle
+            await client.call(
+                "agent.update_status",
+                {"agent_id": "test-agent", "status": "idle"},
+            )
+
+            agents = await client.call("agent.list", {"status": "idle"})
+            assert len(agents["agents"]) == 1
+        finally:
+            await client.disconnect()
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_command_queue_coordination(self, daemon_lifecycle):
+        """Test agents coordinate work through command queue."""
+        daemon_lifecycle.start(wait=True)
+
+        clients = []
+        try:
+            # Register two agents
+            for agent_id in ["agent-1", "agent-2"]:
+                client = DaemonClient(daemon_lifecycle.socket_path)
+                await client.connect()
+                clients.append(client)
+                await client.call(
+                    "agent.register",
+                    {"agent_id": agent_id, "agent_type": "test"},
+                )
+
+            # Queue multiple commands
+            cmd1 = await clients[0].call(
+                "queue.add", {"prompt": "high priority work", "priority": 10}
+            )
+            cmd2 = await clients[0].call(
+                "queue.add", {"prompt": "low priority work", "priority": 1}
+            )
+
+            # Agent 1 polls and gets high priority
+            work1 = await clients[0].call("queue.poll", {"agent_id": "agent-1"})
+            assert work1["id"] == cmd1["id"]
+            assert work1["priority"] == 10
+
+            # Agent 2 polls and gets low priority (high is already assigned)
+            work2 = await clients[1].call("queue.poll", {"agent_id": "agent-2"})
+            assert work2["id"] == cmd2["id"]
+            assert work2["priority"] == 1
+
+            # Complete work
+            await clients[0].call("queue.complete", {"id": cmd1["id"], "result": {"done": True}})
+            await clients[1].call("queue.complete", {"id": cmd2["id"], "result": {"done": True}})
+
+            # No more pending commands
+            work3 = await clients[0].call("queue.poll", {"agent_id": "agent-1"})
+            assert work3.get("command") is None
+        finally:
+            for client in clients:
+                await client.disconnect()
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_resource_locking(self, daemon_lifecycle):
+        """Test agents can lock resources to prevent conflicts."""
+        daemon_lifecycle.start(wait=True)
+
+        clients = []
+        try:
+            # Register two agents
+            for agent_id in ["agent-1", "agent-2"]:
+                client = DaemonClient(daemon_lifecycle.socket_path)
+                await client.connect()
+                clients.append(client)
+                await client.call(
+                    "agent.register",
+                    {"agent_id": agent_id, "agent_type": "test"},
+                )
+
+            # Agent 1 acquires lock on a file
+            result = await clients[0].call(
+                "lock.acquire",
+                {"resource": "src/main.py", "agent_id": "agent-1", "timeout": 60},
+            )
+            assert result["acquired"] is True
+
+            # Agent 2 tries to acquire same lock (should fail)
+            result = await clients[1].call(
+                "lock.acquire",
+                {"resource": "src/main.py", "agent_id": "agent-2", "timeout": 0.1},
+            )
+            assert result["acquired"] is False
+
+            # Check lock status
+            result = await clients[1].call("lock.is_locked", {"resource": "src/main.py"})
+            assert result["is_locked"] is True
+            assert result["lock"]["agent_id"] == "agent-1"
+
+            # Agent 1 releases lock
+            await clients[0].call(
+                "lock.release",
+                {"resource": "src/main.py", "agent_id": "agent-1"},
+            )
+
+            # Now agent 2 can acquire
+            result = await clients[1].call(
+                "lock.acquire",
+                {"resource": "src/main.py", "agent_id": "agent-2", "timeout": 0.1},
+            )
+            assert result["acquired"] is True
+        finally:
+            for client in clients:
+                await client.disconnect()
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_agent_unregister_releases_locks(self, daemon_lifecycle):
+        """Test that unregistering an agent releases its locks."""
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            client = DaemonClient(daemon_lifecycle.socket_path)
+            await client.connect()
+
+            # Register agent
+            await client.call(
+                "agent.register",
+                {"agent_id": "test-agent", "agent_type": "test"},
+            )
+
+            # Acquire locks
+            await client.call(
+                "lock.acquire",
+                {"resource": "file1.py", "agent_id": "test-agent"},
+            )
+            await client.call(
+                "lock.acquire",
+                {"resource": "file2.py", "agent_id": "test-agent"},
+            )
+
+            # Verify locks exist
+            result = await client.call("lock.list", {"agent_id": "test-agent"})
+            assert len(result["locks"]) == 2
+
+            # Unregister agent
+            await client.call("agent.unregister", {"agent_id": "test-agent"})
+
+            # Locks should be released
+            result = await client.call("lock.is_locked", {"resource": "file1.py"})
+            assert result["is_locked"] is False
+
+            result = await client.call("lock.is_locked", {"resource": "file2.py"})
+            assert result["is_locked"] is False
+        finally:
+            await client.disconnect()
+            daemon_lifecycle.stop()
+
+
+class TestDaemonResilience:
+    """Tests for daemon error handling and resilience."""
+
+    @pytest.fixture
+    def daemon_lifecycle(self, temp_project):
+        """Get a lifecycle manager for the temp project."""
+        root = temp_project / ".idlergear"
+        return DaemonLifecycle(root)
+
+    @pytest.mark.asyncio
+    async def test_daemon_handles_invalid_messages(self, daemon_lifecycle):
+        """Test daemon handles malformed messages gracefully."""
+        import socket
+
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            # Connect with raw socket to send malformed data
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            sock.connect(str(daemon_lifecycle.socket_path))
+
+            # Send malformed message (not valid JSON)
+            bad_message = b"not valid json"
+            sock.send(len(bad_message).to_bytes(4, "big") + bad_message)
+
+            # Read response
+            length_bytes = sock.recv(4)
+            if length_bytes:
+                length = int.from_bytes(length_bytes, "big")
+                response = sock.recv(length).decode("utf-8")
+                assert "error" in response.lower() or "parse" in response.lower()
+
+            sock.close()
+
+            # Daemon should still be running
+            assert daemon_lifecycle.is_running()
+
+            # Valid client should still work
+            client = DaemonClient(daemon_lifecycle.socket_path)
+            await client.connect()
+            result = await client.ping()
+            assert result is True
+            await client.disconnect()
+        finally:
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_daemon_survives_client_crash(self, daemon_lifecycle):
+        """Test daemon handles abrupt client disconnection."""
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            # Connect a client
+            client1 = DaemonClient(daemon_lifecycle.socket_path)
+            await client1.connect()
+
+            # Create a task
+            await client1.call("task.create", {"title": "Test task"})
+
+            # Abruptly close the connection (simulating crash)
+            client1._writer.close()
+            await client1._writer.wait_closed()
+
+            # Give daemon time to detect disconnect
+            import asyncio
+
+            await asyncio.sleep(0.2)
+
+            # Daemon should still be running and responsive
+            client2 = DaemonClient(daemon_lifecycle.socket_path)
+            await client2.connect()
+
+            # Previous task should still exist
+            tasks = await client2.call("task.list", {"state": "open"})
+            assert len(tasks) == 1
+            assert tasks[0]["title"] == "Test task"
+
+            await client2.disconnect()
+        finally:
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_daemon_heartbeat_timeout(self, daemon_lifecycle):
+        """Test that stale agents are detected."""
+        import asyncio
+        from datetime import datetime, timezone, timedelta
+
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            client = DaemonClient(daemon_lifecycle.socket_path)
+            await client.connect()
+
+            # Register agent
+            await client.call(
+                "agent.register",
+                {"agent_id": "test-agent", "agent_type": "test"},
+            )
+
+            # Manually check stale detection logic (agent should not be stale yet)
+            agents = await client.call("agent.list", {})
+            assert len(agents["agents"]) == 1
+
+            # The agent should have a recent heartbeat
+            agent = agents["agents"][0]
+            heartbeat = datetime.fromisoformat(agent["last_heartbeat"])
+            now = datetime.now(timezone.utc)
+            age = (now - heartbeat).total_seconds()
+            assert age < 5  # Should be very recent
+
+            await client.disconnect()
+        finally:
+            daemon_lifecycle.stop()
+
+    @pytest.mark.asyncio
+    async def test_rapid_connect_disconnect(self, daemon_lifecycle):
+        """Test daemon handles rapid connect/disconnect cycles."""
+        import asyncio
+
+        daemon_lifecycle.start(wait=True)
+
+        try:
+            # Rapidly connect and disconnect many clients
+            for _ in range(20):
+                client = DaemonClient(daemon_lifecycle.socket_path)
+                await client.connect()
+                await client.ping()
+                await client.disconnect()
+
+            # Short delay
+            await asyncio.sleep(0.1)
+
+            # Daemon should still work
+            client = DaemonClient(daemon_lifecycle.socket_path)
+            await client.connect()
+            status = await client.status()
+            assert status["running"] is True
+            await client.disconnect()
+        finally:
             daemon_lifecycle.stop()

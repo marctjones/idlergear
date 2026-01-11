@@ -1,11 +1,9 @@
 """Tests for watch mode functionality."""
 
 import tempfile
-from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from idlergear.watch import (
     Suggestion,
@@ -15,9 +13,6 @@ from idlergear.watch import (
     FileWatcher,
     ActionResult,
     analyze,
-    get_git_status,
-    get_minutes_since_last_commit,
-    scan_diff_for_todos,
     get_watch_stats,
     act_on_suggestion,
     act_on_all_suggestions,
@@ -477,9 +472,16 @@ class TestActOnAllSuggestions:
             lines_deleted=5,
             minutes_since_commit=10,
             suggestions=[
-                Suggestion(id="s1", category="commit", message="Commit", severity="action"),
-                Suggestion(id="s2", category="todo", message="TODO", severity="action",
-                          context={"type": "TODO", "text": "", "file": "x.py"}),
+                Suggestion(
+                    id="s1", category="commit", message="Commit", severity="action"
+                ),
+                Suggestion(
+                    id="s2",
+                    category="todo",
+                    message="TODO",
+                    severity="action",
+                    context={"type": "TODO", "text": "", "file": "x.py"},
+                ),
                 Suggestion(id="s3", category="test", message="Test", severity="info"),
             ],
         )
@@ -498,7 +500,9 @@ class TestActOnAllSuggestions:
             lines_deleted=5,
             minutes_since_commit=10,
             suggestions=[
-                Suggestion(id="s1", category="commit", message="Commit", severity="action"),
+                Suggestion(
+                    id="s1", category="commit", message="Commit", severity="action"
+                ),
                 Suggestion(id="s2", category="test", message="Test", severity="info"),
             ],
         )
@@ -520,7 +524,9 @@ class TestAnalyzeAndAct:
             lines_deleted=5,
             minutes_since_commit=10,
             suggestions=[
-                Suggestion(id="s1", category="commit", message="Commit", severity="action"),
+                Suggestion(
+                    id="s1", category="commit", message="Commit", severity="action"
+                ),
             ],
         )
 

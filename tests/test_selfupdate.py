@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-import pytest
 
 from idlergear.selfupdate import (
     InstallMethod,
@@ -75,6 +74,7 @@ class TestGetLatestVersion:
     @patch("idlergear.selfupdate.urllib.request.urlopen")
     def test_get_latest_version_network_error(self, mock_urlopen):
         import urllib.error
+
         mock_urlopen.side_effect = urllib.error.URLError("Connection refused")
 
         result = get_latest_version(use_cache=False)
@@ -86,6 +86,7 @@ class TestGetLatestVersion:
     @patch("idlergear.selfupdate.urllib.request.urlopen")
     def test_get_latest_version_rate_limited(self, mock_urlopen):
         import urllib.error
+
         mock_urlopen.side_effect = urllib.error.HTTPError(
             None, 403, "Rate limited", {}, None
         )

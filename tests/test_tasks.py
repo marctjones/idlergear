@@ -1,7 +1,5 @@
 """Tests for task management."""
 
-import pytest
-
 from idlergear.tasks import (
     close_task,
     create_task,

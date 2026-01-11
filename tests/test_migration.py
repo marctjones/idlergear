@@ -148,10 +148,12 @@ class TestMigrateTasks:
 
     def test_migrate_open_tasks(self) -> None:
         """Test migrating open tasks."""
-        source = MockTaskBackend([
-            {"id": 1, "title": "Task 1", "body": "Body 1", "state": "open"},
-            {"id": 2, "title": "Task 2", "body": "Body 2", "state": "open"},
-        ])
+        source = MockTaskBackend(
+            [
+                {"id": 1, "title": "Task 1", "body": "Body 1", "state": "open"},
+                {"id": 2, "title": "Task 2", "body": "Body 2", "state": "open"},
+            ]
+        )
         target = MockTaskBackend()
 
         stats = migrate_tasks(source, target, state="all")
@@ -163,9 +165,11 @@ class TestMigrateTasks:
 
     def test_migrate_closed_tasks(self) -> None:
         """Test migrating closed tasks preserves state."""
-        source = MockTaskBackend([
-            {"id": 1, "title": "Closed Task", "state": "closed"},
-        ])
+        source = MockTaskBackend(
+            [
+                {"id": 1, "title": "Closed Task", "state": "closed"},
+            ]
+        )
         target = MockTaskBackend()
 
         stats = migrate_tasks(source, target, state="all")
@@ -176,17 +180,19 @@ class TestMigrateTasks:
 
     def test_migrate_with_labels_and_priority(self) -> None:
         """Test migrating tasks with metadata."""
-        source = MockTaskBackend([
-            {
-                "id": 1,
-                "title": "Task",
-                "body": "Body",
-                "labels": ["bug", "urgent"],
-                "priority": "high",
-                "due": "2024-12-31",
-                "state": "open",
-            },
-        ])
+        source = MockTaskBackend(
+            [
+                {
+                    "id": 1,
+                    "title": "Task",
+                    "body": "Body",
+                    "labels": ["bug", "urgent"],
+                    "priority": "high",
+                    "due": "2024-12-31",
+                    "state": "open",
+                },
+            ]
+        )
         target = MockTaskBackend()
 
         migrate_tasks(source, target, state="all")
@@ -198,12 +204,15 @@ class TestMigrateTasks:
 
     def test_migrate_with_callback(self) -> None:
         """Test migrate callback is called."""
-        source = MockTaskBackend([
-            {"id": 1, "title": "Task 1", "state": "open"},
-        ])
+        source = MockTaskBackend(
+            [
+                {"id": 1, "title": "Task 1", "state": "open"},
+            ]
+        )
         target = MockTaskBackend()
 
         items = []
+
         def on_item(info: dict) -> None:
             items.append(info)
 
@@ -215,13 +224,16 @@ class TestMigrateTasks:
 
     def test_migrate_with_error_callback(self) -> None:
         """Test error callback is called on failure."""
-        source = MockTaskBackend([
-            {"id": 1, "title": "Task 1", "state": "open"},
-        ])
+        source = MockTaskBackend(
+            [
+                {"id": 1, "title": "Task 1", "state": "open"},
+            ]
+        )
         target = MagicMock()
         target.create.side_effect = Exception("Create failed")
 
         errors = []
+
         def on_error(item: dict, error: Exception) -> None:
             errors.append((item, error))
 
@@ -237,9 +249,11 @@ class TestMigrateExplorations:
 
     def test_migrate_explorations(self) -> None:
         """Test migrating explorations."""
-        source = MockExploreBackend([
-            {"id": 1, "title": "Explore 1", "body": "Body", "state": "open"},
-        ])
+        source = MockExploreBackend(
+            [
+                {"id": 1, "title": "Explore 1", "body": "Body", "state": "open"},
+            ]
+        )
         target = MockExploreBackend()
 
         stats = migrate_explorations(source, target, state="all")
@@ -249,9 +263,11 @@ class TestMigrateExplorations:
 
     def test_migrate_closed_exploration(self) -> None:
         """Test closed exploration is closed in target."""
-        source = MockExploreBackend([
-            {"id": 1, "title": "Done Explore", "state": "closed"},
-        ])
+        source = MockExploreBackend(
+            [
+                {"id": 1, "title": "Done Explore", "state": "closed"},
+            ]
+        )
         target = MockExploreBackend()
 
         migrate_explorations(source, target, state="all")
@@ -264,10 +280,12 @@ class TestMigrateReferences:
 
     def test_migrate_references(self) -> None:
         """Test migrating references."""
-        source = MockReferenceBackend([
-            {"id": 1, "title": "Ref 1", "body": "Content 1"},
-            {"id": 2, "title": "Ref 2", "body": "Content 2"},
-        ])
+        source = MockReferenceBackend(
+            [
+                {"id": 1, "title": "Ref 1", "body": "Content 1"},
+                {"id": 2, "title": "Ref 2", "body": "Content 2"},
+            ]
+        )
         target = MockReferenceBackend()
 
         stats = migrate_references(source, target)
@@ -281,10 +299,12 @@ class TestMigrateNotes:
 
     def test_migrate_notes(self) -> None:
         """Test migrating notes."""
-        source = MockNoteBackend([
-            {"id": 1, "content": "Note 1"},
-            {"id": 2, "content": "Note 2"},
-        ])
+        source = MockNoteBackend(
+            [
+                {"id": 1, "content": "Note 1"},
+                {"id": 2, "content": "Note 2"},
+            ]
+        )
         target = MockNoteBackend()
 
         stats = migrate_notes(source, target)
@@ -350,9 +370,7 @@ assignees: []
 Task body
 """)
 
-            stats = migrate_backend(
-                "task", "local", "local", project, dry_run=True
-            )
+            stats = migrate_backend("task", "local", "local", project, dry_run=True)
 
             assert stats["dry_run"] is True
             assert stats["total"] == 1

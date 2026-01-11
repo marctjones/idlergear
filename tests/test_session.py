@@ -1,7 +1,6 @@
 """Tests for session state management."""
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -17,6 +16,7 @@ def session_state(tmp_path):
 
     # Patch find_idlergear_root to return tmp_path
     import idlergear.session
+
     original_find = idlergear.session.find_idlergear_root
     idlergear.session.find_idlergear_root = lambda: tmp_path
 
@@ -112,6 +112,7 @@ def test_start_session_without_state(tmp_path):
 
     # Patch
     import idlergear.session
+
     original_find = idlergear.session.find_idlergear_root
     idlergear.session.find_idlergear_root = lambda: tmp_path
 
@@ -137,6 +138,7 @@ def test_start_session_with_state(session_state):
 
     # Patch for start_session
     import idlergear.session
+
     original_find = idlergear.session.find_idlergear_root
     idlergear.session.find_idlergear_root = lambda: session_state.root
 
@@ -156,6 +158,7 @@ def test_end_session(session_state):
     """Test ending session with save."""
     # Patch
     import idlergear.session
+
     original_find = idlergear.session.find_idlergear_root
     idlergear.session.find_idlergear_root = lambda: session_state.root
 

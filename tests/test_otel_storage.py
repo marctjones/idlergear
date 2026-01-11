@@ -163,7 +163,11 @@ def test_full_text_search(storage):
     for msg in messages:
         storage.insert(
             LogEntry(
-                timestamp=now, severity="INFO", service="test", message=msg, attributes={}
+                timestamp=now,
+                severity="INFO",
+                service="test",
+                message=msg,
+                attributes={},
             )
         )
 

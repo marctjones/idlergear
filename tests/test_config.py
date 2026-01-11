@@ -2,9 +2,12 @@
 
 import os
 
-import pytest
 
-from idlergear.config import get_config_value, load_config, save_config, set_config_value
+from idlergear.config import (
+    get_config_value,
+    load_config,
+    set_config_value,
+)
 
 
 def test_load_config(temp_project):

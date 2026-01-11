@@ -1,6 +1,5 @@
 """Tests for context gathering and token efficiency."""
 
-import pytest
 from idlergear.context import gather_context, truncate_lines, truncate_text
 
 

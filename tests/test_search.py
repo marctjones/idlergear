@@ -1,7 +1,5 @@
 """Tests for cross-type search functionality."""
 
-import pytest
-
 from idlergear.explorations import create_exploration
 from idlergear.notes import create_note
 from idlergear.plans import create_plan

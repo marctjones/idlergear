@@ -58,7 +58,9 @@ class TestSessionStartBehavior:
         run_idlergear(project, "vision", "edit", "A tic-tac-toe game with AI")
         run_idlergear(project, "task", "create", "Implement minimax algorithm")
         run_idlergear(project, "task", "create", "Add game board display")
-        run_idlergear(project, "note", "create", "Consider alpha-beta pruning for performance")
+        run_idlergear(
+            project, "note", "create", "Consider alpha-beta pruning for performance"
+        )
 
         # Start a "session" with a greeting
         result = run_claude(
@@ -73,7 +75,9 @@ class TestSessionStartBehavior:
 
             # Claude should mention something from the context
             mentions_vision = "tic-tac-toe" in response or "game" in response
-            mentions_task = "minimax" in response or "board" in response or "task" in response
+            mentions_task = (
+                "minimax" in response or "board" in response or "task" in response
+            )
             mentions_note = "alpha" in response or "pruning" in response
 
             assert mentions_vision or mentions_task or mentions_note, (
@@ -109,8 +113,7 @@ class TestSessionStartBehavior:
             found_test = "test" in response
 
             assert found_auth or found_password or found_test, (
-                f"Claude should discover existing tasks.\n"
-                f"Response: {result.stdout}"
+                f"Claude should discover existing tasks.\nResponse: {result.stdout}"
             )
 
     def test_claude_surfaces_notes_on_resumption(
@@ -121,12 +124,16 @@ class TestSessionStartBehavior:
 
         # Create notes that would be useful on resumption
         run_idlergear(
-            project, "note", "create",
-            "Left off in the middle of refactoring the login handler"
+            project,
+            "note",
+            "create",
+            "Left off in the middle of refactoring the login handler",
         )
         run_idlergear(
-            project, "note", "create",
-            "Remember: the session token format changed to JWT"
+            project,
+            "note",
+            "create",
+            "Remember: the session token format changed to JWT",
         )
 
         result = run_claude(
@@ -141,7 +148,9 @@ class TestSessionStartBehavior:
             response = result.stdout.lower()
 
             found_refactor = "refactor" in response or "login" in response
-            found_token = "token" in response or "jwt" in response or "session" in response
+            found_token = (
+                "token" in response or "jwt" in response or "session" in response
+            )
 
             assert found_refactor or found_token, (
                 f"Claude should surface relevant notes on session resumption.\n"
@@ -156,8 +165,10 @@ class TestSessionStartBehavior:
 
         # Set a distinctive vision
         run_idlergear(
-            project, "vision", "edit",
-            "Build a multiplayer chess platform with ELO ratings and tournaments"
+            project,
+            "vision",
+            "edit",
+            "Build a multiplayer chess platform with ELO ratings and tournaments",
         )
 
         result = run_claude(
@@ -206,13 +217,13 @@ class TestEmptyProjectHandling:
             # Should gracefully handle empty project
             # Either ask for clarification or note that vision isn't set
             handled_gracefully = (
-                "no vision" in response or
-                "not set" in response or
-                "haven't" in response or
-                "what would you like" in response or
-                "tell me" in response or
-                "empty" in response or
-                len(response) > 20  # At least gave some response
+                "no vision" in response
+                or "not set" in response
+                or "haven't" in response
+                or "what would you like" in response
+                or "tell me" in response
+                or "empty" in response
+                or len(response) > 20  # At least gave some response
             )
 
             assert handled_gracefully, (
@@ -245,8 +256,7 @@ class TestEmptyProjectHandling:
 
             # Any of these is a reasonable response to an empty project
             assert suggests_vision or asks_purpose or suggests_task, (
-                f"Claude should guide user on empty project.\n"
-                f"Response: {result.stdout}"
+                f"Claude should guide user on empty project.\nResponse: {result.stdout}"
             )
 
 
@@ -276,13 +286,10 @@ class TestContextCommandExecution:
         has_note = "note" in output
 
         assert has_vision and has_task and has_note, (
-            f"Context should show all knowledge types.\n"
-            f"Output: {result.stdout}"
+            f"Context should show all knowledge types.\nOutput: {result.stdout}"
         )
 
-    def test_context_is_readable_by_ai(
-        self, fresh_project_with_install: Path
-    ) -> None:
+    def test_context_is_readable_by_ai(self, fresh_project_with_install: Path) -> None:
         """Test that context output is structured for AI consumption."""
         project = fresh_project_with_install
 
@@ -296,12 +303,9 @@ class TestContextCommandExecution:
 
         # Should have some structure (headers, lists, etc.)
         has_structure = (
-            "#" in output or  # Markdown headers
-            "-" in output or  # List items
-            "*" in output     # List items
+            "#" in output  # Markdown headers
+            or "-" in output  # List items
+            or "*" in output  # List items
         )
 
-        assert has_structure, (
-            f"Context output should be structured.\n"
-            f"Output: {output}"
-        )
+        assert has_structure, f"Context output should be structured.\nOutput: {output}"

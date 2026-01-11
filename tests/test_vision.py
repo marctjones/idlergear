@@ -1,7 +1,5 @@
 """Tests for vision management."""
 
-import pytest
-
 from idlergear.vision import get_vision, get_vision_path, set_vision
 
 

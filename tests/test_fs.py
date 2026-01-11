@@ -89,7 +89,9 @@ class TestFilesystemServer:
         (temp_dir / "subdir").mkdir()
         (temp_dir / "subdir" / "test3.py").write_text("print('3')")
 
-        result = fs_server.search_files(str(temp_dir), pattern="*.py", use_gitignore=False)
+        result = fs_server.search_files(
+            str(temp_dir), pattern="*.py", use_gitignore=False
+        )
 
         assert result["count"] == 3
         assert all(path.endswith(".py") for path in result["matches"])
@@ -115,7 +117,10 @@ class TestFilesystemServer:
 
         assert result["algorithm"] == "sha256"
         assert len(result["checksum"]) == 64  # SHA256 produces 64 hex chars
-        assert result["checksum"] == "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+        assert (
+            result["checksum"]
+            == "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
+        )
 
     def test_move_file(self, fs_server, temp_dir):
         """Test moving a file."""

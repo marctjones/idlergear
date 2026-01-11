@@ -1,6 +1,5 @@
 """Tests for git operations."""
 
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -33,7 +32,9 @@ def temp_repo():
 
         # Create initial commit
         (repo_path / "README.md").write_text("# Test Repo\n")
-        subprocess.run(["git", "add", "README.md"], cwd=repo_path, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "add", "README.md"], cwd=repo_path, check=True, capture_output=True
+        )
         subprocess.run(
             ["git", "commit", "-m", "Initial commit"],
             cwd=repo_path,
@@ -63,7 +64,9 @@ def test_git_status_with_changes(temp_repo):
 
     # Create new file and stage it
     (temp_repo / "new.txt").write_text("new content")
-    subprocess.run(["git", "add", "new.txt"], cwd=temp_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "add", "new.txt"], cwd=temp_repo, check=True, capture_output=True
+    )
 
     # Modify existing file (unstaged)
     (temp_repo / "README.md").write_text("# Modified\n")
@@ -172,7 +175,10 @@ def test_git_branches(temp_repo):
     assert feature_branch["current"]
 
     # Switch back
-    git.branch_checkout("master" if branches[0]["name"] == "master" else "main", repo_path=str(temp_repo))
+    git.branch_checkout(
+        "master" if branches[0]["name"] == "master" else "main",
+        repo_path=str(temp_repo),
+    )
 
     # Delete branch
     result = git.branch_delete("feature", repo_path=str(temp_repo))
@@ -230,7 +236,7 @@ def test_git_commit_task_integration(temp_repo):
         task_id=99,
         message="Complete task work",
         repo_path=str(temp_repo),
-        auto_add=True
+        auto_add=True,
     )
 
     assert len(commit_hash) == 40

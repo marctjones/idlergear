@@ -13,7 +13,6 @@ Hook locations:
 """
 
 import json
-import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -83,16 +82,24 @@ class TestPreToolUseHook:
         """Should block creation of TODO.md."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "TODO.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "TODO.md", "content": "test"},
+            },
         )
         assert result["exit_code"] == 2  # Blocking error
-        assert "FORBIDDEN" in result["stderr"] or "forbidden" in result["stderr"].lower()
+        assert (
+            "FORBIDDEN" in result["stderr"] or "forbidden" in result["stderr"].lower()
+        )
 
     def test_blocks_notes_md(self, hook_path):
         """Should block creation of NOTES.md."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "NOTES.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "NOTES.md", "content": "test"},
+            },
         )
         assert result["exit_code"] == 2
 
@@ -100,7 +107,10 @@ class TestPreToolUseHook:
         """Should block creation of SESSION_*.md files."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "SESSION_2026.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "SESSION_2026.md", "content": "test"},
+            },
         )
         assert result["exit_code"] == 2
 
@@ -108,7 +118,10 @@ class TestPreToolUseHook:
         """Should block creation of BACKLOG.md."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "BACKLOG.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "BACKLOG.md", "content": "test"},
+            },
         )
         assert result["exit_code"] == 2
 
@@ -116,7 +129,10 @@ class TestPreToolUseHook:
         """Should block creation of SCRATCH.md."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "SCRATCH.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "SCRATCH.md", "content": "test"},
+            },
         )
         assert result["exit_code"] == 2
 
@@ -124,7 +140,10 @@ class TestPreToolUseHook:
         """Should allow creation of regular Python files."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "src/main.py", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "src/main.py", "content": "test"},
+            },
         )
         assert result["exit_code"] == 0
 
@@ -132,7 +151,10 @@ class TestPreToolUseHook:
         """Should allow creation of README.md."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "README.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "README.md", "content": "test"},
+            },
         )
         assert result["exit_code"] == 0
 
@@ -148,7 +170,14 @@ class TestPreToolUseHook:
         """Should block Edit tool on forbidden files."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Edit", "tool_input": {"file_path": "TODO.md", "old_string": "a", "new_string": "b"}},
+            {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": "TODO.md",
+                    "old_string": "a",
+                    "new_string": "b",
+                },
+            },
         )
         assert result["exit_code"] == 2
 
@@ -156,7 +185,10 @@ class TestPreToolUseHook:
         """Should suggest IdlerGear alternatives in error message."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "TODO.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "TODO.md", "content": "test"},
+            },
         )
         assert "idlergear" in result["stderr"].lower()
 
@@ -177,13 +209,20 @@ FAILED tests/test_parser.py::test_parse_input - AssertionError: expected 5
 """
         result = run_hook(
             hook_path,
-            {"tool_name": "Bash", "tool_response": pytest_output, "session_id": "test-session"},
+            {
+                "tool_name": "Bash",
+                "tool_response": pytest_output,
+                "session_id": "test-session",
+            },
         )
         assert result["exit_code"] == 0
         # Should have suggestions in stdout
         if result["stdout"]:
             output = json.loads(result["stdout"])
-            assert "bug" in output.get("additionalContext", "").lower() or "test" in output.get("additionalContext", "").lower()
+            assert (
+                "bug" in output.get("additionalContext", "").lower()
+                or "test" in output.get("additionalContext", "").lower()
+            )
 
     def test_detects_python_traceback(self, hook_path):
         """Should detect Python tracebacks."""
@@ -195,7 +234,11 @@ ValueError: invalid literal for int()
 """
         result = run_hook(
             hook_path,
-            {"tool_name": "Bash", "tool_response": traceback_output, "session_id": "test-session"},
+            {
+                "tool_name": "Bash",
+                "tool_response": traceback_output,
+                "session_id": "test-session",
+            },
         )
         assert result["exit_code"] == 0
         if result["stdout"]:
@@ -207,7 +250,11 @@ ValueError: invalid literal for int()
         """Should detect assertion errors."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Bash", "tool_response": "AssertionError: expected True", "session_id": "test-session"},
+            {
+                "tool_name": "Bash",
+                "tool_response": "AssertionError: expected True",
+                "session_id": "test-session",
+            },
         )
         assert result["exit_code"] == 0
 
@@ -215,18 +262,29 @@ ValueError: invalid literal for int()
         """Should detect timeout/freeze issues."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Bash", "tool_response": "Process timed out after 30s", "session_id": "test-session"},
+            {
+                "tool_name": "Bash",
+                "tool_response": "Process timed out after 30s",
+                "session_id": "test-session",
+            },
         )
         assert result["exit_code"] == 0
         if result["stdout"]:
             output = json.loads(result["stdout"])
-            assert "performance" in output.get("additionalContext", "").lower() or "timeout" in output.get("additionalContext", "").lower()
+            assert (
+                "performance" in output.get("additionalContext", "").lower()
+                or "timeout" in output.get("additionalContext", "").lower()
+            )
 
     def test_no_output_on_success(self, hook_path):
         """Should not output suggestions on successful command."""
         result = run_hook(
             hook_path,
-            {"tool_name": "Bash", "tool_response": "Build successful", "session_id": "test-session"},
+            {
+                "tool_name": "Bash",
+                "tool_response": "Build successful",
+                "session_id": "test-session",
+            },
         )
         assert result["exit_code"] == 0
         # Should have no suggestions for success
@@ -323,12 +381,15 @@ class TestHookPerformance:
         # Use source directory for performance tests
         return SOURCE_HOOKS_DIR
 
-    @pytest.mark.parametrize("hook_name,max_time", [
-        ("ig_pre-tool-use.sh", 0.5),
-        ("ig_post-tool-use.sh", 0.5),
-        ("ig_session-start.sh", 0.5),  # Reads files directly, no CLI calls
-        ("ig_stop.sh", 0.5),  # Reads files directly, no CLI calls
-    ])
+    @pytest.mark.parametrize(
+        "hook_name,max_time",
+        [
+            ("ig_pre-tool-use.sh", 0.5),
+            ("ig_post-tool-use.sh", 0.5),
+            ("ig_session-start.sh", 0.5),  # Reads files directly, no CLI calls
+            ("ig_stop.sh", 0.5),  # Reads files directly, no CLI calls
+        ],
+    )
     def test_hook_execution_time(self, hooks_dir, hook_name, max_time):
         """All hooks should complete within reasonable time."""
         import time
@@ -345,7 +406,9 @@ class TestHookPerformance:
         )
         elapsed = time.time() - start
 
-        assert elapsed < max_time, f"{hook_name} took {elapsed:.2f}s (should be < {max_time}s)"
+        assert elapsed < max_time, (
+            f"{hook_name} took {elapsed:.2f}s (should be < {max_time}s)"
+        )
 
 
 class TestUserPromptSubmitHook:
@@ -442,13 +505,19 @@ class TestHookIntegration:
         # Test TODO.md suggests task create
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "TODO.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "TODO.md", "content": "test"},
+            },
         )
         assert "task" in result["stderr"].lower()
 
         # Test NOTES.md suggests note create
         result = run_hook(
             hook_path,
-            {"tool_name": "Write", "tool_input": {"file_path": "NOTES.md", "content": "test"}},
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "NOTES.md", "content": "test"},
+            },
         )
         assert "note" in result["stderr"].lower()

@@ -1,7 +1,5 @@
 """Tests for run management."""
 
-import os
-import signal
 import time
 
 import pytest

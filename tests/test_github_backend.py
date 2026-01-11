@@ -16,7 +16,6 @@ from idlergear.backends.github import (
     GitHubExploreBackend,
     GitHubTaskBackend,
     _map_issue_to_task,
-    _parse_json,
     _run_gh_command,
 )
 
@@ -184,14 +183,16 @@ class TestGitHubTaskBackend:
             # Second call returns JSON from gh issue view
             mock_run.side_effect = [
                 "https://github.com/owner/repo/issues/1",
-                json.dumps({
-                    "number": 1,
-                    "title": "Test Task",
-                    "body": "Description",
-                    "state": "OPEN",
-                    "labels": [],
-                    "assignees": [],
-                }),
+                json.dumps(
+                    {
+                        "number": 1,
+                        "title": "Test Task",
+                        "body": "Description",
+                        "state": "OPEN",
+                        "labels": [],
+                        "assignees": [],
+                    }
+                ),
             ]
 
             result = backend.create("Test Task", body="Description")
@@ -212,14 +213,16 @@ class TestGitHubTaskBackend:
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
             mock_run.side_effect = [
                 "https://github.com/owner/repo/issues/1",
-                json.dumps({
-                    "number": 1,
-                    "title": "Test",
-                    "body": "",
-                    "state": "OPEN",
-                    "labels": [{"name": "bug"}],
-                    "assignees": [],
-                }),
+                json.dumps(
+                    {
+                        "number": 1,
+                        "title": "Test",
+                        "body": "",
+                        "state": "OPEN",
+                        "labels": [{"name": "bug"}],
+                        "assignees": [],
+                    }
+                ),
             ]
 
             backend.create("Test", labels=["bug"])
@@ -236,14 +239,16 @@ class TestGitHubTaskBackend:
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
             mock_run.side_effect = [
                 "https://github.com/owner/repo/issues/1",
-                json.dumps({
-                    "number": 1,
-                    "title": "Test",
-                    "body": "",
-                    "state": "OPEN",
-                    "labels": [{"name": "priority:high"}],
-                    "assignees": [],
-                }),
+                json.dumps(
+                    {
+                        "number": 1,
+                        "title": "Test",
+                        "body": "",
+                        "state": "OPEN",
+                        "labels": [{"name": "priority:high"}],
+                        "assignees": [],
+                    }
+                ),
             ]
 
             backend.create("Test", priority="high")
@@ -258,10 +263,26 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps([
-                {"number": 1, "title": "Task 1", "body": "", "state": "OPEN", "labels": [], "assignees": []},
-                {"number": 2, "title": "Task 2", "body": "", "state": "OPEN", "labels": [], "assignees": []},
-            ])
+            mock_run.return_value = json.dumps(
+                [
+                    {
+                        "number": 1,
+                        "title": "Task 1",
+                        "body": "",
+                        "state": "OPEN",
+                        "labels": [],
+                        "assignees": [],
+                    },
+                    {
+                        "number": 2,
+                        "title": "Task 2",
+                        "body": "",
+                        "state": "OPEN",
+                        "labels": [],
+                        "assignees": [],
+                    },
+                ]
+            )
 
             result = backend.list()
 
@@ -288,14 +309,16 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 42,
-                "title": "Test",
-                "body": "Body",
-                "state": "OPEN",
-                "labels": [],
-                "assignees": [],
-            })
+            mock_run.return_value = json.dumps(
+                {
+                    "number": 42,
+                    "title": "Test",
+                    "body": "Body",
+                    "state": "OPEN",
+                    "labels": [],
+                    "assignees": [],
+                }
+            )
 
             result = backend.get(42)
 
@@ -318,14 +341,16 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 1,
-                "title": "Test",
-                "body": "",
-                "state": "CLOSED",
-                "labels": [],
-                "assignees": [],
-            })
+            mock_run.return_value = json.dumps(
+                {
+                    "number": 1,
+                    "title": "Test",
+                    "body": "",
+                    "state": "CLOSED",
+                    "labels": [],
+                    "assignees": [],
+                }
+            )
 
             result = backend.close(1)
 
@@ -339,14 +364,16 @@ class TestGitHubTaskBackend:
         backend = GitHubTaskBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps({
-                "number": 1,
-                "title": "Test",
-                "body": "",
-                "state": "OPEN",
-                "labels": [],
-                "assignees": [],
-            })
+            mock_run.return_value = json.dumps(
+                {
+                    "number": 1,
+                    "title": "Test",
+                    "body": "",
+                    "state": "OPEN",
+                    "labels": [],
+                    "assignees": [],
+                }
+            )
 
             result = backend.reopen(1)
 
@@ -368,13 +395,15 @@ class TestGitHubExploreBackend:
             mock_run.side_effect = [
                 "",  # label create succeeds (or fails silently)
                 "https://github.com/owner/repo/issues/1",  # issue create
-                json.dumps({
-                    "number": 1,
-                    "title": "Exploration",
-                    "body": "",
-                    "state": "OPEN",
-                    "labels": [{"name": "exploration"}],
-                }),  # issue view
+                json.dumps(
+                    {
+                        "number": 1,
+                        "title": "Exploration",
+                        "body": "",
+                        "state": "OPEN",
+                        "labels": [{"name": "exploration"}],
+                    }
+                ),  # issue view
             ]
 
             result = backend.create("Exploration")
@@ -390,9 +419,17 @@ class TestGitHubExploreBackend:
         backend = GitHubExploreBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            mock_run.return_value = json.dumps([
-                {"number": 1, "title": "Explore 1", "body": "", "state": "OPEN", "labels": []},
-            ])
+            mock_run.return_value = json.dumps(
+                [
+                    {
+                        "number": 1,
+                        "title": "Explore 1",
+                        "body": "",
+                        "state": "OPEN",
+                        "labels": [],
+                    },
+                ]
+            )
 
             result = backend.list()
 

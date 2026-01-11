@@ -209,7 +209,6 @@ class TestPromoteNote:
 
     def test_promote_note_to_reference(self, temp_project):
         """Test promoting a note to a reference."""
-        from idlergear.reference import get_reference
 
         note = create_note("API Documentation\nReference content")
         result = promote_note(note["id"], "reference")

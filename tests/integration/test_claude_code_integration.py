@@ -88,8 +88,9 @@ class TestInstallUninstall:
         # Verify all files created
         assert (fresh_project / "CLAUDE.md").is_file(), "CLAUDE.md not created"
         assert (fresh_project / "AGENTS.md").is_file(), "AGENTS.md not created"
-        assert (fresh_project / ".claude" / "rules" / "idlergear.md").is_file(), \
+        assert (fresh_project / ".claude" / "rules" / "idlergear.md").is_file(), (
             ".claude/rules/idlergear.md not created"
+        )
         assert (fresh_project / ".mcp.json").is_file(), ".mcp.json not created"
 
     def test_uninstall_removes_claude_files(self, fresh_project: Path) -> None:
@@ -107,29 +108,38 @@ class TestInstallUninstall:
 
         # Verify Claude-specific files removed, and IdlerGear content removed from shared files
         # Note: CLAUDE.md and AGENTS.md may still exist but without IdlerGear content
-        assert not (fresh_project / ".claude" / "rules" / "idlergear.md").exists(), \
+        assert not (fresh_project / ".claude" / "rules" / "idlergear.md").exists(), (
             ".claude/rules/idlergear.md not removed"
+        )
         assert not (fresh_project / ".mcp.json").exists(), ".mcp.json not removed"
 
         # CLAUDE.md and AGENTS.md should have IdlerGear content removed
         if (fresh_project / "CLAUDE.md").exists():
             claude_md = (fresh_project / "CLAUDE.md").read_text()
-            assert "idlergear context" not in claude_md.lower(), \
+            assert "idlergear context" not in claude_md.lower(), (
                 "IdlerGear instructions should be removed from CLAUDE.md"
+            )
         if (fresh_project / "AGENTS.md").exists():
             agents_md = (fresh_project / "AGENTS.md").read_text()
-            assert "idlergear" not in agents_md.lower() or len(agents_md) < 50, \
+            assert "idlergear" not in agents_md.lower() or len(agents_md) < 50, (
                 "IdlerGear section should be removed from AGENTS.md"
+            )
 
         # Verify data preserved
-        assert (fresh_project / ".idlergear").is_dir(), ".idlergear/ should be preserved"
+        assert (fresh_project / ".idlergear").is_dir(), (
+            ".idlergear/ should be preserved"
+        )
 
         # Tasks and notes should still be accessible
         task_result = run_idlergear(fresh_project, "task", "list")
-        assert "Test task" in task_result.stdout, "Tasks should be preserved after uninstall"
+        assert "Test task" in task_result.stdout, (
+            "Tasks should be preserved after uninstall"
+        )
 
         note_result = run_idlergear(fresh_project, "note", "list")
-        assert "Test note" in note_result.stdout, "Notes should be preserved after uninstall"
+        assert "Test note" in note_result.stdout, (
+            "Notes should be preserved after uninstall"
+        )
 
     def test_reinstall_works_correctly(self, fresh_project: Path) -> None:
         """Test that reinstalling IdlerGear works and preserves data."""
@@ -185,9 +195,9 @@ class TestClaudeReadsIdlerGearInstructions:
 
         if result.returncode == 0:
             response = result.stdout.lower()
-            assert (
-                "idlergear" in response or "idler" in response
-            ), f"Claude should see IdlerGear in CLAUDE.md. Response: {result.stdout}"
+            assert "idlergear" in response or "idler" in response, (
+                f"Claude should see IdlerGear in CLAUDE.md. Response: {result.stdout}"
+            )
 
     def test_claude_knows_context_command(
         self, fresh_project_with_install: Path
@@ -205,9 +215,9 @@ class TestClaudeReadsIdlerGearInstructions:
 
         if result.returncode == 0:
             response = result.stdout.lower()
-            assert (
-                "idlergear context" in response or "context" in response
-            ), f"Claude should know about idlergear context. Response: {result.stdout}"
+            assert "idlergear context" in response or "context" in response, (
+                f"Claude should know about idlergear context. Response: {result.stdout}"
+            )
 
 
 # =============================================================================
@@ -236,11 +246,11 @@ class TestClaudeUsesIdlerGear:
         if result.returncode == 0:
             response = result.stdout.lower()
             success = (
-                "test task" in response
-                or "context" in response
-                or "task" in response
+                "test task" in response or "context" in response or "task" in response
             )
-            assert success, f"Claude should report context results. Response: {result.stdout}"
+            assert success, (
+                f"Claude should report context results. Response: {result.stdout}"
+            )
 
     def test_claude_can_create_task(self, fresh_project_with_install: Path) -> None:
         """Test that Claude can create a task using idlergear."""
@@ -355,8 +365,12 @@ class TestClaudeAutomaticBehavior:
             task_lower = task_list.stdout.lower()
             note_lower = note_list.stdout.lower()
 
-            in_tasks = any(term in task_lower for term in ["diagonal", "win", "bug", "detect"])
-            in_notes = any(term in note_lower for term in ["diagonal", "win", "bug", "detect"])
+            in_tasks = any(
+                term in task_lower for term in ["diagonal", "win", "bug", "detect"]
+            )
+            in_notes = any(
+                term in note_lower for term in ["diagonal", "win", "bug", "detect"]
+            )
 
             assert in_tasks or in_notes, (
                 f"Claude should auto-track the bug report.\n"
@@ -424,7 +438,14 @@ class TestClaudeAutomaticBehavior:
             # Claude should reference existing tasks
             mentions_tasks = any(
                 term in response
-                for term in ["diagonal", "win", "minimax", "restart", "task", "critical"]
+                for term in [
+                    "diagonal",
+                    "win",
+                    "minimax",
+                    "restart",
+                    "task",
+                    "critical",
+                ]
             )
 
             assert mentions_tasks, (
@@ -432,9 +453,7 @@ class TestClaudeAutomaticBehavior:
                 f"Response: {result.stdout}"
             )
 
-    def test_claude_session_resumption(
-        self, fresh_project_with_install: Path
-    ) -> None:
+    def test_claude_session_resumption(self, fresh_project_with_install: Path) -> None:
         """Test that Claude helps resume a session by checking context.
 
         After a break, developer asks where they left off.
@@ -443,8 +462,12 @@ class TestClaudeAutomaticBehavior:
         project = fresh_project_with_install
 
         # Create some work in progress
-        run_idlergear(project, "task", "create", "Implement board display with ASCII art")
-        run_idlergear(project, "note", "create", "Consider using box-drawing characters")
+        run_idlergear(
+            project, "task", "create", "Implement board display with ASCII art"
+        )
+        run_idlergear(
+            project, "note", "create", "Consider using box-drawing characters"
+        )
 
         result = run_claude(
             project,
@@ -474,9 +497,7 @@ class TestClaudeAutomaticBehavior:
 class TestRealisticWorkflow:
     """Test a complete realistic development workflow."""
 
-    def test_full_development_session(
-        self, fresh_project_with_install: Path
-    ) -> None:
+    def test_full_development_session(self, fresh_project_with_install: Path) -> None:
         """Simulate a complete development session with IdlerGear.
 
         This test walks through:
@@ -544,9 +565,7 @@ class TestRealisticWorkflow:
                 f"This may indicate CLAUDE.md rules need strengthening."
             )
 
-    def test_explicit_commands_work(
-        self, fresh_project_with_install: Path
-    ) -> None:
+    def test_explicit_commands_work(self, fresh_project_with_install: Path) -> None:
         """Verify Claude can execute explicit idlergear commands (sanity check)."""
         project = fresh_project_with_install
 
@@ -586,9 +605,7 @@ class TestWarGamesDemoWorkflow:
     3. Handle multi-step implementations
     """
 
-    def test_claude_builds_simple_game(
-        self, fresh_project_with_install: Path
-    ) -> None:
+    def test_claude_builds_simple_game(self, fresh_project_with_install: Path) -> None:
         """Test that Claude can build a simple Tic-Tac-Toe game.
 
         This mirrors Part 2 of the demo script.
@@ -625,9 +642,7 @@ Keep it under 100 lines. Track your work using IdlerGear.""",
                     f"Content preview: {content[:500]}"
                 )
 
-    def test_claude_creates_design_doc(
-        self, fresh_project_with_install: Path
-    ) -> None:
+    def test_claude_creates_design_doc(self, fresh_project_with_install: Path) -> None:
         """Test that Claude can create a design document for a complex game.
 
         This mirrors Part 4 of the demo (Global Thermonuclear War design).
@@ -735,7 +750,9 @@ class TestEdgeCases:
         project = fresh_project_with_install
 
         result = run_idlergear(project, "context")
-        assert result.returncode == 0, f"Context failed on empty project: {result.stderr}"
+        assert result.returncode == 0, (
+            f"Context failed on empty project: {result.stderr}"
+        )
 
     def test_claude_handles_empty_project(
         self, fresh_project_with_install: Path

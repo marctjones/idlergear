@@ -7,10 +7,12 @@ from pathlib import Path
 
 import grpc
 import pytest
-from opentelemetry.proto.collector.logs.v1 import logs_service_pb2, logs_service_pb2_grpc
+from opentelemetry.proto.collector.logs.v1 import (
+    logs_service_pb2,
+    logs_service_pb2_grpc,
+)
 from opentelemetry.proto.common.v1 import common_pb2
 from opentelemetry.proto.logs.v1 import logs_pb2
-from opentelemetry.proto.resource.v1 import resource_pb2
 
 from idlergear.otel_collector import (
     ConsoleExporter,
@@ -42,7 +44,12 @@ def test_console_exporter():
     config = ExporterConfig(type="console", min_severity="INFO")
     exporter = ConsoleExporter(config)
 
-    log_data = {"timestamp": 1234567890, "severity": "INFO", "service": "test", "message": "Hello"}
+    log_data = {
+        "timestamp": 1234567890,
+        "severity": "INFO",
+        "service": "test",
+        "message": "Hello",
+    }
 
     # Should export INFO
     assert exporter.should_export("INFO")
@@ -55,7 +62,9 @@ def test_console_exporter():
 
 def test_file_exporter(temp_log_file):
     """Test file exporter."""
-    config = ExporterConfig(type="file", min_severity="DEBUG", config={"path": str(temp_log_file)})
+    config = ExporterConfig(
+        type="file", min_severity="DEBUG", config={"path": str(temp_log_file)}
+    )
     exporter = FileExporter(config)
 
     log_data = {
@@ -205,7 +214,7 @@ def test_grpc_integration(temp_storage):
 
     try:
         # Create gRPC client
-        channel = grpc.insecure_channel(f"localhost:14318")
+        channel = grpc.insecure_channel("localhost:14318")
         stub = logs_service_pb2_grpc.LogsServiceStub(channel)
 
         # Create request

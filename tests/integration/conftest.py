@@ -120,8 +120,10 @@ def run_claude(
     """
     cmd = [
         "claude",
-        "-p", prompt,
-        "--output-format", output_format,
+        "-p",
+        prompt,
+        "--output-format",
+        output_format,
         "--dangerously-skip-permissions",
     ]
 

@@ -1,8 +1,5 @@
 """Tests for the upgrade module."""
 
-import pytest
-from pathlib import Path
-
 
 class TestParseVersion:
     """Tests for parse_version function."""
@@ -123,7 +120,11 @@ class TestDoUpgrade:
     """Tests for do_upgrade function."""
 
     def test_upgrade_updates_version(self, temp_project, monkeypatch):
-        from idlergear.upgrade import do_upgrade, get_project_version, set_project_version
+        from idlergear.upgrade import (
+            do_upgrade,
+            get_project_version,
+            set_project_version,
+        )
 
         monkeypatch.setattr("idlergear.upgrade.__version__", "0.3.17")
         set_project_version("0.2.0")

@@ -1,17 +1,13 @@
 """Direct unit tests for daemon components."""
 
-import asyncio
 import json
-import os
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from idlergear.daemon.protocol import (
-    ErrorCode,
-    Notification,
     Request,
     Response,
     parse_message,
@@ -257,14 +253,39 @@ class TestHandlersRegistration:
 
         # Check that all expected methods are registered
         expected_methods = [
-            "task.create", "task.list", "task.get", "task.close", "task.update",
-            "note.create", "note.list", "note.get", "note.delete", "note.promote",
-            "explore.create", "explore.list", "explore.get", "explore.close",
-            "vision.get", "vision.set",
-            "plan.create", "plan.list", "plan.get", "plan.current", "plan.switch",
-            "reference.add", "reference.list", "reference.get", "reference.update", "reference.search",
-            "config.get", "config.set",
-            "run.start", "run.list", "run.status", "run.logs", "run.stop",
+            "task.create",
+            "task.list",
+            "task.get",
+            "task.close",
+            "task.update",
+            "note.create",
+            "note.list",
+            "note.get",
+            "note.delete",
+            "note.promote",
+            "explore.create",
+            "explore.list",
+            "explore.get",
+            "explore.close",
+            "vision.get",
+            "vision.set",
+            "plan.create",
+            "plan.list",
+            "plan.get",
+            "plan.current",
+            "plan.switch",
+            "reference.add",
+            "reference.list",
+            "reference.get",
+            "reference.update",
+            "reference.search",
+            "config.get",
+            "config.set",
+            "run.start",
+            "run.list",
+            "run.status",
+            "run.logs",
+            "run.stop",
         ]
 
         for method in expected_methods:

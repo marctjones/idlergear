@@ -16,7 +16,6 @@ import json
 import subprocess
 from pathlib import Path
 
-import pytest
 
 from .conftest import run_idlergear
 
@@ -210,9 +209,7 @@ class TestDevelopmentWorkflow:
         assert result.returncode == 0
 
         # 2. Create tasks for planned work
-        result = run_idlergear(
-            project, "task", "create", "Set up project structure"
-        )
+        result = run_idlergear(project, "task", "create", "Set up project structure")
         assert result.returncode == 0
 
         result = run_idlergear(
@@ -220,9 +217,7 @@ class TestDevelopmentWorkflow:
         )
         assert result.returncode == 0
 
-        result = run_idlergear(
-            project, "task", "create", "Add unit tests"
-        )
+        result = run_idlergear(project, "task", "create", "Add unit tests")
         assert result.returncode == 0
 
         # 3. Create notes for observations
@@ -285,8 +280,9 @@ class TestUninstallWorkflow:
         )
 
         # Check that install files are removed but data is preserved
-        assert not (project / ".mcp.json").exists() or "idlergear" not in (
-            project / ".mcp.json"
-        ).read_text()
+        assert (
+            not (project / ".mcp.json").exists()
+            or "idlergear" not in (project / ".mcp.json").read_text()
+        )
         # .idlergear should still exist (data preserved)
         assert (project / ".idlergear").exists()

@@ -1,7 +1,5 @@
 """Tests for storage utilities."""
 
-import pytest
-
 from idlergear.storage import (
     get_next_id,
     parse_frontmatter,
@@ -72,7 +70,6 @@ def test_slugify_max_length():
 
 def test_get_next_id(temp_project):
     """Test getting next available ID."""
-    from pathlib import Path
 
     notes_dir = temp_project / ".idlergear" / "notes"
 

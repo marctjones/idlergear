@@ -1,7 +1,5 @@
 """Tests for exploration management."""
 
-import pytest
-
 from idlergear.explorations import (
     close_exploration,
     create_exploration,
