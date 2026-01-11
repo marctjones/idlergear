@@ -1,9 +1,7 @@
 """Tests for secrets management."""
 
 import pytest
-from pathlib import Path
-from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from datetime import datetime
 
 from idlergear.secrets.storage import (
     EncryptedStorage,

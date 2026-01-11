@@ -528,3 +528,338 @@ class TestCLIDoctor:
         data = json.loads(result.output)
         assert "checks" in data
         assert "installed_version" in data
+
+
+# =============================================================================
+# Tests for Test Health Checks (Issues #156-159)
+# =============================================================================
+
+
+class TestCheckTestStaleness:
+    """Tests for check_test_staleness function."""
+
+    def test_no_framework_detected(self, tmp_path):
+        from idlergear.doctor import check_test_staleness, CheckStatus
+
+        # Empty project - no test framework
+        (tmp_path / ".idlergear").mkdir()
+
+        result = check_test_staleness(tmp_path)
+
+        assert result.status == CheckStatus.INFO
+        assert "no test framework" in result.message.lower()
+
+    def test_never_run_tests(self, tmp_path):
+        from idlergear.doctor import check_test_staleness, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        # Create pytest project
+        (tmp_path / "pyproject.toml").write_text('[tool.pytest]\ntestpaths = ["tests"]')
+        (tmp_path / ".idlergear").mkdir()
+
+        # Mock detect_framework to return a valid config
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.get_test_staleness",
+                return_value={"last_run": None, "seconds_ago": None},
+            ):
+                result = check_test_staleness(tmp_path)
+
+        assert result.status == CheckStatus.WARNING
+        assert "never been run" in result.message.lower()
+        assert result.fix == "idlergear test run"
+
+    def test_stale_tests_7_days(self, tmp_path):
+        from idlergear.doctor import check_test_staleness, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        # Tests run 10 days ago
+        ten_days_seconds = 10 * 24 * 3600
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.get_test_staleness",
+                return_value={
+                    "last_run": "2026-01-01T10:00:00Z",
+                    "seconds_ago": ten_days_seconds,
+                },
+            ):
+                result = check_test_staleness(tmp_path)
+
+        assert result.status == CheckStatus.WARNING
+        assert "10 days" in result.message
+        assert result.fix == "idlergear test run"
+
+    def test_recent_tests(self, tmp_path):
+        from idlergear.doctor import check_test_staleness, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        # Tests run 1 hour ago
+        one_hour_seconds = 3600
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.get_test_staleness",
+                return_value={
+                    "last_run": "2026-01-11T09:00:00Z",
+                    "seconds_ago": one_hour_seconds,
+                },
+            ):
+                result = check_test_staleness(tmp_path)
+
+        assert result.status == CheckStatus.OK
+        assert "recently" in result.message.lower()
+
+
+class TestCheckTestFailures:
+    """Tests for check_test_failures function."""
+
+    def test_no_framework_detected(self, tmp_path):
+        from idlergear.doctor import check_test_failures, CheckStatus
+
+        (tmp_path / ".idlergear").mkdir()
+
+        result = check_test_failures(tmp_path)
+
+        assert result.status == CheckStatus.OK
+
+    def test_no_results_recorded(self, tmp_path):
+        from idlergear.doctor import check_test_failures, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch("idlergear.testing.get_last_result", return_value=None):
+                result = check_test_failures(tmp_path)
+
+        assert result.status == CheckStatus.INFO
+        assert "no test results" in result.message.lower()
+
+    def test_failing_tests(self, tmp_path):
+        from idlergear.doctor import check_test_failures, CheckStatus
+        from idlergear.testing import TestResult
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        failing_result = TestResult(
+            framework="pytest",
+            timestamp="2026-01-11T10:00:00Z",
+            duration_seconds=5.0,
+            total=10,
+            passed=7,
+            failed=3,
+            skipped=0,
+            errors=0,
+            failed_tests=["test_one", "test_two", "test_three"],
+            command="pytest",
+            exit_code=1,
+        )
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.get_last_result", return_value=failing_result
+            ):
+                result = check_test_failures(tmp_path)
+
+        assert result.status == CheckStatus.ERROR
+        assert "3 failure" in result.message
+        assert result.fix == "idlergear test run"
+        assert "failed_tests" in result.details
+
+    def test_passing_tests(self, tmp_path):
+        from idlergear.doctor import check_test_failures, CheckStatus
+        from idlergear.testing import TestResult
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        passing_result = TestResult(
+            framework="pytest",
+            timestamp="2026-01-11T10:00:00Z",
+            duration_seconds=5.0,
+            total=10,
+            passed=10,
+            failed=0,
+            skipped=0,
+            errors=0,
+            command="pytest",
+            exit_code=0,
+        )
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.get_last_result", return_value=passing_result
+            ):
+                result = check_test_failures(tmp_path)
+
+        assert result.status == CheckStatus.OK
+        assert "10 tests passing" in result.message
+
+
+class TestCheckTestCoverageGaps:
+    """Tests for check_test_coverage_gaps function."""
+
+    def test_no_framework_detected(self, tmp_path):
+        from idlergear.doctor import check_test_coverage_gaps, CheckStatus
+
+        (tmp_path / ".idlergear").mkdir()
+
+        result = check_test_coverage_gaps(tmp_path)
+
+        assert result.status == CheckStatus.OK
+
+    def test_all_files_covered(self, tmp_path):
+        from idlergear.doctor import check_test_coverage_gaps, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch("idlergear.testing.get_uncovered_files", return_value=[]):
+                result = check_test_coverage_gaps(tmp_path)
+
+        assert result.status == CheckStatus.OK
+        assert "all source files have test coverage" in result.message.lower()
+
+    def test_few_uncovered_files(self, tmp_path):
+        from idlergear.doctor import check_test_coverage_gaps, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.get_uncovered_files",
+                return_value=["src/utils.py", "src/helpers.py"],
+            ):
+                result = check_test_coverage_gaps(tmp_path)
+
+        assert result.status == CheckStatus.INFO
+        assert "2 source file" in result.message
+
+    def test_many_uncovered_files(self, tmp_path):
+        from idlergear.doctor import check_test_coverage_gaps, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        uncovered = [f"src/file{i}.py" for i in range(15)]
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch("idlergear.testing.get_uncovered_files", return_value=uncovered):
+                result = check_test_coverage_gaps(tmp_path)
+
+        assert result.status == CheckStatus.WARNING
+        assert "15 source files" in result.message
+        assert result.fix == "idlergear test uncovered"
+
+
+class TestCheckExternalTestRuns:
+    """Tests for check_external_test_runs function."""
+
+    def test_no_framework_detected(self, tmp_path):
+        from idlergear.doctor import check_external_test_runs, CheckStatus
+
+        (tmp_path / ".idlergear").mkdir()
+
+        result = check_external_test_runs(tmp_path)
+
+        assert result.status == CheckStatus.OK
+
+    def test_no_external_runs(self, tmp_path):
+        from idlergear.doctor import check_external_test_runs, CheckStatus
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch("idlergear.testing.check_external_test_runs", return_value=[]):
+                result = check_external_test_runs(tmp_path)
+
+        assert result.status == CheckStatus.OK
+
+    def test_external_runs_detected(self, tmp_path):
+        from idlergear.doctor import check_external_test_runs, CheckStatus
+        from idlergear.testing import ExternalTestRun
+        from unittest.mock import patch, MagicMock
+
+        (tmp_path / ".idlergear").mkdir()
+
+        mock_config = MagicMock()
+        mock_config.framework = "pytest"
+
+        external_run = ExternalTestRun(
+            framework="pytest",
+            timestamp="2026-01-11T10:00:00",
+            cache_path=".pytest_cache",
+            estimated_tests=10,
+            success=True,
+        )
+
+        with patch("idlergear.testing.detect_framework", return_value=mock_config):
+            with patch(
+                "idlergear.testing.check_external_test_runs",
+                return_value=[external_run],
+            ):
+                result = check_external_test_runs(tmp_path)
+
+        assert result.status == CheckStatus.INFO
+        assert "1 external test run" in result.message
+        assert result.fix == "idlergear test sync"
+
+
+class TestRunDoctorWithTestChecks:
+    """Test that run_doctor includes test health checks."""
+
+    def test_doctor_includes_test_checks(self, temp_project, monkeypatch):
+        from idlergear.doctor import run_doctor
+        from idlergear.upgrade import set_project_version
+
+        monkeypatch.setattr("idlergear.doctor.__version__", "0.3.17")
+        set_project_version("0.3.17")
+
+        report = run_doctor(temp_project)
+
+        check_names = [c.name for c in report.checks]
+
+        # Verify test health checks are included
+        assert "test_staleness" in check_names
+        assert "test_failures" in check_names
+        assert "test_coverage" in check_names
+        assert "external_tests" in check_names

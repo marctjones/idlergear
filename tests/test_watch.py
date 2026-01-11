@@ -584,3 +584,220 @@ class TestAnalyzeAndAct:
         status, actions = analyze_and_act(auto_create_tasks=False)
 
         assert len(actions) == 0
+
+
+# =============================================================================
+# Tests for Test-Aware Watch Suggestions (Issues #160, #161)
+# =============================================================================
+
+
+class TestAnalyzeTestSuggestions:
+    """Tests for test-aware suggestions in analyze function."""
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    def test_source_files_changed_no_tests_recorded(
+        self,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """Warn when source files changed but no tests recorded."""
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 2,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 50,
+            "lines_deleted": 10,
+            "modified_files": ["src/api.py", "src/utils.py"],
+            "staged_files": [],
+            "untracked_files": [],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            # Mock testing module to return no last result
+            with patch("idlergear.testing.get_last_result", return_value=None):
+                with patch("idlergear.testing.get_tests_for_changes", return_value=[]):
+                    status = analyze(project_root)
+
+        # Should have a suggestion about source files modified with no tests
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        assert len(test_suggestions) >= 1
+        assert any("no tests recorded" in s.message.lower() for s in test_suggestions)
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    def test_tests_failing_from_last_run(
+        self,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """Warn when last test run had failures."""
+        from idlergear.testing import TestResult
+
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 1,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 10,
+            "lines_deleted": 5,
+            "modified_files": ["src/main.py"],
+            "staged_files": [],
+            "untracked_files": [],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+
+        # Create a failing test result
+        failing_result = TestResult(
+            framework="pytest",
+            timestamp="2026-01-11T10:00:00Z",
+            duration_seconds=5.0,
+            total=10,
+            passed=8,
+            failed=2,
+            skipped=0,
+            errors=0,
+            failed_tests=["test_foo", "test_bar"],
+            command="pytest",
+            exit_code=1,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            with patch(
+                "idlergear.testing.get_last_result", return_value=failing_result
+            ):
+                with patch("idlergear.testing.get_tests_for_changes", return_value=[]):
+                    status = analyze(project_root)
+
+        # Should have a suggestion about failing tests
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        assert len(test_suggestions) >= 1
+        assert any("failing" in s.message.lower() for s in test_suggestions)
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    def test_tests_for_changed_files_suggestion(
+        self,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """Suggest specific tests for changed source files."""
+        from idlergear.testing import TestResult
+
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 1,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 20,
+            "lines_deleted": 5,
+            "modified_files": ["src/api.py"],
+            "staged_files": [],
+            "untracked_files": [],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+
+        # Create a passing test result
+        passing_result = TestResult(
+            framework="pytest",
+            timestamp="2026-01-11T10:00:00Z",
+            duration_seconds=5.0,
+            total=10,
+            passed=10,
+            failed=0,
+            skipped=0,
+            errors=0,
+            command="pytest",
+            exit_code=0,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            with patch(
+                "idlergear.testing.get_last_result", return_value=passing_result
+            ):
+                with patch(
+                    "idlergear.testing.get_tests_for_changes",
+                    return_value=["tests/test_api.py"],
+                ):
+                    status = analyze(project_root)
+
+        # Should have a suggestion about tests for changed files
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        assert any(
+            "tests for changed files" in s.message.lower() for s in test_suggestions
+        )
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    def test_test_files_changed_suggestion(
+        self,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """Suggest running tests when test files are modified."""
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 1,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 20,
+            "lines_deleted": 5,
+            "modified_files": ["tests/test_api.py"],  # Test file modified
+            "staged_files": [],
+            "untracked_files": [],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            status = analyze(project_root)
+
+        # Should have a suggestion about running tests
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        assert len(test_suggestions) >= 1
+        assert any("test files changed" in s.message.lower() for s in test_suggestions)

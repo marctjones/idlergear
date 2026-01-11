@@ -1,7 +1,5 @@
 """Tests for multi-assistant installation."""
 
-import pytest
-from pathlib import Path
 from unittest.mock import patch
 
 from idlergear.assistant_install import (

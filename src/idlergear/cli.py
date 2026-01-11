@@ -1330,7 +1330,6 @@ def install(
     # Handle multi-assistant installation
     from idlergear.assistant_install import (
         Assistant,
-        detect_installed_assistants,
         install_for_assistant,
         install_for_all,
     )
@@ -1806,7 +1805,6 @@ def mcp_generate(
     Creates .mcp.json for project-level config, or updates Claude Code's
     global config for --global.
     """
-    from pathlib import Path
 
     from idlergear.mcp_config import (
         generate_project_mcp_config,

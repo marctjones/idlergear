@@ -148,3 +148,4 @@ cython_debug/
 .claude/commands/ig_*.md
 .claude/rules/idlergear.md
 .claude/settings.local.json
+.wiki/

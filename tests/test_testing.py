@@ -1,12 +1,8 @@
 """Tests for the testing module."""
 
 import json
-import re
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-import subprocess
+from unittest.mock import patch
 
-import pytest
 
 from idlergear.testing import (
     TestFramework,

@@ -1,14 +1,11 @@
 """Tests for MCP configuration management."""
 
 import json
-import pytest
-from pathlib import Path
 from unittest.mock import patch
 
 from idlergear.mcp_config import (
     McpConfig,
     McpServerConfig,
-    ConfigValidationResult,
     add_server_to_config,
     generate_project_mcp_config,
     get_claude_code_config_path,

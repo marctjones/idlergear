@@ -1027,8 +1027,7 @@ class TestDaemonResilience:
     @pytest.mark.asyncio
     async def test_daemon_heartbeat_timeout(self, daemon_lifecycle):
         """Test that stale agents are detected."""
-        import asyncio
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timezone
 
         daemon_lifecycle.start(wait=True)
 

@@ -1,16 +1,21 @@
 """Tests for run management."""
 
 import time
+from unittest.mock import patch, MagicMock
 
 import pytest
 
 from idlergear.runs import (
+    calculate_script_hash,
+    format_run_footer,
+    format_run_header,
     get_run_info,
     get_run_logs,
     get_run_status,
     list_runs,
     start_run,
     stop_run,
+    _find_askpass_helper,
 )
 
 
@@ -44,7 +49,7 @@ class TestStartRun:
         time.sleep(0.3)
 
     def test_start_duplicate_running(self, temp_project):
-        run = start_run("sleep 10", name="long-run")
+        start_run("sleep 10", name="long-run")
 
         with pytest.raises(RuntimeError, match="already running"):
             start_run("sleep 10", name="long-run")
@@ -219,3 +224,191 @@ class TestStopRun:
             # If still running (shell behavior), stop it
             result = stop_run("already-done")
             assert result is True
+
+
+# =============================================================================
+# Tests for calculate_script_hash (Issue #147)
+# =============================================================================
+
+
+class TestCalculateScriptHash:
+    """Tests for calculate_script_hash function."""
+
+    def test_hash_inline_command(self, temp_project):
+        """Hash an inline command string."""
+        hash1 = calculate_script_hash("echo hello")
+        hash2 = calculate_script_hash("echo hello")
+        hash3 = calculate_script_hash("echo world")
+
+        # Same command should produce same hash
+        assert hash1 == hash2
+        # Different commands should produce different hashes
+        assert hash1 != hash3
+        # Hash should be 12 characters (truncated SHA256)
+        assert len(hash1) == 12
+
+    def test_hash_empty_command(self, temp_project):
+        """Hash an empty command."""
+        hash_result = calculate_script_hash("")
+        assert len(hash_result) == 12
+
+    def test_hash_script_file(self, temp_project):
+        """Hash a script file by its contents."""
+        # Create a script file
+        script_path = temp_project / "test_script.sh"
+        script_path.write_text("#!/bin/bash\necho hello\n")
+
+        hash1 = calculate_script_hash("./test_script.sh", temp_project)
+
+        # Modify the script
+        script_path.write_text("#!/bin/bash\necho world\n")
+        hash2 = calculate_script_hash("./test_script.sh", temp_project)
+
+        # Hashes should differ because file content changed
+        assert hash1 != hash2
+
+    def test_hash_python_script(self, temp_project):
+        """Hash a Python script specified with interpreter."""
+        # Create a Python script
+        script_path = temp_project / "script.py"
+        script_path.write_text("print('hello')\n")
+
+        hash1 = calculate_script_hash("python script.py", temp_project)
+
+        # Modify the script
+        script_path.write_text("print('world')\n")
+        hash2 = calculate_script_hash("python script.py", temp_project)
+
+        # Hashes should differ because file content changed
+        assert hash1 != hash2
+
+    def test_hash_nonexistent_script(self, temp_project):
+        """Hash falls back to command string for nonexistent scripts."""
+        hash1 = calculate_script_hash("./nonexistent.sh", temp_project)
+        hash2 = calculate_script_hash("./nonexistent.sh", temp_project)
+
+        # Should still produce consistent hash
+        assert hash1 == hash2
+        assert len(hash1) == 12
+
+    def test_hash_absolute_path(self, temp_project):
+        """Hash a script with absolute path."""
+        script_path = temp_project / "abs_script.sh"
+        script_path.write_text("#!/bin/bash\necho absolute\n")
+
+        hash_result = calculate_script_hash(str(script_path))
+        assert len(hash_result) == 12
+
+
+# =============================================================================
+# Tests for format_run_header and format_run_footer (Issue #149)
+# =============================================================================
+
+
+class TestFormatRunHeader:
+    """Tests for format_run_header function."""
+
+    def test_header_contains_run_id(self):
+        """Header contains the run ID."""
+        header = format_run_header("my-run-abc123", "abc123456789", "echo hello")
+        assert "my-run-abc123" in header
+
+    def test_header_contains_hash(self):
+        """Header contains the script hash."""
+        header = format_run_header("my-run-abc123", "abc123456789", "echo hello")
+        assert "abc123456789" in header
+
+    def test_header_contains_command(self):
+        """Header contains the command."""
+        header = format_run_header("my-run", "abc123", "echo hello world")
+        assert "echo hello world" in header
+
+    def test_header_has_box_decoration(self):
+        """Header has box decoration for visibility."""
+        header = format_run_header("run", "hash", "cmd")
+        assert "╔" in header
+        assert "╚" in header
+        assert "║" in header
+
+
+class TestFormatRunFooter:
+    """Tests for format_run_footer function."""
+
+    def test_footer_contains_run_id(self):
+        """Footer contains the run ID."""
+        footer = format_run_footer("my-run-abc123", 0, 5.5)
+        assert "my-run-abc123" in footer
+
+    def test_footer_success_status(self):
+        """Footer shows SUCCESS for exit code 0."""
+        footer = format_run_footer("run", 0, 1.0)
+        assert "SUCCESS" in footer
+
+    def test_footer_failed_status(self):
+        """Footer shows FAILED for non-zero exit code."""
+        footer = format_run_footer("run", 1, 1.0)
+        assert "FAILED" in footer
+        assert "exit 1" in footer
+
+    def test_footer_contains_duration(self):
+        """Footer contains the duration."""
+        footer = format_run_footer("run", 0, 123.45)
+        assert "123.45s" in footer
+
+    def test_footer_has_box_decoration(self):
+        """Footer has box decoration for visibility."""
+        footer = format_run_footer("run", 0, 1.0)
+        assert "╔" in footer
+        assert "╚" in footer
+
+
+# =============================================================================
+# Tests for _find_askpass_helper (Issue #169)
+# =============================================================================
+
+
+class TestFindAskpassHelper:
+    """Tests for _find_askpass_helper function."""
+
+    def test_finds_project_askpass(self, temp_project):
+        """Find askpass helper in project's .claude/scripts/."""
+        scripts_dir = temp_project / ".claude" / "scripts"
+        scripts_dir.mkdir(parents=True)
+        askpass = scripts_dir / "ig-askpass"
+        askpass.write_text("#!/bin/bash\necho password\n")
+        askpass.chmod(0o755)
+
+        result = _find_askpass_helper(temp_project)
+        assert result is not None
+        assert result == askpass
+
+    def test_no_askpass_available(self, temp_project):
+        """Return None when no askpass helper is found."""
+        # Mock shutil.which to return None
+        with patch("shutil.which", return_value=None):
+            result = _find_askpass_helper(temp_project)
+            assert result is None
+
+    def test_askpass_not_executable(self, temp_project):
+        """Skip non-executable askpass file."""
+        scripts_dir = temp_project / ".claude" / "scripts"
+        scripts_dir.mkdir(parents=True)
+        askpass = scripts_dir / "ig-askpass"
+        askpass.write_text("#!/bin/bash\necho password\n")
+        # Don't make it executable
+
+        with patch("shutil.which", return_value=None):
+            result = _find_askpass_helper(temp_project)
+            assert result is None
+
+    def test_system_askpass_check_fails(self, temp_project):
+        """Handle system askpass that fails --check."""
+        fake_askpass = temp_project / "fake-askpass"
+        fake_askpass.write_text("#!/bin/bash\nexit 1\n")
+        fake_askpass.chmod(0o755)
+
+        with patch("shutil.which", return_value=str(fake_askpass)):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=1)
+                result = _find_askpass_helper(temp_project)
+                assert result is None

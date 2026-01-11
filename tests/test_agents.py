@@ -1,7 +1,5 @@
 """Tests for AGENTS.md generation and management."""
 
-import pytest
-from pathlib import Path
 
 from idlergear.agents import (
     Language,
