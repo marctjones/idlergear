@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.3.0)
+## Features (v0.3.28)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -35,6 +35,7 @@ IdlerGear works identically across all major AI coding assistants:
 - **Plans** - Organize work into phases
 - **References** - Store documentation and resources
 - **Session State** - Perfect continuity across AI sessions
+- **Secrets** - Secure encrypted local storage for sensitive data
 
 ### Python-Native MCP Servers (Zero Node.js!)
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
@@ -43,15 +44,17 @@ IdlerGear works identically across all major AI coding assistants:
 - **Environment Detection** - 4 tools (auto-detect Python/Node/Rust/.NET/venv)
 - **OpenTelemetry Logs** - 3 tools (query, stats, recent errors)
 - **Session Management** - 4 tools (start, save, end, status)
+- **Test Framework** - 11 tools (detect, run, status, coverage mapping)
+- **Health Check** - Doctor command for configuration validation
 
-**Total: 51 MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 62+ MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **51 tools** via Model Context Protocol (universal)
+- **MCP Server** - **62+ tools** via Model Context Protocol (universal)
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
 - **Goose Integration** - CLI + GUI support with `.goosehints`
 - **Token Efficiency** - 97% context reduction (17K → 570 tokens!)
@@ -112,8 +115,10 @@ idlergear otel start         # ERROR logs → notes, FATAL → tasks automatical
 ```bash
 idlergear --version               # Show version
 idlergear init                    # Initialize IdlerGear in project
-idlergear install                 # Install AI integration files
+idlergear install                 # Install AI integration files (all assistants)
 idlergear uninstall               # Remove AI integration files
+idlergear doctor                  # Health check and auto-fix
+idlergear update                  # Self-update to latest version
 
 # Knowledge Management
 idlergear task create TEXT        # Create a task
@@ -147,6 +152,21 @@ idlergear session-end             # End with smart suggestions
 idlergear session-status          # View current session state
 idlergear session-clear           # Clear session state
 
+# Test Framework Integration (NEW!)
+idlergear test detect             # Detect test framework
+idlergear test status             # Show last test run results
+idlergear test run                # Run tests and parse results
+idlergear test coverage FILE      # Check if file has tests
+idlergear test uncovered          # Find files without tests
+idlergear test changed            # Tests for changed files
+
+# Secrets Management (NEW!)
+idlergear secrets init            # Initialize encrypted storage
+idlergear secrets set KEY         # Store a secret (prompts for value)
+idlergear secrets get KEY         # Retrieve a secret
+idlergear secrets list            # List stored secrets
+idlergear secrets env CMD         # Run command with secrets as env vars
+
 # AI Assistant Integration
 idlergear hooks install           # Install Claude Code lifecycle hooks
 idlergear hooks test              # Test hooks work correctly
@@ -155,6 +175,16 @@ idlergear hooks list              # List installed hooks
 idlergear goose init              # Generate .goosehints for Goose
 idlergear goose register          # Show Goose GUI registration instructions
 
+idlergear agents init             # Generate AGENTS.md
+idlergear agents check            # Validate AGENTS.md
+
+# MCP Configuration (NEW!)
+idlergear mcp generate            # Generate .mcp.json
+idlergear mcp show                # Show current MCP config
+idlergear mcp add NAME CMD        # Add an MCP server
+idlergear mcp remove NAME         # Remove an MCP server
+idlergear mcp test                # Test MCP server connectivity
+
 # OpenTelemetry Logging
 idlergear otel start              # Start OTel collector daemon
 idlergear otel stop               # Stop collector
@@ -162,18 +192,22 @@ idlergear otel status             # Show collector status
 idlergear otel logs               # Query collected logs
 idlergear otel config             # Manage configuration
 
+# Watch Mode
+idlergear watch check             # One-shot project analysis
+idlergear watch check --act       # Auto-create tasks from TODOs
+
 # Configuration
 idlergear config set KEY VAL      # Configure settings
 idlergear config get KEY          # Get config value
 ```
 
-### MCP Tools (51 total - use via AI assistants)
+### MCP Tools (62+ total - use via AI assistants)
 
 See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
 
 ## MCP Tools Reference
 
-IdlerGear provides **51 MCP tools** across 6 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+IdlerGear provides **62+ MCP tools** across 8 categories. All tools are **100% Python** with **zero Node.js dependencies**.
 
 ### Session Management (4 tools) ⚡ **Start here!**
 
@@ -325,7 +359,7 @@ idlergear_otel_query_logs(severity="ERROR", service="goose", limit=20)
 
 ### Knowledge Management (built into all tools)
 
-All 51 MCP tools integrate with IdlerGear's knowledge system:
+All 62+ MCP tools integrate with IdlerGear's knowledge system:
 - Context-aware operations
 - Task linkage where relevant
 - Automatic knowledge capture (OTel)
@@ -350,7 +384,7 @@ vision = "github"    # Sync vision to repo
 - [Getting Started](https://github.com/marctjones/idlergear/wiki/Getting-Started) - Installation and setup
 - [Knowledge Types](https://github.com/marctjones/idlergear/wiki/Knowledge-Types) - All 6 knowledge types
 - [Commands Reference](https://github.com/marctjones/idlergear/wiki/Commands-Reference) - Full CLI reference
-- [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 35+ MCP tools
+- [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 62+ MCP tools
 
 ### AI Assistant Guides
 - [AI Assistant Comparison](https://github.com/marctjones/idlergear/wiki/AI-Assistant-Comparison) - Feature comparison
