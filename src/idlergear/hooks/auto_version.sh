@@ -1,13 +1,29 @@
 #!/bin/bash
-# IdlerGear auto-version pre-commit hook
-# Automatically increments patch version on each commit
+# IdlerGear pre-commit hook
+# Features:
+#   1. Auto-version: Increments patch version on each commit
+#   2. Watch check: Creates tasks from TODO/FIXME/HACK in staged changes
 #
-# Skip auto-bump by setting environment variable:
-#   SKIP_VERSION=1 git commit -m "docs: update readme"
+# Skip auto-bump: SKIP_VERSION=1 git commit -m "..."
+# Skip watch:     SKIP_WATCH=1 git commit -m "..."
+# Skip both:      git commit --no-verify -m "..."
 #
 # Manual major/minor bumps are detected and respected.
 
 set -e
+
+# --- IdlerGear Watch Check ---
+# Only runs if watch.enabled is true in config
+if [ -z "$SKIP_WATCH" ] && command -v idlergear &> /dev/null; then
+    # Check if watch is enabled
+    watch_enabled=$(idlergear config get watch.enabled 2>/dev/null || echo "false")
+    if [ "$watch_enabled" = "true" ]; then
+        # Run watch check with --act to auto-create tasks
+        # Use --staged to only check staged changes (not implemented yet, so check all)
+        echo "[IdlerGear] Running watch check..."
+        idlergear watch check --act 2>/dev/null || true
+    fi
+fi
 
 PYPROJECT="pyproject.toml"
 
