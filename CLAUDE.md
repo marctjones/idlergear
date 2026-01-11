@@ -73,6 +73,8 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 | Completed work | `idlergear task close <id>` |
 | Check project goals | `idlergear vision show` |
 | View open tasks | `idlergear task list` |
+| Start background process | `idlergear run start "command" --name <name>` |
+| Check background runs | `idlergear run list` |
 
 ### Knowledge Flow
 
@@ -300,5 +302,7 @@ idlergear context --mode minimal
 - `idlergear note create "..."` - Capture quick thoughts
 - `idlergear note create "..." --tag explore` - Research questions
 - `idlergear vision show` - Check project goals
+- `idlergear run start "cmd" --name <n>` - Background processes
+- `idlergear run logs <name>` - View run output
 
 See AGENTS.md for full command reference.

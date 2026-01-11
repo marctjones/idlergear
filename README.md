@@ -35,6 +35,7 @@ IdlerGear works identically across all major AI coding assistants:
 - **Plans** - Organize work into phases
 - **References** - Store documentation and resources
 - **Session State** - Perfect continuity across AI sessions
+- **Runs** - Background process tracking with logs
 - **Secrets** - Secure encrypted local storage for sensitive data
 
 ### Python-Native MCP Servers (Zero Node.js!)
@@ -195,6 +196,14 @@ idlergear otel config             # Manage configuration
 # Watch Mode
 idlergear watch check             # One-shot project analysis
 idlergear watch check --act       # Auto-create tasks from TODOs
+
+# Background Runs
+idlergear run start "command"     # Start background process
+idlergear run list                # List all runs
+idlergear run status NAME         # Check run status
+idlergear run logs NAME           # View output (--stderr for errors)
+idlergear run stop NAME           # Stop a running process
+idlergear run exec "command"      # Run with PTY passthrough
 
 # Configuration
 idlergear config set KEY VAL      # Configure settings

@@ -53,6 +53,8 @@ This shows the project vision, current plan, open tasks, and recent notes. Do NO
 | Completed work | `idlergear task close <id>` |
 | Check project goals | `idlergear vision show` |
 | View open tasks | `idlergear task list` |
+| Start background process | `idlergear run start "command" --name <name>` |
+| Check background runs | `idlergear run list` |
 
 ### Knowledge Promotion Flow
 
@@ -70,6 +72,47 @@ note → explore → task
 - `idlergear reference show "title"` - Read a specific reference
 - `idlergear reference add "title" --body "..."` - Add documentation
 - `idlergear search "query"` - Search across all knowledge types
+
+### Background Runs
+
+Track and monitor long-running processes (builds, servers, tests):
+
+| Command | Description |
+|---------|-------------|
+| `idlergear run start "command"` | Start a background process |
+| `idlergear run list` | List all runs |
+| `idlergear run status <name>` | Check run status |
+| `idlergear run logs <name>` | View stdout (add `--stderr` for errors) |
+| `idlergear run stop <name>` | Stop a running process |
+| `idlergear run exec "command"` | Run with PTY passthrough (for interactive commands) |
+
+**Example workflow:**
+```bash
+# Start a dev server in the background
+idlergear run start "npm run dev" --name frontend
+
+# Check if it's running
+idlergear run status frontend
+
+# View recent logs
+idlergear run logs frontend --tail 50
+
+# Stop when done
+idlergear run stop frontend
+```
+
+**Script generation** (creates reusable dev scripts that auto-register with daemon):
+```bash
+# Generate from template
+idlergear run generate-script test "pytest -v" --template pytest
+
+# Custom dev server
+idlergear run generate-script django-dev "python manage.py runserver" \
+    --venv ./venv --requirement django
+
+# Run the generated script
+./scripts/django-dev.sh
+```
 
 ### Protected Files
 
