@@ -373,7 +373,7 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
             )
         )
 
-    # Check test run status (#137)
+    # Check test run status (#137, #160, #161)
     try:
         from idlergear.testing import get_last_result, get_tests_for_changes
 
@@ -390,11 +390,54 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
                         "failed": last_result.failed,
                         "errors": last_result.errors,
                         "failed_tests": last_result.failed_tests[:5],
+                        "fix": "idlergear test run",
                     },
                 )
             )
 
-        # Check if source files changed since last test run
+        # #160: Check if source files changed without test runs
+        source_extensions = {".py", ".js", ".ts", ".go", ".rs", ".java", ".rb"}
+        source_files_changed = [
+            f
+            for f in git_status["modified_files"] + git_status["staged_files"]
+            if any(f.endswith(ext) for ext in source_extensions)
+            and "test" not in f.lower()
+        ]
+
+        if source_files_changed:
+            if last_result is None:
+                # No test results recorded at all
+                suggestions.append(
+                    Suggestion(
+                        id=next_id(),
+                        category="test",
+                        message=f"Source files modified ({len(source_files_changed)}) but no tests recorded",
+                        severity="warning",
+                        context={
+                            "source_files": source_files_changed[:5],
+                            "fix": "idlergear test run",
+                        },
+                    )
+                )
+            else:
+                # #161: Show relevant test files for changes
+                tests_for_changes = get_tests_for_changes(project_root)
+                if tests_for_changes:
+                    suggestions.append(
+                        Suggestion(
+                            id=next_id(),
+                            category="test",
+                            message=f"Tests for changed files: {', '.join(tests_for_changes[:3])}",
+                            severity="info",
+                            context={
+                                "tests_to_run": tests_for_changes[:10],
+                                "source_files": source_files_changed[:5],
+                                "fix": f"pytest {' '.join(tests_for_changes[:3])}",
+                            },
+                        )
+                    )
+
+        # Check if source files changed since last test run (via commits)
         if last_result:
             from datetime import datetime
 
@@ -420,9 +463,12 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
                                 Suggestion(
                                     id=next_id(),
                                     category="test",
-                                    message=f"Source files changed since last test run - {len(tests_for_changes)} tests may need running",
+                                    message=f"Commits since last test run - {len(tests_for_changes)} tests may need running",
                                     severity="info",
-                                    context={"tests_to_run": tests_for_changes[:5]},
+                                    context={
+                                        "tests_to_run": tests_for_changes[:5],
+                                        "fix": "idlergear test run",
+                                    },
                                 )
                             )
             except (ValueError, TypeError):

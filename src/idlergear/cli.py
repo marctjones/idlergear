@@ -3316,6 +3316,9 @@ def run_exec(
     no_register: bool = typer.Option(
         False, "--no-register", help="Don't register with daemon"
     ),
+    stream: bool = typer.Option(
+        False, "--stream", "-s", help="Stream logs to daemon for other agents to see"
+    ),
 ):
     """Execute a command with PTY passthrough and tracking.
 
@@ -3326,6 +3329,7 @@ def run_exec(
         ig run exec "./run_tests.sh"
         ig run exec "python manage.py migrate" --name django-migrate
         ig run exec "npm run build" --no-header
+        ig run exec "./long_job.sh" --stream  # Stream logs to daemon
 
     The output includes header/footer blocks that AI assistants can parse
     to understand what ran and whether it succeeded.
@@ -3338,6 +3342,7 @@ def run_exec(
             name=name,
             show_header=not no_header,
             register_with_daemon=not no_register,
+            stream_logs=stream,
         )
         # Exit with the same code as the wrapped command
         raise typer.Exit(result["exit_code"])

@@ -14,6 +14,47 @@ from idlergear.config import find_idlergear_root
 from idlergear.storage import now_iso, slugify
 
 
+def _find_askpass_helper(project_path: Path | None = None) -> Path | None:
+    """Find the ig-askpass helper script for sudo operations.
+
+    Searches in order:
+    1. Project's .claude/scripts/ig-askpass
+    2. Installed IdlerGear's hooks directory
+    3. System PATH
+
+    Returns the path if found and executable, None otherwise.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+
+    # Check project's .claude/scripts
+    if project_path:
+        project_askpass = project_path / ".claude" / "scripts" / "ig-askpass"
+        if project_askpass.is_file() and os.access(project_askpass, os.X_OK):
+            return project_askpass
+
+    # Check if ig-askpass is available and has a working backend
+    import shutil
+
+    askpass = shutil.which("ig-askpass")
+    if askpass:
+        askpass_path = Path(askpass)
+        # Verify it has a working GUI backend
+        try:
+            result = subprocess.run(
+                [str(askpass_path), "--check"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return askpass_path
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
+    return None
+
+
 def calculate_script_hash(command: str, project_path: Path | None = None) -> str:
     """Calculate SHA256 hash of a script or command.
 
@@ -476,11 +517,11 @@ def format_run_header(run_id: str, script_hash: str, command: str) -> str:
     timestamp = now_iso()
     lines = [
         "",
-        f"╔══════════════════════════════════════════════════════════════════╗",
+        "╔══════════════════════════════════════════════════════════════════╗",
         f"║  IdlerGear Run: {run_id:<49} ║",
         f"║  Hash: {script_hash:<58} ║",
         f"║  Started: {timestamp:<55} ║",
-        f"╚══════════════════════════════════════════════════════════════════╝",
+        "╚══════════════════════════════════════════════════════════════════╝",
         f"Command: {command}",
         "",
     ]
@@ -499,12 +540,12 @@ def format_run_footer(run_id: str, exit_code: int, duration_seconds: float) -> s
 
     lines = [
         "",
-        f"╔══════════════════════════════════════════════════════════════════╗",
+        "╔══════════════════════════════════════════════════════════════════╗",
         f"║  IdlerGear Run Complete: {run_id:<40} ║",
         f"║  Status: {status:<56} ║",
         f"║  Duration: {duration_str:<54} ║",
         f"║  Ended: {timestamp:<57} ║",
-        f"╚══════════════════════════════════════════════════════════════════╝",
+        "╚══════════════════════════════════════════════════════════════════╝",
         "",
     ]
     return "\n".join(lines)
@@ -516,6 +557,7 @@ def run_with_pty(
     project_path: Path | None = None,
     show_header: bool = True,
     register_with_daemon: bool = True,
+    stream_logs: bool = False,
 ) -> dict[str, Any]:
     """Run a command with PTY passthrough for terminal colors/interactivity.
 
@@ -531,6 +573,7 @@ def run_with_pty(
         project_path: Project root path
         show_header: Whether to print header/footer (default True)
         register_with_daemon: Whether to register with daemon
+        stream_logs: Whether to stream logs to daemon (requires daemon registration)
 
     Returns:
         Dict with run info including exit_code
@@ -613,6 +656,22 @@ def run_with_pty(
     start_ts = time.time()
     exit_code = 0
 
+    # Set up environment for sudo handling (#169)
+    env = os.environ.copy()
+
+    # Check if command uses sudo and we're non-interactive
+    is_sudo_command = command.strip().startswith("sudo ") or " sudo " in command
+    is_interactive = sys.stdin.isatty()
+
+    if is_sudo_command and not is_interactive:
+        # Non-interactive sudo - try to use askpass helper
+        askpass_path = _find_askpass_helper(project_path)
+        if askpass_path:
+            env["SUDO_ASKPASS"] = str(askpass_path)
+            # Modify command to use -A flag for sudo
+            if command.strip().startswith("sudo "):
+                command = "sudo -A " + command.strip()[5:]
+
     try:
         # Create a pseudo-terminal
         master_fd, slave_fd = pty.openpty()
@@ -625,6 +684,7 @@ def run_with_pty(
             stderr=slave_fd,
             cwd=project_path,
             close_fds=True,
+            env=env,
         )
 
         # Update metadata with PID
@@ -647,11 +707,21 @@ def run_with_pty(
                             # Write to terminal
                             sys.stdout.buffer.write(data)
                             sys.stdout.buffer.flush()
-                            # Write to log file
+                            # Write to log file and optionally stream to daemon
                             try:
                                 text = data.decode("utf-8", errors="replace")
                                 stdout_log.write(text)
                                 stdout_log.flush()
+                                # Stream to daemon if enabled
+                                if stream_logs and agent_id:
+                                    for line in text.splitlines():
+                                        if line.strip():
+                                            _try_daemon_call(
+                                                "log_from_agent",
+                                                agent_id,
+                                                line.rstrip(),
+                                                level="info",
+                                            )
                             except Exception:
                                 pass
                         else:

@@ -535,7 +535,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="idlergear_run_list",
-            description="List all runs",
+            description="List all runs with metadata (script_hash, terminal_type, timestamps)",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -548,7 +548,7 @@ async def list_tools() -> list[Tool]:
         ),
         Tool(
             name="idlergear_run_status",
-            description="Get run status",
+            description="Get detailed run status including metadata (script_hash, duration, exit_code, timestamps)",
             inputSchema={
                 "type": "object",
                 "properties": {
