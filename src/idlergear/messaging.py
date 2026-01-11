@@ -16,7 +16,6 @@ Message Types:
 """
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
@@ -69,8 +68,14 @@ def send_message(
     # Handle broadcast to all agents
     if to_agent == "all":
         return _broadcast_message(
-            idlergear_root, message, from_agent, delivery, message_type,
-            action_requested, context, metadata
+            idlergear_root,
+            message,
+            from_agent,
+            delivery,
+            message_type,
+            action_requested,
+            context,
+            metadata,
         )
 
     inbox_dir = get_inbox_dir(idlergear_root, to_agent)
@@ -91,7 +96,7 @@ def send_message(
         "context": context or {},
         "read": False,
         "processed": False,  # Whether routed to task/queue
-        "task_id": None,     # If converted to task
+        "task_id": None,  # If converted to task
         "metadata": metadata or {},
     }
 
@@ -138,9 +143,15 @@ def _broadcast_message(
     for agent_id in agents.keys():
         if agent_id != from_agent:  # Don't send to self
             result = send_message(
-                idlergear_root, agent_id, message, from_agent,
-                delivery=delivery, message_type=message_type,
-                action_requested=action_requested, context=context, metadata=metadata
+                idlergear_root,
+                agent_id,
+                message,
+                from_agent,
+                delivery=delivery,
+                message_type=message_type,
+                action_requested=action_requested,
+                context=context,
+                metadata=metadata,
             )
             if result.get("status") == "delivered":
                 delivered.append(agent_id)
@@ -373,9 +384,9 @@ def process_inbox(
     messages = list_messages(idlergear_root, agent_id, unread_only=True)
 
     results = {
-        "context": [],        # Messages to inject into context
+        "context": [],  # Messages to inject into context
         "tasks_created": [],  # Messages converted to tasks
-        "queued": [],         # Deferred messages
+        "queued": [],  # Deferred messages
         "errors": [],
     }
 
@@ -397,11 +408,13 @@ def process_inbox(
                     task_id = _create_task_from_message(msg, create_task_callback)
 
                 if task_id:
-                    results["tasks_created"].append({
-                        "message_id": msg_id,
-                        "task_id": task_id,
-                        "from": msg.get("from"),
-                    })
+                    results["tasks_created"].append(
+                        {
+                            "message_id": msg_id,
+                            "task_id": task_id,
+                            "from": msg.get("from"),
+                        }
+                    )
                     _mark_message_processed(msg_path, task_id=task_id)
                 else:
                     # No callback, treat as context fallback
@@ -409,18 +422,22 @@ def process_inbox(
 
             else:  # deferred
                 # Just mark as processed, queue for later review
-                results["queued"].append({
-                    "message_id": msg_id,
-                    "from": msg.get("from"),
-                    "preview": msg.get("message", "")[:50],
-                })
+                results["queued"].append(
+                    {
+                        "message_id": msg_id,
+                        "from": msg.get("from"),
+                        "preview": msg.get("message", "")[:50],
+                    }
+                )
                 _mark_message_processed(msg_path, task_id=None)
 
         except Exception as e:
-            results["errors"].append({
-                "message_id": msg_id,
-                "error": str(e),
-            })
+            results["errors"].append(
+                {
+                    "message_id": msg_id,
+                    "error": str(e),
+                }
+            )
 
     return results
 
@@ -542,7 +559,8 @@ def get_pending_review(
     """
     messages = list_messages(idlergear_root, agent_id)
     return [
-        m for m in messages
+        m
+        for m in messages
         if m.get("processed") and _get_delivery_type(m) == "deferred"
     ]
 

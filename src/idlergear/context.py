@@ -11,7 +11,9 @@ from pathlib import Path
 from typing import Any
 
 
-def truncate_text(text: str | None, max_chars: int | None, suffix: str = "...") -> str | None:
+def truncate_text(
+    text: str | None, max_chars: int | None, suffix: str = "..."
+) -> str | None:
     """Truncate text to max_chars, adding suffix if truncated.
 
     Args:
@@ -29,7 +31,9 @@ def truncate_text(text: str | None, max_chars: int | None, suffix: str = "...") 
     return text[: max_chars - len(suffix)] + suffix
 
 
-def truncate_lines(text: str | None, max_lines: int | None, suffix: str = "\n...") -> str | None:
+def truncate_lines(
+    text: str | None, max_lines: int | None, suffix: str = "\n..."
+) -> str | None:
     """Truncate text to max_lines, adding suffix if truncated.
 
     Args:

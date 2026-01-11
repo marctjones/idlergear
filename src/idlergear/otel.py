@@ -29,22 +29,23 @@ def otel_start(
     """Start OpenTelemetry collector."""
     global _collector
 
-    #Check if already running
+    # Check if already running
     if _collector_pid_file.exists():
         try:
             pid = int(_collector_pid_file.read_text().strip())
             # Check if process is alive
             import os
+
             os.kill(pid, 0)  # Raises error if not alive
             console.print(f"[yellow]Collector already running (PID: {pid})[/yellow]")
-            console.print(f"Use 'idlergear otel stop' to stop it first")
+            console.print("Use 'idlergear otel stop' to stop it first")
             raise typer.Exit(1)
         except (ProcessLookupError, OSError):
             # Process doesn't exist, clean up stale PID file
             _collector_pid_file.unlink()
 
     # Create collector
-    console.print(f"[cyan]Starting OpenTelemetry collector...[/cyan]")
+    console.print("[cyan]Starting OpenTelemetry collector...[/cyan]")
     console.print(f"  gRPC: localhost:{grpc_port}")
     console.print(f"  HTTP: localhost:{http_port}")
 
@@ -55,11 +56,12 @@ def otel_start(
 
     # Write PID file
     import os
+
     _collector_pid_file.parent.mkdir(parents=True, exist_ok=True)
     _collector_pid_file.write_text(str(os.getpid()))
 
     if daemon:
-        console.print(f"[green]Collector started in daemon mode[/green]")
+        console.print("[green]Collector started in daemon mode[/green]")
         console.print(f"PID: {os.getpid()}")
 
         # Detach from terminal
@@ -80,7 +82,7 @@ def otel_start(
         # Block forever
         signal.pause()
     else:
-        console.print(f"[green]Collector started (press Ctrl+C to stop)[/green]")
+        console.print("[green]Collector started (press Ctrl+C to stop)[/green]")
 
         # Register signal handlers
         def signal_handler(sig, frame):
@@ -113,6 +115,7 @@ def otel_stop():
 
         # Send SIGTERM
         import os
+
         os.kill(pid, signal.SIGTERM)
 
         # Wait for process to die
@@ -141,20 +144,21 @@ def otel_status():
     try:
         pid = int(_collector_pid_file.read_text().strip())
         import os
+
         os.kill(pid, 0)  # Check if alive
 
-        console.print(f"[green]Collector is running[/green]")
+        console.print("[green]Collector is running[/green]")
         console.print(f"PID: {pid}")
 
         # Try to get stats (requires shared state mechanism - for now just show basic info)
         storage = OTelStorage()
         total_logs = storage.count()
 
-        console.print(f"\n[cyan]Storage Statistics:[/cyan]")
+        console.print("\n[cyan]Storage Statistics:[/cyan]")
         console.print(f"Total logs: {total_logs:,}")
 
     except (ProcessLookupError, OSError):
-        console.print(f"[red]Collector PID file exists but process is not running[/red]")
+        console.print("[red]Collector PID file exists but process is not running[/red]")
         _collector_pid_file.unlink()
         raise typer.Exit(1)
 
@@ -162,7 +166,9 @@ def otel_status():
 def otel_logs(
     tail: int = typer.Option(20, help="Show last N logs"),
     service: Optional[str] = typer.Option(None, help="Filter by service name"),
-    severity: Optional[str] = typer.Option(None, help="Filter by severity (DEBUG, INFO, WARN, ERROR, FATAL)"),
+    severity: Optional[str] = typer.Option(
+        None, help="Filter by severity (DEBUG, INFO, WARN, ERROR, FATAL)"
+    ),
     search: Optional[str] = typer.Option(None, help="Full-text search in messages"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
@@ -210,6 +216,7 @@ def otel_logs(
         for log in logs:
             # Format timestamp
             from datetime import datetime
+
             dt = datetime.fromtimestamp(log.timestamp / 1e9)
             timestamp_str = dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -244,11 +251,18 @@ def otel_config_show():
         "pid_file": str(_collector_pid_file),
         "exporters": [
             {"type": "console", "enabled": True, "min_severity": "INFO"},
-            {"type": "file", "enabled": True, "min_severity": "DEBUG", "path": "logs/otel.jsonl"},
+            {
+                "type": "file",
+                "enabled": True,
+                "min_severity": "DEBUG",
+                "path": "logs/otel.jsonl",
+            },
             {"type": "idlergear_note", "enabled": True, "min_severity": "ERROR"},
             {"type": "idlergear_task", "enabled": True, "min_severity": "FATAL"},
         ],
     }
 
     console.print(json.dumps(config, indent=2))
-    console.print("\n[dim]Note: Configuration is currently hard-coded. YAML config support coming soon![/dim]")
+    console.print(
+        "\n[dim]Note: Configuration is currently hard-coded. YAML config support coming soon![/dim]"
+    )

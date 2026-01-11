@@ -48,9 +48,7 @@ def _run_gh_command(args: list[str], timeout: int = 30) -> str:
                     "GitHub CLI not authenticated. Run: gh auth login"
                 )
             if "not a git repository" in stderr.lower():
-                raise GitHubBackendError(
-                    "Not in a git repository with GitHub remote"
-                )
+                raise GitHubBackendError("Not in a git repository with GitHub remote")
             raise GitHubBackendError(f"gh command failed: {stderr}")
 
         return result.stdout.strip()
@@ -94,14 +92,15 @@ def _map_issue_to_task(issue: dict[str, Any]) -> dict[str, Any]:
     # Extract labels as list of strings
     labels = []
     if issue.get("labels"):
-        labels = [l.get("name", l) if isinstance(l, dict) else l for l in issue["labels"]]
+        labels = [
+            l.get("name", l) if isinstance(l, dict) else l for l in issue["labels"]
+        ]
 
     # Extract assignees as list of strings
     assignees = []
     if issue.get("assignees"):
         assignees = [
-            a.get("login", a) if isinstance(a, dict) else a
-            for a in issue["assignees"]
+            a.get("login", a) if isinstance(a, dict) else a for a in issue["assignees"]
         ]
 
     # Map priority from label (convention: priority:high, priority:medium, priority:low)
@@ -186,10 +185,14 @@ class GitHubTaskBackend:
             gh_state = "open"
 
         args = [
-            "issue", "list",
-            "--state", gh_state,
-            "--json", "number,title,body,state,labels,assignees,url,createdAt,updatedAt",
-            "--limit", "100",
+            "issue",
+            "list",
+            "--state",
+            gh_state,
+            "--json",
+            "number,title,body,state,labels,assignees,url,createdAt,updatedAt",
+            "--limit",
+            "100",
         ]
 
         output = _run_gh_command(args)
@@ -199,8 +202,11 @@ class GitHubTaskBackend:
     def get(self, task_id: int) -> dict[str, Any] | None:
         """Get a GitHub issue by number."""
         args = [
-            "issue", "view", str(task_id),
-            "--json", "number,title,body,state,labels,assignees,url,createdAt,updatedAt",
+            "issue",
+            "view",
+            str(task_id),
+            "--json",
+            "number,title,body,state,labels,assignees,url,createdAt,updatedAt",
         ]
 
         try:
@@ -280,12 +286,18 @@ class GitHubExploreBackend:
     def _ensure_label_exists(self) -> None:
         """Ensure the exploration label exists."""
         try:
-            _run_gh_command([
-                "label", "create", self.EXPLORE_LABEL,
-                "--description", "IdlerGear exploration",
-                "--color", "0E8A16",
-                "--force",
-            ])
+            _run_gh_command(
+                [
+                    "label",
+                    "create",
+                    self.EXPLORE_LABEL,
+                    "--description",
+                    "IdlerGear exploration",
+                    "--color",
+                    "0E8A16",
+                    "--force",
+                ]
+            )
         except GitHubBackendError:
             pass  # Label might already exist
 
@@ -298,11 +310,15 @@ class GitHubExploreBackend:
         self._ensure_label_exists()
 
         args = [
-            "issue", "create",
-            "--title", title,
-            "--label", self.EXPLORE_LABEL,
+            "issue",
+            "create",
+            "--title",
+            title,
+            "--label",
+            self.EXPLORE_LABEL,
             # gh issue create requires --body when running non-interactively
-            "--body", body if body else "",
+            "--body",
+            body if body else "",
         ]
 
         # gh issue create returns the issue URL, not JSON
@@ -318,14 +334,21 @@ class GitHubExploreBackend:
 
     def list(self, state: str = "open") -> list[dict[str, Any]]:
         """List explorations (issues with exploration label)."""
-        gh_state = "all" if state == "all" else ("closed" if state == "closed" else "open")
+        gh_state = (
+            "all" if state == "all" else ("closed" if state == "closed" else "open")
+        )
 
         args = [
-            "issue", "list",
-            "--state", gh_state,
-            "--label", self.EXPLORE_LABEL,
-            "--json", "number,title,body,state,labels,url,createdAt,updatedAt",
-            "--limit", "100",
+            "issue",
+            "list",
+            "--state",
+            gh_state,
+            "--label",
+            self.EXPLORE_LABEL,
+            "--json",
+            "number,title,body,state,labels,url,createdAt,updatedAt",
+            "--limit",
+            "100",
         ]
 
         output = _run_gh_command(args)
@@ -336,8 +359,11 @@ class GitHubExploreBackend:
         """Get an exploration by ID."""
         try:
             args = [
-                "issue", "view", str(explore_id),
-                "--json", "number,title,body,state,labels,url,createdAt,updatedAt",
+                "issue",
+                "view",
+                str(explore_id),
+                "--json",
+                "number,title,body,state,labels,url,createdAt,updatedAt",
             ]
             output = _run_gh_command(args)
             issue = _parse_json(output)
@@ -415,12 +441,18 @@ class GitHubNoteBackend:
     def _ensure_label_exists(self) -> None:
         """Ensure the note label exists."""
         try:
-            _run_gh_command([
-                "label", "create", self.NOTE_LABEL,
-                "--description", "IdlerGear note",
-                "--color", "FBCA04",  # Yellow
-                "--force",
-            ])
+            _run_gh_command(
+                [
+                    "label",
+                    "create",
+                    self.NOTE_LABEL,
+                    "--description",
+                    "IdlerGear note",
+                    "--color",
+                    "FBCA04",  # Yellow
+                    "--force",
+                ]
+            )
         except GitHubBackendError:
             pass  # Label might already exist
 
@@ -429,12 +461,18 @@ class GitHubNoteBackend:
         for tag in tags:
             label_name = f"tag:{tag}"
             try:
-                _run_gh_command([
-                    "label", "create", label_name,
-                    "--description", f"IdlerGear note tag: {tag}",
-                    "--color", "C2E0C6",  # Light green
-                    "--force",
-                ])
+                _run_gh_command(
+                    [
+                        "label",
+                        "create",
+                        label_name,
+                        "--description",
+                        f"IdlerGear note tag: {tag}",
+                        "--color",
+                        "C2E0C6",  # Light green
+                        "--force",
+                    ]
+                )
             except GitHubBackendError:
                 pass  # Label might already exist
 
@@ -449,19 +487,23 @@ class GitHubNoteBackend:
             self._ensure_tag_labels_exist(tags)
 
         # Use first line as title, rest as body
-        lines = content.strip().split('\n', 1)
+        lines = content.strip().split("\n", 1)
         title = lines[0][:80] if lines else content[:80]
         body = lines[1] if len(lines) > 1 else ""
 
         args = [
-            "issue", "create",
-            "--title", title,
-            "--label", self.NOTE_LABEL,
-            "--body", body,
+            "issue",
+            "create",
+            "--title",
+            title,
+            "--label",
+            self.NOTE_LABEL,
+            "--body",
+            body,
         ]
 
         # Add tag labels
-        for tag in (tags or []):
+        for tag in tags or []:
             args.extend(["--label", f"tag:{tag}"])
 
         output = _run_gh_command(args)
@@ -470,16 +512,25 @@ class GitHubNoteBackend:
         if issue_number is None:
             raise GitHubBackendError(f"Could not parse issue number from: {output}")
 
-        return self.get(issue_number) or {"id": issue_number, "content": content, "tags": tags or []}
+        return self.get(issue_number) or {
+            "id": issue_number,
+            "content": content,
+            "tags": tags or [],
+        }
 
     def list(self, tag: str | None = None) -> list[dict[str, Any]]:
         """List notes, optionally filtered by tag."""
         args = [
-            "issue", "list",
-            "--state", "open",
-            "--label", self.NOTE_LABEL,
-            "--json", "number,title,body,labels,createdAt,updatedAt",
-            "--limit", "100",
+            "issue",
+            "list",
+            "--state",
+            "open",
+            "--label",
+            self.NOTE_LABEL,
+            "--json",
+            "number,title,body,labels,createdAt,updatedAt",
+            "--limit",
+            "100",
         ]
 
         # Filter by tag if specified
@@ -494,8 +545,11 @@ class GitHubNoteBackend:
         """Get a note by ID."""
         try:
             args = [
-                "issue", "view", str(note_id),
-                "--json", "number,title,body,state,labels,createdAt,updatedAt",
+                "issue",
+                "view",
+                str(note_id),
+                "--json",
+                "number,title,body,state,labels,createdAt,updatedAt",
             ]
             output = _run_gh_command(args)
             issue = _parse_json(output)
@@ -522,20 +576,30 @@ class GitHubNoteBackend:
 
         try:
             # Remove note label
-            _run_gh_command([
-                "issue", "edit", str(note_id),
-                "--remove-label", self.NOTE_LABEL,
-            ])
+            _run_gh_command(
+                [
+                    "issue",
+                    "edit",
+                    str(note_id),
+                    "--remove-label",
+                    self.NOTE_LABEL,
+                ]
+            )
 
             # Add appropriate label based on target type
             if to_type == "task":
                 # Just remove the note label, it becomes a regular issue/task
                 pass
             elif to_type == "explore":
-                _run_gh_command([
-                    "issue", "edit", str(note_id),
-                    "--add-label", "exploration",
-                ])
+                _run_gh_command(
+                    [
+                        "issue",
+                        "edit",
+                        str(note_id),
+                        "--add-label",
+                        "exploration",
+                    ]
+                )
             elif to_type == "reference":
                 # For reference, we'd need to create a wiki page
                 # For now, just remove the note label
@@ -555,7 +619,9 @@ class GitHubNoteBackend:
         tags = []
         if issue.get("labels"):
             for label in issue["labels"]:
-                label_name = label.get("name", label) if isinstance(label, dict) else label
+                label_name = (
+                    label.get("name", label) if isinstance(label, dict) else label
+                )
                 if label_name.startswith("tag:"):
                     tags.append(label_name[4:])  # Remove "tag:" prefix
 
@@ -584,7 +650,10 @@ class GitHubVisionBackend:
         """Check if auto-commit is enabled (default: True for backward compat)."""
         try:
             from idlergear.config import get_config
-            value = get_config("github.vision_auto_commit", project_path=self.project_path)
+
+            value = get_config(
+                "github.vision_auto_commit", project_path=self.project_path
+            )
             if value is None:
                 return True  # Default to auto-commit for backward compatibility
             if isinstance(value, bool):
@@ -597,14 +666,20 @@ class GitHubVisionBackend:
         """Get the vision from GitHub (VISION.md in repo)."""
         try:
             # Try to read the file from the remote default branch
-            output = _run_gh_command([
-                "api", "-X", "GET",
-                "/repos/{owner}/{repo}/contents/" + self.VISION_FILE,
-                "--jq", ".content",
-            ])
+            output = _run_gh_command(
+                [
+                    "api",
+                    "-X",
+                    "GET",
+                    "/repos/{owner}/{repo}/contents/" + self.VISION_FILE,
+                    "--jq",
+                    ".content",
+                ]
+            )
 
             if output:
                 import base64
+
                 # GitHub API returns base64-encoded content
                 content = base64.b64decode(output).decode("utf-8")
                 return content
@@ -668,6 +743,7 @@ class GitHubReferenceBackend:
         """Get or create WikiSync instance."""
         if self._wiki_sync is None:
             from idlergear.wiki import WikiSync
+
             self._wiki_sync = WikiSync(self.project_path)
         return self._wiki_sync
 
@@ -684,10 +760,14 @@ class GitHubReferenceBackend:
             return self._wiki_enabled
 
         try:
-            output = _run_gh_command([
-                "api", "/repos/{owner}/{repo}",
-                "--jq", ".has_wiki",
-            ])
+            output = _run_gh_command(
+                [
+                    "api",
+                    "/repos/{owner}/{repo}",
+                    "--jq",
+                    ".has_wiki",
+                ]
+            )
             self._wiki_enabled = output.strip().lower() == "true"
         except GitHubBackendError:
             self._wiki_enabled = False
@@ -752,14 +832,16 @@ class GitHubReferenceBackend:
             # Extract body (skip the header line if present)
             body = page.content
             if body.startswith(f"# {page.title}"):
-                body = body[len(f"# {page.title}"):].strip()
+                body = body[len(f"# {page.title}") :].strip()
 
-            results.append({
-                "id": ref_id,
-                "title": page.title,
-                "body": body,
-                "path": str(page.path),
-            })
+            results.append(
+                {
+                    "id": ref_id,
+                    "title": page.title,
+                    "body": body,
+                    "path": str(page.path),
+                }
+            )
 
         return sorted(results, key=lambda r: r.get("title", "").lower())
 
@@ -791,7 +873,7 @@ class GitHubReferenceBackend:
         # Extract body (skip the header line if present)
         body = content
         if body.startswith(f"# {title}"):
-            body = body[len(f"# {title}"):].strip()
+            body = body[len(f"# {title}") :].strip()
 
         ref_id = self._get_id_for_title(title)
         return {
@@ -841,7 +923,7 @@ class GitHubReferenceBackend:
         else:
             # Keep existing body, just update title if changed
             if existing_content.startswith(f"# {title}"):
-                content = f"# {final_title}" + existing_content[len(f"# {title}"):]
+                content = f"# {final_title}" + existing_content[len(f"# {title}") :]
             else:
                 content = existing_content
 
@@ -898,6 +980,7 @@ class GitHubPlanBackend:
         """Get current plan from IdlerGear config."""
         try:
             from idlergear.config import get_config
+
             return get_config("github.current_plan", project_path=self.project_path)
         except Exception:
             return None
@@ -906,8 +989,11 @@ class GitHubPlanBackend:
         """Save current plan to IdlerGear config."""
         try:
             from idlergear.config import set_config
+
             if plan_name:
-                set_config("github.current_plan", plan_name, project_path=self.project_path)
+                set_config(
+                    "github.current_plan", plan_name, project_path=self.project_path
+                )
             # Note: We don't clear the config if plan_name is None
         except Exception:
             pass  # Config operations are optional
@@ -915,9 +1001,14 @@ class GitHubPlanBackend:
     def _get_owner_repo(self) -> tuple[str, str]:
         """Get owner and repo from current directory."""
         try:
-            output = _run_gh_command([
-                "repo", "view", "--json", "owner,name",
-            ])
+            output = _run_gh_command(
+                [
+                    "repo",
+                    "view",
+                    "--json",
+                    "owner,name",
+                ]
+            )
             data = _parse_json(output)
             if data:
                 owner = data.get("owner", {})
@@ -957,33 +1048,51 @@ class GitHubPlanBackend:
             """
 
             # First get the owner ID
-            owner_query = _run_gh_command([
-                "api", "graphql", "-f",
-                f"query={{user(login: \"{owner}\") {{id}}}}",
-                "--jq", ".data.user.id",
-            ])
+            owner_query = _run_gh_command(
+                [
+                    "api",
+                    "graphql",
+                    "-f",
+                    f'query={{user(login: "{owner}") {{id}}}}',
+                    "--jq",
+                    ".data.user.id",
+                ]
+            )
 
             if not owner_query:
                 # Try organization
-                owner_query = _run_gh_command([
-                    "api", "graphql", "-f",
-                    f"query={{organization(login: \"{owner}\") {{id}}}}",
-                    "--jq", ".data.organization.id",
-                ])
+                owner_query = _run_gh_command(
+                    [
+                        "api",
+                        "graphql",
+                        "-f",
+                        f'query={{organization(login: "{owner}") {{id}}}}',
+                        "--jq",
+                        ".data.organization.id",
+                    ]
+                )
 
             if not owner_query:
                 raise GitHubBackendError("Could not get owner ID")
 
             # Create the project
-            output = _run_gh_command([
-                "api", "graphql",
-                "-f", f"query={mutation}",
-                "-F", f"ownerId={owner_query.strip()}",
-                "-F", f"title={project_title}",
-            ])
+            output = _run_gh_command(
+                [
+                    "api",
+                    "graphql",
+                    "-f",
+                    f"query={mutation}",
+                    "-F",
+                    f"ownerId={owner_query.strip()}",
+                    "-F",
+                    f"title={project_title}",
+                ]
+            )
 
             result = _parse_json(output)
-            project = result.get("data", {}).get("createProjectV2", {}).get("projectV2", {})
+            project = (
+                result.get("data", {}).get("createProjectV2", {}).get("projectV2", {})
+            )
 
             return {
                 "name": name,
@@ -999,10 +1108,14 @@ class GitHubPlanBackend:
     def list(self) -> list[dict[str, Any]]:
         """List all GitHub Projects for the repository."""
         try:
-            output = _run_gh_command([
-                "project", "list",
-                "--format", "json",
-            ])
+            output = _run_gh_command(
+                [
+                    "project",
+                    "list",
+                    "--format",
+                    "json",
+                ]
+            )
 
             projects = _parse_json(output)
             if not projects:
@@ -1016,14 +1129,16 @@ class GitHubPlanBackend:
 
             for p in projects:
                 plan_name = p.get("title", "").lower().replace(" ", "-")
-                result.append({
-                    "name": plan_name,
-                    "title": p.get("title", ""),
-                    "id": p.get("number"),
-                    "body": "",
-                    "current": plan_name == current_plan,
-                    "url": p.get("url", ""),
-                })
+                result.append(
+                    {
+                        "name": plan_name,
+                        "title": p.get("title", ""),
+                        "id": p.get("number"),
+                        "body": "",
+                        "current": plan_name == current_plan,
+                        "url": p.get("url", ""),
+                    }
+                )
 
             return result
 
@@ -1034,7 +1149,10 @@ class GitHubPlanBackend:
         """Get a plan by name."""
         plans = self.list()
         for plan in plans:
-            if plan.get("name") == name or plan.get("title", "").lower() == name.lower():
+            if (
+                plan.get("name") == name
+                or plan.get("title", "").lower() == name.lower()
+            ):
                 return plan
         return None
 

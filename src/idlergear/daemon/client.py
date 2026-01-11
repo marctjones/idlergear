@@ -1,14 +1,12 @@
 """IdlerGear daemon client - Connect to daemon via Unix socket."""
 
 import asyncio
-import json
 import os
 import signal
 from pathlib import Path
 from typing import Any
 
 from idlergear.daemon.protocol import (
-    ErrorCode,
     Notification,
     Request,
     Response,

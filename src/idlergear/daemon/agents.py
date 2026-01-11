@@ -65,9 +65,7 @@ class AgentRegistry:
 
     async def _save(self) -> None:
         """Save registry to disk."""
-        data = {
-            agent_id: agent.to_dict() for agent_id, agent in self._agents.items()
-        }
+        data = {agent_id: agent.to_dict() for agent_id, agent in self._agents.items()}
         self._registry_file.write_text(json.dumps(data, indent=2))
 
     async def register(

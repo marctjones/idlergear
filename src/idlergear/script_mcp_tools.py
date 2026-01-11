@@ -68,7 +68,13 @@ SCRIPT_TOOLS = [
                 "template": {
                     "type": "string",
                     "description": "Template name",
-                    "enum": ["pytest", "django-dev", "flask-dev", "jupyter", "fastapi-dev"],
+                    "enum": [
+                        "pytest",
+                        "django-dev",
+                        "flask-dev",
+                        "jupyter",
+                        "fastapi-dev",
+                    ],
                 },
                 "script_name": {
                     "type": "string",

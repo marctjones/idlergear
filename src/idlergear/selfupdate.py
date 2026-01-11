@@ -21,6 +21,7 @@ from idlergear import __version__
 
 class InstallMethod(str, Enum):
     """How IdlerGear was installed."""
+
     PIPX = "pipx"
     PIP_USER = "pip-user"
     PIP_VENV = "pip-venv"
@@ -32,6 +33,7 @@ class InstallMethod(str, Enum):
 @dataclass
 class InstallInfo:
     """Information about how IdlerGear is installed."""
+
     method: InstallMethod
     path: Path | None
     can_upgrade: bool
@@ -43,6 +45,7 @@ class InstallInfo:
 @dataclass
 class VersionInfo:
     """Version comparison result."""
+
     current: str
     latest: str | None
     update_available: bool
@@ -96,10 +99,14 @@ def _load_cache() -> dict | None:
 def _save_cache(version: str) -> None:
     """Save version info to cache."""
     CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps({
-        "version": version,
-        "timestamp": time.time(),
-    }))
+    CACHE_FILE.write_text(
+        json.dumps(
+            {
+                "version": version,
+                "timestamp": time.time(),
+            }
+        )
+    )
 
 
 def get_latest_version(use_cache: bool = True) -> VersionInfo:
@@ -245,7 +252,9 @@ def detect_install_method() -> InstallInfo:
             can_upgrade=can_write,
             upgrade_command=f"sudo pip install --upgrade git+https://github.com/{get_github_repo()}.git",
             requires_sudo=not can_write,
-            message="" if can_write else "System install requires elevated permissions.",
+            message=""
+            if can_write
+            else "System install requires elevated permissions.",
         )
 
     # Unknown install method
@@ -271,6 +280,7 @@ def _is_editable_install(pkg_path: Path) -> bool:
     # Also check for .egg-link in site-packages
     try:
         import site
+
         for sp in site.getsitepackages() + [site.getusersitepackages()]:
             egg_link = Path(sp) / "idlergear.egg-link"
             if egg_link.exists():
@@ -316,7 +326,9 @@ def do_self_update(
     }
 
     if not install_info.can_upgrade:
-        result["message"] = install_info.message or "Cannot auto-upgrade with this install method."
+        result["message"] = (
+            install_info.message or "Cannot auto-upgrade with this install method."
+        )
         return result
 
     if not version_info.update_available and version is None:
@@ -339,8 +351,10 @@ def do_self_update(
             # pipx doesn't support version pinning easily, use pip url
             cmd = f"pipx runpip idlergear install git+https://github.com/{repo}.git@v{version}"
         else:
-            cmd = cmd.replace(f"git+https://github.com/{repo}.git",
-                            f"git+https://github.com/{repo}.git@v{version}")
+            cmd = cmd.replace(
+                f"git+https://github.com/{repo}.git",
+                f"git+https://github.com/{repo}.git@v{version}",
+            )
 
     try:
         # Run the upgrade command

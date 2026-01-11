@@ -1,4 +1,5 @@
 """Output formatting for IdlerGear CLI."""
+
 import json
 import sys
 
@@ -59,7 +60,7 @@ def print_human(data: any, data_type: str, **kwargs) -> None:
     if formatter:
         formatter(data, **kwargs)
     elif isinstance(data, list) and not data:
-         # Handle empty lists gracefully for any data type
+        # Handle empty lists gracefully for any data type
         typer.echo(f"No {data_type} found.")
     elif isinstance(data, str):
         typer.echo(data)
@@ -81,7 +82,9 @@ def format_task_list(tasks: list[dict]) -> None:
         labels_str = f" [{', '.join(task['labels'])}]" if task.get("labels") else ""
         priority_str = f" !{task['priority']}" if task.get("priority") else ""
         due_str = f" @{task['due']}" if task.get("due") else ""
-        typer.echo(f"  [{state_icon}] #{task['id']:<4} {task['title']}{priority_str}{due_str}{labels_str}")
+        typer.echo(
+            f"  [{state_icon}] #{task['id']:<4} {task['title']}{priority_str}{due_str}{labels_str}"
+        )
 
 
 def format_task(task: dict | None) -> None:
@@ -94,8 +97,15 @@ def format_task(task: dict | None) -> None:
     typer.echo(f"Task #{task['id']}: {task['title']}")
     typer.secho(f"State: {task['state']}", fg=state_color)
     if task.get("priority"):
-        priority_colors = {"high": typer.colors.RED, "medium": typer.colors.YELLOW, "low": typer.colors.BLUE}
-        typer.secho(f"Priority: {task['priority']}", fg=priority_colors.get(task["priority"], typer.colors.WHITE))
+        priority_colors = {
+            "high": typer.colors.RED,
+            "medium": typer.colors.YELLOW,
+            "low": typer.colors.BLUE,
+        }
+        typer.secho(
+            f"Priority: {task['priority']}",
+            fg=priority_colors.get(task["priority"], typer.colors.WHITE),
+        )
     if task.get("due"):
         typer.echo(f"Due: {task['due']}")
     if task.get("labels"):
@@ -224,7 +234,11 @@ def format_search_results(results: list[dict], **kwargs) -> None:
     }
 
     for type_name, items in by_type.items():
-        typer.secho(f"{type_name.upper()}S ({len(items)})", fg=type_colors.get(type_name, typer.colors.WHITE), bold=True)
+        typer.secho(
+            f"{type_name.upper()}S ({len(items)})",
+            fg=type_colors.get(type_name, typer.colors.WHITE),
+            bold=True,
+        )
         for item in items:
             id_str = f"#{item.get('id', item.get('name', '?'))}"
             title = item.get("title", "")
@@ -238,6 +252,7 @@ def format_search_results(results: list[dict], **kwargs) -> None:
 def format_context(ctx: "ProjectContext", **kwargs) -> None:
     """Format project context by calling the original formatter."""
     from idlergear.context import format_context as original_formatter
+
     verbose = kwargs.get("verbose", False)
     typer.echo(original_formatter(ctx, verbose=verbose))
 
@@ -245,6 +260,7 @@ def format_context(ctx: "ProjectContext", **kwargs) -> None:
 def format_status(status: "ProjectStatus", **kwargs) -> None:
     """Format detailed status dashboard by calling the original formatter."""
     from idlergear.status import format_detailed_status
+
     typer.echo(format_detailed_status(status))
 
 

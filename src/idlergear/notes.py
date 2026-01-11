@@ -169,7 +169,9 @@ def promote_note(
         body = lines[1].strip() if len(lines) > 1 else None
         result = add_reference(title, body=body, project_path=project_path)
     else:
-        raise ValueError(f"Unknown promotion target: {to_type}. Valid targets: task, reference")
+        raise ValueError(
+            f"Unknown promotion target: {to_type}. Valid targets: task, reference"
+        )
 
     # Delete the original note after successful promotion
     delete_note(note_id, project_path)

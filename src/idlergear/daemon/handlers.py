@@ -22,7 +22,9 @@ def register_handlers(server: DaemonServer) -> None:
             priority=params.get("priority"),
             due=params.get("due"),
         )
-        await server.broadcast("task.created", {"id": result.get("id"), "title": params["title"]})
+        await server.broadcast(
+            "task.created", {"id": result.get("id"), "title": params["title"]}
+        )
         return result
 
     async def task_list(params: dict[str, Any], conn: Connection) -> list[dict]:
@@ -30,12 +32,16 @@ def register_handlers(server: DaemonServer) -> None:
 
         return list_tasks(state=params.get("state", "open"))
 
-    async def task_get(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def task_get(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.tasks import get_task
 
         return get_task(params["id"])
 
-    async def task_close(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def task_close(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.tasks import close_task
 
         result = close_task(params["id"])
@@ -43,7 +49,9 @@ def register_handlers(server: DaemonServer) -> None:
             await server.broadcast("task.closed", {"id": params["id"]})
         return result
 
-    async def task_update(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def task_update(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.tasks import update_task
 
         result = update_task(
@@ -71,7 +79,9 @@ def register_handlers(server: DaemonServer) -> None:
 
         return list_notes()
 
-    async def note_get(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def note_get(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.notes import get_note
 
         return get_note(params["id"])
@@ -84,17 +94,23 @@ def register_handlers(server: DaemonServer) -> None:
             await server.broadcast("note.deleted", {"id": params["id"]})
         return result
 
-    async def note_promote(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def note_promote(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.notes import promote_note
 
         return promote_note(params["id"], params.get("to", "task"))
 
     # Exploration handlers
-    async def explore_create(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
+    async def explore_create(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
         from idlergear.explorations import create_exploration
 
         result = create_exploration(params["title"], body=params.get("body"))
-        await server.broadcast("explore.created", {"id": result.get("id"), "title": params["title"]})
+        await server.broadcast(
+            "explore.created", {"id": result.get("id"), "title": params["title"]}
+        )
         return result
 
     async def explore_list(params: dict[str, Any], conn: Connection) -> list[dict]:
@@ -102,12 +118,16 @@ def register_handlers(server: DaemonServer) -> None:
 
         return list_explorations(state=params.get("state", "open"))
 
-    async def explore_get(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def explore_get(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.explorations import get_exploration
 
         return get_exploration(params["id"])
 
-    async def explore_close(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def explore_close(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.explorations import close_exploration
 
         result = close_exploration(params["id"])
@@ -145,17 +165,23 @@ def register_handlers(server: DaemonServer) -> None:
 
         return list_plans()
 
-    async def plan_get(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def plan_get(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.plans import get_plan
 
         return get_plan(params["name"])
 
-    async def plan_current(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def plan_current(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.plans import get_current_plan
 
         return get_current_plan()
 
-    async def plan_switch(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def plan_switch(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.plans import switch_plan
 
         result = switch_plan(params["name"])
@@ -168,7 +194,9 @@ def register_handlers(server: DaemonServer) -> None:
         from idlergear.reference import add_reference
 
         result = add_reference(params["title"], body=params.get("body"))
-        await server.broadcast("reference.added", {"id": result.get("id"), "title": params["title"]})
+        await server.broadcast(
+            "reference.added", {"id": result.get("id"), "title": params["title"]}
+        )
         return result
 
     async def reference_list(params: dict[str, Any], conn: Connection) -> list[dict]:
@@ -176,12 +204,16 @@ def register_handlers(server: DaemonServer) -> None:
 
         return list_references()
 
-    async def reference_get(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def reference_get(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.reference import get_reference
 
         return get_reference(params["title"])
 
-    async def reference_update(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def reference_update(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.reference import update_reference
 
         result = update_reference(
@@ -221,7 +253,9 @@ def register_handlers(server: DaemonServer) -> None:
 
         return list_runs()
 
-    async def run_status(params: dict[str, Any], conn: Connection) -> dict[str, Any] | None:
+    async def run_status(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any] | None:
         from idlergear.runs import get_run_status
 
         return get_run_status(params["name"])

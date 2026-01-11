@@ -6,7 +6,6 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
-from rich.markdown import Markdown
 
 console = Console()
 
@@ -295,7 +294,9 @@ def generate_goosehints(
     goosehints_path = path / ".goosehints"
 
     if goosehints_path.exists() and not force:
-        console.print(f"[red]Error:[/red] .goosehints already exists at {goosehints_path}")
+        console.print(
+            f"[red]Error:[/red] .goosehints already exists at {goosehints_path}"
+        )
         console.print("[yellow]Use --force to overwrite[/yellow]")
         raise typer.Exit(1)
 
@@ -306,7 +307,9 @@ def generate_goosehints(
     console.print("\n[bold]Next steps:[/bold]")
     console.print("  1. Review the file and customize as needed")
     console.print("  2. Configure MCP servers in your Goose settings")
-    console.print("  3. Goose will automatically load these instructions on session start")
+    console.print(
+        "  3. Goose will automatically load these instructions on session start"
+    )
 
 
 def register_goose_extension() -> None:
@@ -315,17 +318,19 @@ def register_goose_extension() -> None:
     This will be implemented after researching Goose's extension API.
     Currently outputs instructions for manual registration.
     """
-    console.print(Panel.fit(
-        "[bold]Goose GUI Extension Registration[/bold]\n\n"
-        "[yellow]Status:[/yellow] Manual configuration required (automatic registration coming soon)\n\n"
-        "[bold]Steps:[/bold]\n"
-        "  1. Open Goose GUI settings\n"
-        "  2. Navigate to Extensions or MCP Servers section\n"
-        "  3. Add IdlerGear MCP server with command: [cyan]idlergear-mcp[/cyan]\n"
-        "  4. Optionally add recommended servers (filesystem, git, pm)\n"
-        "  5. Restart Goose GUI to activate",
-        title="🦆 Goose Integration"
-    ))
+    console.print(
+        Panel.fit(
+            "[bold]Goose GUI Extension Registration[/bold]\n\n"
+            "[yellow]Status:[/yellow] Manual configuration required (automatic registration coming soon)\n\n"
+            "[bold]Steps:[/bold]\n"
+            "  1. Open Goose GUI settings\n"
+            "  2. Navigate to Extensions or MCP Servers section\n"
+            "  3. Add IdlerGear MCP server with command: [cyan]idlergear-mcp[/cyan]\n"
+            "  4. Optionally add recommended servers (filesystem, git, pm)\n"
+            "  5. Restart Goose GUI to activate",
+            title="🦆 Goose Integration",
+        )
+    )
 
     console.print("\n[bold]Goose CLI Configuration (config.yaml):[/bold]\n")
     console.print("```yaml")
@@ -338,15 +343,17 @@ def register_goose_extension() -> None:
 
     console.print("\n[bold]Goose GUI Configuration (JSON):[/bold]\n")
     console.print("```json")
-    console.print('{')
+    console.print("{")
     console.print('  "mcpServers": {')
     console.print('    "idlergear": {')
     console.print('      "command": "idlergear-mcp",')
     console.print('      "args": []')
-    console.print('    }')
-    console.print('  }')
-    console.print('}')
+    console.print("    }")
+    console.print("  }")
+    console.print("}")
     console.print("```")
 
-    console.print("\n[green]✓[/green] IdlerGear provides 51 tools - filesystem, git, PM all built-in!")
+    console.print(
+        "\n[green]✓[/green] IdlerGear provides 51 tools - filesystem, git, PM all built-in!"
+    )
     console.print("[green]✓[/green] Zero Node.js dependencies required!")

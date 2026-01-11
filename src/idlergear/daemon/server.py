@@ -1,18 +1,15 @@
 """IdlerGear daemon server - Unix socket server with JSON-RPC 2.0."""
 
 import asyncio
-import json
 import logging
 import os
 import signal
-import sys
 from pathlib import Path
 from typing import Any, Callable, Coroutine
 
 from idlergear.daemon.protocol import (
     ErrorCode,
     Notification,
-    Request,
     Response,
     parse_message,
 )
@@ -281,9 +278,7 @@ class DaemonServer:
             metadata=params.get("metadata"),
         )
 
-        await self.broadcast(
-            "queue.added", {"id": cmd_id, "prompt": prompt[:100]}
-        )
+        await self.broadcast("queue.added", {"id": cmd_id, "prompt": prompt[:100]})
 
         return {"id": cmd_id}
 
@@ -311,9 +306,7 @@ class DaemonServer:
         if status:
             status = CommandStatus(status)
 
-        commands = await self.queue.list(
-            status=status, agent_id=params.get("agent_id")
-        )
+        commands = await self.queue.list(status=status, agent_id=params.get("agent_id"))
 
         return {"commands": [c.to_dict() for c in commands]}
 
@@ -455,7 +448,11 @@ class DaemonServer:
         event = params.get("event", "message")
         data = params.get("data", {})
         await self.broadcast(event, data)
-        return {"broadcasted": True, "event": event, "connections": len(self._connections)}
+        return {
+            "broadcasted": True,
+            "event": event,
+            "connections": len(self._connections),
+        }
 
     def _matches_subscription(self, event: str, subscription: str) -> bool:
         """Check if an event matches a subscription pattern.
@@ -524,9 +521,7 @@ class DaemonServer:
         try:
             parsed = parse_message(message)
         except ValueError as e:
-            response = Response.error_response(
-                None, ErrorCode.PARSE_ERROR, str(e)
-            )
+            response = Response.error_response(None, ErrorCode.PARSE_ERROR, str(e))
             await conn.send(response.to_json())
             return
 
@@ -543,9 +538,7 @@ class DaemonServer:
         # It's a Request, needs a response
         request = parsed
         try:
-            result = await self._dispatch_method(
-                request.method, request.params, conn
-            )
+            result = await self._dispatch_method(request.method, request.params, conn)
             response = Response.success(request.id, result)
         except KeyError:
             response = Response.error_response(
@@ -656,6 +649,7 @@ def run_daemon(idlergear_root: Path) -> None:
 
     # Register knowledge management methods
     from idlergear.daemon.handlers import register_handlers
+
     register_handlers(server)
 
     async def main():

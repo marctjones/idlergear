@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from idlergear.config import find_idlergear_root
-from idlergear.daemon.client import DaemonClient, DaemonError, DaemonNotRunning
+from idlergear.daemon.client import DaemonClient, DaemonError
 from idlergear.daemon.lifecycle import DaemonLifecycle
 
 
@@ -50,6 +50,7 @@ def _run_async(coro):
     if loop and loop.is_running():
         # We're in an async context, create a task
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, coro)
             return future.result()
@@ -75,7 +76,9 @@ async def _call_daemon(method: str, params: dict[str, Any]) -> Any:
         await client.disconnect()
 
 
-def _write_presence_file(agent_id: str, agent_type: str, metadata: dict[str, Any] | None = None) -> Path:
+def _write_presence_file(
+    agent_id: str, agent_type: str, metadata: dict[str, Any] | None = None
+) -> Path:
     """Write agent presence file for visibility.
 
     Presence files allow `idlergear status` to show connected agents
@@ -178,6 +181,7 @@ def _cleanup_stale_presence_files(timeout_seconds: int = 300) -> int:
 # MCP Handler Functions (called from mcp_server.py)
 # ============================================================================
 
+
 def handle_register_agent(arguments: dict[str, Any]) -> dict[str, Any]:
     """Register an AI agent with the daemon.
 
@@ -201,17 +205,24 @@ def handle_register_agent(arguments: dict[str, Any]) -> dict[str, Any]:
         client = DaemonClient(lifecycle.socket_path)
         try:
             await client.connect()
-            result = await client.call("agent.register", {
-                "agent_id": agent_id,
-                "agent_type": agent_type,
-                "name": name,
-                "metadata": metadata,
-            })
+            result = await client.call(
+                "agent.register",
+                {
+                    "agent_id": agent_id,
+                    "agent_type": agent_type,
+                    "name": name,
+                    "metadata": metadata,
+                },
+            )
             return result
         except DaemonError as e:
             # If daemon doesn't support agent registration yet, still succeed
             if "Unknown method" in str(e):
-                return {"agent_id": agent_id, "registered": True, "note": "Daemon running, agent registered locally"}
+                return {
+                    "agent_id": agent_id,
+                    "registered": True,
+                    "note": "Daemon running, agent registered locally",
+                }
             raise
         finally:
             await client.disconnect()
@@ -290,10 +301,15 @@ def handle_queue_command(arguments: dict[str, Any]) -> dict[str, Any]:
     # Ensure daemon is running
     _ensure_daemon()
 
-    result = _run_async(_call_daemon("queue.add", {
-        "command": command,
-        "priority": priority,
-    }))
+    result = _run_async(
+        _call_daemon(
+            "queue.add",
+            {
+                "command": command,
+                "priority": priority,
+            },
+        )
+    )
 
     if wait_for_result:
         # Poll for completion (with timeout)
@@ -301,6 +317,7 @@ def handle_queue_command(arguments: dict[str, Any]) -> dict[str, Any]:
         if command_id:
             for _ in range(60):  # 60 second timeout
                 import time
+
                 time.sleep(1)
                 status = _run_async(_call_daemon("queue.get", {"id": command_id}))
                 if status.get("status") == "completed":
@@ -319,10 +336,18 @@ def handle_send_message(arguments: dict[str, Any]) -> dict[str, Any]:
     # Ensure daemon is running
     _ensure_daemon()
 
-    result = _run_async(_call_daemon("message.broadcast", {
-        "event": "message",
-        "data": {"message": message, "timestamp": datetime.now(timezone.utc).isoformat()},
-    }))
+    result = _run_async(
+        _call_daemon(
+            "message.broadcast",
+            {
+                "event": "message",
+                "data": {
+                    "message": message,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            },
+        )
+    )
 
     return {"sent": True, "message": message, **result}
 
@@ -346,10 +371,15 @@ def handle_update_status(arguments: dict[str, Any]) -> dict[str, Any]:
         lifecycle = DaemonLifecycle(idlergear_root)
 
         if lifecycle.is_running():
-            result = _run_async(_call_daemon("agent.update_status", {
-                "agent_id": agent_id,
-                "status": status,
-            }))
+            result = _run_async(
+                _call_daemon(
+                    "agent.update_status",
+                    {
+                        "agent_id": agent_id,
+                        "status": status,
+                    },
+                )
+            )
             return result
     except Exception as e:
         return {"updated": False, "error": str(e)}

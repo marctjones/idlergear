@@ -208,9 +208,7 @@ def end_session(
     if auto_suggest:
         suggestions = []
         if current_task_id:
-            suggestions.append(
-                f"Next session: Continue task #{current_task_id}"
-            )
+            suggestions.append(f"Next session: Continue task #{current_task_id}")
         if working_files:
             suggestions.append(
                 f"Next session: Resume editing {len(working_files)} files"

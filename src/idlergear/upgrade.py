@@ -104,7 +104,9 @@ def do_upgrade(project_path: Path | None = None, quiet: bool = False) -> dict:
 
     # Update all files
     results["files"]["rules"] = add_rules_file(project_path)
-    results["files"]["hooks_config"] = "updated" if add_hooks_config(project_path) else "unchanged"
+    results["files"]["hooks_config"] = (
+        "updated" if add_hooks_config(project_path) else "unchanged"
+    )
     results["files"]["hook_scripts"] = install_hook_scripts(project_path)
     results["files"]["commands"] = add_commands(project_path)
     results["files"]["skill"] = add_skill(project_path)
@@ -120,7 +122,6 @@ def check_and_prompt_upgrade(project_path: Path | None = None) -> bool:
 
     Returns True if upgrade was performed, False otherwise.
     """
-    import sys
 
     if project_path is None:
         project_path = find_idlergear_root()
@@ -147,14 +148,16 @@ def check_and_prompt_upgrade(project_path: Path | None = None) -> bool:
     updated_count = 0
     for key, value in results["files"].items():
         if isinstance(value, dict):
-            updated_count += sum(1 for v in value.values() if v in ("created", "updated"))
+            updated_count += sum(
+                1 for v in value.values() if v in ("created", "updated")
+            )
         elif value in ("created", "updated"):
             updated_count += 1
 
     if updated_count > 0:
         print(f"[IdlerGear] Upgraded {updated_count} file(s) in .claude/")
     else:
-        print(f"[IdlerGear] Version updated (files already current)")
+        print("[IdlerGear] Version updated (files already current)")
 
     print()
 

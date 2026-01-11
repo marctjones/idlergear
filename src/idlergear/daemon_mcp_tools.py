@@ -128,7 +128,13 @@ def get_daemon_tools() -> list[Tool]:
                 "properties": {
                     "status": {
                         "type": "string",
-                        "enum": ["pending", "assigned", "running", "completed", "failed"],
+                        "enum": [
+                            "pending",
+                            "assigned",
+                            "running",
+                            "completed",
+                            "failed",
+                        ],
                         "description": "Filter by status",
                     },
                     "agent_id": {

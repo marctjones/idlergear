@@ -1,19 +1,18 @@
 """OpenTelemetry log collector with OTLP receivers and IdlerGear exporters."""
 
-import asyncio
 import json
 import logging
 import threading
-import time
 from concurrent import futures
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import grpc
-from google.protobuf.json_format import MessageToDict
-from opentelemetry.proto.collector.logs.v1 import logs_service_pb2, logs_service_pb2_grpc
-from opentelemetry.proto.common.v1 import common_pb2
+from opentelemetry.proto.collector.logs.v1 import (
+    logs_service_pb2,
+    logs_service_pb2_grpc,
+)
 from opentelemetry.proto.logs.v1 import logs_pb2
 
 from idlergear.otel_storage import OTelStorage
@@ -126,19 +125,19 @@ class IdlerGearNoteExporter(BaseExporter):
             from idlergear.notes import create_note
 
             # Format note content
-            content = f"""# {log_data['severity']}: {log_data['message']}
+            content = f"""# {log_data["severity"]}: {log_data["message"]}
 
-**Service:** {log_data['service']}
-**Timestamp:** {log_data['timestamp']}
+**Service:** {log_data["service"]}
+**Timestamp:** {log_data["timestamp"]}
 
 ## Attributes
 ```json
-{json.dumps(log_data.get('attributes', {}), indent=2)}
+{json.dumps(log_data.get("attributes", {}), indent=2)}
 ```
 
 ## Trace Context
-- Trace ID: {log_data.get('trace_id', 'N/A')}
-- Span ID: {log_data.get('span_id', 'N/A')}
+- Trace ID: {log_data.get("trace_id", "N/A")}
+- Span ID: {log_data.get("span_id", "N/A")}
 """
 
             # Create note with appropriate tags
@@ -173,19 +172,19 @@ class IdlerGearTaskExporter(BaseExporter):
 
             # Format task
             title = f"[{log_data['service']}] {log_data['message'][:80]}"
-            body = f"""# Fatal Error from {log_data['service']}
+            body = f"""# Fatal Error from {log_data["service"]}
 
-**Timestamp:** {log_data['timestamp']}
-**Message:** {log_data['message']}
+**Timestamp:** {log_data["timestamp"]}
+**Message:** {log_data["message"]}
 
 ## Attributes
 ```json
-{json.dumps(log_data.get('attributes', {}), indent=2)}
+{json.dumps(log_data.get("attributes", {}), indent=2)}
 ```
 
 ## Trace Context
-- Trace ID: {log_data.get('trace_id', 'N/A')}
-- Span ID: {log_data.get('span_id', 'N/A')}
+- Trace ID: {log_data.get("trace_id", "N/A")}
+- Span ID: {log_data.get("span_id", "N/A")}
 
 ## Action Required
 This fatal error was automatically captured from OpenTelemetry logs. Please investigate and resolve.
@@ -193,7 +192,10 @@ This fatal error was automatically captured from OpenTelemetry logs. Please inve
 
             # Create high-priority task
             task_id = create_task(
-                title=title, body=body, priority="high", labels=["bug", "automated", "otel"]
+                title=title,
+                body=body,
+                priority="high",
+                labels=["bug", "automated", "otel"],
             )
             logger.info(f"Created task #{task_id} from FATAL log")
 
@@ -251,7 +253,12 @@ class OTelCollector:
 
         # Running state
         self.running = False
-        self.stats = {"logs_received": 0, "logs_stored": 0, "logs_exported": 0, "errors": 0}
+        self.stats = {
+            "logs_received": 0,
+            "logs_stored": 0,
+            "logs_exported": 0,
+            "errors": 0,
+        }
 
     def _severity_from_number(self, severity_number: int) -> str:
         """Convert OTel severity number to string."""
@@ -266,13 +273,19 @@ class OTelCollector:
         else:
             return "DEBUG"
 
-    def _process_log_record(self, log_record: logs_pb2.LogRecord, service_name: str) -> Dict[str, Any]:
+    def _process_log_record(
+        self, log_record: logs_pb2.LogRecord, service_name: str
+    ) -> Dict[str, Any]:
         """Process OTel log record into dict."""
         # Extract fields
         timestamp_ns = log_record.time_unix_nano
         severity_number = log_record.severity_number
         severity = self._severity_from_number(severity_number)
-        message = log_record.body.string_value if log_record.body.HasField("string_value") else ""
+        message = (
+            log_record.body.string_value
+            if log_record.body.HasField("string_value")
+            else ""
+        )
 
         # Extract attributes
         attributes = {}
@@ -308,7 +321,9 @@ class OTelCollector:
         for exporter in self.exporters:
             try:
                 result = exporter.export(log_data)
-                self.stats["logs_exported"] += 1  # Count all exports, not just those with metadata
+                self.stats["logs_exported"] += (
+                    1  # Count all exports, not just those with metadata
+                )
                 if result:
                     metadata.update(result)
             except Exception as e:
@@ -317,7 +332,9 @@ class OTelCollector:
 
         return metadata
 
-    def process_logs(self, request: logs_service_pb2.ExportLogsServiceRequest) -> logs_service_pb2.ExportLogsServiceResponse:
+    def process_logs(
+        self, request: logs_service_pb2.ExportLogsServiceRequest
+    ) -> logs_service_pb2.ExportLogsServiceResponse:
         """Process OTLP logs request."""
         for resource_logs in request.resource_logs:
             # Extract service name from resource
@@ -374,7 +391,9 @@ class OTelCollector:
         # Start gRPC server
         self._start_grpc_server()
 
-        logger.info(f"OTel collector started - gRPC: {self.grpc_port}, HTTP: {self.http_port}")
+        logger.info(
+            f"OTel collector started - gRPC: {self.grpc_port}, HTTP: {self.http_port}"
+        )
 
     def _start_grpc_server(self):
         """Start gRPC server in background thread."""
@@ -388,7 +407,9 @@ class OTelCollector:
 
         # Create and start gRPC server
         self.grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        logs_service_pb2_grpc.add_LogsServiceServicer_to_server(LogsServiceServicer(self), self.grpc_server)
+        logs_service_pb2_grpc.add_LogsServiceServicer_to_server(
+            LogsServiceServicer(self), self.grpc_server
+        )
         self.grpc_server.add_insecure_port(f"[::]:{self.grpc_port}")
 
         def run_server():
@@ -426,7 +447,11 @@ class OTelCollector:
             "http_port": self.http_port,
             "stats": self.stats,
             "exporters": [
-                {"type": e.__class__.__name__, "enabled": e.config.enabled, "min_severity": e.config.min_severity}
+                {
+                    "type": e.__class__.__name__,
+                    "enabled": e.config.enabled,
+                    "min_severity": e.config.min_severity,
+                }
                 for e in self.exporters
             ],
         }
@@ -440,7 +465,12 @@ def create_default_collector(storage_path: Optional[Path] = None) -> OTelCollect
     # Default exporters
     exporters = [
         ExporterConfig(type="console", enabled=True, min_severity="INFO"),
-        ExporterConfig(type="file", enabled=True, min_severity="DEBUG", config={"path": "logs/otel.jsonl"}),
+        ExporterConfig(
+            type="file",
+            enabled=True,
+            min_severity="DEBUG",
+            config={"path": "logs/otel.jsonl"},
+        ),
         ExporterConfig(type="idlergear_note", enabled=True, min_severity="ERROR"),
         ExporterConfig(type="idlergear_task", enabled=True, min_severity="FATAL"),
     ]

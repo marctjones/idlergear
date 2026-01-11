@@ -7,7 +7,6 @@ This module generates shell scripts that:
 4. Provide helpers for coordination
 """
 
-import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -240,6 +239,7 @@ def save_script(
 
     if make_executable:
         import stat
+
         output_path.chmod(output_path.stat().st_mode | stat.S_IEXEC)
 
     return output_path

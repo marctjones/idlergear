@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import typer
 
 from idlergear.backends.registry import get_backend
 from idlergear.schema import IdlerGearSchema
@@ -347,7 +346,9 @@ def format_detailed_status(status: ProjectStatus) -> str:
 
     # Daemon/Agents
     if status.daemon_running:
-        agent_info = f", {status.agents_count} agents" if status.agents_count > 0 else ""
+        agent_info = (
+            f", {status.agents_count} agents" if status.agents_count > 0 else ""
+        )
         lines.append(f"Daemon: Running (PID {status.daemon_pid}{agent_info})")
         if status.agents_list:
             for agent in status.agents_list[:5]:  # Show max 5 agents
@@ -384,5 +385,3 @@ def format_detailed_status(status: ProjectStatus) -> str:
         lines.append(f"Last release: {status.last_release}")
 
     return "\n".join(lines)
-
-

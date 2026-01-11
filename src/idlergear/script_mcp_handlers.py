@@ -65,7 +65,7 @@ def handle_script_generate(arguments: dict[str, Any]) -> str:
 Run with: ./{rel_path}
 
 Features:
-{chr(10).join(f'  • {f}' for f in features)}
+{chr(10).join(f"  • {f}" for f in features)}
 
 The script will:
 1. Set up the development environment
@@ -159,19 +159,19 @@ def handle_run_with_daemon(arguments: dict[str, Any]) -> str:
         if stream_logs:
             features.append("Streaming logs to daemon")
 
-        return f"""✓ Started background process: {run['name']}
+        return f"""✓ Started background process: {run["name"]}
 
-  PID:     {run['pid']}
-  Command: {run['command']}
-  Status:  {run['status']}
+  PID:     {run["pid"]}
+  Command: {run["command"]}
+  Status:  {run["status"]}
 
-{chr(10).join(f'  • {f}' for f in features) if features else ''}
+{chr(10).join(f"  • {f}" for f in features) if features else ""}
 
-View logs: idlergear run logs {run['name']}
-Stop:      idlergear run stop {run['name']}
-Status:    idlergear run status {run['name']}
+View logs: idlergear run logs {run["name"]}
+Stop:      idlergear run stop {run["name"]}
+Status:    idlergear run status {run["name"]}
 
-{'The process is registered with the daemon and visible to other AI agents.' if register else ''}
+{"The process is registered with the daemon and visible to other AI agents." if register else ""}
 """
 
     except RuntimeError as e:

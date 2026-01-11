@@ -134,9 +134,7 @@ class LockManager:
         """Remove expired locks (internal, assumes _lock is held)."""
         now = time.time()
         expired = [
-            resource
-            for resource, lock in self._locks.items()
-            if lock.expires_at <= now
+            resource for resource, lock in self._locks.items() if lock.expires_at <= now
         ]
 
         for resource in expired:

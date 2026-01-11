@@ -128,8 +128,7 @@ def remove_claude_settings(project_path: Path) -> bool:
     if "protectedPaths" in settings:
         original_count = len(settings["protectedPaths"])
         settings["protectedPaths"] = [
-            p for p in settings["protectedPaths"]
-            if not p.startswith(".idlergear")
+            p for p in settings["protectedPaths"] if not p.startswith(".idlergear")
         ]
         if len(settings["protectedPaths"]) < original_count:
             modified = True
@@ -235,6 +234,7 @@ def uninstall_idlergear(
 
     # Check for hook scripts installed by idlergear
     from idlergear.install import HOOK_SCRIPTS
+
     if hooks_dir.exists():
         for script_name in HOOK_SCRIPTS:
             if (hooks_dir / script_name).exists():
@@ -266,18 +266,22 @@ def uninstall_idlergear(
 
     if results["claude_md"]:
         from idlergear.install import remove_claude_md_section
+
         results["claude_md"] = remove_claude_md_section(project_path)
 
     if results["rules_file"]:
         from idlergear.install import remove_rules_file
+
         results["rules_file"] = remove_rules_file(project_path)
 
     if results["skill"]:
         from idlergear.install import remove_skill
+
         results["skill"] = remove_skill(project_path)
 
     if results["hook_scripts"]:
         from idlergear.install import remove_hook_scripts
+
         results["hook_scripts"] = remove_hook_scripts(project_path)
 
     if results["claude_settings"]:

@@ -37,66 +37,78 @@ def search_all(
     if "task" in search_types:
         for task in list_tasks(state="all", project_path=project_path):
             if _matches(task, query_lower, ["title", "body"]):
-                results.append({
-                    "type": "task",
-                    "id": task["id"],
-                    "title": task.get("title", ""),
-                    "preview": _get_preview(task, query_lower),
-                    "state": task.get("state"),
-                    "priority": task.get("priority"),
-                    "due": task.get("due"),
-                    "path": task.get("path"),
-                })
+                results.append(
+                    {
+                        "type": "task",
+                        "id": task["id"],
+                        "title": task.get("title", ""),
+                        "preview": _get_preview(task, query_lower),
+                        "state": task.get("state"),
+                        "priority": task.get("priority"),
+                        "due": task.get("due"),
+                        "path": task.get("path"),
+                    }
+                )
 
     # Search notes
     if "note" in search_types:
         for note in list_notes(project_path=project_path):
             if _matches(note, query_lower, ["content"]):
-                results.append({
-                    "type": "note",
-                    "id": note["id"],
-                    "title": _get_note_title(note),
-                    "preview": _get_preview(note, query_lower, content_field="content"),
-                    "path": note.get("path"),
-                })
+                results.append(
+                    {
+                        "type": "note",
+                        "id": note["id"],
+                        "title": _get_note_title(note),
+                        "preview": _get_preview(
+                            note, query_lower, content_field="content"
+                        ),
+                        "path": note.get("path"),
+                    }
+                )
 
     # Search explorations
     if "explore" in search_types:
         for exp in list_explorations(state="all", project_path=project_path):
             if _matches(exp, query_lower, ["title", "body"]):
-                results.append({
-                    "type": "explore",
-                    "id": exp["id"],
-                    "title": exp.get("title", ""),
-                    "preview": _get_preview(exp, query_lower),
-                    "state": exp.get("state"),
-                    "path": exp.get("path"),
-                })
+                results.append(
+                    {
+                        "type": "explore",
+                        "id": exp["id"],
+                        "title": exp.get("title", ""),
+                        "preview": _get_preview(exp, query_lower),
+                        "state": exp.get("state"),
+                        "path": exp.get("path"),
+                    }
+                )
 
     # Search references
     if "reference" in search_types:
         for ref in list_references(project_path=project_path):
             if _matches(ref, query_lower, ["title", "body"]):
-                results.append({
-                    "type": "reference",
-                    "id": ref.get("id"),
-                    "title": ref.get("title", ""),
-                    "preview": _get_preview(ref, query_lower),
-                    "path": ref.get("path"),
-                })
+                results.append(
+                    {
+                        "type": "reference",
+                        "id": ref.get("id"),
+                        "title": ref.get("title", ""),
+                        "preview": _get_preview(ref, query_lower),
+                        "path": ref.get("path"),
+                    }
+                )
 
     # Search plans
     if "plan" in search_types:
         for plan in list_plans(project_path=project_path):
             if _matches(plan, query_lower, ["name", "title", "body"]):
-                results.append({
-                    "type": "plan",
-                    "name": plan.get("name"),
-                    "title": plan.get("title", plan.get("name", "")),
-                    "preview": _get_preview(plan, query_lower),
-                    "state": plan.get("state"),
-                    "path": plan.get("path"),
-                })
+                results.append(
+                    {
+                        "type": "plan",
+                        "name": plan.get("name"),
+                        "title": plan.get("title", plan.get("name", "")),
+                        "preview": _get_preview(plan, query_lower),
+                        "state": plan.get("state"),
+                        "path": plan.get("path"),
+                    }
+                )
 
     return results
 

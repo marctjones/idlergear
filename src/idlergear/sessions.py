@@ -255,7 +255,7 @@ def format_session_state(state: SessionState, verbose: bool = False) -> str:
     except (ValueError, TypeError):
         time_ago = "unknown time ago"
 
-    lines.append(f"=== Session State ===")
+    lines.append("=== Session State ===")
     if state.name:
         lines.append(f"Name: {state.name}")
     lines.append(f"Saved: {time_ago}")

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List
 
 # Hook script templates
-SESSION_START_HOOK = '''#!/bin/bash
+SESSION_START_HOOK = """#!/bin/bash
 # Auto-inject IdlerGear context at session start
 
 # Check if IdlerGear is initialized
@@ -25,9 +25,9 @@ EOF
 fi
 
 exit 0
-'''
+"""
 
-PRE_TOOL_USE_HOOK = '''#!/bin/bash
+PRE_TOOL_USE_HOOK = """#!/bin/bash
 # Block forbidden file operations BEFORE they happen
 
 INPUT=$(cat)
@@ -104,9 +104,9 @@ EOF
 done
 
 exit 0
-'''
+"""
 
-STOP_HOOK = '''#!/bin/bash
+STOP_HOOK = """#!/bin/bash
 # Prompt for knowledge capture before ending session
 
 # Check if IdlerGear is initialized
@@ -164,17 +164,14 @@ fi
 # Approve stop
 echo '{"decision": "approve"}'
 exit 0
-'''
+"""
 
 HOOKS_JSON_TEMPLATE = {
     "hooks": {
         "SessionStart": [
             {
                 "hooks": [
-                    {
-                        "type": "command",
-                        "command": "./.claude/hooks/session-start.sh"
-                    }
+                    {"type": "command", "command": "./.claude/hooks/session-start.sh"}
                 ]
             }
         ],
@@ -182,23 +179,13 @@ HOOKS_JSON_TEMPLATE = {
             {
                 "matcher": "Write|Edit",
                 "hooks": [
-                    {
-                        "type": "command",
-                        "command": "./.claude/hooks/pre-tool-use.sh"
-                    }
-                ]
+                    {"type": "command", "command": "./.claude/hooks/pre-tool-use.sh"}
+                ],
             }
         ],
         "Stop": [
-            {
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "./.claude/hooks/stop.sh"
-                    }
-                ]
-            }
-        ]
+            {"hooks": [{"type": "command", "command": "./.claude/hooks/stop.sh"}]}
+        ],
     }
 }
 
@@ -278,13 +265,13 @@ def test_hooks(project_path: Path = None) -> Dict[str, Dict[str, any]]:
             input='{"session_id":"test","source":"startup"}',
             capture_output=True,
             text=True,
-            cwd=project_path
+            cwd=project_path,
         )
         results["session-start"] = {
             "exists": True,
             "executable": session_start.stat().st_mode & 0o111 != 0,
             "exit_code": result.returncode,
-            "output_length": len(result.stdout)
+            "output_length": len(result.stdout),
         }
     else:
         results["session-start"] = {"exists": False}
@@ -292,23 +279,22 @@ def test_hooks(project_path: Path = None) -> Dict[str, Dict[str, any]]:
     # Test PreToolUse (should block TODO.md)
     pre_tool_use = hooks_dir / "pre-tool-use.sh"
     if pre_tool_use.exists():
-        test_input = json.dumps({
-            "tool_name": "Write",
-            "tool_input": {"file_path": "TODO.md"}
-        })
+        test_input = json.dumps(
+            {"tool_name": "Write", "tool_input": {"file_path": "TODO.md"}}
+        )
         result = subprocess.run(
             [str(pre_tool_use)],
             input=test_input,
             capture_output=True,
             text=True,
-            cwd=project_path
+            cwd=project_path,
         )
         results["pre-tool-use"] = {
             "exists": True,
             "executable": pre_tool_use.stat().st_mode & 0o111 != 0,
             "exit_code": result.returncode,
             "blocks_forbidden": result.returncode == 2,
-            "error_message": result.stderr[:200] if result.stderr else ""
+            "error_message": result.stderr[:200] if result.stderr else "",
         }
     else:
         results["pre-tool-use"] = {"exists": False}
@@ -317,17 +303,13 @@ def test_hooks(project_path: Path = None) -> Dict[str, Dict[str, any]]:
     stop = hooks_dir / "stop.sh"
     if stop.exists():
         result = subprocess.run(
-            [str(stop)],
-            input='{}',
-            capture_output=True,
-            text=True,
-            cwd=project_path
+            [str(stop)], input="{}", capture_output=True, text=True, cwd=project_path
         )
         results["stop"] = {
             "exists": True,
             "executable": stop.stat().st_mode & 0o111 != 0,
             "exit_code": result.returncode,
-            "valid_json": result.stdout.strip().startswith("{")
+            "valid_json": result.stdout.strip().startswith("{"),
         }
     else:
         results["stop"] = {"exists": False}
@@ -348,12 +330,14 @@ def list_hooks(project_path: Path = None) -> List[Dict[str, any]]:
     hooks = []
     for hook_file in hooks_dir.glob("*.sh"):
         stat = hook_file.stat()
-        hooks.append({
-            "name": hook_file.name,
-            "path": str(hook_file),
-            "executable": stat.st_mode & 0o111 != 0,
-            "size": stat.st_size,
-            "modified": stat.st_mtime
-        })
+        hooks.append(
+            {
+                "name": hook_file.name,
+                "path": str(hook_file),
+                "executable": stat.st_mode & 0o111 != 0,
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+            }
+        )
 
     return hooks

@@ -158,14 +158,17 @@ class ShellTaskBackend:
         if not cmd:
             raise ShellBackendError("No 'create' command configured")
 
-        output = _run_command(cmd, {
-            "title": title,
-            "body": body or "",
-            "labels": labels or [],
-            "assignees": assignees or [],
-            "priority": priority or "",
-            "due": due or "",
-        })
+        output = _run_command(
+            cmd,
+            {
+                "title": title,
+                "body": body or "",
+                "labels": labels or [],
+                "assignees": assignees or [],
+                "priority": priority or "",
+                "due": due or "",
+            },
+        )
 
         return _parse_json_output(output, self.field_map)
 
@@ -208,16 +211,19 @@ class ShellTaskBackend:
             raise ShellBackendError("No 'update' command configured")
 
         try:
-            output = _run_command(cmd, {
-                "id": task_id,
-                "title": title or "",
-                "body": body or "",
-                "state": state or "",
-                "labels": labels or [],
-                "assignees": assignees or [],
-                "priority": priority or "",
-                "due": due or "",
-            })
+            output = _run_command(
+                cmd,
+                {
+                    "id": task_id,
+                    "title": title or "",
+                    "body": body or "",
+                    "state": state or "",
+                    "labels": labels or [],
+                    "assignees": assignees or [],
+                    "priority": priority or "",
+                    "due": due or "",
+                },
+            )
             return _parse_json_output(output, self.field_map)
         except ShellBackendError:
             return None
@@ -310,12 +316,15 @@ class ShellExploreBackend:
             raise ShellBackendError("No 'update' command configured")
 
         try:
-            output = _run_command(cmd, {
-                "id": explore_id,
-                "title": title or "",
-                "body": body or "",
-                "state": state or "",
-            })
+            output = _run_command(
+                cmd,
+                {
+                    "id": explore_id,
+                    "title": title or "",
+                    "body": body or "",
+                    "state": state or "",
+                },
+            )
             return _parse_json_output(output, self.field_map)
         except ShellBackendError:
             return None
@@ -422,11 +431,14 @@ class ShellReferenceBackend:
             raise ShellBackendError("No 'update' command configured")
 
         try:
-            output = _run_command(cmd, {
-                "title": title,
-                "new_title": new_title or "",
-                "body": body or "",
-            })
+            output = _run_command(
+                cmd,
+                {
+                    "title": title,
+                    "new_title": new_title or "",
+                    "body": body or "",
+                },
+            )
             return _parse_json_output(output, self.field_map)
         except ShellBackendError:
             return None
@@ -439,7 +451,8 @@ class ShellReferenceBackend:
             refs = self.list()
             query_lower = query.lower()
             return [
-                r for r in refs
+                r
+                for r in refs
                 if query_lower in r.get("title", "").lower()
                 or query_lower in r.get("body", "").lower()
             ]
@@ -483,10 +496,14 @@ def load_shell_backend_config(
     # Search paths
     search_paths = []
     if project_path:
-        search_paths.append(project_path / ".idlergear" / "backends" / f"{backend_name}.toml")
+        search_paths.append(
+            project_path / ".idlergear" / "backends" / f"{backend_name}.toml"
+        )
 
     home = Path.home()
-    search_paths.append(home / ".config" / "idlergear" / "backends" / f"{backend_name}.toml")
+    search_paths.append(
+        home / ".config" / "idlergear" / "backends" / f"{backend_name}.toml"
+    )
 
     for config_path in search_paths:
         if config_path.exists():

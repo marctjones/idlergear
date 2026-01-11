@@ -5,12 +5,11 @@ Provides git integration with IdlerGear-specific task linking features.
 Replaces Node.js git-mcp-server with pure Python implementation.
 """
 
-import json
 import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -117,7 +116,7 @@ class GitServer:
         behind = 0
         try:
             count_result = self._run_git(
-                ["rev-list", "--left-right", "--count", f"HEAD...@{{u}}"],
+                ["rev-list", "--left-right", "--count", "HEAD...@{u}"],
                 cwd=repo_path,
                 check=False,
             )
@@ -129,9 +128,7 @@ class GitServer:
             pass
 
         # Get status
-        status_result = self._run_git(
-            ["status", "--porcelain=v1", "-z"], cwd=repo_path
-        )
+        status_result = self._run_git(["status", "--porcelain=v1", "-z"], cwd=repo_path)
 
         staged = []
         modified = []
@@ -417,7 +414,12 @@ class GitServer:
 
         # Get commit info with files
         info_result = self._run_git(
-            ["show", "--format=HASH:%H%nSHORT:%h%nAUTHOR:%an%nEMAIL:%ae%nDATE:%ai%nMESSAGE_START%n%B%nMESSAGE_END%nFILES_START", "--name-only", commit],
+            [
+                "show",
+                "--format=HASH:%H%nSHORT:%h%nAUTHOR:%an%nEMAIL:%ae%nDATE:%ai%nMESSAGE_START%n%B%nMESSAGE_END%nFILES_START",
+                "--name-only",
+                commit,
+            ],
             cwd=repo_path,
         )
 
@@ -659,7 +661,9 @@ class GitServer:
 
         return {
             "total_commits": len(commits),
-            "task_commits": len([c for commits in task_commits.values() for c in commits]),
+            "task_commits": len(
+                [c for commits in task_commits.values() for c in commits]
+            ),
             "tasks_found": list(task_commits.keys()),
             "note": "Full task sync requires task backend integration",
         }

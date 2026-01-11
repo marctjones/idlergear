@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from idlergear.config import find_idlergear_root, get_config_value
+from idlergear.config import find_idlergear_root
 from idlergear.storage import now_iso, slugify
 from idlergear.github_detect import get_github_owner
 
@@ -93,10 +93,14 @@ def create_project(
         owner = get_github_owner(project_path or find_idlergear_root())
         if owner:
             success, output = _run_gh(
-                "project", "create",
-                "--owner", owner,
-                "--title", title,
-                "--format", "json",
+                "project",
+                "create",
+                "--owner",
+                owner,
+                "--title",
+                title,
+                "--format",
+                "json",
             )
             if success:
                 try:
@@ -186,9 +190,11 @@ def delete_project(
         owner = get_github_owner(project_path or find_idlergear_root())
         if owner:
             _run_gh(
-                "project", "delete",
+                "project",
+                "delete",
                 str(project["github_project_number"]),
-                "--owner", owner,
+                "--owner",
+                owner,
                 "--yes",
             )
 
@@ -221,7 +227,9 @@ def add_task_to_project(
         column = project["columns"][0]
 
     if column not in project["columns"]:
-        raise ValueError(f"Column '{column}' not found. Available: {project['columns']}")
+        raise ValueError(
+            f"Column '{column}' not found. Available: {project['columns']}"
+        )
 
     # Remove from any existing column first
     for col in project["columns"]:
@@ -299,15 +307,21 @@ def sync_project_to_github(
     root = project_path or find_idlergear_root()
     owner = get_github_owner(root)
     if not owner:
-        raise RuntimeError("Could not determine GitHub owner. Ensure you're in a git repo with a GitHub remote.")
+        raise RuntimeError(
+            "Could not determine GitHub owner. Ensure you're in a git repo with a GitHub remote."
+        )
 
     # Create project on GitHub if not already linked
     if not project.get("github_project_number"):
         success, output = _run_gh(
-            "project", "create",
-            "--owner", owner,
-            "--title", project["title"],
-            "--format", "json",
+            "project",
+            "create",
+            "--owner",
+            owner,
+            "--title",
+            project["title"],
+            "--format",
+            "json",
         )
         if success:
             try:
@@ -320,7 +334,9 @@ def sync_project_to_github(
             raise RuntimeError(f"Failed to create GitHub project: {output}")
 
     # Get repo for issue URLs
-    success, repo_output = _run_gh("repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner")
+    success, repo_output = _run_gh(
+        "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"
+    )
     if not success:
         raise RuntimeError("Could not determine repository")
     repo = repo_output.strip()
@@ -330,10 +346,13 @@ def sync_project_to_github(
         for task_id in task_ids:
             issue_url = f"https://github.com/{repo}/issues/{task_id}"
             _run_gh(
-                "project", "item-add",
+                "project",
+                "item-add",
                 str(project["github_project_number"]),
-                "--owner", owner,
-                "--url", issue_url,
+                "--owner",
+                owner,
+                "--url",
+                issue_url,
             )
 
     # Save updated project
@@ -355,9 +374,12 @@ def list_github_projects(project_path: Path | None = None) -> list[dict[str, Any
         return []
 
     success, output = _run_gh(
-        "project", "list",
-        "--owner", owner,
-        "--format", "json",
+        "project",
+        "list",
+        "--owner",
+        owner,
+        "--format",
+        "json",
     )
 
     if not success:
@@ -390,14 +412,19 @@ def link_to_github_project(
 
     # Get GitHub project ID
     success, output = _run_gh(
-        "project", "view",
+        "project",
+        "view",
         str(github_project_number),
-        "--owner", owner,
-        "--format", "json",
+        "--owner",
+        owner,
+        "--format",
+        "json",
     )
 
     if not success:
-        raise RuntimeError(f"GitHub project #{github_project_number} not found: {output}")
+        raise RuntimeError(
+            f"GitHub project #{github_project_number} not found: {output}"
+        )
 
     try:
         gh_data = json.loads(output)

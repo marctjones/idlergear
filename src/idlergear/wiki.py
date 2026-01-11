@@ -4,9 +4,7 @@ Wiki synchronization for IdlerGear.
 Bidirectional sync between IdlerGear references and GitHub Wiki.
 """
 
-import json
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -86,10 +84,7 @@ class WikiSync:
         """
         cwd = cwd or self.wiki_dir
         result = subprocess.run(
-            ["git"] + list(args),
-            cwd=str(cwd),
-            capture_output=True,
-            text=True
+            ["git"] + list(args), cwd=str(cwd), capture_output=True, text=True
         )
         return result.returncode, result.stdout, result.stderr
 
@@ -100,7 +95,9 @@ class WikiSync:
             Wiki URL or None if not found
         """
         # Get origin URL
-        returncode, stdout, stderr = self._run_git("remote", "get-url", "origin", cwd=self.project_root)
+        returncode, stdout, stderr = self._run_git(
+            "remote", "get-url", "origin", cwd=self.project_root
+        )
         if returncode != 0:
             return None
 
@@ -164,6 +161,7 @@ class WikiSync:
         # Parse owner/repo from URL
         # https://github.com/owner/repo.git or git@github.com:owner/repo.git
         import re
+
         match = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", origin_url)
         if not match:
             return False
@@ -190,6 +188,7 @@ class WikiSync:
             # We need to init locally and push.
             # Create a local wiki repo with Home.md
             import shutil
+
             if self.wiki_dir.exists():
                 shutil.rmtree(self.wiki_dir)
 
@@ -254,7 +253,11 @@ class WikiSync:
 
             return result.returncode == 0
 
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        except (
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+            FileNotFoundError,
+        ):
             return False
 
     def clone_wiki(self) -> bool:
@@ -272,12 +275,12 @@ class WikiSync:
         # Remove existing wiki dir if it exists
         if self.wiki_dir.exists():
             import shutil
+
             shutil.rmtree(self.wiki_dir)
 
         # Clone wiki
         returncode, stdout, stderr = self._run_git(
-            "clone", wiki_url, str(self.wiki_dir),
-            cwd=self.project_root
+            "clone", wiki_url, str(self.wiki_dir), cwd=self.project_root
         )
 
         # If clone failed, try to initialize the wiki
@@ -358,12 +361,9 @@ class WikiSync:
             stat = md_file.stat()
             modified = datetime.fromtimestamp(stat.st_mtime)
 
-            pages.append(WikiPage(
-                title=title,
-                content=content,
-                path=md_file,
-                modified=modified
-            ))
+            pages.append(
+                WikiPage(title=title, content=content, path=md_file, modified=modified)
+            )
 
         return pages
 

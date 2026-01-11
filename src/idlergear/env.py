@@ -7,14 +7,13 @@ This module provides MCP tools for detecting and managing development environmen
 - Consolidated environment info
 """
 
-import json
 import os
 import platform
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, Any
 
 
 def detect_python_env() -> Dict[str, Any]:
@@ -38,7 +37,9 @@ def detect_python_env() -> Dict[str, Any]:
         if "CONDA_DEFAULT_ENV" in os.environ:
             result["venv_type"] = "conda"
             result["venv_path"] = os.environ.get("CONDA_PREFIX")
-        elif "POETRY_ACTIVE" in os.environ or (Path(sys.prefix) / "poetry.lock").exists():
+        elif (
+            "POETRY_ACTIVE" in os.environ or (Path(sys.prefix) / "poetry.lock").exists()
+        ):
             result["venv_type"] = "poetry"
             result["venv_path"] = sys.prefix
         elif "VIRTUAL_ENV" in os.environ:
@@ -285,12 +286,16 @@ def find_virtualenv(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
             continue
 
         # Check for Python venv markers
-        if (venv_path / "bin" / "python").exists() or (venv_path / "Scripts" / "python.exe").exists():
+        if (venv_path / "bin" / "python").exists() or (
+            venv_path / "Scripts" / "python.exe"
+        ).exists():
             return {
                 "type": "venv",
                 "path": str(venv_path),
                 "name": venv_name,
-                "python": str(venv_path / "bin" / "python") if (venv_path / "bin" / "python").exists() else str(venv_path / "Scripts" / "python.exe"),
+                "python": str(venv_path / "bin" / "python")
+                if (venv_path / "bin" / "python").exists()
+                else str(venv_path / "Scripts" / "python.exe"),
             }
 
     # Check for poetry.lock

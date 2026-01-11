@@ -54,7 +54,13 @@ def detect_github_features(project_path: Path | None = None) -> GitHubFeatures:
     # Check if we're in a git repo with GitHub remote
     try:
         result = subprocess.run(
-            ["gh", "repo", "view", "--json", "name,url,hasIssuesEnabled,hasWikiEnabled,hasDiscussionsEnabled,hasProjectsEnabled"],
+            [
+                "gh",
+                "repo",
+                "view",
+                "--json",
+                "name,url,hasIssuesEnabled,hasWikiEnabled,hasDiscussionsEnabled,hasProjectsEnabled",
+            ],
             capture_output=True,
             text=True,
             timeout=10,
@@ -65,9 +71,13 @@ def detect_github_features(project_path: Path | None = None) -> GitHubFeatures:
             stderr = result.stderr.strip()
             if "not a git repository" in stderr.lower():
                 features.error = "Not a git repository"
-            elif "could not determine" in stderr.lower() or "no github" in stderr.lower():
+            elif (
+                "could not determine" in stderr.lower() or "no github" in stderr.lower()
+            ):
                 features.error = "No GitHub remote found"
-            elif "not logged in" in stderr.lower() or "authentication" in stderr.lower():
+            elif (
+                "not logged in" in stderr.lower() or "authentication" in stderr.lower()
+            ):
                 features.error = "Not authenticated with GitHub (run: gh auth login)"
             else:
                 features.error = stderr or "Unknown error"

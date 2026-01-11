@@ -4,10 +4,8 @@ Provides process listing, management, and monitoring capabilities.
 Integrates with IdlerGear's existing run system for background task management.
 """
 
-import os
 import platform
 import shutil
-import signal
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -282,7 +280,9 @@ class ProcessManager:
 
     # ==== Quick Start ====
 
-    def quick_start(self, executable: str, args: list[str] | None = None) -> dict[str, Any]:
+    def quick_start(
+        self, executable: str, args: list[str] | None = None
+    ) -> dict[str, Any]:
         """Start a process in the foreground (not as a run).
 
         Args:

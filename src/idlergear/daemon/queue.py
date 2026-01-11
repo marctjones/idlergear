@@ -194,9 +194,7 @@ class CommandQueue:
         async with self._lock:
             # Find highest priority pending command
             pending = [
-                c
-                for c in self._commands.values()
-                if c.status == CommandStatus.PENDING
+                c for c in self._commands.values() if c.status == CommandStatus.PENDING
             ]
             if not pending:
                 return None

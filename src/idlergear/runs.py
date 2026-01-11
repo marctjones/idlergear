@@ -262,7 +262,9 @@ def get_run_info(name: str, project_path: Path | None = None) -> dict[str, Any] 
     }
 
 
-def get_run_status(name: str, project_path: Path | None = None) -> dict[str, Any] | None:
+def get_run_status(
+    name: str, project_path: Path | None = None
+) -> dict[str, Any] | None:
     """Get detailed status of a run."""
     run = get_run_info(name, project_path)
     if run is None:

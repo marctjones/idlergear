@@ -1,6 +1,5 @@
 """MCP tool handlers for daemon-based multi-agent coordination."""
 
-import asyncio
 from typing import Any
 
 from idlergear.config import find_idlergear_root

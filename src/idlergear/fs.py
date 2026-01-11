@@ -13,17 +13,16 @@ Features:
 """
 
 import hashlib
-import json
 import os
 import shutil
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union
 import fnmatch
-import re
 
 # Try to import gitignore parser, fall back to basic pattern matching
 try:
     from gitignore_parser import parse_gitignore
+
     HAS_GITIGNORE_PARSER = True
 except ImportError:
     HAS_GITIGNORE_PARSER = False
@@ -31,11 +30,13 @@ except ImportError:
 
 class FilesystemError(Exception):
     """Base exception for filesystem operations."""
+
     pass
 
 
 class SecurityError(FilesystemError):
     """Raised when attempting to access forbidden paths."""
+
     pass
 
 
@@ -44,20 +45,20 @@ class FilesystemServer:
 
     DEFAULT_ALLOWED_DIRS = [os.getcwd()]
     DEFAULT_EXCLUDE_PATTERNS = [
-        '.git',
-        '__pycache__',
-        '*.pyc',
-        'node_modules',
-        '.venv',
-        'venv',
-        '*.egg-info',
-        'dist',
-        'build',
-        '.tox',
-        '.pytest_cache',
-        '.mypy_cache',
-        '.coverage',
-        'htmlcov',
+        ".git",
+        "__pycache__",
+        "*.pyc",
+        "node_modules",
+        ".venv",
+        "venv",
+        "*.egg-info",
+        "dist",
+        "build",
+        ".tox",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".coverage",
+        "htmlcov",
     ]
 
     def __init__(self, allowed_dirs: Optional[List[str]] = None):
@@ -69,8 +70,7 @@ class FilesystemServer:
                          Defaults to current working directory.
         """
         self.allowed_dirs = [
-            Path(d).resolve()
-            for d in (allowed_dirs or self.DEFAULT_ALLOWED_DIRS)
+            Path(d).resolve() for d in (allowed_dirs or self.DEFAULT_ALLOWED_DIRS)
         ]
 
     def _check_access(self, path: Union[str, Path]) -> Path:
@@ -141,10 +141,7 @@ class FilesystemServer:
             try:
                 results.append(self.read_file(path))
             except Exception as e:
-                results.append({
-                    "path": path,
-                    "error": str(e)
-                })
+                results.append({"path": path, "error": str(e)})
         return results
 
     def write_file(self, path: str, content: str) -> Dict[str, Any]:
@@ -191,9 +188,7 @@ class FilesystemServer:
         }
 
     def list_directory(
-        self,
-        path: str = ".",
-        exclude_patterns: Optional[List[str]] = None
+        self, path: str = ".", exclude_patterns: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
         List directory contents.
@@ -230,12 +225,14 @@ class FilesystemServer:
                 continue
 
             stat = item.stat()
-            entries.append({
-                "name": item.name,
-                "type": "directory" if item.is_dir() else "file",
-                "size": stat.st_size,
-                "modified": stat.st_mtime,
-            })
+            entries.append(
+                {
+                    "name": item.name,
+                    "type": "directory" if item.is_dir() else "file",
+                    "size": stat.st_size,
+                    "modified": stat.st_mtime,
+                }
+            )
 
         return {
             "path": str(dir_path),
@@ -246,7 +243,7 @@ class FilesystemServer:
         self,
         path: str = ".",
         max_depth: int = 3,
-        exclude_patterns: Optional[List[str]] = None
+        exclude_patterns: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Generate directory tree structure.
@@ -328,7 +325,7 @@ class FilesystemServer:
         path: str = ".",
         pattern: str = "*",
         exclude_patterns: Optional[List[str]] = None,
-        use_gitignore: bool = True
+        use_gitignore: bool = True,
     ) -> Dict[str, Any]:
         """
         Search for files matching pattern.
@@ -409,11 +406,7 @@ class FilesystemServer:
             "permissions": oct(stat.st_mode)[-3:],
         }
 
-    def get_file_checksum(
-        self,
-        path: str,
-        algorithm: str = "sha256"
-    ) -> Dict[str, Any]:
+    def get_file_checksum(self, path: str, algorithm: str = "sha256") -> Dict[str, Any]:
         """
         Calculate file checksum.
 
@@ -458,6 +451,4 @@ class FilesystemServer:
         Returns:
             {"allowed_directories": [str]}
         """
-        return {
-            "allowed_directories": [str(d) for d in self.allowed_dirs]
-        }
+        return {"allowed_directories": [str(d) for d in self.allowed_dirs]}

@@ -241,18 +241,26 @@ def migrate_backend(
         source_class = _backend_classes[backend_type][source_name]
         source_backend = source_class(project_path=project_path)
     else:
-        source_backend = _try_load_shell_backend(backend_type, source_name, project_path)
+        source_backend = _try_load_shell_backend(
+            backend_type, source_name, project_path
+        )
         if source_backend is None:
-            raise ValueError(f"Unknown source backend '{source_name}' for type '{backend_type}'")
+            raise ValueError(
+                f"Unknown source backend '{source_name}' for type '{backend_type}'"
+            )
 
     # Create target backend
     if target_name in _backend_classes[backend_type]:
         target_class = _backend_classes[backend_type][target_name]
         target_backend = target_class(project_path=project_path)
     else:
-        target_backend = _try_load_shell_backend(backend_type, target_name, project_path)
+        target_backend = _try_load_shell_backend(
+            backend_type, target_name, project_path
+        )
         if target_backend is None:
-            raise ValueError(f"Unknown target backend '{target_name}' for type '{backend_type}'")
+            raise ValueError(
+                f"Unknown target backend '{target_name}' for type '{backend_type}'"
+            )
 
     # Get count for dry run
     if dry_run:
@@ -260,7 +268,13 @@ def migrate_backend(
             items = source_backend.list(state=state)
         else:
             items = source_backend.list()
-        return {"total": len(items), "migrated": 0, "errors": 0, "skipped": 0, "dry_run": True}
+        return {
+            "total": len(items),
+            "migrated": 0,
+            "errors": 0,
+            "skipped": 0,
+            "dry_run": True,
+        }
 
     # Perform migration
     migrate_funcs = {

@@ -2,7 +2,7 @@
 
 import json
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 
 class OutputFormat(str, Enum):
@@ -151,7 +151,11 @@ def format_goose(data: Any) -> str:
                 status_badge = f"![{data['status']}](https://img.shields.io/badge/status-{data['status']}-blue)"
                 badges.append(status_badge)
             if "priority" in data:
-                priority_color = {"high": "red", "medium": "orange", "low": "green"}.get(data["priority"], "gray")
+                priority_color = {
+                    "high": "red",
+                    "medium": "orange",
+                    "low": "green",
+                }.get(data["priority"], "gray")
                 priority_badge = f"![{data['priority']}](https://img.shields.io/badge/priority-{data['priority']}-{priority_color})"
                 badges.append(priority_badge)
             lines.append(" ".join(badges))
@@ -162,12 +166,14 @@ def format_goose(data: Any) -> str:
             if key in ["status", "priority"]:  # Already shown as badges
                 continue
 
-            section_title = key.replace('_', ' ').title()
+            section_title = key.replace("_", " ").title()
 
             if isinstance(value, list) and len(value) > 5:
                 # Collapsible for long lists
-                lines.append(f"<details>")
-                lines.append(f"<summary><strong>{section_title}</strong> ({len(value)} items)</summary>")
+                lines.append("<details>")
+                lines.append(
+                    f"<summary><strong>{section_title}</strong> ({len(value)} items)</summary>"
+                )
                 lines.append("")
                 for item in value:
                     if isinstance(item, dict):
@@ -208,6 +214,7 @@ def format_goose(data: Any) -> str:
 
 # Helper functions
 
+
 def format_dict_as_list(d: Dict) -> str:
     """Format dict as markdown list item."""
     items = [f"**{k}**: {v}" for k, v in d.items()]
@@ -240,11 +247,19 @@ def format_dict_as_goose_card(d: Dict) -> str:
     badges = []
 
     if "status" in d:
-        status_emoji = {"pending": "⏳", "in_progress": "🔄", "completed": "✅", "open": "📂", "closed": "✅"}.get(d["status"], "")
+        status_emoji = {
+            "pending": "⏳",
+            "in_progress": "🔄",
+            "completed": "✅",
+            "open": "📂",
+            "closed": "✅",
+        }.get(d["status"], "")
         badges.append(f"{status_emoji} `{d['status']}`")
 
     if "priority" in d:
-        priority_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(d["priority"], "")
+        priority_emoji = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(
+            d["priority"], ""
+        )
         badges.append(f"{priority_emoji} `{d['priority']}`")
 
     lines.append(f"**{title}** {' '.join(badges)}")

@@ -373,6 +373,63 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
             )
         )
 
+    # Check test run status (#137)
+    try:
+        from idlergear.testing import get_last_result, get_tests_for_changes
+
+        # Check if tests are failing from last run
+        last_result = get_last_result(project_root)
+        if last_result and (last_result.failed > 0 or last_result.errors > 0):
+            suggestions.append(
+                Suggestion(
+                    id=next_id(),
+                    category="test",
+                    message=f"{last_result.failed} tests still failing from last run",
+                    severity="warning",
+                    context={
+                        "failed": last_result.failed,
+                        "errors": last_result.errors,
+                        "failed_tests": last_result.failed_tests[:5],
+                    },
+                )
+            )
+
+        # Check if source files changed since last test run
+        if last_result:
+            from datetime import datetime
+
+            try:
+                last_run_time = datetime.fromisoformat(
+                    last_result.timestamp.replace("Z", "+00:00")
+                )
+                last_commit_output = subprocess.run(
+                    ["git", "log", "-1", "--format=%cI"],
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                )
+                if last_commit_output.returncode == 0:
+                    last_commit_time = datetime.fromisoformat(
+                        last_commit_output.stdout.strip()
+                    )
+                    # If commits happened after last test run
+                    if last_commit_time > last_run_time.replace(tzinfo=None):
+                        tests_for_changes = get_tests_for_changes(project_root)
+                        if tests_for_changes:
+                            suggestions.append(
+                                Suggestion(
+                                    id=next_id(),
+                                    category="test",
+                                    message=f"Source files changed since last test run - {len(tests_for_changes)} tests may need running",
+                                    severity="info",
+                                    context={"tests_to_run": tests_for_changes[:5]},
+                                )
+                            )
+            except (ValueError, TypeError):
+                pass  # Ignore date parsing errors
+    except ImportError:
+        pass  # Testing module not available
+
     # Check for doc changes
     doc_files = [
         f
@@ -554,7 +611,9 @@ def _create_task_from_todo(suggestion: Suggestion) -> ActionResult:
         )
 
 
-def act_on_all_suggestions(status: WatchStatus, categories: list[str] | None = None) -> list[ActionResult]:
+def act_on_all_suggestions(
+    status: WatchStatus, categories: list[str] | None = None
+) -> list[ActionResult]:
     """Execute actions for all suggestions in a WatchStatus.
 
     Args:
@@ -718,6 +777,7 @@ class FileWatcher:
         # Check if watchdog is available
         try:
             import importlib.util
+
             self._use_watchdog = importlib.util.find_spec("watchdog") is not None
         except ImportError:
             self._use_watchdog = False
@@ -808,16 +868,24 @@ class FileWatcher:
                 self.watcher = watcher
 
             def on_created(self, event):
-                self.watcher._on_file_change("created", event.src_path, event.is_directory)
+                self.watcher._on_file_change(
+                    "created", event.src_path, event.is_directory
+                )
 
             def on_modified(self, event):
-                self.watcher._on_file_change("modified", event.src_path, event.is_directory)
+                self.watcher._on_file_change(
+                    "modified", event.src_path, event.is_directory
+                )
 
             def on_deleted(self, event):
-                self.watcher._on_file_change("deleted", event.src_path, event.is_directory)
+                self.watcher._on_file_change(
+                    "deleted", event.src_path, event.is_directory
+                )
 
             def on_moved(self, event):
-                self.watcher._on_file_change("moved", event.dest_path, event.is_directory)
+                self.watcher._on_file_change(
+                    "moved", event.dest_path, event.is_directory
+                )
 
         observer = Observer()
         handler = Handler(self)
@@ -827,6 +895,7 @@ class FileWatcher:
 
         try:
             import time
+
             while self._running:
                 time.sleep(1)
                 if self._debounce_timer > 0:

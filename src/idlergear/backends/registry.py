@@ -93,7 +93,9 @@ def get_backend(
         return _backend_instances[cache_key][backend_type]
 
     # Get configured backend name (default to "local")
-    backend_name = get_config_value(f"backends.{backend_type}", project_path=project_path)
+    backend_name = get_config_value(
+        f"backends.{backend_type}", project_path=project_path
+    )
     if backend_name is None:
         backend_name = "local"
 
@@ -175,7 +177,9 @@ def get_configured_backend_name(
     """Get the configured backend name for a type."""
     from idlergear.config import get_config_value
 
-    backend_name = get_config_value(f"backends.{backend_type}", project_path=project_path)
+    backend_name = get_config_value(
+        f"backends.{backend_type}", project_path=project_path
+    )
     return backend_name if backend_name else "local"
 
 
