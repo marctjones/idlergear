@@ -1,5 +1,7 @@
 """Run management for IdlerGear - script execution and log tracking."""
 
+import hashlib
+import json
 import os
 import signal
 import subprocess
@@ -10,6 +12,64 @@ from typing import Any
 
 from idlergear.config import find_idlergear_root
 from idlergear.storage import now_iso, slugify
+
+
+def calculate_script_hash(command: str, project_path: Path | None = None) -> str:
+    """Calculate SHA256 hash of a script or command.
+
+    For file-based scripts (./script.sh, python script.py), hashes the file contents.
+    For inline commands, hashes the command string itself.
+
+    Args:
+        command: The command to hash
+        project_path: Project root for resolving relative paths
+
+    Returns:
+        SHA256 hash as hex string (first 12 chars for brevity)
+    """
+    if project_path is None:
+        project_path = find_idlergear_root() or Path.cwd()
+
+    # Try to extract script path from command
+    parts = command.split()
+    if not parts:
+        return hashlib.sha256(command.encode()).hexdigest()[:12]
+
+    # Check if first argument is a script file
+    first_arg = parts[0]
+
+    # Handle ./script.sh or /path/to/script
+    if first_arg.startswith("./") or first_arg.startswith("/"):
+        script_path = (
+            project_path / first_arg if first_arg.startswith("./") else Path(first_arg)
+        )
+        if script_path.is_file():
+            try:
+                content = script_path.read_bytes()
+                return hashlib.sha256(content).hexdigest()[:12]
+            except (OSError, PermissionError):
+                pass
+
+    # Handle "python script.py" or "bash script.sh"
+    if len(parts) >= 2 and first_arg in (
+        "python",
+        "python3",
+        "bash",
+        "sh",
+        "node",
+        "ruby",
+        "perl",
+    ):
+        script_path = project_path / parts[1]
+        if script_path.is_file():
+            try:
+                content = script_path.read_bytes()
+                return hashlib.sha256(content).hexdigest()[:12]
+            except (OSError, PermissionError):
+                pass
+
+    # Fall back to hashing the command string
+    return hashlib.sha256(command.encode()).hexdigest()[:12]
 
 
 def _try_daemon_call(method: str, *args: Any, **kwargs: Any) -> Any:
@@ -89,9 +149,13 @@ def start_run(
     command_file = run_dir / "command.txt"
     command_file.write_text(command)
 
+    # Calculate script hash for version tracking
+    script_hash = calculate_script_hash(command, project_path)
+
     # Write start time
+    start_time = now_iso()
     status_file = run_dir / "status.txt"
-    status_file.write_text(f"running\nstarted: {now_iso()}\n")
+    status_file.write_text(f"running\nstarted: {start_time}\n")
 
     # Open log files
     stdout_file = run_dir / "stdout.log"
@@ -116,6 +180,21 @@ def start_run(
 
     # Write PID
     pid_file.write_text(str(process.pid))
+
+    # Write metadata.json for rich run information
+    metadata = {
+        "name": name,
+        "command": command,
+        "script_hash": script_hash,
+        "pid": process.pid,
+        "started_at": start_time,
+        "ended_at": None,
+        "exit_code": None,
+        "status": "running",
+        "terminal_type": "background",
+    }
+    metadata_file = run_dir / "metadata.json"
+    metadata_file.write_text(json.dumps(metadata, indent=2) + "\n")
 
     # Register with daemon if requested
     agent_id = None
@@ -142,8 +221,10 @@ def start_run(
     result = {
         "name": name,
         "command": command,
+        "script_hash": script_hash,
         "pid": process.pid,
         "status": "running",
+        "started_at": start_time,
         "path": str(run_dir),
     }
 
@@ -222,7 +303,33 @@ def get_run_info(name: str, project_path: Path | None = None) -> dict[str, Any] 
     if not run_dir.exists():
         return None
 
-    # Read command
+    # Try to read metadata.json first (new format)
+    metadata_file = run_dir / "metadata.json"
+    if metadata_file.exists():
+        try:
+            metadata = json.loads(metadata_file.read_text())
+            # Check if still running
+            pid = metadata.get("pid")
+            is_running = False
+            if pid:
+                try:
+                    os.kill(pid, 0)
+                    is_running = True
+                except (ProcessLookupError, ValueError, TypeError):
+                    pass
+
+            # Update status based on actual process state
+            if is_running:
+                metadata["status"] = "running"
+            elif metadata.get("status") == "running":
+                metadata["status"] = "stopped"
+
+            metadata["path"] = str(run_dir)
+            return metadata
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Fall back to legacy format
     command_file = run_dir / "command.txt"
     command = command_file.read_text().strip() if command_file.exists() else None
 
@@ -353,3 +460,278 @@ def stop_run(name: str, project_path: Path | None = None) -> bool:
         return True
     except ProcessLookupError:
         return False
+
+
+# =============================================================================
+# PTY Runner for External Terminal Tracking (#148)
+# =============================================================================
+
+
+def format_run_header(run_id: str, script_hash: str, command: str) -> str:
+    """Format the header output for an ig run session.
+
+    This header is printed at the start of a wrapped command to provide
+    AI assistants with context about the run.
+    """
+    timestamp = now_iso()
+    lines = [
+        "",
+        f"╔══════════════════════════════════════════════════════════════════╗",
+        f"║  IdlerGear Run: {run_id:<49} ║",
+        f"║  Hash: {script_hash:<58} ║",
+        f"║  Started: {timestamp:<55} ║",
+        f"╚══════════════════════════════════════════════════════════════════╝",
+        f"Command: {command}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def format_run_footer(run_id: str, exit_code: int, duration_seconds: float) -> str:
+    """Format the footer output for an ig run session.
+
+    This footer is printed at the end of a wrapped command to provide
+    AI assistants with the outcome.
+    """
+    timestamp = now_iso()
+    status = "SUCCESS" if exit_code == 0 else f"FAILED (exit {exit_code})"
+    duration_str = f"{duration_seconds:.2f}s"
+
+    lines = [
+        "",
+        f"╔══════════════════════════════════════════════════════════════════╗",
+        f"║  IdlerGear Run Complete: {run_id:<40} ║",
+        f"║  Status: {status:<56} ║",
+        f"║  Duration: {duration_str:<54} ║",
+        f"║  Ended: {timestamp:<57} ║",
+        f"╚══════════════════════════════════════════════════════════════════╝",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def run_with_pty(
+    command: str,
+    name: str | None = None,
+    project_path: Path | None = None,
+    show_header: bool = True,
+    register_with_daemon: bool = True,
+) -> dict[str, Any]:
+    """Run a command with PTY passthrough for terminal colors/interactivity.
+
+    This is the core function for `ig run` - it wraps a command while:
+    1. Preserving terminal colors and interactivity (via PTY)
+    2. Printing header/footer with run ID and hash for AI visibility
+    3. Logging output to .idlergear/runs/<name>/
+    4. Tracking metadata (hash, timestamps, exit code)
+
+    Args:
+        command: Command to execute
+        name: Name for the run (auto-generated if None)
+        project_path: Project root path
+        show_header: Whether to print header/footer (default True)
+        register_with_daemon: Whether to register with daemon
+
+    Returns:
+        Dict with run info including exit_code
+    """
+    import pty
+    import select
+    import sys
+
+    if project_path is None:
+        project_path = find_idlergear_root() or Path.cwd()
+
+    runs_dir = get_runs_dir(project_path)
+    if runs_dir is None:
+        runs_dir = project_path / ".idlergear" / "runs"
+        runs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate name from command if not provided
+    if name is None:
+        base = command.split()[0].split("/")[-1]
+        name = slugify(base)
+
+    run_dir = runs_dir / name
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Calculate script hash
+    script_hash = calculate_script_hash(command, project_path)
+
+    # Generate run ID (name + short hash)
+    run_id = f"{name}-{script_hash[:8]}"
+
+    start_time = now_iso()
+
+    # Print header
+    if show_header:
+        header = format_run_header(run_id, script_hash, command)
+        sys.stdout.write(header)
+        sys.stdout.flush()
+
+    # Open log files
+    stdout_file = run_dir / "stdout.log"
+    stderr_file = run_dir / "stderr.log"
+    stdout_log = open(stdout_file, "w")
+    stderr_log = open(stderr_file, "w")
+
+    # Write initial metadata
+    metadata = {
+        "name": name,
+        "run_id": run_id,
+        "command": command,
+        "script_hash": script_hash,
+        "pid": None,
+        "started_at": start_time,
+        "ended_at": None,
+        "exit_code": None,
+        "status": "running",
+        "terminal_type": "pty",
+    }
+
+    metadata_file = run_dir / "metadata.json"
+    metadata_file.write_text(json.dumps(metadata, indent=2) + "\n")
+
+    # Write command file
+    command_file = run_dir / "command.txt"
+    command_file.write_text(command)
+
+    # Register with daemon
+    agent_id = None
+    if register_with_daemon:
+        agent_id = _try_daemon_call(
+            "register_agent",
+            name=run_id,
+            agent_type="pty-run",
+            metadata={"command": command, "script_hash": script_hash},
+        )
+        if agent_id:
+            agent_id_file = run_dir / "agent_id.txt"
+            agent_id_file.write_text(agent_id)
+
+    # Run with PTY for terminal passthrough
+    start_ts = time.time()
+    exit_code = 0
+
+    try:
+        # Create a pseudo-terminal
+        master_fd, slave_fd = pty.openpty()
+
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            cwd=project_path,
+            close_fds=True,
+        )
+
+        # Update metadata with PID
+        metadata["pid"] = process.pid
+        pid_file = run_dir / "pid"
+        pid_file.write_text(str(process.pid))
+        metadata_file.write_text(json.dumps(metadata, indent=2) + "\n")
+
+        os.close(slave_fd)
+
+        # Stream output
+        try:
+            while True:
+                # Check if there's data to read
+                r, _, _ = select.select([master_fd], [], [], 0.1)
+                if master_fd in r:
+                    try:
+                        data = os.read(master_fd, 1024)
+                        if data:
+                            # Write to terminal
+                            sys.stdout.buffer.write(data)
+                            sys.stdout.buffer.flush()
+                            # Write to log file
+                            try:
+                                text = data.decode("utf-8", errors="replace")
+                                stdout_log.write(text)
+                                stdout_log.flush()
+                            except Exception:
+                                pass
+                        else:
+                            break
+                    except OSError:
+                        break
+
+                # Check if process has exited
+                if process.poll() is not None:
+                    # Read any remaining output
+                    try:
+                        while True:
+                            r, _, _ = select.select([master_fd], [], [], 0)
+                            if master_fd in r:
+                                data = os.read(master_fd, 1024)
+                                if data:
+                                    sys.stdout.buffer.write(data)
+                                    sys.stdout.buffer.flush()
+                                    try:
+                                        text = data.decode("utf-8", errors="replace")
+                                        stdout_log.write(text)
+                                    except Exception:
+                                        pass
+                                else:
+                                    break
+                            else:
+                                break
+                    except OSError:
+                        pass
+                    break
+        finally:
+            os.close(master_fd)
+
+        exit_code = process.returncode
+
+    except Exception as e:
+        exit_code = 1
+        stderr_log.write(f"Error: {e}\n")
+    finally:
+        stdout_log.close()
+        stderr_log.close()
+
+    end_ts = time.time()
+    duration = end_ts - start_ts
+    end_time = now_iso()
+
+    # Print footer
+    if show_header:
+        footer = format_run_footer(run_id, exit_code, duration)
+        sys.stdout.write(footer)
+        sys.stdout.flush()
+
+    # Update metadata
+    metadata["ended_at"] = end_time
+    metadata["exit_code"] = exit_code
+    metadata["status"] = "completed" if exit_code == 0 else "failed"
+    metadata["duration_seconds"] = round(duration, 2)
+    metadata_file.write_text(json.dumps(metadata, indent=2) + "\n")
+
+    # Update status file
+    status_file = run_dir / "status.txt"
+    status = "completed" if exit_code == 0 else "failed"
+    status_file.write_text(f"{status}\nstarted: {start_time}\nended: {end_time}\n")
+
+    # Unregister from daemon
+    if agent_id:
+        _try_daemon_call("unregister_agent", agent_id)
+        agent_id_file = run_dir / "agent_id.txt"
+        if agent_id_file.exists():
+            agent_id_file.unlink()
+
+    return {
+        "name": name,
+        "run_id": run_id,
+        "command": command,
+        "script_hash": script_hash,
+        "exit_code": exit_code,
+        "status": metadata["status"],
+        "duration_seconds": round(duration, 2),
+        "started_at": start_time,
+        "ended_at": end_time,
+        "path": str(run_dir),
+    }

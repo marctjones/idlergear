@@ -449,6 +449,207 @@ def check_installed_files(project_path: Path) -> list[CheckResult]:
 
 
 # ============================================================================
+# Test Health Checks
+# ============================================================================
+
+
+def check_test_staleness(project_path: Path) -> CheckResult:
+    """Check if test results are stale (haven't been run recently)."""
+    try:
+        from idlergear.testing import get_test_staleness, detect_framework
+
+        config = detect_framework(project_path)
+        if config is None:
+            return CheckResult(
+                name="test_staleness",
+                status=CheckStatus.INFO,
+                message="No test framework detected",
+            )
+
+        staleness = get_test_staleness(project_path)
+        if staleness["last_run"] is None:
+            return CheckResult(
+                name="test_staleness",
+                status=CheckStatus.WARNING,
+                message="Tests have never been run via IdlerGear",
+                fix="idlergear test run",
+            )
+
+        seconds_ago = staleness.get("seconds_ago", 0) or 0
+
+        # Thresholds: warning after 24h, error after 7 days
+        if seconds_ago > 7 * 24 * 3600:
+            days = int(seconds_ago / (24 * 3600))
+            return CheckResult(
+                name="test_staleness",
+                status=CheckStatus.WARNING,
+                message=f"Tests haven't been run in {days} days",
+                fix="idlergear test run",
+                details={"last_run": staleness["last_run"], "days_ago": days},
+            )
+        elif seconds_ago > 24 * 3600:
+            hours = int(seconds_ago / 3600)
+            return CheckResult(
+                name="test_staleness",
+                status=CheckStatus.INFO,
+                message=f"Tests were last run {hours} hours ago",
+                details={"last_run": staleness["last_run"]},
+            )
+        else:
+            return CheckResult(
+                name="test_staleness",
+                status=CheckStatus.OK,
+                message="Tests were run recently",
+            )
+    except ImportError:
+        return CheckResult(
+            name="test_staleness",
+            status=CheckStatus.OK,
+            message="Test module not available",
+        )
+
+
+def check_test_failures(project_path: Path) -> CheckResult:
+    """Check if the last test run had failures."""
+    try:
+        from idlergear.testing import get_last_result, detect_framework
+
+        config = detect_framework(project_path)
+        if config is None:
+            return CheckResult(
+                name="test_failures",
+                status=CheckStatus.OK,
+                message="No test framework detected",
+            )
+
+        result = get_last_result(project_path)
+        if result is None:
+            return CheckResult(
+                name="test_failures",
+                status=CheckStatus.INFO,
+                message="No test results recorded",
+            )
+
+        if result.failed > 0 or result.errors > 0:
+            failed_count = result.failed + result.errors
+            return CheckResult(
+                name="test_failures",
+                status=CheckStatus.ERROR,
+                message=f"Last test run had {failed_count} failure(s)",
+                fix="idlergear test run",
+                details={
+                    "failed": result.failed,
+                    "errors": result.errors,
+                    "failed_tests": result.failed_tests[:5],  # First 5
+                },
+            )
+        elif result.passed == 0:
+            return CheckResult(
+                name="test_failures",
+                status=CheckStatus.WARNING,
+                message="Last test run found no tests",
+            )
+        else:
+            return CheckResult(
+                name="test_failures",
+                status=CheckStatus.OK,
+                message=f"All {result.passed} tests passing",
+            )
+    except ImportError:
+        return CheckResult(
+            name="test_failures",
+            status=CheckStatus.OK,
+            message="Test module not available",
+        )
+
+
+def check_test_coverage_gaps(project_path: Path) -> CheckResult:
+    """Check for source files without test coverage."""
+    try:
+        from idlergear.testing import get_uncovered_files, detect_framework
+
+        config = detect_framework(project_path)
+        if config is None:
+            return CheckResult(
+                name="test_coverage",
+                status=CheckStatus.OK,
+                message="No test framework detected",
+            )
+
+        uncovered = get_uncovered_files(project_path)
+
+        if not uncovered:
+            return CheckResult(
+                name="test_coverage",
+                status=CheckStatus.OK,
+                message="All source files have test coverage",
+            )
+
+        # Only warn if there are many uncovered files
+        if len(uncovered) > 10:
+            return CheckResult(
+                name="test_coverage",
+                status=CheckStatus.WARNING,
+                message=f"{len(uncovered)} source files lack test coverage",
+                fix="idlergear test uncovered",
+                details={"uncovered_files": uncovered[:10]},  # First 10
+            )
+        else:
+            return CheckResult(
+                name="test_coverage",
+                status=CheckStatus.INFO,
+                message=f"{len(uncovered)} source file(s) lack test coverage",
+                details={"uncovered_files": uncovered},
+            )
+    except ImportError:
+        return CheckResult(
+            name="test_coverage",
+            status=CheckStatus.OK,
+            message="Test module not available",
+        )
+
+
+def check_external_test_runs(project_path: Path) -> CheckResult:
+    """Check for tests run outside IdlerGear (via IDE, CLI, etc.)."""
+    try:
+        from idlergear.testing import (
+            check_external_test_runs as check_external,
+            detect_framework,
+        )
+
+        config = detect_framework(project_path)
+        if config is None:
+            return CheckResult(
+                name="external_tests",
+                status=CheckStatus.OK,
+                message="No test framework detected",
+            )
+
+        external_runs = check_external(project_path)
+
+        if not external_runs:
+            return CheckResult(
+                name="external_tests",
+                status=CheckStatus.OK,
+                message="No external test runs detected",
+            )
+
+        return CheckResult(
+            name="external_tests",
+            status=CheckStatus.INFO,
+            message=f"Detected {len(external_runs)} external test run(s)",
+            fix="idlergear test sync",
+            details={"runs": [r.to_dict() for r in external_runs]},
+        )
+    except ImportError:
+        return CheckResult(
+            name="external_tests",
+            status=CheckStatus.OK,
+            message="Test module not available",
+        )
+
+
+# ============================================================================
 # Lingering/Legacy File Checks
 # ============================================================================
 
@@ -678,6 +879,12 @@ def run_doctor(project_path: Path | None = None) -> DoctorReport:
     checks.extend(check_legacy_files(project_path))
     checks.extend(check_unmanaged_knowledge_files(project_path))
     checks.extend(check_orphaned_claude_files(project_path))
+
+    # Test health checks
+    checks.append(check_test_staleness(project_path))
+    checks.append(check_test_failures(project_path))
+    checks.append(check_test_coverage_gaps(project_path))
+    checks.append(check_external_test_runs(project_path))
 
     return DoctorReport(
         checks=checks,

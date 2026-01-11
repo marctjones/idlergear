@@ -1198,21 +1198,13 @@ def install(
     all_assistants: bool = typer.Option(
         False, "--all", help="Install for all detected AI assistants"
     ),
-    gemini: bool = typer.Option(
-        False, "--gemini", help="Install for Gemini CLI"
-    ),
+    gemini: bool = typer.Option(False, "--gemini", help="Install for Gemini CLI"),
     copilot: bool = typer.Option(
         False, "--copilot", help="Install for GitHub Copilot CLI"
     ),
-    codex: bool = typer.Option(
-        False, "--codex", help="Install for Codex CLI"
-    ),
-    aider: bool = typer.Option(
-        False, "--aider", help="Install for Aider"
-    ),
-    goose: bool = typer.Option(
-        False, "--goose", help="Install for Goose"
-    ),
+    codex: bool = typer.Option(False, "--codex", help="Install for Codex CLI"),
+    aider: bool = typer.Option(False, "--aider", help="Install for Aider"),
+    goose: bool = typer.Option(False, "--goose", help="Install for Goose"),
 ):
     """Install IdlerGear integration for Claude Code (and other assistants).
 
@@ -1797,7 +1789,10 @@ def mcp_status():
 def mcp_generate(
     ctx: typer.Context,
     global_config: bool = typer.Option(
-        False, "--global", "-g", help="Generate global Claude Code config instead of project-level"
+        False,
+        "--global",
+        "-g",
+        help="Generate global Claude Code config instead of project-level",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", "-n", help="Show what would be generated without writing"
@@ -1939,7 +1934,9 @@ def mcp_add(
     args: Optional[list[str]] = typer.Option(
         None, "--arg", "-a", help="Command arguments (can be repeated)"
     ),
-    server_type: str = typer.Option("stdio", "--type", "-t", help="Server type (stdio, sse, http)"),
+    server_type: str = typer.Option(
+        "stdio", "--type", "-t", help="Server type (stdio, sse, http)"
+    ),
     global_config: bool = typer.Option(
         False, "--global", "-g", help="Add to global Claude Code config"
     ),
@@ -2041,7 +2038,9 @@ def mcp_test_cmd(
     servers_to_test = []
     if server_name:
         if server_name not in config.servers:
-            typer.secho(f"Server '{server_name}' not found in config", fg=typer.colors.RED)
+            typer.secho(
+                f"Server '{server_name}' not found in config", fg=typer.colors.RED
+            )
             raise typer.Exit(1)
         servers_to_test.append(config.servers[server_name])
     else:
@@ -2065,7 +2064,9 @@ def mcp_test_cmd(
                 )
                 if result.server_info:
                     info = result.server_info
-                    typer.echo(f"  Server: {info.get('name', 'unknown')} {info.get('version', '')}")
+                    typer.echo(
+                        f"  Server: {info.get('name', 'unknown')} {info.get('version', '')}"
+                    )
             else:
                 typer.secho(f" FAILED: {result.error}", fg=typer.colors.RED)
 
@@ -3302,6 +3303,46 @@ def run_stop(name: str):
         typer.secho(f"Stopped run '{name}'", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Run '{name}' is not running or not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@run_app.command("exec")
+def run_exec(
+    command: str = typer.Argument(..., help="Command to execute"),
+    name: str = typer.Option(None, "--name", "-n", help="Run name"),
+    no_header: bool = typer.Option(
+        False, "--no-header", help="Suppress header/footer output"
+    ),
+    no_register: bool = typer.Option(
+        False, "--no-register", help="Don't register with daemon"
+    ),
+):
+    """Execute a command with PTY passthrough and tracking.
+
+    This wraps any command while preserving terminal colors and interactivity,
+    and provides AI-visible metadata (run ID, script hash, timestamps).
+
+    Examples:
+        ig run exec "./run_tests.sh"
+        ig run exec "python manage.py migrate" --name django-migrate
+        ig run exec "npm run build" --no-header
+
+    The output includes header/footer blocks that AI assistants can parse
+    to understand what ran and whether it succeeded.
+    """
+    from idlergear.runs import run_with_pty
+
+    try:
+        result = run_with_pty(
+            command,
+            name=name,
+            show_header=not no_header,
+            register_with_daemon=not no_register,
+        )
+        # Exit with the same code as the wrapped command
+        raise typer.Exit(result["exit_code"])
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
 
@@ -4913,11 +4954,11 @@ def test_list(
 @test_app.command("coverage")
 def test_coverage(
     ctx: typer.Context,
-    file: Optional[str] = typer.Argument(None, help="Source file to check coverage for"),
-    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
-    refresh: bool = typer.Option(
-        False, "--refresh", "-r", help="Rebuild coverage map"
+    file: Optional[str] = typer.Argument(
+        None, help="Source file to check coverage for"
     ),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    refresh: bool = typer.Option(False, "--refresh", "-r", help="Rebuild coverage map"),
 ):
     """Show test coverage mapping.
 
@@ -4930,7 +4971,11 @@ def test_coverage(
     """
     from pathlib import Path
 
-    from idlergear.testing import build_coverage_map, get_coverage_map, get_tests_for_file
+    from idlergear.testing import (
+        build_coverage_map,
+        get_coverage_map,
+        get_tests_for_file,
+    )
 
     project_path = Path(path).resolve()
 
@@ -5009,7 +5054,9 @@ def test_uncovered(
     else:
         if uncovered:
             typer.secho(
-                f"Uncovered files ({len(uncovered)}):", fg=typer.colors.YELLOW, bold=True
+                f"Uncovered files ({len(uncovered)}):",
+                fg=typer.colors.YELLOW,
+                bold=True,
             )
             for f in uncovered:
                 typer.echo(f"  - {f}")
@@ -5024,9 +5071,7 @@ def test_changed(
     since: Optional[str] = typer.Option(
         None, "--since", "-s", help="Commit hash or ref to compare against"
     ),
-    run: bool = typer.Option(
-        False, "--run", "-r", help="Actually run the tests"
-    ),
+    run: bool = typer.Option(False, "--run", "-r", help="Actually run the tests"),
     args: Optional[str] = typer.Option(
         None, "--args", "-a", help="Additional arguments for test command"
     ),
@@ -5101,9 +5146,7 @@ def test_changed(
                 typer.echo(f"  ... and {len(changed) - 10} more")
 
             typer.echo()
-            typer.secho(
-                f"Tests to run: {len(tests)}", fg=typer.colors.CYAN, bold=True
-            )
+            typer.secho(f"Tests to run: {len(tests)}", fg=typer.colors.CYAN, bold=True)
             for t in tests[:10]:
                 typer.echo(f"  - {t}")
             if len(tests) > 10:
@@ -5184,9 +5227,7 @@ def test_sync(
             typer.echo()
             typer.secho(f"Imported {len(imported)} result(s)", fg=typer.colors.GREEN)
             for result in imported:
-                typer.echo(
-                    f"  - {result.passed} passed, {result.failed} failed"
-                )
+                typer.echo(f"  - {result.passed} passed, {result.failed} failed")
         else:
             typer.echo()
             typer.secho(
@@ -5455,7 +5496,9 @@ def agents_init(
                     json.dumps(
                         {
                             "error": f"Unknown language: {lang}",
-                            "supported": [l.value for l in Language if l != Language.UNKNOWN],
+                            "supported": [
+                                l.value for l in Language if l != Language.UNKNOWN
+                            ],
                         }
                     )
                 )
@@ -5487,7 +5530,9 @@ def agents_init(
 
     # Generate content
     agents_content = generate_agents_md(template, include_idlergear=True)
-    claude_content = generate_claude_md(template, include_idlergear=True) if with_claude else None
+    claude_content = (
+        generate_claude_md(template, include_idlergear=True) if with_claude else None
+    )
 
     if dry_run:
         if output_format == OutputFormat.JSON:
@@ -5500,14 +5545,24 @@ def agents_init(
                 result["files"]["CLAUDE.md"] = len(claude_content)
             typer.echo(json.dumps(result))
         else:
-            typer.secho(f"Would generate for language: {language.value}", fg=typer.colors.CYAN)
+            typer.secho(
+                f"Would generate for language: {language.value}", fg=typer.colors.CYAN
+            )
             typer.echo()
             typer.secho("--- AGENTS.md ---", fg=typer.colors.YELLOW)
-            typer.echo(agents_content[:500] + "..." if len(agents_content) > 500 else agents_content)
+            typer.echo(
+                agents_content[:500] + "..."
+                if len(agents_content) > 500
+                else agents_content
+            )
             if claude_content:
                 typer.echo()
                 typer.secho("--- CLAUDE.md ---", fg=typer.colors.YELLOW)
-                typer.echo(claude_content[:300] + "..." if len(claude_content) > 300 else claude_content)
+                typer.echo(
+                    claude_content[:300] + "..."
+                    if len(claude_content) > 300
+                    else claude_content
+                )
         return
 
     # Write files
@@ -5643,9 +5698,13 @@ def agents_update(
 
     if language == Language.UNKNOWN:
         if output_format == OutputFormat.JSON:
-            typer.echo(json.dumps({"error": "Could not detect language", "hint": "Use --lang"}))
+            typer.echo(
+                json.dumps({"error": "Could not detect language", "hint": "Use --lang"})
+            )
         else:
-            typer.secho("Could not detect language. Use --lang.", fg=typer.colors.YELLOW)
+            typer.secho(
+                "Could not detect language. Use --lang.", fg=typer.colors.YELLOW
+            )
         raise typer.Exit(1)
 
     template = TEMPLATES[language]
@@ -5687,7 +5746,9 @@ def agents_update(
     agents_path.write_text(new_content)
 
     if output_format == OutputFormat.JSON:
-        typer.echo(json.dumps({"success": True, "changed": True, "language": language.value}))
+        typer.echo(
+            json.dumps({"success": True, "changed": True, "language": language.value})
+        )
     else:
         typer.secho("✓ Updated AGENTS.md", fg=typer.colors.GREEN)
 
@@ -5713,10 +5774,14 @@ def agents_show(
         typer.echo(
             json.dumps(
                 {
-                    "detected_language": detected.value if detected != Language.UNKNOWN else None,
+                    "detected_language": detected.value
+                    if detected != Language.UNKNOWN
+                    else None,
                     "agents_md_exists": agents_exists,
                     "claude_md_exists": claude_exists,
-                    "available_templates": [l.value for l in Language if l != Language.UNKNOWN],
+                    "available_templates": [
+                        l.value for l in Language if l != Language.UNKNOWN
+                    ],
                 }
             )
         )
@@ -5810,7 +5875,10 @@ def secrets_set(
     manager = SecretsManager(project_path)
 
     if not manager.is_initialized():
-        typer.secho("Secrets store not initialized. Run 'idlergear secrets init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Secrets store not initialized. Run 'idlergear secrets init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     # Get password
@@ -5871,7 +5939,11 @@ def secrets_get(
         password = getpass("Master password: ")
     else:
         # When piping, we can't prompt - this is a limitation
-        typer.secho("Cannot prompt for password in non-interactive mode.", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "Cannot prompt for password in non-interactive mode.",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise typer.Exit(1)
 
     if not manager.unlock(password):
@@ -5904,7 +5976,10 @@ def secrets_list(
     manager = SecretsManager(project_path)
 
     if not manager.is_initialized():
-        typer.secho("Secrets store not initialized. Run 'idlergear secrets init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Secrets store not initialized. Run 'idlergear secrets init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     password = getpass("Master password: ")
@@ -6038,7 +6113,9 @@ def secrets_export(
         entries = manager.list()
         for entry in sorted(entries, key=lambda e: e.name):
             value = manager.get(entry.name)
-            escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            escaped = (
+                value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            )
             typer.echo(f'{entry.name}="{escaped}"')
 
 
@@ -6065,7 +6142,10 @@ def secrets_import(
     manager = SecretsManager(project_path)
 
     if not manager.is_initialized():
-        typer.secho("Secrets store not initialized. Run 'idlergear secrets init' first.", fg=typer.colors.RED)
+        typer.secho(
+            "Secrets store not initialized. Run 'idlergear secrets init' first.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     password = getpass("Master password: ")
@@ -6138,7 +6218,9 @@ def secrets_run(
 @release_app.command("list")
 def release_list(
     ctx: typer.Context,
-    limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of releases to show"),
+    limit: int = typer.Option(
+        10, "--limit", "-n", help="Maximum number of releases to show"
+    ),
 ):
     """List releases from GitHub."""
     from idlergear.release import check_gh_installed, check_gh_auth, list_releases
@@ -6214,7 +6296,9 @@ def release_show(
         if release.name != release.tag:
             typer.echo(f"  Title: {release.name}")
         if release.published_at:
-            typer.echo(f"  Published: {release.published_at.strftime('%Y-%m-%d %H:%M')}")
+            typer.echo(
+                f"  Published: {release.published_at.strftime('%Y-%m-%d %H:%M')}"
+            )
         if release.is_draft:
             typer.secho("  Status: Draft", fg=typer.colors.YELLOW)
         if release.is_prerelease:
@@ -6241,7 +6325,9 @@ def release_create(
     bump: bool = typer.Option(
         False, "--bump", help="Run version command before creating release"
     ),
-    target: Optional[str] = typer.Option(None, "--target", help="Target branch or commit"),
+    target: Optional[str] = typer.Option(
+        None, "--target", help="Target branch or commit"
+    ),
 ):
     """Create a new release on GitHub.
 
