@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.3.28)
+## Features (v0.4.0)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
