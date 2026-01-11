@@ -492,7 +492,8 @@ class WikiSync:
                 return result
 
         # Get references and wiki pages
-        references = {ref.title: ref for ref in list_references()}
+        # list_references() returns list of dicts, use dict key access
+        references = {ref["title"]: ref for ref in list_references()}
         wiki_pages = {page.title: page for page in self.list_wiki_pages()}
 
         # All titles
