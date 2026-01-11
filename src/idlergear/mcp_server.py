@@ -23,6 +23,7 @@ _reload_requested = False
 # Set when idlergear_daemon_register_agent is called successfully
 _registered_agent_id: str | None = None
 
+
 # PID file for external reload triggers
 def _get_pid_file() -> Path:
     """Get path to PID file for this MCP server."""
@@ -95,6 +96,7 @@ from idlergear.projects import (
     remove_task_from_project,
     sync_project_to_github,
 )
+
 # Plans now use backend system via get_backend("plan")
 # References now use backend system via get_backend("reference")
 from idlergear.runs import get_run_logs, get_run_status, list_runs, start_run, stop_run
@@ -112,6 +114,7 @@ from idlergear.fs import FilesystemServer
 # Initialize filesystem server
 fs_server = None
 
+
 def _get_fs_server() -> FilesystemServer:
     """Get or create filesystem server instance."""
     global fs_server
@@ -119,9 +122,11 @@ def _get_fs_server() -> FilesystemServer:
         fs_server = FilesystemServer()
     return fs_server
 
+
 # Initialize servers
 git_server = None
 pm_server = None
+
 
 def _get_git_server() -> GitServer:
     """Get or create git server instance."""
@@ -130,12 +135,14 @@ def _get_git_server() -> GitServer:
         git_server = GitServer()
     return git_server
 
+
 def _get_pm_server() -> ProcessManager:
     """Get or create process manager instance."""
     global pm_server
     if pm_server is None:
         pm_server = ProcessManager()
     return pm_server
+
 
 # Create the MCP server with enhanced instructions
 server = Server(
@@ -162,7 +169,7 @@ Available tool categories:
 - Environment (4 tools) - Python/Node/Rust detection, venv finder
 - OpenTelemetry (3 tools) - Log collection and querying
 
-All tools return structured JSON for token efficiency."""
+All tools return structured JSON for token efficiency.""",
 )
 
 
@@ -432,7 +439,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "description": "Limit number of results"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit number of results",
+                    },
                 },
             },
         ),
@@ -476,8 +486,15 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "description": "Limit number of results"},
-                    "preview": {"type": "boolean", "default": False, "description": "Strip bodies for token efficiency (default: false)"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit number of results",
+                    },
+                    "preview": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Strip bodies for token efficiency (default: false)",
+                    },
                 },
             },
         ),
@@ -522,7 +539,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "description": "Limit number of results"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit number of results",
+                    },
                 },
             },
         ),
@@ -573,7 +593,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "key": {"type": "string", "description": "Config key (dot notation)"},
+                    "key": {
+                        "type": "string",
+                        "description": "Config key (dot notation)",
+                    },
                 },
                 "required": ["key"],
             },
@@ -584,7 +607,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "key": {"type": "string", "description": "Config key (dot notation)"},
+                    "key": {
+                        "type": "string",
+                        "description": "Config key (dot notation)",
+                    },
                     "value": {"type": "string", "description": "Config value"},
                 },
                 "required": ["key", "value"],
@@ -751,9 +777,15 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "project_name": {"type": "string", "description": "Project name or slug"},
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name or slug",
+                    },
                     "task_id": {"type": "string", "description": "Task ID to add"},
-                    "column": {"type": "string", "description": "Target column (default: first column)"},
+                    "column": {
+                        "type": "string",
+                        "description": "Target column (default: first column)",
+                    },
                 },
                 "required": ["project_name", "task_id"],
             },
@@ -764,7 +796,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "project_name": {"type": "string", "description": "Project name or slug"},
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name or slug",
+                    },
                     "task_id": {"type": "string", "description": "Task ID to remove"},
                 },
                 "required": ["project_name", "task_id"],
@@ -776,7 +811,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "project_name": {"type": "string", "description": "Project name or slug"},
+                    "project_name": {
+                        "type": "string",
+                        "description": "Project name or slug",
+                    },
                     "task_id": {"type": "string", "description": "Task ID to move"},
                     "column": {"type": "string", "description": "Target column"},
                 },
@@ -800,8 +838,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Local project name or slug"},
-                    "github_project_number": {"type": "integer", "description": "GitHub Project number"},
+                    "name": {
+                        "type": "string",
+                        "description": "Local project name or slug",
+                    },
+                    "github_project_number": {
+                        "type": "integer",
+                        "description": "GitHub Project number",
+                    },
                 },
                 "required": ["name", "github_project_number"],
             },
@@ -813,8 +857,14 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Agent name (e.g., 'Claude Code Session', 'Goose Terminal')"},
-                    "agent_type": {"type": "string", "description": "Agent type (e.g., 'claude-code', 'goose', 'aider')"},
+                    "name": {
+                        "type": "string",
+                        "description": "Agent name (e.g., 'Claude Code Session', 'Goose Terminal')",
+                    },
+                    "agent_type": {
+                        "type": "string",
+                        "description": "Agent type (e.g., 'claude-code', 'goose', 'aider')",
+                    },
                     "metadata": {
                         "type": "object",
                         "description": "Additional metadata (optional)",
@@ -836,8 +886,14 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Command to execute"},
-                    "priority": {"type": "integer", "description": "Priority (higher = more urgent, default: 1)"},
-                    "wait_for_result": {"type": "boolean", "description": "Wait for command completion (default: False)"},
+                    "priority": {
+                        "type": "integer",
+                        "description": "Priority (higher = more urgent, default: 1)",
+                    },
+                    "wait_for_result": {
+                        "type": "boolean",
+                        "description": "Wait for command completion (default: False)",
+                    },
                 },
                 "required": ["command"],
             },
@@ -848,7 +904,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "message": {"type": "string", "description": "Message to broadcast to all agents"},
+                    "message": {
+                        "type": "string",
+                        "description": "Message to broadcast to all agents",
+                    },
                     "delivery": {
                         "type": "string",
                         "enum": ["context", "notification", "deferred"],
@@ -865,7 +924,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "agent_id": {"type": "string", "description": "Agent ID from registration"},
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Agent ID from registration",
+                    },
                     "status": {
                         "type": "string",
                         "enum": ["active", "idle", "busy"],
@@ -892,8 +954,14 @@ Use 'all' as to_agent to broadcast to all registered agents.""",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "to_agent": {"type": "string", "description": "Target agent ID (e.g., 'claude-code-abc123') or 'all' to broadcast"},
-                    "message": {"type": "string", "description": "Message content - can be a request, question, or information"},
+                    "to_agent": {
+                        "type": "string",
+                        "description": "Target agent ID (e.g., 'claude-code-abc123') or 'all' to broadcast",
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Message content - can be a request, question, or information",
+                    },
                     "delivery": {
                         "type": "string",
                         "enum": ["context", "notification", "deferred"],
@@ -904,12 +972,18 @@ Use 'all' as to_agent to broadcast to all registered agents.""",
                         "enum": ["info", "request", "alert", "question"],
                         "description": "Message type: info, request, alert, or question (default: info)",
                     },
-                    "action_requested": {"type": "boolean", "description": "Whether you need the recipient to DO something (default: false)"},
+                    "action_requested": {
+                        "type": "boolean",
+                        "description": "Whether you need the recipient to DO something (default: false)",
+                    },
                     "context": {
                         "type": "object",
                         "description": "Related context (e.g., {task_id: 45, files: ['api.py']})",
                     },
-                    "from_agent": {"type": "string", "description": "Your agent ID (optional, auto-detected if registered)"},
+                    "from_agent": {
+                        "type": "string",
+                        "description": "Your agent ID (optional, auto-detected if registered)",
+                    },
                 },
                 "required": ["to_agent", "message"],
             },
@@ -925,8 +999,14 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "agent_id": {"type": "string", "description": "Your agent ID (optional, auto-detected)"},
-                    "create_tasks": {"type": "boolean", "description": "Create tasks for normal-priority messages (default: true)"},
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Your agent ID (optional, auto-detected)",
+                    },
+                    "create_tasks": {
+                        "type": "boolean",
+                        "description": "Create tasks for normal-priority messages (default: true)",
+                    },
                 },
             },
         ),
@@ -936,8 +1016,15 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "agent_id": {"type": "string", "description": "Your agent ID (optional, uses registered ID if available)"},
-                    "unread_only": {"type": "boolean", "description": "Only show unread messages (default: true)", "default": True},
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Your agent ID (optional, uses registered ID if available)",
+                    },
+                    "unread_only": {
+                        "type": "boolean",
+                        "description": "Only show unread messages (default: true)",
+                        "default": True,
+                    },
                     "delivery": {
                         "type": "string",
                         "enum": ["context", "notification", "deferred"],
@@ -977,7 +1064,10 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "agent_id": {"type": "string", "description": "Your agent ID"},
-                    "all_messages": {"type": "boolean", "description": "Clear all messages, not just read ones (default: false)"},
+                    "all_messages": {
+                        "type": "boolean",
+                        "description": "Clear all messages, not just read ones (default: false)",
+                    },
                 },
             },
         ),
@@ -1001,14 +1091,29 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Script name (e.g., 'backend-server')"},
-                    "command": {"type": "string", "description": "Command to run (e.g., 'python manage.py runserver')"},
+                    "name": {
+                        "type": "string",
+                        "description": "Script name (e.g., 'backend-server')",
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "Command to run (e.g., 'python manage.py runserver')",
+                    },
                     "template": {
                         "type": "string",
-                        "enum": ["pytest", "django-dev", "flask-dev", "jupyter", "fastapi-dev"],
+                        "enum": [
+                            "pytest",
+                            "django-dev",
+                            "flask-dev",
+                            "jupyter",
+                            "fastapi-dev",
+                        ],
                         "description": "Use a pre-built template (optional)",
                     },
-                    "venv_path": {"type": "string", "description": "Virtual environment path (e.g., './venv')"},
+                    "venv_path": {
+                        "type": "string",
+                        "description": "Virtual environment path (e.g., './venv')",
+                    },
                     "requirements": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -1055,7 +1160,10 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "command": {"type": "string", "description": "Command name to search for"},
+                    "command": {
+                        "type": "string",
+                        "description": "Command name to search for",
+                    },
                 },
                 "required": ["command"],
             },
@@ -1066,7 +1174,10 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project directory to analyze (default: current directory)"},
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory to analyze (default: current directory)",
+                    },
                 },
             },
         ),
@@ -1076,7 +1187,10 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Project directory to search (default: current directory)"},
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory to search (default: current directory)",
+                    },
                 },
             },
         ),
@@ -1136,7 +1250,11 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Directory path (default: current directory)", "default": "."},
+                    "path": {
+                        "type": "string",
+                        "description": "Directory path (default: current directory)",
+                        "default": ".",
+                    },
                     "exclude_patterns": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -1151,8 +1269,16 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Root directory (default: current)", "default": "."},
-                    "max_depth": {"type": "integer", "description": "Maximum recursion depth (default: 3)", "default": 3},
+                    "path": {
+                        "type": "string",
+                        "description": "Root directory (default: current)",
+                        "default": ".",
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum recursion depth (default: 3)",
+                        "default": 3,
+                    },
                     "exclude_patterns": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -1168,7 +1294,10 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "source": {"type": "string", "description": "Source path"},
-                    "destination": {"type": "string", "description": "Destination path"},
+                    "destination": {
+                        "type": "string",
+                        "description": "Destination path",
+                    },
                 },
                 "required": ["source", "destination"],
             },
@@ -1179,14 +1308,26 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "Root directory to search (default: current)", "default": "."},
-                    "pattern": {"type": "string", "description": "Glob pattern (e.g., '*.py', 'test_*.py')", "default": "*"},
+                    "path": {
+                        "type": "string",
+                        "description": "Root directory to search (default: current)",
+                        "default": ".",
+                    },
+                    "pattern": {
+                        "type": "string",
+                        "description": "Glob pattern (e.g., '*.py', 'test_*.py')",
+                        "default": "*",
+                    },
                     "exclude_patterns": {
                         "type": "array",
                         "items": {"type": "string"},
                         "description": "Additional patterns to exclude",
                     },
-                    "use_gitignore": {"type": "boolean", "description": "Respect .gitignore files (default: true)", "default": True},
+                    "use_gitignore": {
+                        "type": "boolean",
+                        "description": "Respect .gitignore files (default: true)",
+                        "default": True,
+                    },
                 },
             },
         ),
@@ -1233,7 +1374,10 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "repo_path": {"type": "string", "description": "Repository path (default: current directory)"},
+                    "repo_path": {
+                        "type": "string",
+                        "description": "Repository path (default: current directory)",
+                    },
                 },
             },
         ),
@@ -1244,9 +1388,21 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "staged": {"type": "boolean", "description": "Show staged changes (git diff --cached)", "default": False},
-                    "files": {"type": "array", "items": {"type": "string"}, "description": "Specific files to diff"},
-                    "context_lines": {"type": "integer", "description": "Number of context lines", "default": 3},
+                    "staged": {
+                        "type": "boolean",
+                        "description": "Show staged changes (git diff --cached)",
+                        "default": False,
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Specific files to diff",
+                    },
+                    "context_lines": {
+                        "type": "integer",
+                        "description": "Number of context lines",
+                        "default": 3,
+                    },
                 },
             },
         ),
@@ -1257,11 +1413,24 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "max_count": {"type": "integer", "description": "Maximum number of commits", "default": 10},
-                    "since": {"type": "string", "description": "Show commits since date"},
-                    "until": {"type": "string", "description": "Show commits until date"},
+                    "max_count": {
+                        "type": "integer",
+                        "description": "Maximum number of commits",
+                        "default": 10,
+                    },
+                    "since": {
+                        "type": "string",
+                        "description": "Show commits since date",
+                    },
+                    "until": {
+                        "type": "string",
+                        "description": "Show commits until date",
+                    },
                     "author": {"type": "string", "description": "Filter by author"},
-                    "grep": {"type": "string", "description": "Filter by commit message"},
+                    "grep": {
+                        "type": "string",
+                        "description": "Filter by commit message",
+                    },
                 },
             },
         ),
@@ -1271,9 +1440,17 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "files": {"type": "array", "items": {"type": "string"}, "description": "Files to stage"},
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Files to stage",
+                    },
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "all": {"type": "boolean", "description": "Stage all changes (git add -A)", "default": False},
+                    "all": {
+                        "type": "boolean",
+                        "description": "Stage all changes (git add -A)",
+                        "default": False,
+                    },
                 },
                 "required": ["files"],
             },
@@ -1286,7 +1463,10 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {
                     "message": {"type": "string", "description": "Commit message"},
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "task_id": {"type": "integer", "description": "Optional task ID to link"},
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Optional task ID to link",
+                    },
                 },
                 "required": ["message"],
             },
@@ -1297,9 +1477,17 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "files": {"type": "array", "items": {"type": "string"}, "description": "Files to unstage (None = all)"},
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Files to unstage (None = all)",
+                    },
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "hard": {"type": "boolean", "description": "Hard reset (WARNING: discards changes)", "default": False},
+                    "hard": {
+                        "type": "boolean",
+                        "description": "Hard reset (WARNING: discards changes)",
+                        "default": False,
+                    },
                 },
             },
         ),
@@ -1309,7 +1497,10 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "commit": {"type": "string", "description": "Commit hash or reference (e.g., 'HEAD', 'abc123')"},
+                    "commit": {
+                        "type": "string",
+                        "description": "Commit hash or reference (e.g., 'HEAD', 'abc123')",
+                    },
                     "repo_path": {"type": "string", "description": "Repository path"},
                 },
                 "required": ["commit"],
@@ -1333,7 +1524,11 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {
                     "name": {"type": "string", "description": "Branch name"},
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "checkout": {"type": "boolean", "description": "Checkout after creation", "default": True},
+                    "checkout": {
+                        "type": "boolean",
+                        "description": "Checkout after creation",
+                        "default": True,
+                    },
                 },
                 "required": ["name"],
             },
@@ -1358,7 +1553,11 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {
                     "name": {"type": "string", "description": "Branch name"},
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "force": {"type": "boolean", "description": "Force delete (even if not merged)", "default": False},
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force delete (even if not merged)",
+                        "default": False,
+                    },
                 },
                 "required": ["name"],
             },
@@ -1373,7 +1572,11 @@ This ensures messages don't derail your work - only context ones are shown immed
                     "task_id": {"type": "integer", "description": "Task ID to link"},
                     "message": {"type": "string", "description": "Commit message"},
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "auto_add": {"type": "boolean", "description": "Automatically stage all changes", "default": True},
+                    "auto_add": {
+                        "type": "boolean",
+                        "description": "Automatically stage all changes",
+                        "default": True,
+                    },
                 },
                 "required": ["task_id", "message"],
             },
@@ -1398,7 +1601,11 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {
                     "task_id": {"type": "integer", "description": "Task ID"},
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "max_count": {"type": "integer", "description": "Maximum commits to search", "default": 50},
+                    "max_count": {
+                        "type": "integer",
+                        "description": "Maximum commits to search",
+                        "default": 50,
+                    },
                 },
                 "required": ["task_id"],
             },
@@ -1410,7 +1617,10 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "repo_path": {"type": "string", "description": "Repository path"},
-                    "since": {"type": "string", "description": "Only process commits since this date"},
+                    "since": {
+                        "type": "string",
+                        "description": "Only process commits since this date",
+                    },
                 },
             },
         ),
@@ -1421,9 +1631,19 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "filter_name": {"type": "string", "description": "Filter by process name (substring match)"},
-                    "filter_user": {"type": "string", "description": "Filter by username"},
-                    "sort_by": {"type": "string", "enum": ["cpu", "memory", "pid", "name"], "description": "Sort by field (default: cpu)"},
+                    "filter_name": {
+                        "type": "string",
+                        "description": "Filter by process name (substring match)",
+                    },
+                    "filter_user": {
+                        "type": "string",
+                        "description": "Filter by username",
+                    },
+                    "sort_by": {
+                        "type": "string",
+                        "enum": ["cpu", "memory", "pid", "name"],
+                        "description": "Sort by field (default: cpu)",
+                    },
                 },
             },
         ),
@@ -1445,7 +1665,10 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "pid": {"type": "integer", "description": "Process ID"},
-                    "force": {"type": "boolean", "description": "Use SIGKILL instead of SIGTERM"},
+                    "force": {
+                        "type": "boolean",
+                        "description": "Use SIGKILL instead of SIGTERM",
+                    },
                 },
                 "required": ["pid"],
             },
@@ -1465,8 +1688,14 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Command to execute"},
-                    "name": {"type": "string", "description": "Run name (auto-generated if not provided)"},
-                    "task_id": {"type": "integer", "description": "Optional task ID to associate with run"},
+                    "name": {
+                        "type": "string",
+                        "description": "Run name (auto-generated if not provided)",
+                    },
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Optional task ID to associate with run",
+                    },
                 },
                 "required": ["command"],
             },
@@ -1497,8 +1726,15 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Run name"},
-                    "tail": {"type": "integer", "description": "Number of lines from end (all if not specified)"},
-                    "stream": {"type": "string", "enum": ["stdout", "stderr"], "description": "Log stream (default: stdout)"},
+                    "tail": {
+                        "type": "integer",
+                        "description": "Number of lines from end (all if not specified)",
+                    },
+                    "stream": {
+                        "type": "string",
+                        "enum": ["stdout", "stderr"],
+                        "description": "Log stream (default: stdout)",
+                    },
                 },
                 "required": ["name"],
             },
@@ -1531,8 +1767,15 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "executable": {"type": "string", "description": "Path to executable or command name"},
-                    "args": {"type": "array", "items": {"type": "string"}, "description": "Command arguments"},
+                    "executable": {
+                        "type": "string",
+                        "description": "Path to executable or command name",
+                    },
+                    "args": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Command arguments",
+                    },
                 },
                 "required": ["executable"],
             },
@@ -1544,12 +1787,31 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "severity": {"type": "string", "description": "Filter by severity (DEBUG, INFO, WARN, ERROR, FATAL)", "enum": ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"]},
-                    "service": {"type": "string", "description": "Filter by service name (e.g., 'goose', 'claude-code')"},
-                    "start_time": {"type": "string", "description": "Start time (ISO format or relative like '1h', '30m', '24h')"},
-                    "end_time": {"type": "string", "description": "End time (ISO format)"},
-                    "search": {"type": "string", "description": "Full-text search query (searches message field)"},
-                    "limit": {"type": "integer", "description": "Maximum number of results (default: 100)"},
+                    "severity": {
+                        "type": "string",
+                        "description": "Filter by severity (DEBUG, INFO, WARN, ERROR, FATAL)",
+                        "enum": ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"],
+                    },
+                    "service": {
+                        "type": "string",
+                        "description": "Filter by service name (e.g., 'goose', 'claude-code')",
+                    },
+                    "start_time": {
+                        "type": "string",
+                        "description": "Start time (ISO format or relative like '1h', '30m', '24h')",
+                    },
+                    "end_time": {
+                        "type": "string",
+                        "description": "End time (ISO format)",
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Full-text search query (searches message field)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results (default: 100)",
+                    },
                 },
             },
         ),
@@ -1567,8 +1829,14 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {"type": "integer", "description": "Number of recent errors to return (default: 20)"},
-                    "service": {"type": "string", "description": "Filter by service name"},
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of recent errors to return (default: 20)",
+                    },
+                    "service": {
+                        "type": "string",
+                        "description": "Filter by service name",
+                    },
                 },
             },
         ),
@@ -1584,7 +1852,10 @@ This ensures messages don't derail your work - only context ones are shown immed
                         "description": "Context verbosity (minimal=570 tokens [DEFAULT], standard=7K, detailed=11K, full=17K)",
                         "enum": ["minimal", "standard", "detailed", "full"],
                     },
-                    "load_state": {"type": "boolean", "description": "Load previous session state (default: true)"},
+                    "load_state": {
+                        "type": "boolean",
+                        "description": "Load previous session state (default: true)",
+                    },
                 },
             },
         ),
@@ -1594,9 +1865,19 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "current_task_id": {"type": "integer", "description": "ID of task currently being worked on"},
-                    "working_files": {"type": "array", "items": {"type": "string"}, "description": "List of files currently being edited"},
-                    "notes": {"type": "string", "description": "Free-form notes about current session (what was accomplished, next steps, etc.)"},
+                    "current_task_id": {
+                        "type": "integer",
+                        "description": "ID of task currently being worked on",
+                    },
+                    "working_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of files currently being edited",
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Free-form notes about current session (what was accomplished, next steps, etc.)",
+                    },
                 },
             },
         ),
@@ -1606,8 +1887,15 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "current_task_id": {"type": "integer", "description": "ID of task being worked on"},
-                    "working_files": {"type": "array", "items": {"type": "string"}, "description": "Files being worked on"},
+                    "current_task_id": {
+                        "type": "integer",
+                        "description": "ID of task being worked on",
+                    },
+                    "working_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Files being worked on",
+                    },
                     "notes": {"type": "string", "description": "Session notes"},
                 },
             },
@@ -1655,6 +1943,176 @@ This ensures messages don't derail your work - only context ones are shown immed
             inputSchema={
                 "type": "object",
                 "properties": {},
+            },
+        ),
+        # Doctor tool - installation health check
+        Tool(
+            name="idlergear_doctor",
+            description="Check IdlerGear installation health. Detects: outdated files, missing configuration, legacy files from older versions, and unmanaged knowledge files (TODO.md, NOTES.md). Use this to diagnose installation issues or after upgrading IdlerGear.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "fix": {
+                        "type": "boolean",
+                        "description": "Automatically fix issues by running install --upgrade (default: false)",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        # === Test Tools ===
+        Tool(
+            name="idlergear_test_detect",
+            description="Detect the test framework used in the project. Supports: pytest (Python), cargo test (Rust), dotnet test (.NET), jest/vitest (JavaScript), go test (Go), rspec (Ruby). Call this to understand what testing tools are available.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory to analyze (default: current directory)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_status",
+            description="Show the status of the last test run. Returns cached results including pass/fail counts, duration, and failed test names. Use this to quickly check if tests are passing without running them again.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_run",
+            description="Run the project's tests and cache results. Automatically detects the test framework and parses output. Results are saved for quick status checks later.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                    "args": {
+                        "type": "string",
+                        "description": "Additional arguments to pass to test command (e.g., '-k auth' for pytest)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_history",
+            description="Show test run history. Returns the last N test runs with their results.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of results to show (default: 10)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_list",
+            description="List all tests in the project. Enumerates individual test functions/methods using the framework's collection mechanism (e.g., pytest --collect-only).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                    "files_only": {
+                        "type": "boolean",
+                        "description": "Return only test files, not individual tests (default: false)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_coverage",
+            description="Show test coverage mapping. Maps source files to their test files using naming conventions. Use to find which tests cover a specific file or to identify untested code.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "Optional: specific source file to check coverage for",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_uncovered",
+            description="List source files that don't have corresponding tests. Useful for identifying code that needs test coverage.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_changed",
+            description="Show or run tests affected by changed files. Uses git diff to find changed files, then identifies which tests cover them. Use with run=true to execute the tests.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                    "since": {
+                        "type": "string",
+                        "description": "Commit hash or ref to compare against (e.g., 'HEAD~3', 'main')",
+                    },
+                    "run": {
+                        "type": "boolean",
+                        "description": "Actually run the tests (default: false, just shows what would run)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_sync",
+            description="Detect and import test runs from outside IdlerGear. Checks for tests run via IDE, command line, or CI/CD by monitoring cache directories (.pytest_cache, node_modules/.cache, etc) and imports results.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_test_staleness",
+            description="Check how stale test results are. Reports when tests were last run and whether tests have run outside of IdlerGear since then.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory (default: current directory)",
+                    },
+                },
             },
         ),
     ]
@@ -1740,7 +2198,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if limit and len(result) > limit:
                 result = result[:limit]
             if preview:
-                result = [{"id": n.get("id"), "tags": n.get("tags", []), "created": n.get("created")} for n in result]
+                result = [
+                    {
+                        "id": n.get("id"),
+                        "tags": n.get("tags", []),
+                        "created": n.get("created"),
+                    }
+                    for n in result
+                ]
             return _format_result(result)
 
         elif name == "idlergear_note_show":
@@ -1771,7 +2236,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 content = f"{content}\n\n{arguments['body']}"
             backend = get_backend("note")
             result = backend.create(content, tags=["explore"])
-            result["deprecated"] = "Use idlergear_note_create with tags=['explore'] instead"
+            result["deprecated"] = (
+                "Use idlergear_note_create with tags=['explore'] instead"
+            )
             return _format_result(result)
 
         elif name == "idlergear_explore_list":
@@ -1909,7 +2376,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_run_stop":
             if not stop_run(arguments["name"]):
-                raise ValueError(f"Run '{arguments['name']}' is not running or not found")
+                raise ValueError(
+                    f"Run '{arguments['name']}' is not running or not found"
+                )
             return _format_result({"stopped": True, "name": arguments["name"]})
 
         # Config handlers
@@ -1940,12 +2409,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             status = get_project_status()
             if arguments.get("detailed", False):
                 from idlergear.status import format_detailed_status
+
                 return _format_result({"detailed": format_detailed_status(status)})
             else:
-                return _format_result({
-                    "summary": status.summary(),
-                    **status.to_dict()
-                })
+                return _format_result({"summary": status.summary(), **status.to_dict()})
 
         # Search handler
         elif name == "idlergear_search":
@@ -1957,7 +2424,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Backend handlers
         elif name == "idlergear_backend_show":
-            from idlergear.backends import get_configured_backend_name, list_available_backends
+            from idlergear.backends import (
+                get_configured_backend_name,
+                list_available_backends,
+            )
 
             all_types = ["task", "note", "reference", "plan", "vision"]
             result = {}
@@ -1982,19 +2452,23 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 )
 
             set_config_value(f"backends.{backend_type}", backend_name)
-            return _format_result({
-                "type": backend_type,
-                "backend": backend_name,
-                "set": True,
-            })
+            return _format_result(
+                {
+                    "type": backend_type,
+                    "backend": backend_name,
+                    "set": True,
+                }
+            )
 
         # Server management handlers
         elif name == "idlergear_version":
-            return _format_result({
-                "version": __version__,
-                "pid": os.getpid(),
-                "python": sys.executable,
-            })
+            return _format_result(
+                {
+                    "version": __version__,
+                    "pid": os.getpid(),
+                    "python": sys.executable,
+                }
+            )
 
         elif name == "idlergear_reload":
             import threading
@@ -2009,12 +2483,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Start delayed reload in background thread
             threading.Thread(target=delayed_reload, daemon=True).start()
 
-            return _format_result({
-                "status": "reload_triggered",
-                "message": "MCP server will reload in 100ms. The new version will be active for subsequent tool calls.",
-                "current_version": __version__,
-                "pid": os.getpid(),
-            })
+            return _format_result(
+                {
+                    "status": "reload_triggered",
+                    "message": "MCP server will reload in 100ms. The new version will be active for subsequent tool calls.",
+                    "current_version": __version__,
+                    "pid": os.getpid(),
+                }
+            )
 
         # Project handlers
         elif name == "idlergear_project_create":
@@ -2094,6 +2570,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_daemon_register_agent":
             global _registered_agent_id
             from idlergear.daemon.mcp_handlers import handle_register_agent
+
             result = handle_register_agent(arguments)
             # Store the agent_id for use in message operations
             if "agent_id" in result:
@@ -2102,32 +2579,38 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_daemon_list_agents":
             from idlergear.daemon.mcp_handlers import handle_list_agents
+
             result = handle_list_agents()
             return _format_result(result)
 
         elif name == "idlergear_daemon_queue_command":
             from idlergear.daemon.mcp_handlers import handle_queue_command
+
             result = handle_queue_command(arguments)
             return _format_result(result)
 
         elif name == "idlergear_daemon_broadcast":
             from idlergear.daemon.mcp_handlers import handle_send_message
+
             result = handle_send_message(arguments)
             return _format_result(result)
 
         elif name == "idlergear_daemon_update_status":
             from idlergear.daemon.mcp_handlers import handle_update_status
+
             result = handle_update_status(arguments)
             return _format_result(result)
 
         elif name == "idlergear_daemon_list_queue":
             from idlergear.daemon.mcp_handlers import handle_list_queue
+
             result = handle_list_queue()
             return _format_result(result)
 
         # Cross-agent messaging handlers (inbox-based)
         elif name == "idlergear_message_send":
             from idlergear.messaging import send_message
+
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2161,6 +2644,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_message_process":
             from idlergear.messaging import process_inbox, format_context_for_injection
+
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2180,15 +2664,22 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             agent_id = f.stem
                             break
             if not agent_id:
-                return _format_result({"error": "No agent_id provided or detected. Call idlergear_daemon_register_agent first."})
+                return _format_result(
+                    {
+                        "error": "No agent_id provided or detected. Call idlergear_daemon_register_agent first."
+                    }
+                )
 
             # Create task callback if requested
             should_create_tasks = arguments.get("create_tasks", True)
             task_callback = None
             if should_create_tasks:
                 from idlergear.tasks import create_task as _create_task_for_callback
+
                 def task_callback(title: str, body: str, labels: list[str]) -> int:
-                    task = _create_task_for_callback(title, body=body, labels=labels, project_path=root)
+                    task = _create_task_for_callback(
+                        title, body=body, labels=labels, project_path=root
+                    )
                     return task.get("id") if isinstance(task, dict) else task.id
 
             # Process inbox
@@ -2199,18 +2690,27 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if results["context"]:
                 context_text = format_context_for_injection(results["context"])
 
-            return _format_result({
-                "agent_id": agent_id,
-                "context_count": len(results["context"]),
-                "context_messages": context_text,
-                "tasks_created": results["tasks_created"],
-                "queued_for_review": results["queued"],
-                "errors": results["errors"],
-                "note": "Context messages returned for immediate handling. Notification messages converted to tasks." if results["context"] else "No context messages. Notification messages converted to tasks.",
-            })
+            return _format_result(
+                {
+                    "agent_id": agent_id,
+                    "context_count": len(results["context"]),
+                    "context_messages": context_text,
+                    "tasks_created": results["tasks_created"],
+                    "queued_for_review": results["queued"],
+                    "errors": results["errors"],
+                    "note": "Context messages returned for immediate handling. Notification messages converted to tasks."
+                    if results["context"]
+                    else "No context messages. Notification messages converted to tasks.",
+                }
+            )
 
         elif name == "idlergear_message_list":
-            from idlergear.messaging import list_messages, get_inbox_summary, _get_delivery_type
+            from idlergear.messaging import (
+                list_messages,
+                get_inbox_summary,
+                _get_delivery_type,
+            )
+
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2228,7 +2728,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             agent_id = f.stem
                             break
             if not agent_id:
-                return _format_result({"messages": [], "note": "No agent_id provided or detected. Call idlergear_daemon_register_agent first."})
+                return _format_result(
+                    {
+                        "messages": [],
+                        "note": "No agent_id provided or detected. Call idlergear_daemon_register_agent first.",
+                    }
+                )
 
             unread_only = arguments.get("unread_only", True)
             messages = list_messages(idlergear_dir, agent_id, unread_only=unread_only)
@@ -2236,7 +2741,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Filter by delivery type if specified
             delivery_filter = arguments.get("delivery")
             if delivery_filter:
-                messages = [m for m in messages if _get_delivery_type(m) == delivery_filter]
+                messages = [
+                    m for m in messages if _get_delivery_type(m) == delivery_filter
+                ]
 
             # Apply limit
             limit = arguments.get("limit")
@@ -2246,23 +2753,29 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Apply preview mode
             preview = arguments.get("preview", False)
             if preview:
-                messages = [{
-                    "id": m.get("id"),
-                    "from": m.get("from"),
-                    "delivery": _get_delivery_type(m),
-                    "timestamp": m.get("timestamp"),
-                    "read": m.get("read", False),
-                } for m in messages]
+                messages = [
+                    {
+                        "id": m.get("id"),
+                        "from": m.get("from"),
+                        "delivery": _get_delivery_type(m),
+                        "timestamp": m.get("timestamp"),
+                        "read": m.get("read", False),
+                    }
+                    for m in messages
+                ]
 
             summary = get_inbox_summary(idlergear_dir, agent_id)
-            return _format_result({
-                "messages": messages,
-                "summary": summary,
-                "agent_id": agent_id,
-            })
+            return _format_result(
+                {
+                    "messages": messages,
+                    "summary": summary,
+                    "agent_id": agent_id,
+                }
+            )
 
         elif name == "idlergear_message_mark_read":
             from idlergear.messaging import mark_as_read
+
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2272,13 +2785,16 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 # Use registered agent_id if available
                 agent_id = _registered_agent_id
             if not agent_id:
-                raise ValueError("agent_id is required. Call idlergear_daemon_register_agent first.")
+                raise ValueError(
+                    "agent_id is required. Call idlergear_daemon_register_agent first."
+                )
             message_ids = arguments.get("message_ids")
             count = mark_as_read(idlergear_dir, agent_id, message_ids)
             return _format_result({"marked_read": count})
 
         elif name == "idlergear_message_clear":
             from idlergear.messaging import clear_inbox
+
             root = find_idlergear_root()
             if not root:
                 raise ValueError("IdlerGear not initialized")
@@ -2288,7 +2804,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 # Use registered agent_id if available
                 agent_id = _registered_agent_id
             if not agent_id:
-                raise ValueError("agent_id is required. Call idlergear_daemon_register_agent first.")
+                raise ValueError(
+                    "agent_id is required. Call idlergear_daemon_register_agent first."
+                )
             read_only = not arguments.get("all_messages", False)
             count = clear_inbox(idlergear_dir, agent_id, read_only=read_only)
             return _format_result({"cleared": count})
@@ -2296,7 +2814,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_message_test":
             # Test messaging round-trip: send to self, then retrieve
             from datetime import datetime, timezone
-            from idlergear.messaging import send_message, list_messages, mark_as_read, get_inbox_summary
+            from idlergear.messaging import (
+                send_message,
+                list_messages,
+                mark_as_read,
+                get_inbox_summary,
+            )
 
             root = find_idlergear_root()
             if not root:
@@ -2315,10 +2838,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             break
 
             if not agent_id:
-                return _format_result({
-                    "success": False,
-                    "error": "No agent registered. Call idlergear_daemon_register_agent first.",
-                })
+                return _format_result(
+                    {
+                        "success": False,
+                        "error": "No agent registered. Call idlergear_daemon_register_agent first.",
+                    }
+                )
 
             # Step 2: Create test message
             test_content = arguments.get("test_message")
@@ -2336,7 +2861,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             )
 
             # Step 4: Retrieve messages using list_messages()
-            messages = list_messages(idlergear_dir, agent_id, unread_only=False, limit=10)
+            messages = list_messages(
+                idlergear_dir, agent_id, unread_only=False, limit=10
+            )
 
             # Step 5: Find our test message
             test_message_found = None
@@ -2350,50 +2877,59 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             # Step 7: Mark test message as read using mark_as_read()
             if test_message_found:
-                marked = mark_as_read(idlergear_dir, agent_id, [send_result["message_id"]])
+                marked = mark_as_read(
+                    idlergear_dir, agent_id, [send_result["message_id"]]
+                )
             else:
                 marked = 0
 
             # Return comprehensive results
-            return _format_result({
-                "success": test_message_found is not None,
-                "agent_id": agent_id,
-                "steps": {
-                    "1_send": {
-                        "function": "send_message()",
-                        "result": send_result,
+            return _format_result(
+                {
+                    "success": test_message_found is not None,
+                    "agent_id": agent_id,
+                    "steps": {
+                        "1_send": {
+                            "function": "send_message()",
+                            "result": send_result,
+                        },
+                        "2_list": {
+                            "function": "list_messages()",
+                            "messages_retrieved": len(messages),
+                            "test_message_found": test_message_found is not None,
+                        },
+                        "3_summary": {
+                            "function": "get_inbox_summary()",
+                            "result": summary,
+                        },
+                        "4_mark_read": {
+                            "function": "mark_as_read()",
+                            "marked_count": marked,
+                        },
                     },
-                    "2_list": {
-                        "function": "list_messages()",
-                        "messages_retrieved": len(messages),
-                        "test_message_found": test_message_found is not None,
-                    },
-                    "3_summary": {
-                        "function": "get_inbox_summary()",
-                        "result": summary,
-                    },
-                    "4_mark_read": {
-                        "function": "mark_as_read()",
-                        "marked_count": marked,
-                    },
-                },
-                "test_message": test_message_found,
-                "note": "All messaging functions exercised successfully" if test_message_found else "Test message not found after sending",
-            })
+                    "test_message": test_message_found,
+                    "note": "All messaging functions exercised successfully"
+                    if test_message_found
+                    else "Test message not found after sending",
+                }
+            )
 
         # Script generation handlers
         elif name == "idlergear_generate_dev_script":
             from idlergear.daemon.script_handlers import handle_generate_script
+
             result = handle_generate_script(arguments)
             return _format_result(result)
 
         elif name == "idlergear_list_script_templates":
             from idlergear.daemon.script_handlers import handle_list_templates
+
             result = handle_list_templates()
             return _format_result(result)
 
         elif name == "idlergear_get_script_template":
             from idlergear.daemon.script_handlers import handle_get_template
+
             result = handle_get_template(arguments)
             return _format_result(result)
 
@@ -2408,12 +2944,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_env_detect":
             from pathlib import Path
+
             path = Path(arguments["path"]) if arguments.get("path") else None
             result = detect_project_type(path)
             return _format_result(result)
 
         elif name == "idlergear_env_find_venv":
             from pathlib import Path
+
             path = Path(arguments["path"]) if arguments.get("path") else None
             result = find_virtualenv(path)
             if result is None:
@@ -2445,7 +2983,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             fs = _get_fs_server()
             result = fs.list_directory(
                 path=arguments.get("path", "."),
-                exclude_patterns=arguments.get("exclude_patterns")
+                exclude_patterns=arguments.get("exclude_patterns"),
             )
             return _format_result(result)
 
@@ -2454,7 +2992,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             result = fs.directory_tree(
                 path=arguments.get("path", "."),
                 max_depth=arguments.get("max_depth", 3),
-                exclude_patterns=arguments.get("exclude_patterns")
+                exclude_patterns=arguments.get("exclude_patterns"),
             )
             return _format_result(result)
 
@@ -2469,7 +3007,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 path=arguments.get("path", "."),
                 pattern=arguments.get("pattern", "*"),
                 exclude_patterns=arguments.get("exclude_patterns"),
-                use_gitignore=arguments.get("use_gitignore", True)
+                use_gitignore=arguments.get("use_gitignore", True),
             )
             return _format_result(result)
 
@@ -2481,8 +3019,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_fs_file_checksum":
             fs = _get_fs_server()
             result = fs.get_file_checksum(
-                path=arguments["path"],
-                algorithm=arguments.get("algorithm", "sha256")
+                path=arguments["path"], algorithm=arguments.get("algorithm", "sha256")
             )
             return _format_result(result)
 
@@ -2495,16 +3032,18 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_git_status":
             git = _get_git_server()
             status = git.status(repo_path=arguments.get("repo_path"))
-            return _format_result({
-                "branch": status.branch,
-                "ahead": status.ahead,
-                "behind": status.behind,
-                "staged": status.staged,
-                "modified": status.modified,
-                "untracked": status.untracked,
-                "conflicts": status.conflicts,
-                "last_commit": status.last_commit,
-            })
+            return _format_result(
+                {
+                    "branch": status.branch,
+                    "ahead": status.ahead,
+                    "behind": status.behind,
+                    "staged": status.staged,
+                    "modified": status.modified,
+                    "untracked": status.untracked,
+                    "conflicts": status.conflicts,
+                    "last_commit": status.last_commit,
+                }
+            )
 
         elif name == "idlergear_git_diff":
             git = _get_git_server()
@@ -2526,20 +3065,22 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 author=arguments.get("author"),
                 grep=arguments.get("grep"),
             )
-            return _format_result({
-                "commits": [
-                    {
-                        "hash": c.hash,
-                        "short_hash": c.short_hash,
-                        "author": c.author,
-                        "email": c.email,
-                        "date": c.date,
-                        "message": c.message,
-                        "files": c.files,
-                    }
-                    for c in commits
-                ]
-            })
+            return _format_result(
+                {
+                    "commits": [
+                        {
+                            "hash": c.hash,
+                            "short_hash": c.short_hash,
+                            "author": c.author,
+                            "email": c.email,
+                            "date": c.date,
+                            "message": c.message,
+                            "files": c.files,
+                        }
+                        for c in commits
+                    ]
+                }
+            )
 
         elif name == "idlergear_git_add":
             git = _get_git_server()
@@ -2557,7 +3098,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 repo_path=arguments.get("repo_path"),
                 task_id=arguments.get("task_id"),
             )
-            return _format_result({"commit_hash": commit_hash, "message": arguments["message"]})
+            return _format_result(
+                {"commit_hash": commit_hash, "message": arguments["message"]}
+            )
 
         elif name == "idlergear_git_reset":
             git = _get_git_server()
@@ -2616,11 +3159,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 repo_path=arguments.get("repo_path"),
                 auto_add=arguments.get("auto_add", True),
             )
-            return _format_result({
-                "commit_hash": commit_hash,
-                "task_id": arguments["task_id"],
-                "message": arguments["message"],
-            })
+            return _format_result(
+                {
+                    "commit_hash": commit_hash,
+                    "task_id": arguments["task_id"],
+                    "message": arguments["message"],
+                }
+            )
 
         elif name == "idlergear_git_status_for_task":
             git = _get_git_server()
@@ -2637,21 +3182,23 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 repo_path=arguments.get("repo_path"),
                 max_count=arguments.get("max_count", 50),
             )
-            return _format_result({
-                "task_id": arguments["task_id"],
-                "commits": [
-                    {
-                        "hash": c.hash,
-                        "short_hash": c.short_hash,
-                        "author": c.author,
-                        "email": c.email,
-                        "date": c.date,
-                        "message": c.message,
-                        "files": c.files,
-                    }
-                    for c in commits
-                ],
-            })
+            return _format_result(
+                {
+                    "task_id": arguments["task_id"],
+                    "commits": [
+                        {
+                            "hash": c.hash,
+                            "short_hash": c.short_hash,
+                            "author": c.author,
+                            "email": c.email,
+                            "date": c.date,
+                            "message": c.message,
+                            "files": c.files,
+                        }
+                        for c in commits
+                    ],
+                }
+            )
 
         elif name == "idlergear_git_sync_tasks":
             git = _get_git_server()
@@ -2675,7 +3222,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             pm = _get_pm_server()
             process = pm.get_process(arguments["pid"])
             if process is None:
-                return [TextContent(type="text", text=f"Process not found: {arguments['pid']}")]
+                return [
+                    TextContent(
+                        type="text", text=f"Process not found: {arguments['pid']}"
+                    )
+                ]
             return _format_result(process)
 
         elif name == "idlergear_pm_kill_process":
@@ -2709,7 +3260,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             pm = _get_pm_server()
             status = pm.get_run_status(arguments["name"])
             if status is None:
-                return [TextContent(type="text", text=f"Run not found: {arguments['name']}")]
+                return [
+                    TextContent(type="text", text=f"Run not found: {arguments['name']}")
+                ]
             return _format_result(status)
 
         elif name == "idlergear_pm_get_run_logs":
@@ -2720,7 +3273,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 stream=arguments.get("stream", "stdout"),
             )
             if logs is None:
-                return [TextContent(type="text", text=f"Run not found: {arguments['name']}")]
+                return [
+                    TextContent(type="text", text=f"Run not found: {arguments['name']}")
+                ]
             return [TextContent(type="text", text=logs)]
 
         elif name == "idlergear_pm_stop_run":
@@ -2835,10 +3390,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             # Sort by timestamp (newest first)
             all_errors.sort(key=lambda x: x["timestamp"], reverse=True)
 
-            return _format_result({
-                "errors": all_errors[:arguments.get("limit", 20)],
-                "count": len(all_errors),
-            })
+            return _format_result(
+                {
+                    "errors": all_errors[: arguments.get("limit", 20)],
+                    "count": len(all_errors),
+                }
+            )
 
         # === Session Management Handlers ===
         elif name == "idlergear_session_start":
@@ -2877,10 +3434,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             session = SessionState()
             summary = session.get_summary()
             state = session.load()
-            return _format_result({
-                "summary": summary,
-                "state": state,
-            })
+            return _format_result(
+                {
+                    "summary": summary,
+                    "state": state,
+                }
+            )
 
         # === Watch Mode Handlers ===
         elif name == "idlergear_watch_check":
@@ -2888,10 +3447,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             if arguments.get("act", False):
                 status, actions = analyze_and_act(auto_create_tasks=True)
-                return _format_result({
-                    "status": status.to_dict(),
-                    "actions": [a.to_dict() for a in actions],
-                })
+                return _format_result(
+                    {
+                        "status": status.to_dict(),
+                        "actions": [a.to_dict() for a in actions],
+                    }
+                )
             else:
                 status = analyze()
                 return _format_result(status.to_dict())
@@ -2912,10 +3473,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     break
 
             if suggestion is None:
-                return _format_result({
-                    "success": False,
-                    "error": f"Suggestion '{suggestion_id}' not found. Available: {[s.id for s in status.suggestions]}",
-                })
+                return _format_result(
+                    {
+                        "success": False,
+                        "error": f"Suggestion '{suggestion_id}' not found. Available: {[s.id for s in status.suggestions]}",
+                    }
+                )
 
             result = act_on_suggestion(suggestion)
             return _format_result(result.to_dict())
@@ -2925,6 +3488,262 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             stats = get_watch_stats()
             return _format_result(stats)
+
+        elif name == "idlergear_doctor":
+            from idlergear.doctor import run_doctor
+            from idlergear.upgrade import do_upgrade
+
+            report = run_doctor()
+            result = report.to_dict()
+
+            # Auto-fix if requested
+            if arguments.get("fix", False) and not report.is_healthy:
+                upgrade_result = do_upgrade()
+                result["fix_applied"] = True
+                result["fix_result"] = upgrade_result
+
+            return _format_result(result)
+
+        # === Test Tool Handlers ===
+        elif name == "idlergear_test_detect":
+            from pathlib import Path
+
+            from idlergear.testing import detect_framework
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            config = detect_framework(project_path)
+
+            if config is None:
+                return _format_result(
+                    {
+                        "framework": "unknown",
+                        "detected": False,
+                        "message": "No test framework detected",
+                    }
+                )
+
+            return _format_result(
+                {
+                    "framework": config.framework,
+                    "command": config.command,
+                    "test_dir": config.test_dir,
+                    "test_pattern": config.test_pattern,
+                    "detected": True,
+                }
+            )
+
+        elif name == "idlergear_test_status":
+            from pathlib import Path
+
+            from idlergear.testing import get_last_result
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            result = get_last_result(project_path)
+
+            if result is None:
+                return _format_result(
+                    {
+                        "status": "no_results",
+                        "message": "No test results found. Run tests with idlergear_test_run.",
+                    }
+                )
+
+            return _format_result(result.to_dict())
+
+        elif name == "idlergear_test_run":
+            from pathlib import Path
+
+            from idlergear.testing import detect_framework, run_tests
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            extra_args = arguments.get("args")
+
+            config = detect_framework(project_path)
+            if config is None:
+                return _format_result(
+                    {
+                        "success": False,
+                        "error": "No test framework detected",
+                    }
+                )
+
+            result, output = run_tests(project_path, config, extra_args)
+
+            return _format_result(
+                {
+                    "success": result.exit_code == 0,
+                    **result.to_dict(),
+                    "output_lines": len(output.splitlines()),
+                }
+            )
+
+        elif name == "idlergear_test_history":
+            from pathlib import Path
+
+            from idlergear.testing import get_history
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            limit = arguments.get("limit", 10)
+
+            history = get_history(project_path, limit=limit)
+
+            return _format_result(
+                {
+                    "count": len(history),
+                    "runs": [r.to_dict() for r in history],
+                }
+            )
+
+        elif name == "idlergear_test_list":
+            from pathlib import Path
+
+            from idlergear.testing import enumerate_tests, save_enumeration
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            files_only = arguments.get("files_only", False)
+
+            enum = enumerate_tests(project_path)
+            if enum is None:
+                return _format_result(
+                    {"error": "No test framework detected", "tests": []}
+                )
+
+            save_enumeration(enum, project_path)
+
+            if files_only:
+                return _format_result(
+                    {
+                        "framework": enum.framework,
+                        "total_files": enum.total_files,
+                        "files": enum.test_files,
+                    }
+                )
+            else:
+                return _format_result(enum.to_dict())
+
+        elif name == "idlergear_test_coverage":
+            from pathlib import Path
+
+            from idlergear.testing import build_coverage_map, get_tests_for_file
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            file = arguments.get("file")
+
+            if file:
+                tests = get_tests_for_file(file, project_path)
+                return _format_result(
+                    {
+                        "source_file": file,
+                        "test_files": tests,
+                        "has_tests": len(tests) > 0,
+                    }
+                )
+
+            coverage_map = build_coverage_map(project_path)
+            if coverage_map is None:
+                return _format_result({"error": "Could not build coverage map"})
+
+            return _format_result(coverage_map.to_dict())
+
+        elif name == "idlergear_test_uncovered":
+            from pathlib import Path
+
+            from idlergear.testing import get_uncovered_files
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+
+            uncovered = get_uncovered_files(project_path)
+
+            return _format_result(
+                {
+                    "uncovered": uncovered,
+                    "count": len(uncovered),
+                }
+            )
+
+        elif name == "idlergear_test_changed":
+            from pathlib import Path
+
+            from idlergear.testing import (
+                get_changed_files,
+                get_tests_for_changes,
+                run_changed_tests,
+            )
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+            since = arguments.get("since")
+            run = arguments.get("run", False)
+
+            if run:
+                result, output = run_changed_tests(project_path, since=since)
+                return _format_result(
+                    {
+                        "success": result.exit_code == 0,
+                        **result.to_dict(),
+                        "output_lines": len(output.splitlines()),
+                    }
+                )
+            else:
+                changed = get_changed_files(project_path, since=since)
+                tests = get_tests_for_changes(project_path, since=since)
+                return _format_result(
+                    {
+                        "changed_files": changed,
+                        "tests_to_run": tests,
+                        "changed_count": len(changed),
+                        "test_count": len(tests),
+                    }
+                )
+
+        elif name == "idlergear_test_sync":
+            from pathlib import Path
+
+            from idlergear.testing import (
+                check_external_test_runs,
+                sync_external_runs,
+            )
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+
+            external_runs = check_external_test_runs(project_path)
+            if not external_runs:
+                return _format_result(
+                    {
+                        "external_detected": False,
+                        "imported": 0,
+                        "message": "No external test runs detected",
+                    }
+                )
+
+            imported = sync_external_runs(project_path)
+            return _format_result(
+                {
+                    "external_detected": True,
+                    "external_runs": [r.to_dict() for r in external_runs],
+                    "imported": len(imported),
+                    "results": [r.to_dict() for r in imported],
+                }
+            )
+
+        elif name == "idlergear_test_staleness":
+            from pathlib import Path
+
+            from idlergear.testing import get_test_staleness
+
+            path = arguments.get("path")
+            project_path = Path(path) if path else None
+
+            staleness = get_test_staleness(project_path)
+            return _format_result(staleness)
 
         else:
             raise ValueError(f"Unknown tool: {name}")

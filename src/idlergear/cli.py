@@ -2,6 +2,7 @@
 
 import json
 from enum import Enum
+from pathlib import Path
 from typing import Optional
 
 from importlib.metadata import version as get_version
@@ -95,6 +96,10 @@ project_app = typer.Typer(help="Kanban project boards (→ GitHub Projects v2)")
 session_app = typer.Typer(help="Session state persistence")
 goose_app = typer.Typer(help="Goose integration and configuration")
 otel_app = typer.Typer(help="OpenTelemetry log collection")
+test_app = typer.Typer(help="Test framework detection and status")
+agents_app = typer.Typer(help="AGENTS.md generation and management")
+secrets_app = typer.Typer(help="Secure local secrets management")
+release_app = typer.Typer(help="Release management (GitHub Releases)")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -110,6 +115,10 @@ app.add_typer(project_app, name="project")
 app.add_typer(session_app, name="session")
 app.add_typer(goose_app, name="goose")
 app.add_typer(otel_app, name="otel")
+app.add_typer(test_app, name="test")
+app.add_typer(agents_app, name="agents")
+app.add_typer(secrets_app, name="secrets")
+app.add_typer(release_app, name="release")
 
 
 @app.command()
@@ -1185,8 +1194,27 @@ def install(
         "--auto-version",
         help="Install git hook to auto-bump patch version on commit",
     ),
+    # Multi-assistant options
+    all_assistants: bool = typer.Option(
+        False, "--all", help="Install for all detected AI assistants"
+    ),
+    gemini: bool = typer.Option(
+        False, "--gemini", help="Install for Gemini CLI"
+    ),
+    copilot: bool = typer.Option(
+        False, "--copilot", help="Install for GitHub Copilot CLI"
+    ),
+    codex: bool = typer.Option(
+        False, "--codex", help="Install for Codex CLI"
+    ),
+    aider: bool = typer.Option(
+        False, "--aider", help="Install for Aider"
+    ),
+    goose: bool = typer.Option(
+        False, "--goose", help="Install for Goose"
+    ),
 ):
-    """Install IdlerGear integration for Claude Code.
+    """Install IdlerGear integration for Claude Code (and other assistants).
 
     Creates:
     - .mcp.json - MCP server registration
@@ -1307,6 +1335,44 @@ def install(
 
     set_project_version(__version__)
 
+    # Handle multi-assistant installation
+    from idlergear.assistant_install import (
+        Assistant,
+        detect_installed_assistants,
+        install_for_assistant,
+        install_for_all,
+    )
+
+    other_assistants = []
+    if gemini:
+        other_assistants.append(Assistant.GEMINI)
+    if copilot:
+        other_assistants.append(Assistant.COPILOT)
+    if codex:
+        other_assistants.append(Assistant.CODEX)
+    if aider:
+        other_assistants.append(Assistant.AIDER)
+    if goose:
+        other_assistants.append(Assistant.GOOSE)
+
+    if all_assistants:
+        typer.echo("")
+        typer.secho("Installing for all detected assistants...", fg=typer.colors.CYAN)
+        all_results = install_for_all()
+        for assistant_name, results in all_results.items():
+            if results:
+                typer.secho(f"\n{assistant_name}:", bold=True)
+                report_results(results, "files")
+        if not all_results:
+            typer.echo("No additional AI assistants detected.")
+
+    elif other_assistants:
+        typer.echo("")
+        for assistant in other_assistants:
+            typer.secho(f"\nInstalling for {assistant.value}...", fg=typer.colors.CYAN)
+            results = install_for_assistant(assistant)
+            report_results(results, f"{assistant.value} files")
+
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
     typer.echo("IdlerGear auto-starts at session beginning via hooks and skill.")
@@ -1314,6 +1380,10 @@ def install(
         "Available commands: /ig_start (refresh context), /ig_status (diagnostics)"
     )
     typer.echo("Restart Claude Code or run /mcp to verify.")
+
+    if other_assistants or all_assistants:
+        typer.echo("")
+        typer.echo("Other assistants configured - restart them to activate IdlerGear.")
 
 
 # Daemon commands
@@ -1721,6 +1791,295 @@ def mcp_status():
         typer.secho("No active MCP servers.", fg=typer.colors.YELLOW)
     else:
         typer.echo(f"\n{active} active MCP server(s)")
+
+
+@mcp_app.command("generate")
+def mcp_generate(
+    ctx: typer.Context,
+    global_config: bool = typer.Option(
+        False, "--global", "-g", help="Generate global Claude Code config instead of project-level"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be generated without writing"
+    ),
+    include_idlergear: bool = typer.Option(
+        True, "--idlergear/--no-idlergear", help="Include IdlerGear MCP server"
+    ),
+):
+    """Generate MCP configuration file.
+
+    Creates .mcp.json for project-level config, or updates Claude Code's
+    global config for --global.
+    """
+    from pathlib import Path
+
+    from idlergear.mcp_config import (
+        generate_project_mcp_config,
+        get_claude_code_config_path,
+        get_project_mcp_path,
+    )
+
+    if global_config:
+        config_path = get_claude_code_config_path()
+    else:
+        config_path = get_project_mcp_path()
+
+    config = generate_project_mcp_config(include_idlergear=include_idlergear)
+    content = json.dumps(config.to_dict(), indent=2)
+
+    if dry_run:
+        typer.echo(f"Would write to {config_path}:")
+        typer.echo(content)
+        return
+
+    if config_path.exists():
+        typer.secho(f"Config already exists: {config_path}", fg=typer.colors.YELLOW)
+        if not typer.confirm("Overwrite?"):
+            raise typer.Exit(0)
+
+    config.save(config_path)
+    typer.secho(f"Generated {config_path}", fg=typer.colors.GREEN)
+
+
+@mcp_app.command("show")
+def mcp_show(
+    ctx: typer.Context,
+    global_config: bool = typer.Option(
+        False, "--global", "-g", help="Show global Claude Code config"
+    ),
+):
+    """Show current MCP configuration."""
+    from idlergear.mcp_config import (
+        get_claude_code_config_path,
+        get_project_mcp_path,
+        load_claude_code_config,
+        load_project_mcp_config,
+    )
+
+    if global_config:
+        config_path = get_claude_code_config_path()
+        config = load_claude_code_config()
+    else:
+        config_path = get_project_mcp_path()
+        config = load_project_mcp_config()
+
+    if config is None:
+        typer.secho(f"No config found at {config_path}", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+    typer.echo(f"Config: {config_path}")
+    typer.echo("")
+
+    if not config.servers:
+        typer.echo("No MCP servers configured.")
+        return
+
+    for name, server in config.servers.items():
+        typer.secho(f"  {name}:", fg=typer.colors.CYAN, bold=True)
+        typer.echo(f"    command: {server.command}")
+        if server.args:
+            typer.echo(f"    args: {' '.join(server.args)}")
+        if server.env:
+            typer.echo(f"    env: {server.env}")
+        typer.echo(f"    type: {server.type}")
+
+
+@mcp_app.command("check")
+def mcp_check(
+    ctx: typer.Context,
+    global_config: bool = typer.Option(
+        False, "--global", "-g", help="Check global Claude Code config"
+    ),
+):
+    """Validate MCP configuration."""
+    from idlergear.mcp_config import (
+        get_claude_code_config_path,
+        get_project_mcp_path,
+        load_claude_code_config,
+        load_project_mcp_config,
+        validate_mcp_config,
+    )
+
+    if global_config:
+        config_path = get_claude_code_config_path()
+        config = load_claude_code_config()
+    else:
+        config_path = get_project_mcp_path()
+        config = load_project_mcp_config()
+
+    if config is None:
+        typer.secho(f"No config found at {config_path}", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+    result = validate_mcp_config(config)
+
+    if result.valid and not result.warnings:
+        typer.secho("✓ Configuration is valid", fg=typer.colors.GREEN)
+        return
+
+    if result.issues:
+        typer.secho("Errors:", fg=typer.colors.RED, bold=True)
+        for issue in result.issues:
+            typer.echo(f"  ✗ {issue}")
+
+    if result.warnings:
+        typer.secho("Warnings:", fg=typer.colors.YELLOW, bold=True)
+        for warning in result.warnings:
+            typer.echo(f"  ⚠ {warning}")
+
+    if not result.valid:
+        raise typer.Exit(1)
+
+
+@mcp_app.command("add")
+def mcp_add(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Server name"),
+    command: str = typer.Argument(..., help="Command to run the server"),
+    args: Optional[list[str]] = typer.Option(
+        None, "--arg", "-a", help="Command arguments (can be repeated)"
+    ),
+    server_type: str = typer.Option("stdio", "--type", "-t", help="Server type (stdio, sse, http)"),
+    global_config: bool = typer.Option(
+        False, "--global", "-g", help="Add to global Claude Code config"
+    ),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", help="Overwrite if server already exists"
+    ),
+):
+    """Add an MCP server to configuration."""
+    from idlergear.mcp_config import (
+        McpServerConfig,
+        add_server_to_config,
+        get_claude_code_config_path,
+        get_project_mcp_path,
+    )
+
+    if global_config:
+        config_path = get_claude_code_config_path()
+    else:
+        config_path = get_project_mcp_path()
+
+    server = McpServerConfig(
+        name=name,
+        command=command,
+        args=args or [],
+        type=server_type,
+    )
+
+    success, message = add_server_to_config(config_path, server, overwrite=overwrite)
+
+    if success:
+        typer.secho(message, fg=typer.colors.GREEN)
+    else:
+        typer.secho(message, fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@mcp_app.command("remove")
+def mcp_remove(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Server name to remove"),
+    global_config: bool = typer.Option(
+        False, "--global", "-g", help="Remove from global Claude Code config"
+    ),
+):
+    """Remove an MCP server from configuration."""
+    from idlergear.mcp_config import (
+        get_claude_code_config_path,
+        get_project_mcp_path,
+        remove_server_from_config,
+    )
+
+    if global_config:
+        config_path = get_claude_code_config_path()
+    else:
+        config_path = get_project_mcp_path()
+
+    success, message = remove_server_from_config(config_path, name)
+
+    if success:
+        typer.secho(message, fg=typer.colors.GREEN)
+    else:
+        typer.secho(message, fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@mcp_app.command("test")
+def mcp_test_cmd(
+    ctx: typer.Context,
+    server_name: Optional[str] = typer.Argument(
+        None, help="Server name to test (tests all if not specified)"
+    ),
+    global_config: bool = typer.Option(
+        False, "--global", "-g", help="Test servers from global config"
+    ),
+    timeout: float = typer.Option(5.0, "--timeout", help="Timeout in seconds"),
+):
+    """Test MCP server connectivity."""
+    import asyncio
+
+    from idlergear.mcp_config import (
+        get_claude_code_config_path,
+        get_project_mcp_path,
+        load_claude_code_config,
+        load_project_mcp_config,
+        test_mcp_server,
+    )
+
+    if global_config:
+        config_path = get_claude_code_config_path()
+        config = load_claude_code_config()
+    else:
+        config_path = get_project_mcp_path()
+        config = load_project_mcp_config()
+
+    if config is None:
+        typer.secho(f"No config found at {config_path}", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+    servers_to_test = []
+    if server_name:
+        if server_name not in config.servers:
+            typer.secho(f"Server '{server_name}' not found in config", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        servers_to_test.append(config.servers[server_name])
+    else:
+        servers_to_test = list(config.servers.values())
+
+    if not servers_to_test:
+        typer.echo("No servers to test.")
+        return
+
+    async def run_tests():
+        results = []
+        for server in servers_to_test:
+            typer.echo(f"Testing {server.name}...", nl=False)
+            result = await test_mcp_server(server, timeout=timeout)
+            results.append(result)
+
+            if result.success:
+                typer.secho(
+                    f" OK ({result.response_time_ms:.0f}ms)",
+                    fg=typer.colors.GREEN,
+                )
+                if result.server_info:
+                    info = result.server_info
+                    typer.echo(f"  Server: {info.get('name', 'unknown')} {info.get('version', '')}")
+            else:
+                typer.secho(f" FAILED: {result.error}", fg=typer.colors.RED)
+
+        return results
+
+    results = asyncio.run(run_tests())
+    failed = sum(1 for r in results if not r.success)
+
+    typer.echo("")
+    if failed:
+        typer.secho(f"{failed}/{len(results)} servers failed", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    else:
+        typer.secho(f"All {len(results)} servers OK", fg=typer.colors.GREEN)
 
 
 # Config commands
@@ -4206,6 +4565,690 @@ def watch_config(
     typer.secho(f"✓ Set watch.{key} = {value}", fg=typer.colors.GREEN)
 
 
+# ============================================================================
+# Test commands - Test framework detection and status tracking
+# ============================================================================
+
+
+@test_app.command("detect")
+def test_detect(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory to analyze"),
+):
+    """Detect test framework in use.
+
+    Supports: pytest, cargo test, dotnet test, jest, vitest, go test, rspec
+
+    Examples:
+        idlergear test detect        # Detect in current directory
+        idlergear test detect ./api  # Detect in specific directory
+    """
+    from pathlib import Path
+
+    from idlergear.testing import detect_framework
+
+    project_path = Path(path).resolve()
+    if not project_path.exists():
+        typer.secho(f"Path does not exist: {path}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    config = detect_framework(project_path)
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                {
+                    "framework": config.framework,
+                    "command": config.command,
+                    "test_dir": config.test_dir,
+                    "test_pattern": config.test_pattern,
+                }
+            )
+        )
+    else:
+        if config.framework == "unknown":
+            typer.secho("No test framework detected.", fg=typer.colors.YELLOW)
+            typer.echo("\nSupported frameworks:")
+            typer.echo("  • pytest (Python)")
+            typer.echo("  • cargo test (Rust)")
+            typer.echo("  • dotnet test (.NET)")
+            typer.echo("  • jest/vitest (JavaScript)")
+            typer.echo("  • go test (Go)")
+            typer.echo("  • rspec (Ruby)")
+        else:
+            typer.secho(f"Framework: {config.framework}", fg=typer.colors.GREEN)
+            typer.echo(f"Command: {config.command}")
+            if config.test_dir:
+                typer.echo(f"Test directory: {config.test_dir}")
+            if config.test_pattern:
+                typer.echo(f"Test pattern: {config.test_pattern}")
+
+
+@test_app.command("status")
+def test_status(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+):
+    """Show last test run status.
+
+    Shows cached results from the most recent test run.
+
+    Examples:
+        idlergear test status        # Show last run status
+        idlergear test status --json # JSON output
+    """
+    from pathlib import Path
+
+    from idlergear.testing import format_status, get_last_result
+
+    project_path = Path(path).resolve()
+    result = get_last_result(project_path)
+
+    if result is None:
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps({"status": "no_results", "message": "No test results found"})
+            )
+        else:
+            typer.secho("No test results found.", fg=typer.colors.YELLOW)
+            typer.echo("\nRun tests with: idlergear test run")
+        return
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                {
+                    "framework": result.framework,
+                    "timestamp": result.timestamp,
+                    "duration_seconds": result.duration_seconds,
+                    "total": result.total,
+                    "passed": result.passed,
+                    "failed": result.failed,
+                    "skipped": result.skipped,
+                    "errors": result.errors,
+                    "failed_tests": result.failed_tests,
+                    "command": result.command,
+                    "exit_code": result.exit_code,
+                }
+            )
+        )
+    else:
+        typer.echo(format_status(result))
+
+
+@test_app.command("run")
+def test_run(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+    args: Optional[str] = typer.Option(
+        None, "--args", "-a", help="Additional arguments to pass to test command"
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show full test output"
+    ),
+):
+    """Run tests and cache results.
+
+    Detects the test framework and runs tests, parsing and caching the results.
+
+    Examples:
+        idlergear test run                    # Run all tests
+        idlergear test run --args "-k auth"   # Run with extra args
+        idlergear test run --verbose          # Show full output
+    """
+    from pathlib import Path
+
+    from idlergear.testing import detect_framework, format_status, run_tests
+
+    project_path = Path(path).resolve()
+    if not project_path.exists():
+        typer.secho(f"Path does not exist: {path}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Detect framework
+    config = detect_framework(project_path)
+    if config.framework == "unknown":
+        typer.secho("No test framework detected.", fg=typer.colors.RED)
+        typer.echo(
+            "\nSupported frameworks: pytest, cargo, dotnet, jest, vitest, go, rspec"
+        )
+        raise typer.Exit(1)
+
+    # Build command with extra args
+    command = config.command
+    if args:
+        command = f"{command} {args}"
+
+    typer.echo(f"Running: {command}")
+    typer.echo()
+
+    # Run tests
+    result, output = run_tests(project_path, config, extra_args=args)
+
+    if verbose:
+        typer.echo(output)
+        typer.echo()
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                {
+                    "framework": result.framework,
+                    "timestamp": result.timestamp,
+                    "duration_seconds": result.duration_seconds,
+                    "total": result.total,
+                    "passed": result.passed,
+                    "failed": result.failed,
+                    "skipped": result.skipped,
+                    "errors": result.errors,
+                    "failed_tests": result.failed_tests,
+                    "command": result.command,
+                    "exit_code": result.exit_code,
+                    "success": result.exit_code == 0,
+                }
+            )
+        )
+    else:
+        typer.echo(format_status(result))
+
+    # Exit with test exit code
+    if result.exit_code != 0:
+        raise typer.Exit(result.exit_code)
+
+
+@test_app.command("history")
+def test_history(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Number of results to show"),
+):
+    """Show test run history.
+
+    Examples:
+        idlergear test history           # Show last 10 runs
+        idlergear test history -n 5      # Show last 5 runs
+    """
+    from pathlib import Path
+
+    from idlergear.testing import get_history
+
+    project_path = Path(path).resolve()
+    history = get_history(project_path, limit=limit)
+
+    if not history:
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(json.dumps([]))
+        else:
+            typer.secho("No test history found.", fg=typer.colors.YELLOW)
+        return
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                [
+                    {
+                        "framework": r.framework,
+                        "timestamp": r.timestamp,
+                        "duration_seconds": r.duration_seconds,
+                        "total": r.total,
+                        "passed": r.passed,
+                        "failed": r.failed,
+                        "exit_code": r.exit_code,
+                    }
+                    for r in history
+                ]
+            )
+        )
+    else:
+        typer.secho(
+            f"Test history ({len(history)} runs):", fg=typer.colors.CYAN, bold=True
+        )
+        typer.echo()
+        for r in history:
+            # Format timestamp nicely
+            try:
+                from datetime import datetime
+
+                dt = datetime.fromisoformat(r.timestamp.replace("Z", "+00:00"))
+                time_str = dt.strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                time_str = r.timestamp[:16]
+
+            # Status indicator
+            if r.failed > 0 or r.errors > 0:
+                status = typer.style("✗", fg=typer.colors.RED)
+            else:
+                status = typer.style("✓", fg=typer.colors.GREEN)
+
+            typer.echo(
+                f"  {status} {time_str} | {r.passed}/{r.total} passed | {r.duration_seconds:.1f}s"
+            )
+
+
+@test_app.command("list")
+def test_list(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+    files_only: bool = typer.Option(
+        False, "--files", "-f", help="List test files only, not individual tests"
+    ),
+    refresh: bool = typer.Option(
+        False, "--refresh", "-r", help="Re-enumerate tests (don't use cache)"
+    ),
+):
+    """List all tests in the project.
+
+    Enumerates tests using the framework's collection mechanism.
+
+    Examples:
+        idlergear test list           # List all tests
+        idlergear test list --files   # List test files only
+        idlergear test list --refresh # Force re-enumeration
+    """
+    from pathlib import Path
+
+    from idlergear.testing import enumerate_tests, get_enumeration, save_enumeration
+
+    project_path = Path(path).resolve()
+
+    # Use cache unless refresh requested
+    if not refresh:
+        enum = get_enumeration(project_path)
+        if enum is None:
+            enum = enumerate_tests(project_path)
+            if enum:
+                save_enumeration(enum, project_path)
+    else:
+        enum = enumerate_tests(project_path)
+        if enum:
+            save_enumeration(enum, project_path)
+
+    if enum is None:
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": "No test framework detected"}))
+        else:
+            typer.secho("No test framework detected.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        if files_only:
+            typer.echo(
+                json.dumps(
+                    {
+                        "framework": enum.framework,
+                        "total_files": enum.total_files,
+                        "files": enum.test_files,
+                    }
+                )
+            )
+        else:
+            typer.echo(json.dumps(enum.to_dict()))
+    else:
+        typer.secho(
+            f"Tests ({enum.framework}): {enum.total_tests} tests in {enum.total_files} files",
+            fg=typer.colors.CYAN,
+            bold=True,
+        )
+        typer.echo()
+
+        if files_only:
+            for f in enum.test_files:
+                typer.echo(f"  {f}")
+        else:
+            # Group by file
+            by_file: dict[str, list[str]] = {}
+            for item in enum.test_items:
+                if item.file not in by_file:
+                    by_file[item.file] = []
+                by_file[item.file].append(item.name)
+
+            for file in sorted(by_file.keys()):
+                typer.secho(f"  {file}", fg=typer.colors.GREEN)
+                for test in by_file[file][:10]:  # Limit per file
+                    typer.echo(f"    - {test}")
+                if len(by_file[file]) > 10:
+                    typer.echo(f"    ... and {len(by_file[file]) - 10} more")
+
+
+@test_app.command("coverage")
+def test_coverage(
+    ctx: typer.Context,
+    file: Optional[str] = typer.Argument(None, help="Source file to check coverage for"),
+    path: str = typer.Option(".", "--path", "-p", help="Project directory"),
+    refresh: bool = typer.Option(
+        False, "--refresh", "-r", help="Rebuild coverage map"
+    ),
+):
+    """Show test coverage mapping.
+
+    Maps source files to their test files using naming conventions.
+
+    Examples:
+        idlergear test coverage                    # Show all mappings
+        idlergear test coverage src/foo.py         # Show tests for specific file
+        idlergear test coverage --refresh          # Rebuild coverage map
+    """
+    from pathlib import Path
+
+    from idlergear.testing import build_coverage_map, get_coverage_map, get_tests_for_file
+
+    project_path = Path(path).resolve()
+
+    if file:
+        # Show tests for specific file
+        tests = get_tests_for_file(file, project_path)
+
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"source_file": file, "test_files": tests}))
+        else:
+            if tests:
+                typer.secho(f"Tests for {file}:", fg=typer.colors.CYAN)
+                for t in tests:
+                    typer.echo(f"  - {t}")
+            else:
+                typer.secho(f"No tests found for {file}", fg=typer.colors.YELLOW)
+        return
+
+    # Show full coverage map
+    if refresh:
+        coverage_map = build_coverage_map(project_path)
+    else:
+        coverage_map = get_coverage_map(project_path)
+        if coverage_map is None:
+            coverage_map = build_coverage_map(project_path)
+
+    if coverage_map is None:
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": "Could not build coverage map"}))
+        else:
+            typer.secho("Could not build coverage map.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(coverage_map.to_dict()))
+    else:
+        covered = len(coverage_map.mappings)
+        uncovered = len(coverage_map.uncovered)
+        total = covered + uncovered
+        pct = (covered / total * 100) if total > 0 else 0
+
+        typer.secho(
+            f"Coverage Map ({coverage_map.framework}): {covered}/{total} files have tests ({pct:.0f}%)",
+            fg=typer.colors.CYAN,
+            bold=True,
+        )
+        typer.echo()
+
+        if coverage_map.uncovered:
+            typer.secho("Uncovered files:", fg=typer.colors.YELLOW)
+            for f in coverage_map.uncovered[:20]:
+                typer.echo(f"  - {f}")
+            if len(coverage_map.uncovered) > 20:
+                typer.echo(f"  ... and {len(coverage_map.uncovered) - 20} more")
+
+
+@test_app.command("uncovered")
+def test_uncovered(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+):
+    """List source files without tests.
+
+    Examples:
+        idlergear test uncovered       # List uncovered files
+    """
+    from pathlib import Path
+
+    from idlergear.testing import get_uncovered_files
+
+    project_path = Path(path).resolve()
+    uncovered = get_uncovered_files(project_path)
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"uncovered": uncovered, "count": len(uncovered)}))
+    else:
+        if uncovered:
+            typer.secho(
+                f"Uncovered files ({len(uncovered)}):", fg=typer.colors.YELLOW, bold=True
+            )
+            for f in uncovered:
+                typer.echo(f"  - {f}")
+        else:
+            typer.secho("All source files have tests!", fg=typer.colors.GREEN)
+
+
+@test_app.command("changed")
+def test_changed(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+    since: Optional[str] = typer.Option(
+        None, "--since", "-s", help="Commit hash or ref to compare against"
+    ),
+    run: bool = typer.Option(
+        False, "--run", "-r", help="Actually run the tests"
+    ),
+    args: Optional[str] = typer.Option(
+        None, "--args", "-a", help="Additional arguments for test command"
+    ),
+):
+    """Show or run tests for changed files.
+
+    Identifies which tests should run based on files changed since last commit.
+
+    Examples:
+        idlergear test changed                 # Show tests for uncommitted changes
+        idlergear test changed --run           # Run tests for changed files
+        idlergear test changed --since HEAD~3  # Tests for last 3 commits
+    """
+    from pathlib import Path
+
+    from idlergear.testing import (
+        format_status,
+        get_changed_files,
+        get_tests_for_changes,
+        run_changed_tests,
+    )
+
+    project_path = Path(path).resolve()
+
+    if run:
+        # Run the tests
+        result, output = run_changed_tests(project_path, since=since, extra_args=args)
+
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "success": result.exit_code == 0,
+                        **result.to_dict(),
+                    }
+                )
+            )
+        else:
+            if result.total == 0 and result.errors == 0:
+                typer.secho(
+                    "No tests to run - no changed files affect tests.",
+                    fg=typer.colors.YELLOW,
+                )
+            else:
+                typer.echo(format_status(result))
+
+        if result.exit_code != 0:
+            raise typer.Exit(result.exit_code)
+    else:
+        # Just show what would run
+        changed = get_changed_files(project_path, since=since)
+        tests = get_tests_for_changes(project_path, since=since)
+
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "changed_files": changed,
+                        "tests_to_run": tests,
+                        "changed_count": len(changed),
+                        "test_count": len(tests),
+                    }
+                )
+            )
+        else:
+            typer.secho(
+                f"Changed files: {len(changed)}", fg=typer.colors.CYAN, bold=True
+            )
+            for f in changed[:10]:
+                typer.echo(f"  - {f}")
+            if len(changed) > 10:
+                typer.echo(f"  ... and {len(changed) - 10} more")
+
+            typer.echo()
+            typer.secho(
+                f"Tests to run: {len(tests)}", fg=typer.colors.CYAN, bold=True
+            )
+            for t in tests[:10]:
+                typer.echo(f"  - {t}")
+            if len(tests) > 10:
+                typer.echo(f"  ... and {len(tests) - 10} more")
+
+            if tests:
+                typer.echo()
+                typer.echo("Run with: idlergear test changed --run")
+
+
+@test_app.command("sync")
+def test_sync(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+):
+    """Detect and import test runs from outside IdlerGear.
+
+    Checks for tests that ran via IDE, command line, or CI/CD and imports
+    their results into IdlerGear's tracking.
+
+    Examples:
+        idlergear test sync        # Check for external test runs
+    """
+    from pathlib import Path
+
+    from idlergear.testing import (
+        check_external_test_runs,
+        sync_external_runs,
+    )
+
+    project_path = Path(path).resolve()
+
+    # Check for external runs
+    external_runs = check_external_test_runs(project_path)
+
+    if not external_runs:
+        if ctx.obj.output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "external_detected": False,
+                        "imported": 0,
+                        "message": "No external test runs detected",
+                    }
+                )
+            )
+        else:
+            typer.echo("No external test runs detected.")
+        return
+
+    # Import them
+    imported = sync_external_runs(project_path)
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                {
+                    "external_detected": True,
+                    "external_runs": [r.to_dict() for r in external_runs],
+                    "imported": len(imported),
+                    "results": [r.to_dict() for r in imported],
+                }
+            )
+        )
+    else:
+        typer.secho(
+            f"Detected {len(external_runs)} external test run(s)",
+            fg=typer.colors.CYAN,
+            bold=True,
+        )
+        for run in external_runs:
+            status = "✅" if run.success else "❌" if run.success is False else "❓"
+            typer.echo(f"  {status} {run.cache_path} @ {run.timestamp}")
+            if run.estimated_tests:
+                typer.echo(f"     ~{run.estimated_tests} tests")
+
+        if imported:
+            typer.echo()
+            typer.secho(f"Imported {len(imported)} result(s)", fg=typer.colors.GREEN)
+            for result in imported:
+                typer.echo(
+                    f"  - {result.passed} passed, {result.failed} failed"
+                )
+        else:
+            typer.echo()
+            typer.secho(
+                "Could not import detailed results (cache may be incomplete)",
+                fg=typer.colors.YELLOW,
+            )
+
+
+@test_app.command("staleness")
+def test_staleness(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory"),
+):
+    """Check how stale test results are.
+
+    Reports when tests were last run and whether tests have run outside
+    of IdlerGear since then.
+
+    Examples:
+        idlergear test staleness   # Check test result freshness
+    """
+    from pathlib import Path
+
+    from idlergear.testing import get_test_staleness
+
+    project_path = Path(path).resolve()
+    staleness = get_test_staleness(project_path)
+
+    if ctx.obj.output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(staleness))
+    else:
+        if staleness["last_run"]:
+            seconds = staleness.get("seconds_ago", 0)
+            if seconds is None:
+                time_ago = "unknown"
+            elif seconds < 60:
+                time_ago = "just now"
+            elif seconds < 3600:
+                mins = int(seconds // 60)
+                time_ago = f"{mins} minute{'s' if mins != 1 else ''} ago"
+            elif seconds < 86400:
+                hours = int(seconds // 3600)
+                time_ago = f"{hours} hour{'s' if hours != 1 else ''} ago"
+            else:
+                days = int(seconds // 86400)
+                time_ago = f"{days} day{'s' if days != 1 else ''} ago"
+
+            typer.secho("Last recorded test run:", bold=True)
+            typer.echo(f"  {time_ago} ({staleness['last_run']})")
+        else:
+            typer.secho("No test runs recorded.", fg=typer.colors.YELLOW)
+
+        if staleness["external_detected"]:
+            typer.echo()
+            typer.secho(
+                "⚠️  External test runs detected!",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
+            typer.echo("  Run 'idlergear test sync' to import them.")
+
+
 # Self-update commands
 @app.command()
 def update(
@@ -4355,6 +5398,932 @@ def update(
         else:
             typer.secho(f"✗ {result['message']}", fg=typer.colors.RED)
             raise typer.Exit(1)
+
+
+# ============================================================================
+# Agents Commands (AGENTS.md generation)
+# ============================================================================
+
+
+@agents_app.command("init")
+def agents_init(
+    ctx: typer.Context,
+    lang: Optional[str] = typer.Option(
+        None,
+        "--lang",
+        "-l",
+        help="Language (python, rust, javascript, go, java). Auto-detects if not specified.",
+    ),
+    with_claude: bool = typer.Option(
+        True, "--with-claude/--no-claude", help="Also generate CLAUDE.md"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be generated without writing"
+    ),
+):
+    """Initialize AGENTS.md with language-specific defaults.
+
+    Auto-detects the project language if --lang is not specified.
+    Generates build, test, lint, and format commands appropriate for the language.
+
+    Examples:
+        idlergear agents init              # Auto-detect language
+        idlergear agents init --lang python
+        idlergear agents init --dry-run
+    """
+    from pathlib import Path
+
+    from idlergear.agents import (
+        Language,
+        TEMPLATES,
+        detect_language,
+        generate_agents_md,
+        generate_claude_md,
+    )
+    from idlergear.config import find_idlergear_root
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+    project_path = find_idlergear_root() or Path.cwd()
+
+    # Detect or use specified language
+    if lang:
+        try:
+            language = Language(lang.lower())
+        except ValueError:
+            if output_format == OutputFormat.JSON:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "error": f"Unknown language: {lang}",
+                            "supported": [l.value for l in Language if l != Language.UNKNOWN],
+                        }
+                    )
+                )
+            else:
+                typer.secho(f"Unknown language: {lang}", fg=typer.colors.RED)
+                typer.echo(
+                    f"Supported: {', '.join(l.value for l in Language if l != Language.UNKNOWN)}"
+                )
+            raise typer.Exit(1)
+    else:
+        language = detect_language(project_path)
+
+    if language == Language.UNKNOWN:
+        if output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": "Could not detect language",
+                        "hint": "Use --lang to specify",
+                    }
+                )
+            )
+        else:
+            typer.secho("Could not detect project language.", fg=typer.colors.YELLOW)
+            typer.echo("Use --lang to specify: python, rust, javascript, go, java")
+        raise typer.Exit(1)
+
+    template = TEMPLATES[language]
+
+    # Generate content
+    agents_content = generate_agents_md(template, include_idlergear=True)
+    claude_content = generate_claude_md(template, include_idlergear=True) if with_claude else None
+
+    if dry_run:
+        if output_format == OutputFormat.JSON:
+            result = {
+                "dry_run": True,
+                "language": language.value,
+                "files": {"AGENTS.md": len(agents_content)},
+            }
+            if claude_content:
+                result["files"]["CLAUDE.md"] = len(claude_content)
+            typer.echo(json.dumps(result))
+        else:
+            typer.secho(f"Would generate for language: {language.value}", fg=typer.colors.CYAN)
+            typer.echo()
+            typer.secho("--- AGENTS.md ---", fg=typer.colors.YELLOW)
+            typer.echo(agents_content[:500] + "..." if len(agents_content) > 500 else agents_content)
+            if claude_content:
+                typer.echo()
+                typer.secho("--- CLAUDE.md ---", fg=typer.colors.YELLOW)
+                typer.echo(claude_content[:300] + "..." if len(claude_content) > 300 else claude_content)
+        return
+
+    # Write files
+    agents_path = project_path / "AGENTS.md"
+    created_agents = not agents_path.exists()
+    agents_path.write_text(agents_content)
+
+    created_claude = False
+    if claude_content:
+        claude_path = project_path / "CLAUDE.md"
+        created_claude = not claude_path.exists()
+        claude_path.write_text(claude_content)
+
+    if output_format == OutputFormat.JSON:
+        result = {
+            "success": True,
+            "language": language.value,
+            "files": {
+                "AGENTS.md": "created" if created_agents else "updated",
+            },
+        }
+        if claude_content:
+            result["files"]["CLAUDE.md"] = "created" if created_claude else "updated"
+        typer.echo(json.dumps(result))
+    else:
+        typer.secho(f"✓ Generated for {language.value}", fg=typer.colors.GREEN)
+        action = "Created" if created_agents else "Updated"
+        typer.echo(f"  {action}: AGENTS.md")
+        if claude_content:
+            action = "Created" if created_claude else "Updated"
+            typer.echo(f"  {action}: CLAUDE.md")
+
+
+@agents_app.command("check")
+def agents_check(
+    ctx: typer.Context,
+):
+    """Validate existing AGENTS.md file.
+
+    Checks for common issues like missing sections, empty code blocks, and TODOs.
+    """
+    from pathlib import Path
+
+    from idlergear.agents import validate_agents_md
+    from idlergear.config import find_idlergear_root
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+    project_path = find_idlergear_root() or Path.cwd()
+
+    agents_path = project_path / "AGENTS.md"
+
+    if not agents_path.exists():
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": "AGENTS.md not found", "valid": False}))
+        else:
+            typer.secho("AGENTS.md not found.", fg=typer.colors.RED)
+            typer.echo("Run 'idlergear agents init' to create one.")
+        raise typer.Exit(1)
+
+    content = agents_path.read_text()
+    issues = validate_agents_md(content)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"valid": len(issues) == 0, "issues": issues}))
+    else:
+        if issues:
+            typer.secho(f"Found {len(issues)} issue(s):", fg=typer.colors.YELLOW)
+            for issue in issues:
+                typer.echo(f"  - {issue}")
+        else:
+            typer.secho("✓ AGENTS.md is valid", fg=typer.colors.GREEN)
+
+
+@agents_app.command("update")
+def agents_update(
+    ctx: typer.Context,
+    lang: Optional[str] = typer.Option(
+        None,
+        "--lang",
+        "-l",
+        help="Language to update template for",
+    ),
+    preserve_custom: bool = typer.Option(
+        True,
+        "--preserve/--no-preserve",
+        help="Preserve custom sections when updating",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would change without writing"
+    ),
+):
+    """Update AGENTS.md with latest template while preserving customizations.
+
+    Merges new template defaults with your existing customizations.
+    Use --no-preserve to completely replace with fresh template.
+    """
+    from pathlib import Path
+
+    from idlergear.agents import (
+        Language,
+        TEMPLATES,
+        detect_language,
+        update_agents_md,
+        generate_agents_md,
+    )
+    from idlergear.config import find_idlergear_root
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+    project_path = find_idlergear_root() or Path.cwd()
+
+    agents_path = project_path / "AGENTS.md"
+
+    if not agents_path.exists():
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": "AGENTS.md not found"}))
+        else:
+            typer.secho("AGENTS.md not found.", fg=typer.colors.RED)
+            typer.echo("Run 'idlergear agents init' to create one.")
+        raise typer.Exit(1)
+
+    # Determine language
+    if lang:
+        try:
+            language = Language(lang.lower())
+        except ValueError:
+            if output_format == OutputFormat.JSON:
+                typer.echo(json.dumps({"error": f"Unknown language: {lang}"}))
+            else:
+                typer.secho(f"Unknown language: {lang}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+    else:
+        language = detect_language(project_path)
+
+    if language == Language.UNKNOWN:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": "Could not detect language", "hint": "Use --lang"}))
+        else:
+            typer.secho("Could not detect language. Use --lang.", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+    template = TEMPLATES[language]
+    existing_content = agents_path.read_text()
+
+    if preserve_custom:
+        new_content = update_agents_md(existing_content, template, preserve_custom=True)
+    else:
+        new_content = generate_agents_md(template, include_idlergear=True)
+
+    if dry_run:
+        if output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "dry_run": True,
+                        "language": language.value,
+                        "preserve_custom": preserve_custom,
+                        "would_change": existing_content != new_content,
+                    }
+                )
+            )
+        else:
+            if existing_content == new_content:
+                typer.echo("No changes needed.")
+            else:
+                typer.secho("Would update AGENTS.md", fg=typer.colors.CYAN)
+                typer.echo(f"  Language: {language.value}")
+                typer.echo(f"  Preserve custom: {preserve_custom}")
+        return
+
+    if existing_content == new_content:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"success": True, "changed": False}))
+        else:
+            typer.echo("AGENTS.md is already up to date.")
+        return
+
+    agents_path.write_text(new_content)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"success": True, "changed": True, "language": language.value}))
+    else:
+        typer.secho("✓ Updated AGENTS.md", fg=typer.colors.GREEN)
+
+
+@agents_app.command("show")
+def agents_show(
+    ctx: typer.Context,
+):
+    """Show detected language and available templates."""
+    from pathlib import Path
+
+    from idlergear.agents import Language, TEMPLATES, detect_language
+    from idlergear.config import find_idlergear_root
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+    project_path = find_idlergear_root() or Path.cwd()
+
+    detected = detect_language(project_path)
+    agents_exists = (project_path / "AGENTS.md").exists()
+    claude_exists = (project_path / "CLAUDE.md").exists()
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                {
+                    "detected_language": detected.value if detected != Language.UNKNOWN else None,
+                    "agents_md_exists": agents_exists,
+                    "claude_md_exists": claude_exists,
+                    "available_templates": [l.value for l in Language if l != Language.UNKNOWN],
+                }
+            )
+        )
+    else:
+        typer.secho("Project Status:", fg=typer.colors.CYAN, bold=True)
+        if detected != Language.UNKNOWN:
+            typer.echo(f"  Detected language: {detected.value}")
+        else:
+            typer.echo("  Detected language: (unknown)")
+        typer.echo(f"  AGENTS.md: {'exists' if agents_exists else 'not found'}")
+        typer.echo(f"  CLAUDE.md: {'exists' if claude_exists else 'not found'}")
+        typer.echo()
+        typer.secho("Available Templates:", fg=typer.colors.CYAN, bold=True)
+        for lang in Language:
+            if lang != Language.UNKNOWN:
+                template = TEMPLATES[lang]
+                commands = ", ".join(template.commands.keys())
+                typer.echo(f"  {lang.value}: {commands}")
+
+
+# Secrets commands
+@secrets_app.command("init")
+def secrets_init(
+    ctx: typer.Context,
+):
+    """Initialize secrets store for this project.
+
+    Creates an encrypted secrets store for the current project.
+    You will be prompted for a master password.
+    """
+    from getpass import getpass
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if manager.is_initialized():
+        typer.secho("Secrets store already initialized.", fg=typer.colors.YELLOW)
+        raise typer.Exit(0)
+
+    # Prompt for password
+    typer.echo("Create a master password for encrypting secrets.")
+    typer.echo("This password will be required to access secrets.")
+    typer.echo()
+
+    password = getpass("Master password: ")
+    if not password:
+        typer.secho("Password cannot be empty.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    confirm = getpass("Confirm password: ")
+    if password != confirm:
+        typer.secho("Passwords do not match.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    try:
+        manager.initialize(password)
+        typer.secho("Secrets store initialized.", fg=typer.colors.GREEN)
+        typer.echo(f"Project ID: {manager._get_or_create_project_id()}")
+    except RuntimeError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@secrets_app.command("set")
+def secrets_set(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Secret name (e.g., API_KEY)"),
+    value: Optional[str] = typer.Option(
+        None, "--value", "-v", help="Secret value (prompts if not provided)"
+    ),
+    from_file: Optional[Path] = typer.Option(
+        None, "--from-file", "-f", help="Read value from file"
+    ),
+):
+    """Set a secret value.
+
+    Prompts for the value if not provided via --value or --from-file.
+    Using --value is not recommended as it may appear in shell history.
+    """
+    from getpass import getpass
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized. Run 'idlergear secrets init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Get password
+    password = getpass("Master password: ")
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Get value
+    if from_file:
+        if not from_file.exists():
+            typer.secho(f"File not found: {from_file}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+        secret_value = from_file.read_text().strip()
+    elif value:
+        typer.secho(
+            "Warning: Using --value may expose the secret in shell history.",
+            fg=typer.colors.YELLOW,
+        )
+        secret_value = value
+    else:
+        secret_value = getpass(f"Enter value for {name}: ")
+
+    if not secret_value:
+        typer.secho("Value cannot be empty.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    entry = manager.set(name, secret_value)
+    typer.secho(f"Set secret: {name}", fg=typer.colors.GREEN)
+
+
+@secrets_app.command("get")
+def secrets_get(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Secret name"),
+):
+    """Get a secret value (for scripting).
+
+    Outputs the secret value to stdout without any decoration.
+    Useful for piping to other commands.
+    """
+    from getpass import getpass
+    from pathlib import Path
+    import sys
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    # Read password from stdin if piped, otherwise prompt
+    if sys.stdin.isatty():
+        password = getpass("Master password: ")
+    else:
+        # When piping, we can't prompt - this is a limitation
+        typer.secho("Cannot prompt for password in non-interactive mode.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    value = manager.get(name)
+    if value is None:
+        typer.secho(f"Secret not found: {name}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    # Output value without newline for piping
+    typer.echo(value, nl=False)
+
+
+@secrets_app.command("list")
+def secrets_list(
+    ctx: typer.Context,
+):
+    """List all secrets (names only, never values)."""
+    from getpass import getpass
+    from pathlib import Path
+    from datetime import datetime
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized. Run 'idlergear secrets init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    password = getpass("Master password: ")
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    entries = manager.list()
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(
+            json.dumps(
+                {
+                    "secrets": [
+                        {
+                            "name": e.name,
+                            "created_at": e.created_at.isoformat(),
+                            "updated_at": e.updated_at.isoformat(),
+                        }
+                        for e in entries
+                    ]
+                }
+            )
+        )
+    else:
+        if not entries:
+            typer.echo("No secrets stored.")
+            return
+
+        typer.secho("Secrets:", fg=typer.colors.CYAN, bold=True)
+        for entry in sorted(entries, key=lambda e: e.name):
+            # Calculate relative time
+            age = datetime.now() - entry.updated_at
+            if age.days > 0:
+                age_str = f"{age.days} day{'s' if age.days > 1 else ''} ago"
+            elif age.seconds > 3600:
+                hours = age.seconds // 3600
+                age_str = f"{hours} hour{'s' if hours > 1 else ''} ago"
+            elif age.seconds > 60:
+                mins = age.seconds // 60
+                age_str = f"{mins} minute{'s' if mins > 1 else ''} ago"
+            else:
+                age_str = "just now"
+
+            typer.echo(f"  {entry.name:<30} [set {age_str}]")
+
+
+@secrets_app.command("delete")
+def secrets_delete(
+    ctx: typer.Context,
+    name: str = typer.Argument(..., help="Secret name to delete"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a secret."""
+    from getpass import getpass
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    password = getpass("Master password: ")
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not manager.exists(name):
+        typer.secho(f"Secret not found: {name}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not yes and not typer.confirm(f"Delete secret '{name}'?"):
+        raise typer.Exit(0)
+
+    manager.delete(name)
+    typer.secho(f"Deleted: {name}", fg=typer.colors.GREEN)
+
+
+@secrets_app.command("export")
+def secrets_export(
+    ctx: typer.Context,
+    output_path: Optional[Path] = typer.Argument(
+        None, help="Output file path (default: stdout)"
+    ),
+):
+    """Export secrets to .env format.
+
+    WARNING: Creates an unencrypted file! Do not commit to version control.
+    """
+    from getpass import getpass
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    password = getpass("Master password: ")
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if output_path:
+        typer.secho(
+            "WARNING: This will create an unencrypted file!",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+        typer.secho(
+            "Do NOT commit this file to version control.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+        if not typer.confirm("Continue?"):
+            raise typer.Exit(0)
+
+        manager.export_env_file(output_path)
+        typer.secho(f"Exported to {output_path}", fg=typer.colors.GREEN, err=True)
+    else:
+        # Output to stdout
+        entries = manager.list()
+        for entry in sorted(entries, key=lambda e: e.name):
+            value = manager.get(entry.name)
+            escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            typer.echo(f'{entry.name}="{escaped}"')
+
+
+@secrets_app.command("import")
+def secrets_import(
+    ctx: typer.Context,
+    env_file: Path = typer.Argument(..., help="Path to .env file"),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", help="Overwrite existing secrets"
+    ),
+):
+    """Import secrets from .env format file."""
+    from getpass import getpass
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    if not env_file.exists():
+        typer.secho(f"File not found: {env_file}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized. Run 'idlergear secrets init' first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    password = getpass("Master password: ")
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    imported = manager.import_env_file(env_file, overwrite=overwrite)
+
+    if imported:
+        typer.secho(f"Imported {len(imported)} secret(s):", fg=typer.colors.GREEN)
+        for name in imported:
+            typer.echo(f"  {name}")
+    else:
+        typer.echo("No new secrets imported.")
+
+
+@secrets_app.command("run")
+def secrets_run(
+    ctx: typer.Context,
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show secrets that would be injected"
+    ),
+    command: list[str] = typer.Argument(None, help="Command to run"),
+):
+    """Run command with secrets injected as environment variables.
+
+    Example:
+        idlergear secrets run -- python app.py
+        idlergear secrets run -- npm start
+    """
+    from getpass import getpass
+    from pathlib import Path
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.secrets import SecretsManager
+
+    if not command:
+        typer.secho("No command specified. Use -- before command.", fg=typer.colors.RED)
+        typer.echo("Example: idlergear secrets run -- python app.py")
+        raise typer.Exit(1)
+
+    project_path = find_idlergear_root() or Path.cwd()
+    manager = SecretsManager(project_path)
+
+    if not manager.is_initialized():
+        typer.secho("Secrets store not initialized.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    password = getpass("Master password: ")
+    if not manager.unlock(password):
+        typer.secho("Invalid password.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if dry_run:
+        preview = manager.get_run_preview()
+        if not preview:
+            typer.echo("No secrets to inject.")
+        else:
+            typer.secho("Secrets that would be injected:", fg=typer.colors.CYAN)
+            for name, masked in sorted(preview.items()):
+                typer.echo(f"  {name}={masked}")
+        return
+
+    exit_code = manager.run_with_secrets(command)
+    raise typer.Exit(exit_code)
+
+
+# Release commands
+@release_app.command("list")
+def release_list(
+    ctx: typer.Context,
+    limit: int = typer.Option(10, "--limit", "-n", help="Maximum number of releases to show"),
+):
+    """List releases from GitHub."""
+    from idlergear.release import check_gh_installed, check_gh_auth, list_releases
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    if not check_gh_installed():
+        typer.secho("GitHub CLI (gh) is not installed.", fg=typer.colors.RED)
+        typer.echo("Install from: https://cli.github.com/")
+        raise typer.Exit(1)
+
+    if not check_gh_auth():
+        typer.secho("Not authenticated with GitHub CLI.", fg=typer.colors.RED)
+        typer.echo("Run: gh auth login")
+        raise typer.Exit(1)
+
+    try:
+        releases = list_releases(limit=limit)
+    except RuntimeError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"releases": [r.to_dict() for r in releases]}))
+    else:
+        if not releases:
+            typer.echo("No releases found.")
+            return
+
+        typer.secho("Releases:", fg=typer.colors.CYAN, bold=True)
+        for release in releases:
+            status = []
+            if release.is_draft:
+                status.append("draft")
+            if release.is_prerelease:
+                status.append("prerelease")
+            status_str = f" [{', '.join(status)}]" if status else ""
+
+            date_str = ""
+            if release.published_at:
+                date_str = f" ({release.published_at.strftime('%Y-%m-%d')})"
+
+            typer.echo(f"  {release.tag}{date_str}{status_str}")
+
+
+@release_app.command("show")
+def release_show(
+    ctx: typer.Context,
+    tag: str = typer.Argument(..., help="Release tag (e.g., v0.3.27)"),
+):
+    """Show details of a specific release."""
+    from idlergear.release import check_gh_installed, check_gh_auth, get_release
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    if not check_gh_installed():
+        typer.secho("GitHub CLI (gh) is not installed.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not check_gh_auth():
+        typer.secho("Not authenticated with GitHub CLI.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    release = get_release(tag)
+    if release is None:
+        typer.secho(f"Release not found: {tag}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(release.to_dict()))
+    else:
+        typer.secho(f"Release: {release.tag}", fg=typer.colors.CYAN, bold=True)
+        if release.name != release.tag:
+            typer.echo(f"  Title: {release.name}")
+        if release.published_at:
+            typer.echo(f"  Published: {release.published_at.strftime('%Y-%m-%d %H:%M')}")
+        if release.is_draft:
+            typer.secho("  Status: Draft", fg=typer.colors.YELLOW)
+        if release.is_prerelease:
+            typer.secho("  Status: Pre-release", fg=typer.colors.YELLOW)
+        if release.url:
+            typer.echo(f"  URL: {release.url}")
+        if release.body:
+            typer.echo("")
+            typer.secho("Notes:", bold=True)
+            typer.echo(release.body)
+
+
+@release_app.command("create")
+def release_create(
+    ctx: typer.Context,
+    tag: str = typer.Argument(..., help="Release tag (e.g., v0.4.0)"),
+    title: Optional[str] = typer.Option(None, "--title", "-t", help="Release title"),
+    notes: Optional[str] = typer.Option(None, "--notes", "-n", help="Release notes"),
+    notes_from_tasks: bool = typer.Option(
+        False, "--notes-from-tasks", help="Generate notes from closed tasks"
+    ),
+    draft: bool = typer.Option(False, "--draft", help="Create as draft release"),
+    prerelease: bool = typer.Option(False, "--prerelease", help="Mark as pre-release"),
+    bump: bool = typer.Option(
+        False, "--bump", help="Run version command before creating release"
+    ),
+    target: Optional[str] = typer.Option(None, "--target", help="Target branch or commit"),
+):
+    """Create a new release on GitHub.
+
+    Examples:
+        idlergear release create v0.4.0
+        idlergear release create v0.4.0 --notes "What's new..."
+        idlergear release create v0.4.0 --notes-from-tasks
+        idlergear release create v0.4.0 --draft
+        idlergear release create v0.4.0 --bump
+    """
+    from idlergear.release import check_gh_installed, check_gh_auth, create_release
+
+    if not check_gh_installed():
+        typer.secho("GitHub CLI (gh) is not installed.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not check_gh_auth():
+        typer.secho("Not authenticated with GitHub CLI.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    success, message, url = create_release(
+        tag=tag,
+        title=title,
+        notes=notes,
+        notes_from_tasks=notes_from_tasks,
+        draft=draft,
+        prerelease=prerelease,
+        bump=bump,
+        target=target,
+    )
+
+    if success:
+        typer.secho(message, fg=typer.colors.GREEN)
+        if url:
+            typer.echo(f"URL: {url}")
+    else:
+        typer.secho(message, fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@release_app.command("delete")
+def release_delete(
+    ctx: typer.Context,
+    tag: str = typer.Argument(..., help="Release tag to delete"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a release from GitHub."""
+    from idlergear.release import check_gh_installed, check_gh_auth, delete_release
+
+    if not check_gh_installed():
+        typer.secho("GitHub CLI (gh) is not installed.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not check_gh_auth():
+        typer.secho("Not authenticated with GitHub CLI.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    if not yes:
+        if not typer.confirm(f"Delete release {tag}?"):
+            raise typer.Exit(0)
+
+    success, message = delete_release(tag, yes=True)
+
+    if success:
+        typer.secho(message, fg=typer.colors.GREEN)
+    else:
+        typer.secho(message, fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@release_app.command("notes")
+def release_notes(
+    ctx: typer.Context,
+    since: Optional[str] = typer.Option(
+        None, "--since", help="Generate notes since this tag"
+    ),
+):
+    """Generate release notes from closed tasks."""
+    from idlergear.release import generate_notes_from_tasks
+
+    notes = generate_notes_from_tasks(since_tag=since)
+    typer.echo(notes)
 
 
 if __name__ == "__main__":
