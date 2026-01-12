@@ -5461,33 +5461,51 @@ def docs_module(
 @docs_app.command("check")
 def docs_check(
     ctx: typer.Context,
+    lang: str = typer.Option(
+        "all", "--lang", "-l", help="Language to check: python, rust, all"
+    ),
 ):
     """Check if documentation generation is available.
 
-    Checks if pdoc is installed and accessible.
+    Checks if pdoc (Python) and cargo (Rust) are installed and accessible.
     """
     from idlergear.docs import check_pdoc_available
+    from idlergear.docs_rust import check_cargo_available
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
 
-    available = check_pdoc_available()
+    result: dict[str, dict[str, bool]] = {}
+    if lang in ("python", "all"):
+        result["python"] = {"available": check_pdoc_available()}
+    if lang in ("rust", "all"):
+        result["rust"] = {"available": check_cargo_available()}
 
     if output_format == OutputFormat.JSON:
-        typer.echo(json.dumps({"available": available}))
+        typer.echo(json.dumps(result))
     else:
-        if available:
-            typer.secho("✓ pdoc is installed and available", fg=typer.colors.GREEN)
-        else:
-            typer.secho("✗ pdoc is not installed", fg=typer.colors.RED)
-            typer.echo("  Install with: pip install 'idlergear[docs]'")
+        if "python" in result:
+            if result["python"]["available"]:
+                typer.secho("✓ Python (pdoc) is installed", fg=typer.colors.GREEN)
+            else:
+                typer.secho("✗ Python (pdoc) is not installed", fg=typer.colors.RED)
+                typer.echo("  Install with: pip install 'idlergear[docs]'")
+        if "rust" in result:
+            if result["rust"]["available"]:
+                typer.secho("✓ Rust (cargo) is installed", fg=typer.colors.GREEN)
+            else:
+                typer.secho("✗ Rust (cargo) is not installed", fg=typer.colors.RED)
+                typer.echo("  Install from: https://rustup.rs/")
 
 
 @docs_app.command("summary")
 def docs_summary(
     ctx: typer.Context,
-    package: str = typer.Argument(..., help="Python package name to summarize"),
+    package: str = typer.Argument(..., help="Package name or path to summarize"),
     mode: str = typer.Option(
         "standard", "--mode", "-m", help="Summary mode: minimal, standard, detailed"
+    ),
+    lang: str = typer.Option(
+        "auto", "--lang", "-l", help="Language: python, rust, auto"
     ),
     include_private: bool = typer.Option(
         False, "--private", "-p", help="Include private modules"
@@ -5498,6 +5516,8 @@ def docs_summary(
 ):
     """Generate token-efficient API summary for AI consumption.
 
+    Supports both Python and Rust projects with auto-detection.
+
     Summary modes:
     - minimal: ~500 tokens - function/class names only
     - standard: ~2000 tokens - first-line docstrings
@@ -5506,40 +5526,73 @@ def docs_summary(
     Examples:
         idlergear docs summary idlergear --mode minimal
         idlergear docs summary requests --mode standard --depth 1
+        idlergear docs summary /path/to/rust/project --lang rust
+        idlergear docs summary . --lang auto  # Auto-detect language
     """
-    from idlergear.docs import check_pdoc_available, generate_summary_json
+    from pathlib import Path
+    from idlergear.docs import (
+        check_pdoc_available,
+        generate_summary_json,
+        detect_python_project,
+    )
+    from idlergear.docs_rust import (
+        detect_rust_project,
+        generate_rust_summary_json,
+    )
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
-
-    if not check_pdoc_available():
-        if output_format == OutputFormat.JSON:
-            typer.echo(
-                json.dumps(
-                    {
-                        "error": "pdoc not installed",
-                        "install": "pip install 'idlergear[docs]'",
-                    }
-                )
-            )
-        else:
-            typer.secho(
-                "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
-                fg=typer.colors.RED,
-            )
-        raise typer.Exit(1)
 
     if mode not in ("minimal", "standard", "detailed"):
         typer.secho(f"Invalid mode: {mode}. Use minimal, standard, or detailed.")
         raise typer.Exit(1)
 
+    # Auto-detect language if needed
+    detected_lang = lang
+    if lang == "auto":
+        path = Path(package)
+        if path.exists():
+            rust_project = detect_rust_project(path)
+            if rust_project["detected"]:
+                detected_lang = "rust"
+            else:
+                python_project = detect_python_project(path)
+                if python_project["detected"]:
+                    detected_lang = "python"
+                else:
+                    detected_lang = "python"  # Default
+        else:
+            # Assume it's a Python module name
+            detected_lang = "python"
+
     try:
-        result = generate_summary_json(
-            package,
-            mode=mode,  # type: ignore
-            include_private=include_private,
-            max_depth=max_depth,
-        )
-        typer.echo(result)
+        if detected_lang == "rust":
+            result = generate_rust_summary_json(package, mode=mode)  # type: ignore
+            typer.echo(result)
+        else:
+            if not check_pdoc_available():
+                if output_format == OutputFormat.JSON:
+                    typer.echo(
+                        json.dumps(
+                            {
+                                "error": "pdoc not installed",
+                                "install": "pip install 'idlergear[docs]'",
+                            }
+                        )
+                    )
+                else:
+                    typer.secho(
+                        "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
+                        fg=typer.colors.RED,
+                    )
+                raise typer.Exit(1)
+
+            result = generate_summary_json(
+                package,
+                mode=mode,  # type: ignore
+                include_private=include_private,
+                max_depth=max_depth,
+            )
+            typer.echo(result)
 
     except Exception as e:
         if output_format == OutputFormat.JSON:
@@ -5553,75 +5606,143 @@ def docs_summary(
 def docs_build(
     ctx: typer.Context,
     package: str = typer.Argument(
-        None, help="Python package name (auto-detects if not provided)"
+        None, help="Package name or path (auto-detects if not provided)"
+    ),
+    lang: str = typer.Option(
+        "auto", "--lang", "-l", help="Language: python, rust, auto"
     ),
     output: str = typer.Option(
-        "docs/api", "--output", "-o", help="Output directory for HTML files"
+        None,
+        "--output",
+        "-o",
+        help="Output directory (Python: docs/api, Rust: target/doc)",
     ),
-    logo: Optional[str] = typer.Option(None, "--logo", help="Path to logo image"),
-    favicon: Optional[str] = typer.Option(None, "--favicon", help="Path to favicon"),
+    open_browser: bool = typer.Option(
+        False, "--open", help="Open docs in browser after build"
+    ),
+    logo: Optional[str] = typer.Option(
+        None, "--logo", help="Path to logo image (Python only)"
+    ),
+    favicon: Optional[str] = typer.Option(
+        None, "--favicon", help="Path to favicon (Python only)"
+    ),
 ):
-    """Build HTML documentation using pdoc.
+    """Build HTML documentation.
+
+    Uses pdoc for Python projects, cargo doc for Rust projects.
+    Auto-detects project language if not specified.
 
     Examples:
         idlergear docs build                    # Auto-detect package
-        idlergear docs build mypackage          # Explicit package
-        idlergear docs build -o docs/api        # Custom output dir
+        idlergear docs build mypackage          # Explicit Python package
+        idlergear docs build . --lang rust      # Rust project in current dir
+        idlergear docs build --open             # Build and open in browser
     """
+    from pathlib import Path
     from idlergear.docs import (
         build_html_docs,
         check_pdoc_available,
         detect_python_project,
     )
+    from idlergear.docs_rust import (
+        build_rust_docs,
+        check_cargo_available,
+        detect_rust_project,
+    )
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
 
-    if not check_pdoc_available():
-        if output_format == OutputFormat.JSON:
-            typer.echo(
-                json.dumps(
-                    {
-                        "error": "pdoc not installed",
-                        "install": "pip install 'idlergear[docs]'",
-                    }
-                )
-            )
+    # Auto-detect language if needed
+    detected_lang = lang
+    if lang == "auto":
+        path = Path(package) if package else Path(".")
+        rust_project = detect_rust_project(path)
+        if rust_project["detected"]:
+            detected_lang = "rust"
         else:
-            typer.secho(
-                "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
-                fg=typer.colors.RED,
-            )
-        raise typer.Exit(1)
+            detected_lang = "python"
 
-    # Auto-detect package if not provided
-    if not package:
-        project = detect_python_project()
-        if project.get("packages"):
-            package = project["packages"][0]
-            if output_format != OutputFormat.JSON:
-                typer.echo(f"Detected package: {package}")
-        else:
+    if detected_lang == "rust":
+        if not check_cargo_available():
             if output_format == OutputFormat.JSON:
-                typer.echo(json.dumps({"error": "Could not detect Python package"}))
+                typer.echo(json.dumps({"error": "cargo not found"}))
             else:
                 typer.secho(
-                    "Could not detect Python package. Specify one explicitly.",
+                    "cargo is not found. Install from https://rustup.rs/",
                     fg=typer.colors.RED,
                 )
             raise typer.Exit(1)
 
-    result = build_html_docs(package, output_dir=output, logo=logo, favicon=favicon)
+        path = Path(package) if package else Path(".")
+        if output_format != OutputFormat.JSON:
+            typer.echo(f"Building Rust docs for: {path}")
 
-    if output_format == OutputFormat.JSON:
-        typer.echo(json.dumps(result))
-    else:
-        if result["success"]:
-            typer.secho("✓ Documentation built successfully", fg=typer.colors.GREEN)
-            typer.echo(f"  Output: {result['output_dir']}")
-            typer.echo(f"  Files: {result['count']}")
+        result = build_rust_docs(path, open_browser=open_browser)
+
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps(result))
         else:
-            typer.secho(f"✗ Build failed: {result.get('error')}", fg=typer.colors.RED)
+            if result["success"]:
+                typer.secho("✓ Documentation built successfully", fg=typer.colors.GREEN)
+                typer.echo(f"  Output: {result['output_dir']}")
+                typer.echo(f"  Files: {result['count']}")
+            else:
+                typer.secho(
+                    f"✗ Build failed: {result.get('error')}", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
+    else:
+        if not check_pdoc_available():
+            if output_format == OutputFormat.JSON:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "error": "pdoc not installed",
+                            "install": "pip install 'idlergear[docs]'",
+                        }
+                    )
+                )
+            else:
+                typer.secho(
+                    "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
+                    fg=typer.colors.RED,
+                )
             raise typer.Exit(1)
+
+        # Auto-detect package if not provided
+        if not package:
+            project = detect_python_project()
+            if project.get("packages"):
+                package = project["packages"][0]
+                if output_format != OutputFormat.JSON:
+                    typer.echo(f"Detected package: {package}")
+            else:
+                if output_format == OutputFormat.JSON:
+                    typer.echo(json.dumps({"error": "Could not detect Python package"}))
+                else:
+                    typer.secho(
+                        "Could not detect Python package. Specify one explicitly.",
+                        fg=typer.colors.RED,
+                    )
+                raise typer.Exit(1)
+
+        output_dir = output or "docs/api"
+        result = build_html_docs(
+            package, output_dir=output_dir, logo=logo, favicon=favicon
+        )
+
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps(result))
+        else:
+            if result["success"]:
+                typer.secho("✓ Documentation built successfully", fg=typer.colors.GREEN)
+                typer.echo(f"  Output: {result['output_dir']}")
+                typer.echo(f"  Files: {result['count']}")
+            else:
+                typer.secho(
+                    f"✗ Build failed: {result.get('error')}", fg=typer.colors.RED
+                )
+                raise typer.Exit(1)
 
 
 @docs_app.command("serve")
@@ -5707,38 +5828,72 @@ def docs_detect(
     ctx: typer.Context,
     path: str = typer.Argument(".", help="Project directory to analyze"),
 ):
-    """Detect Python project for documentation.
+    """Detect project for documentation.
 
-    Shows detected package name, source directory, and configuration.
+    Detects Python and Rust projects, showing package name, version,
+    source directory, and configuration.
 
     Examples:
         idlergear docs detect
         idlergear docs detect /path/to/project
     """
     from idlergear.docs import detect_python_project
+    from idlergear.docs_rust import detect_rust_project
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
 
-    result = detect_python_project(path)
-
-    if output_format == OutputFormat.JSON:
-        typer.echo(json.dumps(result))
-    else:
-        if result["detected"]:
-            typer.secho("✓ Python project detected", fg=typer.colors.GREEN)
-            if result.get("name"):
-                typer.echo(f"  Name: {result['name']}")
-            if result.get("version"):
-                typer.echo(f"  Version: {result['version']}")
-            if result.get("config_file"):
-                typer.echo(f"  Config: {result['config_file']}")
-            if result.get("source_dir"):
-                typer.echo(f"  Source: {result['source_dir']}/")
-            if result.get("packages"):
-                typer.echo(f"  Packages: {', '.join(result['packages'])}")
+    # Check Rust first, then Python
+    rust_result = detect_rust_project(path)
+    if rust_result["detected"]:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps(rust_result))
         else:
-            typer.secho("✗ No Python project detected", fg=typer.colors.YELLOW)
-            typer.echo(f"  Path: {result['path']}")
+            typer.secho("✓ Rust project detected", fg=typer.colors.GREEN)
+            if rust_result.get("name"):
+                typer.echo(f"  Name: {rust_result['name']}")
+            if rust_result.get("version"):
+                typer.echo(f"  Version: {rust_result['version']}")
+            if rust_result.get("edition"):
+                typer.echo(f"  Edition: {rust_result['edition']}")
+            if rust_result.get("config_file"):
+                typer.echo(f"  Config: {rust_result['config_file']}")
+            if rust_result.get("source_dir"):
+                typer.echo(f"  Source: {rust_result['source_dir']}/")
+            if rust_result.get("crate_type"):
+                typer.echo(f"  Type: {rust_result['crate_type']}")
+            if rust_result.get("is_workspace"):
+                typer.echo(f"  Workspace: yes")
+                if rust_result.get("workspace_members"):
+                    typer.echo(
+                        f"  Members: {', '.join(rust_result['workspace_members'])}"
+                    )
+        return
+
+    python_result = detect_python_project(path)
+    if python_result["detected"]:
+        python_result["language"] = "python"
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps(python_result))
+        else:
+            typer.secho("✓ Python project detected", fg=typer.colors.GREEN)
+            if python_result.get("name"):
+                typer.echo(f"  Name: {python_result['name']}")
+            if python_result.get("version"):
+                typer.echo(f"  Version: {python_result['version']}")
+            if python_result.get("config_file"):
+                typer.echo(f"  Config: {python_result['config_file']}")
+            if python_result.get("source_dir"):
+                typer.echo(f"  Source: {python_result['source_dir']}/")
+            if python_result.get("packages"):
+                typer.echo(f"  Packages: {', '.join(python_result['packages'])}")
+        return
+
+    # Neither detected
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"path": path, "detected": False}))
+    else:
+        typer.secho("✗ No Python or Rust project detected", fg=typer.colors.YELLOW)
+        typer.echo(f"  Path: {path}")
 
 
 # Self-update commands

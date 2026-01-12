@@ -259,9 +259,10 @@ class TestCliIntegration:
         runner = CliRunner()
         result = runner.invoke(app, ["docs", "check"])
         assert result.exit_code == 0
-        # JSON output by default
+        # JSON output by default - now returns python and rust availability
         data = json.loads(result.output)
-        assert data["available"] is True
+        assert "python" in data
+        assert data["python"]["available"] is True
 
     def test_docs_module_command(self):
         """Test idlergear docs module command."""

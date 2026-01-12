@@ -2115,13 +2115,19 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
-        # Documentation generation tools
+        # Documentation generation tools (Python + Rust)
         Tool(
             name="idlergear_docs_check",
-            description="Check if Python documentation generation is available. Returns whether pdoc is installed.",
+            description="Check if documentation generation is available. Returns availability for Python (pdoc) and Rust (cargo).",
             inputSchema={
                 "type": "object",
-                "properties": {},
+                "properties": {
+                    "lang": {
+                        "type": "string",
+                        "enum": ["python", "rust", "all"],
+                        "description": "Language to check (default: all)",
+                    },
+                },
             },
         ),
         Tool(
@@ -2167,18 +2173,23 @@ This ensures messages don't derail your work - only context ones are shown immed
         ),
         Tool(
             name="idlergear_docs_summary",
-            description="⚡ TOKEN-EFFICIENT: Generate a compact API summary for AI consumption. Use this to quickly understand a package's API. Modes: minimal (~500 tokens), standard (~2k tokens), detailed (~5k tokens).",
+            description="⚡ TOKEN-EFFICIENT: Generate a compact API summary for AI consumption. Supports Python and Rust projects with auto-detection. Modes: minimal (~500 tokens), standard (~2k tokens), detailed (~5k tokens).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "package": {
                         "type": "string",
-                        "description": "Python package name (e.g., 'idlergear')",
+                        "description": "Python package name OR path to Rust crate (auto-detects language)",
                     },
                     "mode": {
                         "type": "string",
                         "enum": ["minimal", "standard", "detailed"],
                         "description": "Summary mode: minimal (names only), standard (first-line docstrings), detailed (full docs)",
+                    },
+                    "lang": {
+                        "type": "string",
+                        "enum": ["python", "rust", "auto"],
+                        "description": "Language (default: auto-detect from project)",
                     },
                     "include_private": {
                         "type": "boolean",
@@ -2194,32 +2205,41 @@ This ensures messages don't derail your work - only context ones are shown immed
         ),
         Tool(
             name="idlergear_docs_build",
-            description="Build HTML documentation using pdoc. Generates browsable HTML files in the specified output directory.",
+            description="Build HTML documentation. Uses pdoc for Python, cargo doc for Rust. Auto-detects project type if not specified.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "package": {
                         "type": "string",
-                        "description": "Python package name (auto-detects if not provided)",
+                        "description": "Package name or path (auto-detects if not provided)",
+                    },
+                    "lang": {
+                        "type": "string",
+                        "enum": ["python", "rust", "auto"],
+                        "description": "Language (default: auto-detect)",
                     },
                     "output_dir": {
                         "type": "string",
-                        "description": "Output directory for HTML files (default: docs/api)",
+                        "description": "Output directory for HTML files (Python: docs/api, Rust: target/doc)",
+                    },
+                    "open_browser": {
+                        "type": "boolean",
+                        "description": "Open documentation in browser after build (default: false)",
                     },
                     "logo": {
                         "type": "string",
-                        "description": "Path to logo image",
+                        "description": "Path to logo image (Python only)",
                     },
                     "favicon": {
                         "type": "string",
-                        "description": "Path to favicon",
+                        "description": "Path to favicon (Python only)",
                     },
                 },
             },
         ),
         Tool(
             name="idlergear_docs_detect",
-            description="Detect Python project configuration. Returns package name, version, source directory, and available packages.",
+            description="Detect project configuration for documentation. Returns language, package name, version, and source directory. Supports Python and Rust.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -3860,11 +3880,23 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             staleness = get_test_staleness(project_path)
             return _format_result(staleness)
 
-        # Documentation generation tools
+        # Documentation generation tools (Python + Rust)
         elif name == "idlergear_docs_check":
             from idlergear.docs import check_pdoc_available
+            from idlergear.docs_rust import check_cargo_available
 
-            return _format_result({"available": check_pdoc_available()})
+            lang = arguments.get("lang", "all")
+            if lang == "python":
+                return _format_result({"python": {"available": check_pdoc_available()}})
+            elif lang == "rust":
+                return _format_result({"rust": {"available": check_cargo_available()}})
+            else:
+                return _format_result(
+                    {
+                        "python": {"available": check_pdoc_available()},
+                        "rust": {"available": check_cargo_available()},
+                    }
+                )
 
         elif name == "idlergear_docs_module":
             from idlergear.docs import check_pdoc_available, generate_module_docs
@@ -3917,70 +3949,144 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 return [TextContent(type="text", text=result)]
 
         elif name == "idlergear_docs_summary":
+            from pathlib import Path
             from idlergear.docs import (
                 check_pdoc_available,
                 generate_summary_json,
+                detect_python_project,
             )
-
-            if not check_pdoc_available():
-                return _format_result(
-                    {
-                        "error": "pdoc not installed",
-                        "install": "pip install 'idlergear[docs]'",
-                    }
-                )
+            from idlergear.docs_rust import (
+                detect_rust_project,
+                generate_rust_summary_json,
+            )
 
             package = arguments["package"]
             mode = arguments.get("mode", "standard")
+            lang = arguments.get("lang", "auto")
             include_private = arguments.get("include_private", False)
             max_depth = arguments.get("max_depth")
 
-            result = generate_summary_json(
-                package,
-                mode=mode,  # type: ignore
-                include_private=include_private,
-                max_depth=max_depth,
-            )
-            return [TextContent(type="text", text=result)]
+            # Auto-detect language if needed
+            if lang == "auto":
+                # Check if package is a path
+                path = Path(package)
+                if path.exists():
+                    rust_project = detect_rust_project(path)
+                    if rust_project["detected"]:
+                        lang = "rust"
+                    else:
+                        python_project = detect_python_project(path)
+                        if python_project["detected"]:
+                            lang = "python"
+                        else:
+                            lang = "python"  # Default to python
+                else:
+                    # Assume it's a Python module name
+                    lang = "python"
+
+            if lang == "rust":
+                result = generate_rust_summary_json(package, mode=mode)  # type: ignore
+                return [TextContent(type="text", text=result)]
+            else:
+                if not check_pdoc_available():
+                    return _format_result(
+                        {
+                            "error": "pdoc not installed",
+                            "install": "pip install 'idlergear[docs]'",
+                        }
+                    )
+                result = generate_summary_json(
+                    package,
+                    mode=mode,  # type: ignore
+                    include_private=include_private,
+                    max_depth=max_depth,
+                )
+                return [TextContent(type="text", text=result)]
 
         elif name == "idlergear_docs_build":
+            from pathlib import Path
             from idlergear.docs import (
                 build_html_docs,
                 check_pdoc_available,
                 detect_python_project,
             )
-
-            if not check_pdoc_available():
-                return _format_result(
-                    {
-                        "error": "pdoc not installed",
-                        "install": "pip install 'idlergear[docs]'",
-                    }
-                )
-
-            package = arguments.get("package")
-            if not package:
-                project = detect_python_project()
-                if project.get("packages"):
-                    package = project["packages"][0]
-                else:
-                    return _format_result({"error": "Could not detect Python package"})
-
-            output_dir = arguments.get("output_dir", "docs/api")
-            logo = arguments.get("logo")
-            favicon = arguments.get("favicon")
-
-            result = build_html_docs(
-                package, output_dir=output_dir, logo=logo, favicon=favicon
+            from idlergear.docs_rust import (
+                build_rust_docs,
+                check_cargo_available,
+                detect_rust_project,
             )
-            return _format_result(result)
+
+            package = arguments.get("package", ".")
+            lang = arguments.get("lang", "auto")
+            open_browser = arguments.get("open_browser", False)
+
+            # Auto-detect language if needed
+            if lang == "auto":
+                path = Path(package) if package else Path(".")
+                rust_project = detect_rust_project(path)
+                if rust_project["detected"]:
+                    lang = "rust"
+                else:
+                    lang = "python"
+
+            if lang == "rust":
+                if not check_cargo_available():
+                    return _format_result({"error": "cargo not found"})
+
+                path = Path(package) if package else Path(".")
+                result = build_rust_docs(path, open_browser=open_browser)
+                return _format_result(result)
+            else:
+                if not check_pdoc_available():
+                    return _format_result(
+                        {
+                            "error": "pdoc not installed",
+                            "install": "pip install 'idlergear[docs]'",
+                        }
+                    )
+
+                if not package or package == ".":
+                    project = detect_python_project()
+                    if project.get("packages"):
+                        package = project["packages"][0]
+                    else:
+                        return _format_result(
+                            {"error": "Could not detect Python package"}
+                        )
+
+                output_dir = arguments.get("output_dir", "docs/api")
+                logo = arguments.get("logo")
+                favicon = arguments.get("favicon")
+
+                result = build_html_docs(
+                    package, output_dir=output_dir, logo=logo, favicon=favicon
+                )
+                return _format_result(result)
 
         elif name == "idlergear_docs_detect":
             from idlergear.docs import detect_python_project
+            from idlergear.docs_rust import detect_rust_project
 
             path = arguments.get("path", ".")
-            result = detect_python_project(path)
-            return _format_result(result)
+
+            # Check Rust first, then Python
+            rust_result = detect_rust_project(path)
+            if rust_result["detected"]:
+                return _format_result(rust_result)
+
+            python_result = detect_python_project(path)
+            if python_result["detected"]:
+                python_result["language"] = "python"
+                return _format_result(python_result)
+
+            # Neither detected
+            return _format_result(
+                {
+                    "path": path,
+                    "detected": False,
+                    "message": "No Python or Rust project detected",
+                }
+            )
 
         else:
             raise ValueError(f"Unknown tool: {name}")
