@@ -97,6 +97,7 @@ session_app = typer.Typer(help="Session state persistence")
 goose_app = typer.Typer(help="Goose integration and configuration")
 otel_app = typer.Typer(help="OpenTelemetry log collection")
 test_app = typer.Typer(help="Test framework detection and status")
+docs_app = typer.Typer(help="Python API documentation generation")
 agents_app = typer.Typer(help="AGENTS.md generation and management")
 secrets_app = typer.Typer(help="Secure local secrets management")
 release_app = typer.Typer(help="Release management (GitHub Releases)")
@@ -116,6 +117,7 @@ app.add_typer(session_app, name="session")
 app.add_typer(goose_app, name="goose")
 app.add_typer(otel_app, name="otel")
 app.add_typer(test_app, name="test")
+app.add_typer(docs_app, name="docs")
 app.add_typer(agents_app, name="agents")
 app.add_typer(secrets_app, name="secrets")
 app.add_typer(release_app, name="release")
@@ -5291,6 +5293,193 @@ def test_staleness(
                 bold=True,
             )
             typer.echo("  Run 'idlergear test sync' to import them.")
+
+
+# Documentation generation commands
+@docs_app.command("generate")
+def docs_generate(
+    ctx: typer.Context,
+    package: str = typer.Argument(..., help="Python package name to document"),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output file path (default: stdout)"
+    ),
+    format: str = typer.Option(
+        "json", "--format", "-f", help="Output format: json, markdown"
+    ),
+    include_private: bool = typer.Option(
+        False, "--private", "-p", help="Include private modules"
+    ),
+    max_depth: Optional[int] = typer.Option(
+        None, "--depth", "-d", help="Maximum submodule depth"
+    ),
+):
+    """Generate API documentation for a Python package.
+
+    Requires pdoc: pip install 'idlergear[docs]'
+
+    Examples:
+        idlergear docs generate mypackage
+        idlergear docs generate mypackage -f markdown -o docs/api.md
+        idlergear docs generate mypackage --depth 2
+    """
+    from idlergear.docs import (
+        check_pdoc_available,
+        generate_docs_json,
+        generate_docs_markdown,
+    )
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    if not check_pdoc_available():
+        if output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+            )
+        else:
+            typer.secho(
+                "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
+                fg=typer.colors.RED,
+            )
+        raise typer.Exit(1)
+
+    try:
+        if format == "markdown":
+            result = generate_docs_markdown(
+                package, include_private=include_private, max_depth=max_depth
+            )
+        else:
+            result = generate_docs_json(
+                package, include_private=include_private, max_depth=max_depth
+            )
+
+        if output:
+            Path(output).write_text(result)
+            if output_format == OutputFormat.JSON:
+                typer.echo(json.dumps({"status": "success", "output": output}))
+            else:
+                typer.secho(f"Documentation written to {output}", fg=typer.colors.GREEN)
+        else:
+            typer.echo(result)
+
+    except ModuleNotFoundError as e:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": str(e)}))
+        else:
+            typer.secho(f"Module not found: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": str(e)}))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@docs_app.command("module")
+def docs_module(
+    ctx: typer.Context,
+    module: str = typer.Argument(..., help="Python module name to document"),
+):
+    """Generate documentation for a single Python module.
+
+    Examples:
+        idlergear docs module idlergear.tasks
+        idlergear docs module json
+    """
+    from idlergear.docs import check_pdoc_available, generate_module_docs
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    if not check_pdoc_available():
+        if output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+            )
+        else:
+            typer.secho(
+                "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
+                fg=typer.colors.RED,
+            )
+        raise typer.Exit(1)
+
+    try:
+        doc = generate_module_docs(module)
+
+        if output_format == OutputFormat.JSON:
+            typer.echo(doc.to_json())
+        else:
+            typer.secho(f"Module: {doc.name}", bold=True)
+            if doc.docstring:
+                typer.echo()
+                # First paragraph only
+                first_para = doc.docstring.split("\n\n")[0]
+                typer.echo(first_para)
+
+            if doc.functions:
+                typer.echo()
+                typer.secho("Functions:", bold=True)
+                for func in doc.functions:
+                    typer.echo(f"  {func.name}{func.signature}")
+
+            if doc.classes:
+                typer.echo()
+                typer.secho("Classes:", bold=True)
+                for cls in doc.classes:
+                    bases = f"({', '.join(cls.bases)})" if cls.bases else ""
+                    typer.echo(f"  {cls.name}{bases}")
+
+            if doc.submodules:
+                typer.echo()
+                typer.secho("Submodules:", bold=True)
+                for sub in doc.submodules:
+                    typer.echo(f"  {sub}")
+
+    except ModuleNotFoundError as e:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": str(e)}))
+        else:
+            typer.secho(f"Module not found: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": str(e)}))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@docs_app.command("check")
+def docs_check(
+    ctx: typer.Context,
+):
+    """Check if documentation generation is available.
+
+    Checks if pdoc is installed and accessible.
+    """
+    from idlergear.docs import check_pdoc_available
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    available = check_pdoc_available()
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"available": available}))
+    else:
+        if available:
+            typer.secho("✓ pdoc is installed and available", fg=typer.colors.GREEN)
+        else:
+            typer.secho("✗ pdoc is not installed", fg=typer.colors.RED)
+            typer.echo("  Install with: pip install 'idlergear[docs]'")
 
 
 # Self-update commands

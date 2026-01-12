@@ -2115,6 +2115,56 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
+        # Documentation generation tools
+        Tool(
+            name="idlergear_docs_check",
+            description="Check if Python documentation generation is available. Returns whether pdoc is installed.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="idlergear_docs_module",
+            description="Generate API documentation for a single Python module. Returns structured JSON with functions, classes, and docstrings.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "module": {
+                        "type": "string",
+                        "description": "Python module name (e.g., 'json', 'idlergear.tasks')",
+                    },
+                },
+                "required": ["module"],
+            },
+        ),
+        Tool(
+            name="idlergear_docs_generate",
+            description="Generate API documentation for a Python package and all submodules. Returns comprehensive JSON or markdown documentation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "package": {
+                        "type": "string",
+                        "description": "Python package name (e.g., 'idlergear')",
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["json", "markdown"],
+                        "description": "Output format (default: json)",
+                    },
+                    "include_private": {
+                        "type": "boolean",
+                        "description": "Include private modules (default: false)",
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum submodule depth (default: unlimited)",
+                    },
+                },
+                "required": ["package"],
+            },
+        ),
     ]
 
 
@@ -3744,6 +3794,62 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             staleness = get_test_staleness(project_path)
             return _format_result(staleness)
+
+        # Documentation generation tools
+        elif name == "idlergear_docs_check":
+            from idlergear.docs import check_pdoc_available
+
+            return _format_result({"available": check_pdoc_available()})
+
+        elif name == "idlergear_docs_module":
+            from idlergear.docs import check_pdoc_available, generate_module_docs
+
+            if not check_pdoc_available():
+                return _format_result(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+
+            module_name = arguments["module"]
+            doc = generate_module_docs(module_name)
+            return _format_result(doc.to_dict())
+
+        elif name == "idlergear_docs_generate":
+            from idlergear.docs import (
+                check_pdoc_available,
+                generate_docs_json,
+                generate_docs_markdown,
+            )
+
+            if not check_pdoc_available():
+                return _format_result(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+
+            package = arguments["package"]
+            fmt = arguments.get("format", "json")
+            include_private = arguments.get("include_private", False)
+            max_depth = arguments.get("max_depth")
+
+            if fmt == "markdown":
+                result = generate_docs_markdown(
+                    package,
+                    include_private=include_private,
+                    max_depth=max_depth,
+                )
+                return [TextContent(type="text", text=result)]
+            else:
+                result = generate_docs_json(
+                    package,
+                    include_private=include_private,
+                    max_depth=max_depth,
+                )
+                return [TextContent(type="text", text=result)]
 
         else:
             raise ValueError(f"Unknown tool: {name}")
