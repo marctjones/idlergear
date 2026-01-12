@@ -2115,16 +2115,16 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
-        # Documentation generation tools (Python + Rust)
+        # Documentation generation tools (Python + Rust + .NET)
         Tool(
             name="idlergear_docs_check",
-            description="Check if documentation generation is available. Returns availability for Python (pdoc) and Rust (cargo).",
+            description="Check if documentation generation is available. Returns availability for Python (pdoc), Rust (cargo), and .NET (dotnet).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "lang": {
                         "type": "string",
-                        "enum": ["python", "rust", "all"],
+                        "enum": ["python", "rust", "dotnet", "all"],
                         "description": "Language to check (default: all)",
                     },
                 },
@@ -2173,13 +2173,13 @@ This ensures messages don't derail your work - only context ones are shown immed
         ),
         Tool(
             name="idlergear_docs_summary",
-            description="⚡ TOKEN-EFFICIENT: Generate a compact API summary for AI consumption. Supports Python and Rust projects with auto-detection. Modes: minimal (~500 tokens), standard (~2k tokens), detailed (~5k tokens).",
+            description="⚡ TOKEN-EFFICIENT: Generate a compact API summary for AI consumption. Supports Python, Rust, and .NET projects with auto-detection. Modes: minimal (~500 tokens), standard (~2k tokens), detailed (~5k tokens).",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "package": {
                         "type": "string",
-                        "description": "Python package name OR path to Rust crate (auto-detects language)",
+                        "description": "Python package name OR path to Rust/.NET project (auto-detects language)",
                     },
                     "mode": {
                         "type": "string",
@@ -2188,7 +2188,7 @@ This ensures messages don't derail your work - only context ones are shown immed
                     },
                     "lang": {
                         "type": "string",
-                        "enum": ["python", "rust", "auto"],
+                        "enum": ["python", "rust", "dotnet", "auto"],
                         "description": "Language (default: auto-detect from project)",
                     },
                     "include_private": {
@@ -2205,7 +2205,7 @@ This ensures messages don't derail your work - only context ones are shown immed
         ),
         Tool(
             name="idlergear_docs_build",
-            description="Build HTML documentation. Uses pdoc for Python, cargo doc for Rust. Auto-detects project type if not specified.",
+            description="Build documentation. Uses pdoc for Python, cargo doc for Rust, dotnet build for .NET. Auto-detects project type if not specified.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -2215,7 +2215,7 @@ This ensures messages don't derail your work - only context ones are shown immed
                     },
                     "lang": {
                         "type": "string",
-                        "enum": ["python", "rust", "auto"],
+                        "enum": ["python", "rust", "dotnet", "auto"],
                         "description": "Language (default: auto-detect)",
                     },
                     "output_dir": {
@@ -2234,12 +2234,16 @@ This ensures messages don't derail your work - only context ones are shown immed
                         "type": "string",
                         "description": "Path to favicon (Python only)",
                     },
+                    "configuration": {
+                        "type": "string",
+                        "description": "Build configuration (.NET only, default: Debug)",
+                    },
                 },
             },
         ),
         Tool(
             name="idlergear_docs_detect",
-            description="Detect project configuration for documentation. Returns language, package name, version, and source directory. Supports Python and Rust.",
+            description="Detect project configuration for documentation. Returns language, package name, version, and source directory. Supports Python, Rust, and .NET.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -3880,21 +3884,25 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             staleness = get_test_staleness(project_path)
             return _format_result(staleness)
 
-        # Documentation generation tools (Python + Rust)
+        # Documentation generation tools (Python + Rust + .NET)
         elif name == "idlergear_docs_check":
             from idlergear.docs import check_pdoc_available
             from idlergear.docs_rust import check_cargo_available
+            from idlergear.docs_dotnet import check_dotnet_available
 
             lang = arguments.get("lang", "all")
             if lang == "python":
                 return _format_result({"python": {"available": check_pdoc_available()}})
             elif lang == "rust":
                 return _format_result({"rust": {"available": check_cargo_available()}})
+            elif lang == "dotnet":
+                return _format_result({"dotnet": {"available": check_dotnet_available()}})
             else:
                 return _format_result(
                     {
                         "python": {"available": check_pdoc_available()},
                         "rust": {"available": check_cargo_available()},
+                        "dotnet": {"available": check_dotnet_available()},
                     }
                 )
 
@@ -3949,6 +3957,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 return [TextContent(type="text", text=result)]
 
         elif name == "idlergear_docs_summary":
+            import json
             from pathlib import Path
             from idlergear.docs import (
                 check_pdoc_available,
@@ -3958,6 +3967,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             from idlergear.docs_rust import (
                 detect_rust_project,
                 generate_rust_summary_json,
+            )
+            from idlergear.docs_dotnet import (
+                detect_dotnet_project,
+                find_xml_docs,
+                parse_xml_docs,
+                generate_dotnet_summary,
             )
 
             package = arguments["package"]
@@ -3975,11 +3990,15 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     if rust_project["detected"]:
                         lang = "rust"
                     else:
-                        python_project = detect_python_project(path)
-                        if python_project["detected"]:
-                            lang = "python"
+                        dotnet_project = detect_dotnet_project(path)
+                        if dotnet_project["detected"]:
+                            lang = "dotnet"
                         else:
-                            lang = "python"  # Default to python
+                            python_project = detect_python_project(path)
+                            if python_project["detected"]:
+                                lang = "python"
+                            else:
+                                lang = "python"  # Default to python
                 else:
                     # Assume it's a Python module name
                     lang = "python"
@@ -3987,6 +4006,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if lang == "rust":
                 result = generate_rust_summary_json(package, mode=mode)  # type: ignore
                 return [TextContent(type="text", text=result)]
+            elif lang == "dotnet":
+                path = Path(package)
+                xml_docs = find_xml_docs(path)
+                if not xml_docs:
+                    return _format_result(
+                        {
+                            "error": "No XML documentation files found",
+                            "hint": "Build with <GenerateDocumentationFile>true</GenerateDocumentationFile>",
+                        }
+                    )
+                assembly = parse_xml_docs(xml_docs[0])
+                summary = generate_dotnet_summary(assembly, mode=mode)
+                return [TextContent(type="text", text=json.dumps(summary, indent=2))]
             else:
                 if not check_pdoc_available():
                     return _format_result(
@@ -4015,6 +4047,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 check_cargo_available,
                 detect_rust_project,
             )
+            from idlergear.docs_dotnet import (
+                build_dotnet_docs,
+                check_dotnet_available,
+                detect_dotnet_project,
+            )
 
             package = arguments.get("package", ".")
             lang = arguments.get("lang", "auto")
@@ -4027,7 +4064,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 if rust_project["detected"]:
                     lang = "rust"
                 else:
-                    lang = "python"
+                    dotnet_project = detect_dotnet_project(path)
+                    if dotnet_project["detected"]:
+                        lang = "dotnet"
+                    else:
+                        lang = "python"
 
             if lang == "rust":
                 if not check_cargo_available():
@@ -4035,6 +4076,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
                 path = Path(package) if package else Path(".")
                 result = build_rust_docs(path, open_browser=open_browser)
+                return _format_result(result)
+            elif lang == "dotnet":
+                if not check_dotnet_available():
+                    return _format_result({"error": "dotnet not found"})
+
+                path = Path(package) if package else Path(".")
+                configuration = arguments.get("configuration", "Debug")
+                result = build_dotnet_docs(path, configuration=configuration)
                 return _format_result(result)
             else:
                 if not check_pdoc_available():
@@ -4066,25 +4115,31 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_docs_detect":
             from idlergear.docs import detect_python_project
             from idlergear.docs_rust import detect_rust_project
+            from idlergear.docs_dotnet import detect_dotnet_project
 
             path = arguments.get("path", ".")
 
-            # Check Rust first, then Python
+            # Check Rust first, then .NET, then Python
             rust_result = detect_rust_project(path)
             if rust_result["detected"]:
                 return _format_result(rust_result)
+
+            dotnet_result = detect_dotnet_project(path)
+            if dotnet_result["detected"]:
+                dotnet_result["language"] = "dotnet"
+                return _format_result(dotnet_result)
 
             python_result = detect_python_project(path)
             if python_result["detected"]:
                 python_result["language"] = "python"
                 return _format_result(python_result)
 
-            # Neither detected
+            # None detected
             return _format_result(
                 {
                     "path": path,
                     "detected": False,
-                    "message": "No Python or Rust project detected",
+                    "message": "No Python, Rust, or .NET project detected",
                 }
             )
 

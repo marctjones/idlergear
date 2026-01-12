@@ -5462,15 +5462,16 @@ def docs_module(
 def docs_check(
     ctx: typer.Context,
     lang: str = typer.Option(
-        "all", "--lang", "-l", help="Language to check: python, rust, all"
+        "all", "--lang", "-l", help="Language to check: python, rust, dotnet, all"
     ),
 ):
     """Check if documentation generation is available.
 
-    Checks if pdoc (Python) and cargo (Rust) are installed and accessible.
+    Checks if pdoc (Python), cargo (Rust), and dotnet (.NET) are installed.
     """
     from idlergear.docs import check_pdoc_available
     from idlergear.docs_rust import check_cargo_available
+    from idlergear.docs_dotnet import check_dotnet_available
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
 
@@ -5479,6 +5480,8 @@ def docs_check(
         result["python"] = {"available": check_pdoc_available()}
     if lang in ("rust", "all"):
         result["rust"] = {"available": check_cargo_available()}
+    if lang in ("dotnet", "all"):
+        result["dotnet"] = {"available": check_dotnet_available()}
 
     if output_format == OutputFormat.JSON:
         typer.echo(json.dumps(result))
@@ -5495,6 +5498,12 @@ def docs_check(
             else:
                 typer.secho("✗ Rust (cargo) is not installed", fg=typer.colors.RED)
                 typer.echo("  Install from: https://rustup.rs/")
+        if "dotnet" in result:
+            if result["dotnet"]["available"]:
+                typer.secho("✓ .NET (dotnet) is installed", fg=typer.colors.GREEN)
+            else:
+                typer.secho("✗ .NET (dotnet) is not installed", fg=typer.colors.RED)
+                typer.echo("  Install from: https://dotnet.microsoft.com/")
 
 
 @docs_app.command("summary")
@@ -5505,7 +5514,7 @@ def docs_summary(
         "standard", "--mode", "-m", help="Summary mode: minimal, standard, detailed"
     ),
     lang: str = typer.Option(
-        "auto", "--lang", "-l", help="Language: python, rust, auto"
+        "auto", "--lang", "-l", help="Language: python, rust, dotnet, auto"
     ),
     include_private: bool = typer.Option(
         False, "--private", "-p", help="Include private modules"
@@ -5516,7 +5525,7 @@ def docs_summary(
 ):
     """Generate token-efficient API summary for AI consumption.
 
-    Supports both Python and Rust projects with auto-detection.
+    Supports Python, Rust, and .NET projects with auto-detection.
 
     Summary modes:
     - minimal: ~500 tokens - function/class names only
@@ -5527,6 +5536,7 @@ def docs_summary(
         idlergear docs summary idlergear --mode minimal
         idlergear docs summary requests --mode standard --depth 1
         idlergear docs summary /path/to/rust/project --lang rust
+        idlergear docs summary /path/to/dotnet/project --lang dotnet
         idlergear docs summary . --lang auto  # Auto-detect language
     """
     from pathlib import Path
@@ -5538,6 +5548,12 @@ def docs_summary(
     from idlergear.docs_rust import (
         detect_rust_project,
         generate_rust_summary_json,
+    )
+    from idlergear.docs_dotnet import (
+        detect_dotnet_project,
+        find_xml_docs,
+        parse_xml_docs,
+        generate_dotnet_summary,
     )
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
@@ -5555,11 +5571,15 @@ def docs_summary(
             if rust_project["detected"]:
                 detected_lang = "rust"
             else:
-                python_project = detect_python_project(path)
-                if python_project["detected"]:
-                    detected_lang = "python"
+                dotnet_project = detect_dotnet_project(path)
+                if dotnet_project["detected"]:
+                    detected_lang = "dotnet"
                 else:
-                    detected_lang = "python"  # Default
+                    python_project = detect_python_project(path)
+                    if python_project["detected"]:
+                        detected_lang = "python"
+                    else:
+                        detected_lang = "python"  # Default
         else:
             # Assume it's a Python module name
             detected_lang = "python"
@@ -5568,6 +5588,31 @@ def docs_summary(
         if detected_lang == "rust":
             result = generate_rust_summary_json(package, mode=mode)  # type: ignore
             typer.echo(result)
+        elif detected_lang == "dotnet":
+            path = Path(package)
+            xml_docs = find_xml_docs(path)
+            if not xml_docs:
+                if output_format == OutputFormat.JSON:
+                    typer.echo(
+                        json.dumps(
+                            {
+                                "error": "No XML documentation files found",
+                                "hint": "Build with <GenerateDocumentationFile>true</GenerateDocumentationFile>",
+                            }
+                        )
+                    )
+                else:
+                    typer.secho(
+                        "No XML documentation files found.",
+                        fg=typer.colors.RED,
+                    )
+                    typer.echo("  Build with: dotnet build -p:GenerateDocumentationFile=true")
+                raise typer.Exit(1)
+
+            # Parse first XML docs file
+            assembly = parse_xml_docs(xml_docs[0])
+            summary = generate_dotnet_summary(assembly, mode=mode)
+            typer.echo(json.dumps(summary, indent=2))
         else:
             if not check_pdoc_available():
                 if output_format == OutputFormat.JSON:
@@ -5609,13 +5654,13 @@ def docs_build(
         None, help="Package name or path (auto-detects if not provided)"
     ),
     lang: str = typer.Option(
-        "auto", "--lang", "-l", help="Language: python, rust, auto"
+        "auto", "--lang", "-l", help="Language: python, rust, dotnet, auto"
     ),
     output: str = typer.Option(
         None,
         "--output",
         "-o",
-        help="Output directory (Python: docs/api, Rust: target/doc)",
+        help="Output directory (Python: docs/api, Rust: target/doc, .NET: docs/api)",
     ),
     open_browser: bool = typer.Option(
         False, "--open", help="Open docs in browser after build"
@@ -5626,16 +5671,20 @@ def docs_build(
     favicon: Optional[str] = typer.Option(
         None, "--favicon", help="Path to favicon (Python only)"
     ),
+    configuration: str = typer.Option(
+        "Debug", "--config", "-c", help="Build configuration (.NET only)"
+    ),
 ):
     """Build HTML documentation.
 
-    Uses pdoc for Python projects, cargo doc for Rust projects.
+    Uses pdoc for Python, cargo doc for Rust, dotnet build for .NET.
     Auto-detects project language if not specified.
 
     Examples:
         idlergear docs build                    # Auto-detect package
         idlergear docs build mypackage          # Explicit Python package
         idlergear docs build . --lang rust      # Rust project in current dir
+        idlergear docs build . --lang dotnet    # .NET project in current dir
         idlergear docs build --open             # Build and open in browser
     """
     from pathlib import Path
@@ -5649,6 +5698,11 @@ def docs_build(
         check_cargo_available,
         detect_rust_project,
     )
+    from idlergear.docs_dotnet import (
+        build_dotnet_docs,
+        check_dotnet_available,
+        detect_dotnet_project,
+    )
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
 
@@ -5660,7 +5714,11 @@ def docs_build(
         if rust_project["detected"]:
             detected_lang = "rust"
         else:
-            detected_lang = "python"
+            dotnet_project = detect_dotnet_project(path)
+            if dotnet_project["detected"]:
+                detected_lang = "dotnet"
+            else:
+                detected_lang = "python"
 
     if detected_lang == "rust":
         if not check_cargo_available():
@@ -5690,6 +5748,35 @@ def docs_build(
                 typer.secho(
                     f"✗ Build failed: {result.get('error')}", fg=typer.colors.RED
                 )
+                raise typer.Exit(1)
+    elif detected_lang == "dotnet":
+        if not check_dotnet_available():
+            if output_format == OutputFormat.JSON:
+                typer.echo(json.dumps({"error": "dotnet not found"}))
+            else:
+                typer.secho(
+                    "dotnet is not found. Install from https://dotnet.microsoft.com/",
+                    fg=typer.colors.RED,
+                )
+            raise typer.Exit(1)
+
+        path = Path(package) if package else Path(".")
+        if output_format != OutputFormat.JSON:
+            typer.echo(f"Building .NET docs for: {path}")
+
+        result = build_dotnet_docs(path, configuration=configuration)
+
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps(result))
+        else:
+            if result["success"]:
+                typer.secho("✓ XML documentation built successfully", fg=typer.colors.GREEN)
+                typer.echo(f"  XML files: {len(result.get('xml_files', []))}")
+                for xml_file in result.get("xml_files", []):
+                    typer.echo(f"    - {xml_file}")
+            else:
+                errors = result.get("errors", ["Unknown error"])
+                typer.secho(f"✗ Build failed: {errors[0]}", fg=typer.colors.RED)
                 raise typer.Exit(1)
     else:
         if not check_pdoc_available():
@@ -5830,7 +5917,7 @@ def docs_detect(
 ):
     """Detect project for documentation.
 
-    Detects Python and Rust projects, showing package name, version,
+    Detects Python, Rust, and .NET projects, showing package name, version,
     source directory, and configuration.
 
     Examples:
@@ -5839,10 +5926,11 @@ def docs_detect(
     """
     from idlergear.docs import detect_python_project
     from idlergear.docs_rust import detect_rust_project
+    from idlergear.docs_dotnet import detect_dotnet_project
 
     output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
 
-    # Check Rust first, then Python
+    # Check Rust first, then .NET, then Python
     rust_result = detect_rust_project(path)
     if rust_result["detected"]:
         if output_format == OutputFormat.JSON:
@@ -5862,11 +5950,34 @@ def docs_detect(
             if rust_result.get("crate_type"):
                 typer.echo(f"  Type: {rust_result['crate_type']}")
             if rust_result.get("is_workspace"):
-                typer.echo(f"  Workspace: yes")
+                typer.echo("  Workspace: yes")
                 if rust_result.get("workspace_members"):
                     typer.echo(
                         f"  Members: {', '.join(rust_result['workspace_members'])}"
                     )
+        return
+
+    dotnet_result = detect_dotnet_project(path)
+    if dotnet_result["detected"]:
+        dotnet_result["language"] = "dotnet"
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps(dotnet_result))
+        else:
+            typer.secho("✓ .NET project detected", fg=typer.colors.GREEN)
+            if dotnet_result.get("name"):
+                typer.echo(f"  Name: {dotnet_result['name']}")
+            if dotnet_result.get("config_file"):
+                typer.echo(f"  Config: {dotnet_result['config_file']}")
+            if dotnet_result.get("projects"):
+                typer.echo(f"  Projects: {len(dotnet_result['projects'])}")
+                for proj in dotnet_result["projects"][:5]:  # Limit display
+                    typer.echo(f"    - {proj['name']} ({proj['type']})")
+            if dotnet_result.get("target_frameworks"):
+                typer.echo(
+                    f"  Frameworks: {', '.join(dotnet_result['target_frameworks'])}"
+                )
+            if dotnet_result.get("xml_docs"):
+                typer.echo(f"  XML docs: {len(dotnet_result['xml_docs'])} files")
         return
 
     python_result = detect_python_project(path)
@@ -5888,11 +5999,13 @@ def docs_detect(
                 typer.echo(f"  Packages: {', '.join(python_result['packages'])}")
         return
 
-    # Neither detected
+    # None detected
     if output_format == OutputFormat.JSON:
         typer.echo(json.dumps({"path": path, "detected": False}))
     else:
-        typer.secho("✗ No Python or Rust project detected", fg=typer.colors.YELLOW)
+        typer.secho(
+            "✗ No Python, Rust, or .NET project detected", fg=typer.colors.YELLOW
+        )
         typer.echo(f"  Path: {path}")
 
 
