@@ -11,6 +11,8 @@ description: |
   - User asks about project context or goals
   - Coordinating with other AI agents on the same codebase
   - User mentions: "save this", "remember", "note", "task", "bug", "idea"
+  - User wants to explore or document a Python API
+  - User mentions: "docs", "documentation", "API", "explore package"
 ---
 
 # IdlerGear Knowledge Management
@@ -82,6 +84,75 @@ idlergear_session_end(notes="what was accomplished")
 ```
 
 This saves state for the next session.
+
+## Python Documentation (API Exploration)
+
+Quickly explore Python APIs with token-efficient summaries:
+
+### Token-Efficient Summaries ⚡
+```
+idlergear_docs_summary(package="requests", mode="minimal")   # ~500 tokens
+idlergear_docs_summary(package="requests", mode="standard")  # ~2000 tokens
+idlergear_docs_summary(package="requests", mode="detailed")  # ~5000 tokens
+```
+
+### Other Docs Tools
+
+| Action | MCP Tool |
+|--------|----------|
+| Check pdoc available | `idlergear_docs_check()` |
+| Single module docs | `idlergear_docs_module(module="json")` |
+| Full package docs | `idlergear_docs_generate(package="...", format="json")` |
+| Build HTML docs | `idlergear_docs_build(package="...")` |
+| Detect project | `idlergear_docs_detect()` |
+
+**Requires:** `pip install 'idlergear[docs]'`
+
+## Health Check (Doctor)
+
+To check if IdlerGear is properly configured and up-to-date:
+```
+idlergear_doctor()
+```
+
+This checks:
+- Configuration health (version, initialization)
+- File installation status (MCP, hooks, rules, skills)
+- Legacy files from older versions
+- Unmanaged knowledge files (TODO.md, NOTES.md)
+
+To auto-fix issues:
+```
+idlergear_doctor(fix=True)
+```
+
+## Sudo Handling
+
+When a command requires sudo, IdlerGear provides assistance:
+
+### Pre-authentication (Preferred)
+If a GUI prompt isn't available, ask the user to pre-authenticate:
+```
+"Please run 'sudo -v' in another terminal, then I'll run the command."
+```
+
+### GUI Password Prompt (Automatic)
+If zenity, kdialog, or osascript is available, a GUI password dialog will appear automatically when sudo is needed. The pre-tool-use hook detects sudo commands and:
+1. Checks if already authenticated (`sudo -n true`)
+2. If not, checks for GUI askpass availability
+3. Informs user if a password dialog will appear
+
+### Manual Execution
+For complex commands or when no GUI is available:
+```
+"Please run this command directly in your terminal:
+  sudo <command>"
+```
+
+### Utility Scripts
+IdlerGear installs helper scripts in `.claude/scripts/`:
+- `ig-askpass` - Multi-platform GUI password prompt (zenity, kdialog, osascript)
+- `ig-sudo` - Wrapper that auto-uses askpass when available
 
 ---
 

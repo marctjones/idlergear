@@ -1,6 +1,6 @@
 # IdlerGear MCP Tools Reference
 
-Complete reference for all 51+ MCP tools provided by IdlerGear.
+Complete reference for all 57+ MCP tools provided by IdlerGear.
 
 ## Session Management (4 tools)
 
@@ -242,3 +242,57 @@ Search references.
 - `idlergear_otel_query_logs(service?, severity?, search?, start_time?, end_time?, limit?)` - Query logs
 - `idlergear_otel_stats()` - Log statistics
 - `idlergear_otel_recent_errors(service?, limit?)` - Recent errors
+
+## Documentation (6 tools)
+
+### idlergear_docs_check
+Check if pdoc is available for documentation generation.
+
+**Returns:** `{available: boolean}`
+
+### idlergear_docs_module
+Generate documentation for a single Python module.
+
+**Parameters:**
+- `module`: string (required) - Module name (e.g., "json", "idlergear.tasks")
+
+**Returns:** Structured JSON with functions, classes, docstrings.
+
+### idlergear_docs_generate
+Generate full documentation for a Python package.
+
+**Parameters:**
+- `package`: string (required) - Package name
+- `format`: "json" | "markdown" (default: "json")
+- `include_private`: boolean (default: false)
+- `max_depth`: integer (optional)
+
+### idlergear_docs_summary ⚡
+**TOKEN-EFFICIENT**: Generate compact API summary for AI consumption.
+
+**Parameters:**
+- `package`: string (required) - Package name
+- `mode`: "minimal" (~500 tokens) | "standard" (~2k) | "detailed" (~5k)
+- `include_private`: boolean (default: false)
+- `max_depth`: integer (optional)
+
+**Use this to quickly understand an API without consuming many tokens.**
+
+### idlergear_docs_build
+Build HTML documentation using pdoc.
+
+**Parameters:**
+- `package`: string (optional, auto-detects if not provided)
+- `output_dir`: string (default: "docs/api")
+- `logo`: string (optional)
+- `favicon`: string (optional)
+
+**Returns:** `{success, output_dir, files, count}`
+
+### idlergear_docs_detect
+Detect Python project configuration.
+
+**Parameters:**
+- `path`: string (default: current directory)
+
+**Returns:** `{detected, name, version, config_file, source_dir, packages}`
