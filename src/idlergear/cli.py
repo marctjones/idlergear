@@ -5482,6 +5482,265 @@ def docs_check(
             typer.echo("  Install with: pip install 'idlergear[docs]'")
 
 
+@docs_app.command("summary")
+def docs_summary(
+    ctx: typer.Context,
+    package: str = typer.Argument(..., help="Python package name to summarize"),
+    mode: str = typer.Option(
+        "standard", "--mode", "-m", help="Summary mode: minimal, standard, detailed"
+    ),
+    include_private: bool = typer.Option(
+        False, "--private", "-p", help="Include private modules"
+    ),
+    max_depth: Optional[int] = typer.Option(
+        None, "--depth", "-d", help="Maximum submodule depth"
+    ),
+):
+    """Generate token-efficient API summary for AI consumption.
+
+    Summary modes:
+    - minimal: ~500 tokens - function/class names only
+    - standard: ~2000 tokens - first-line docstrings
+    - detailed: ~5000 tokens - full docstrings, parameters
+
+    Examples:
+        idlergear docs summary idlergear --mode minimal
+        idlergear docs summary requests --mode standard --depth 1
+    """
+    from idlergear.docs import check_pdoc_available, generate_summary_json
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    if not check_pdoc_available():
+        if output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+            )
+        else:
+            typer.secho(
+                "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
+                fg=typer.colors.RED,
+            )
+        raise typer.Exit(1)
+
+    if mode not in ("minimal", "standard", "detailed"):
+        typer.secho(f"Invalid mode: {mode}. Use minimal, standard, or detailed.")
+        raise typer.Exit(1)
+
+    try:
+        result = generate_summary_json(
+            package,
+            mode=mode,  # type: ignore
+            include_private=include_private,
+            max_depth=max_depth,
+        )
+        typer.echo(result)
+
+    except Exception as e:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": str(e)}))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@docs_app.command("build")
+def docs_build(
+    ctx: typer.Context,
+    package: str = typer.Argument(
+        None, help="Python package name (auto-detects if not provided)"
+    ),
+    output: str = typer.Option(
+        "docs/api", "--output", "-o", help="Output directory for HTML files"
+    ),
+    logo: Optional[str] = typer.Option(None, "--logo", help="Path to logo image"),
+    favicon: Optional[str] = typer.Option(None, "--favicon", help="Path to favicon"),
+):
+    """Build HTML documentation using pdoc.
+
+    Examples:
+        idlergear docs build                    # Auto-detect package
+        idlergear docs build mypackage          # Explicit package
+        idlergear docs build -o docs/api        # Custom output dir
+    """
+    from idlergear.docs import (
+        build_html_docs,
+        check_pdoc_available,
+        detect_python_project,
+    )
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    if not check_pdoc_available():
+        if output_format == OutputFormat.JSON:
+            typer.echo(
+                json.dumps(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+            )
+        else:
+            typer.secho(
+                "pdoc is not installed. Install with: pip install 'idlergear[docs]'",
+                fg=typer.colors.RED,
+            )
+        raise typer.Exit(1)
+
+    # Auto-detect package if not provided
+    if not package:
+        project = detect_python_project()
+        if project.get("packages"):
+            package = project["packages"][0]
+            if output_format != OutputFormat.JSON:
+                typer.echo(f"Detected package: {package}")
+        else:
+            if output_format == OutputFormat.JSON:
+                typer.echo(json.dumps({"error": "Could not detect Python package"}))
+            else:
+                typer.secho(
+                    "Could not detect Python package. Specify one explicitly.",
+                    fg=typer.colors.RED,
+                )
+            raise typer.Exit(1)
+
+    result = build_html_docs(package, output_dir=output, logo=logo, favicon=favicon)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(result))
+    else:
+        if result["success"]:
+            typer.secho("✓ Documentation built successfully", fg=typer.colors.GREEN)
+            typer.echo(f"  Output: {result['output_dir']}")
+            typer.echo(f"  Files: {result['count']}")
+        else:
+            typer.secho(f"✗ Build failed: {result.get('error')}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+
+@docs_app.command("serve")
+def docs_serve(
+    ctx: typer.Context,
+    docs_dir: str = typer.Argument(
+        "docs/api", help="Directory containing HTML documentation"
+    ),
+    port: int = typer.Option(8080, "--port", "-p", help="Port to serve on"),
+    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Don't open browser"),
+):
+    """Serve HTML documentation locally for preview.
+
+    Examples:
+        idlergear docs serve                    # Serve docs/api on port 8080
+        idlergear docs serve --port 9000        # Custom port
+        idlergear docs serve ./my-docs          # Custom directory
+    """
+    import http.server
+    import socketserver
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+    docs_path = Path(docs_dir)
+
+    if not docs_path.exists():
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": f"Directory not found: {docs_path}"}))
+        else:
+            typer.secho(f"Directory not found: {docs_path}", fg=typer.colors.RED)
+            typer.echo("  Run 'idlergear docs build' first to generate documentation.")
+        raise typer.Exit(1)
+
+    # Check if docs exist
+    html_files = list(docs_path.glob("*.html"))
+    if not html_files:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": f"No HTML files in {docs_path}"}))
+        else:
+            typer.secho(f"No HTML files found in {docs_path}", fg=typer.colors.RED)
+            typer.echo("  Run 'idlergear docs build' first to generate documentation.")
+        raise typer.Exit(1)
+
+    url = f"http://{host}:{port}"
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(docs_path), **kwargs)
+
+        def log_message(self, format, *args):
+            if output_format != OutputFormat.JSON:
+                typer.echo(f"  {args[0]}")
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps({"url": url, "docs_dir": str(docs_path.absolute())}))
+    else:
+        typer.secho(f"Serving documentation at {url}", fg=typer.colors.GREEN)
+        typer.echo(f"  Directory: {docs_path.absolute()}")
+        typer.echo("  Press Ctrl+C to stop")
+
+    if not no_browser:
+        import threading
+        import webbrowser
+
+        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+
+    try:
+        with socketserver.TCPServer((host, port), Handler) as httpd:
+            httpd.serve_forever()
+    except KeyboardInterrupt:
+        if output_format != OutputFormat.JSON:
+            typer.echo("\nServer stopped.")
+    except OSError as e:
+        if output_format == OutputFormat.JSON:
+            typer.echo(json.dumps({"error": str(e)}))
+        else:
+            typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@docs_app.command("detect")
+def docs_detect(
+    ctx: typer.Context,
+    path: str = typer.Argument(".", help="Project directory to analyze"),
+):
+    """Detect Python project for documentation.
+
+    Shows detected package name, source directory, and configuration.
+
+    Examples:
+        idlergear docs detect
+        idlergear docs detect /path/to/project
+    """
+    from idlergear.docs import detect_python_project
+
+    output_format = ctx.obj.output_format if ctx.obj else OutputFormat.HUMAN
+
+    result = detect_python_project(path)
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(json.dumps(result))
+    else:
+        if result["detected"]:
+            typer.secho("✓ Python project detected", fg=typer.colors.GREEN)
+            if result.get("name"):
+                typer.echo(f"  Name: {result['name']}")
+            if result.get("version"):
+                typer.echo(f"  Version: {result['version']}")
+            if result.get("config_file"):
+                typer.echo(f"  Config: {result['config_file']}")
+            if result.get("source_dir"):
+                typer.echo(f"  Source: {result['source_dir']}/")
+            if result.get("packages"):
+                typer.echo(f"  Packages: {', '.join(result['packages'])}")
+        else:
+            typer.secho("✗ No Python project detected", fg=typer.colors.YELLOW)
+            typer.echo(f"  Path: {result['path']}")
+
+
 # Self-update commands
 @app.command()
 def update(

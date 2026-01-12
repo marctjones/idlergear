@@ -310,3 +310,209 @@ class TestCliIntegration:
         runner = CliRunner()
         result = runner.invoke(app, ["docs", "module", "nonexistent_12345"])
         assert result.exit_code == 1
+
+    def test_docs_summary_minimal(self):
+        """Test idlergear docs summary --mode minimal."""
+        from typer.testing import CliRunner
+
+        from idlergear.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app, ["docs", "summary", "json", "--mode", "minimal", "--depth", "0"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["package"] == "json"
+        assert data["mode"] == "minimal"
+        # Minimal mode should have just function names, no docstrings
+        assert "modules" in data
+        json_mod = data["modules"].get("json", {})
+        assert "functions" in json_mod
+        assert "dumps" in json_mod["functions"]
+
+    def test_docs_summary_standard(self):
+        """Test idlergear docs summary --mode standard."""
+        from typer.testing import CliRunner
+
+        from idlergear.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app, ["docs", "summary", "json", "--mode", "standard", "--depth", "0"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["package"] == "json"
+        assert data["mode"] == "standard"
+        # Standard mode should have first-line docstrings
+        json_mod = data["modules"].get("json", {})
+        assert "functions" in json_mod
+        # Functions should be dicts with name and sig
+        funcs = json_mod["functions"]
+        dumps_func = next((f for f in funcs if f["name"] == "dumps"), None)
+        assert dumps_func is not None
+        assert "sig" in dumps_func
+
+    def test_docs_summary_detailed(self):
+        """Test idlergear docs summary --mode detailed."""
+        from typer.testing import CliRunner
+
+        from idlergear.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(
+            app, ["docs", "summary", "json", "--mode", "detailed", "--depth", "0"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["package"] == "json"
+        assert data["mode"] == "detailed"
+        # Detailed mode should have full function dicts
+        json_mod = data["modules"].get("json", {})
+        assert "functions" in json_mod
+
+    def test_docs_detect(self):
+        """Test idlergear docs detect command."""
+        from typer.testing import CliRunner
+
+        from idlergear.cli import app
+
+        runner = CliRunner()
+        result = runner.invoke(app, ["docs", "detect"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        # Should detect idlergear project
+        assert data["detected"] is True
+        assert data["name"] == "idlergear"
+        assert "packages" in data
+
+    def test_docs_build(self):
+        """Test idlergear docs build command."""
+        import tempfile
+
+        from typer.testing import CliRunner
+
+        from idlergear.cli import app
+
+        runner = CliRunner()
+
+        # Use a temp directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = runner.invoke(
+                app, ["docs", "build", "json", "--output", f"{tmpdir}/api"]
+            )
+            assert result.exit_code == 0
+            data = json.loads(result.output)
+            assert data["success"] is True
+            assert data["count"] > 0
+
+
+class TestTokenEfficientSummary:
+    """Tests for token-efficient summary generation."""
+
+    def test_generate_summary_minimal(self):
+        """Test generate_summary with minimal mode."""
+        from idlergear.docs import generate_summary
+
+        summary = generate_summary("json", mode="minimal", max_depth=0)
+        assert summary["package"] == "json"
+        assert summary["mode"] == "minimal"
+        assert "modules" in summary
+        json_mod = summary["modules"].get("json", {})
+        # Should be list of names only
+        assert isinstance(json_mod.get("functions"), list)
+        if json_mod.get("functions"):
+            assert isinstance(json_mod["functions"][0], str)
+
+    def test_generate_summary_standard(self):
+        """Test generate_summary with standard mode."""
+        from idlergear.docs import generate_summary
+
+        summary = generate_summary("json", mode="standard", max_depth=0)
+        assert summary["package"] == "json"
+        assert summary["mode"] == "standard"
+        json_mod = summary["modules"].get("json", {})
+        # Should have dicts with name/sig/desc
+        funcs = json_mod.get("functions", [])
+        if funcs:
+            assert isinstance(funcs[0], dict)
+            assert "name" in funcs[0]
+
+    def test_generate_summary_detailed(self):
+        """Test generate_summary with detailed mode."""
+        from idlergear.docs import generate_summary
+
+        summary = generate_summary("json", mode="detailed", max_depth=0)
+        assert summary["package"] == "json"
+        assert summary["mode"] == "detailed"
+        json_mod = summary["modules"].get("json", {})
+        # Should have full function dicts
+        funcs = json_mod.get("functions", [])
+        if funcs:
+            assert isinstance(funcs[0], dict)
+
+    def test_generate_summary_json(self):
+        """Test generate_summary_json output."""
+        from idlergear.docs import generate_summary_json
+
+        result = generate_summary_json("json", mode="minimal", max_depth=0)
+        # Should be valid JSON
+        data = json.loads(result)
+        assert data["package"] == "json"
+
+
+class TestProjectDetection:
+    """Tests for Python project detection."""
+
+    def test_detect_python_project(self):
+        """Test detect_python_project in idlergear repo."""
+        from idlergear.docs import detect_python_project
+
+        result = detect_python_project()
+        assert result["detected"] is True
+        assert result["name"] == "idlergear"
+        assert result["config_file"] == "pyproject.toml"
+        assert "packages" in result
+        assert "idlergear" in result["packages"]
+
+    def test_detect_python_project_nonexistent(self):
+        """Test detect_python_project with non-Python directory."""
+        import tempfile
+
+        from idlergear.docs import detect_python_project
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = detect_python_project(tmpdir)
+            assert result["detected"] is False
+
+
+class TestBuildHtmlDocs:
+    """Tests for HTML documentation building."""
+
+    def test_build_html_docs(self):
+        """Test build_html_docs function."""
+        import tempfile
+
+        from idlergear.docs import build_html_docs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = build_html_docs("json", output_dir=f"{tmpdir}/api")
+            assert result["success"] is True
+            assert result["count"] > 0
+            assert "files" in result
+
+    def test_build_html_docs_creates_index(self):
+        """Test that build_html_docs creates index.html redirect."""
+        import tempfile
+        from pathlib import Path
+
+        from idlergear.docs import build_html_docs
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = build_html_docs("json", output_dir=f"{tmpdir}/api")
+            assert result["success"] is True
+            index_path = Path(tmpdir) / "api" / "index.html"
+            assert index_path.exists()
+            content = index_path.read_text()
+            assert "json.html" in content

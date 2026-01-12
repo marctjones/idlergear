@@ -2165,6 +2165,71 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "required": ["package"],
             },
         ),
+        Tool(
+            name="idlergear_docs_summary",
+            description="⚡ TOKEN-EFFICIENT: Generate a compact API summary for AI consumption. Use this to quickly understand a package's API. Modes: minimal (~500 tokens), standard (~2k tokens), detailed (~5k tokens).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "package": {
+                        "type": "string",
+                        "description": "Python package name (e.g., 'idlergear')",
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["minimal", "standard", "detailed"],
+                        "description": "Summary mode: minimal (names only), standard (first-line docstrings), detailed (full docs)",
+                    },
+                    "include_private": {
+                        "type": "boolean",
+                        "description": "Include private modules (default: false)",
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum submodule depth (default: unlimited)",
+                    },
+                },
+                "required": ["package"],
+            },
+        ),
+        Tool(
+            name="idlergear_docs_build",
+            description="Build HTML documentation using pdoc. Generates browsable HTML files in the specified output directory.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "package": {
+                        "type": "string",
+                        "description": "Python package name (auto-detects if not provided)",
+                    },
+                    "output_dir": {
+                        "type": "string",
+                        "description": "Output directory for HTML files (default: docs/api)",
+                    },
+                    "logo": {
+                        "type": "string",
+                        "description": "Path to logo image",
+                    },
+                    "favicon": {
+                        "type": "string",
+                        "description": "Path to favicon",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_docs_detect",
+            description="Detect Python project configuration. Returns package name, version, source directory, and available packages.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Project directory to analyze (default: current directory)",
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -3850,6 +3915,72 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     max_depth=max_depth,
                 )
                 return [TextContent(type="text", text=result)]
+
+        elif name == "idlergear_docs_summary":
+            from idlergear.docs import (
+                check_pdoc_available,
+                generate_summary_json,
+            )
+
+            if not check_pdoc_available():
+                return _format_result(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+
+            package = arguments["package"]
+            mode = arguments.get("mode", "standard")
+            include_private = arguments.get("include_private", False)
+            max_depth = arguments.get("max_depth")
+
+            result = generate_summary_json(
+                package,
+                mode=mode,  # type: ignore
+                include_private=include_private,
+                max_depth=max_depth,
+            )
+            return [TextContent(type="text", text=result)]
+
+        elif name == "idlergear_docs_build":
+            from idlergear.docs import (
+                build_html_docs,
+                check_pdoc_available,
+                detect_python_project,
+            )
+
+            if not check_pdoc_available():
+                return _format_result(
+                    {
+                        "error": "pdoc not installed",
+                        "install": "pip install 'idlergear[docs]'",
+                    }
+                )
+
+            package = arguments.get("package")
+            if not package:
+                project = detect_python_project()
+                if project.get("packages"):
+                    package = project["packages"][0]
+                else:
+                    return _format_result({"error": "Could not detect Python package"})
+
+            output_dir = arguments.get("output_dir", "docs/api")
+            logo = arguments.get("logo")
+            favicon = arguments.get("favicon")
+
+            result = build_html_docs(
+                package, output_dir=output_dir, logo=logo, favicon=favicon
+            )
+            return _format_result(result)
+
+        elif name == "idlergear_docs_detect":
+            from idlergear.docs import detect_python_project
+
+            path = arguments.get("path", ".")
+            result = detect_python_project(path)
+            return _format_result(result)
 
         else:
             raise ValueError(f"Unknown tool: {name}")

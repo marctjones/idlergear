@@ -1,14 +1,28 @@
 """Documentation generation for Python projects.
 
 This module provides tools for generating structured API documentation
-from Python source code using pdoc.
+from Python source code using pdoc. Designed for token-efficient API
+exploration by AI assistants.
+
+Features:
+- Token-efficient summary modes (minimal ~500 tokens, standard ~2k, detailed ~5k)
+- Structured JSON output for AI consumption
+- Local HTML documentation build and serve
+- Automatic project detection
 """
 
 from __future__ import annotations
 
+import http.server
 import json
+import socketserver
+import subprocess
+import threading
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
+
+SummaryMode = Literal["minimal", "standard", "detailed"]
 
 # Check if pdoc is available
 try:
@@ -422,3 +436,335 @@ def generate_docs_markdown(
             lines.append("")
 
     return "\n".join(lines)
+
+
+# Token-efficient summary generation
+
+
+def generate_summary(
+    package_name: str,
+    mode: SummaryMode = "standard",
+    include_private: bool = False,
+    max_depth: int | None = None,
+) -> dict[str, Any]:
+    """Generate a token-efficient summary of a Python package.
+
+    Args:
+        package_name: The package name (e.g., 'idlergear')
+        mode: Summary verbosity level:
+            - "minimal": ~500 tokens - names only, no descriptions
+            - "standard": ~2000 tokens - first-line docstrings
+            - "detailed": ~5000 tokens - full docstrings, parameters
+        include_private: Whether to include private modules
+        max_depth: Maximum depth of submodules
+
+    Returns:
+        Dictionary with token-efficient package summary
+    """
+    docs = generate_package_docs(package_name, include_private, max_depth)
+
+    if mode == "minimal":
+        return _generate_minimal_summary(package_name, docs)
+    elif mode == "standard":
+        return _generate_standard_summary(package_name, docs)
+    else:  # detailed
+        return _generate_detailed_summary(package_name, docs)
+
+
+def _generate_minimal_summary(
+    package_name: str, docs: dict[str, ModuleDoc]
+) -> dict[str, Any]:
+    """Generate minimal summary (~500 tokens) - names only."""
+    modules = {}
+    for mod_name, mod_doc in sorted(docs.items()):
+        mod_info: dict[str, Any] = {}
+        if mod_doc.functions:
+            mod_info["functions"] = [f.name for f in mod_doc.functions]
+        if mod_doc.classes:
+            mod_info["classes"] = [c.name for c in mod_doc.classes]
+        if mod_doc.submodules:
+            mod_info["submodules"] = mod_doc.submodules
+        if mod_info:
+            modules[mod_name] = mod_info
+
+    return {"package": package_name, "mode": "minimal", "modules": modules}
+
+
+def _generate_standard_summary(
+    package_name: str, docs: dict[str, ModuleDoc]
+) -> dict[str, Any]:
+    """Generate standard summary (~2000 tokens) - first-line docstrings."""
+    modules = {}
+    for mod_name, mod_doc in sorted(docs.items()):
+        mod_info: dict[str, Any] = {}
+
+        # First line of module docstring
+        if mod_doc.docstring:
+            first_line = mod_doc.docstring.split("\n")[0].strip()
+            if first_line:
+                mod_info["description"] = first_line
+
+        if mod_doc.functions:
+            funcs = []
+            for f in mod_doc.functions:
+                func_info: dict[str, Any] = {"name": f.name, "sig": f.signature}
+                if f.docstring:
+                    first_line = f.docstring.split("\n")[0].strip()
+                    if first_line:
+                        func_info["desc"] = first_line
+                funcs.append(func_info)
+            mod_info["functions"] = funcs
+
+        if mod_doc.classes:
+            classes = []
+            for c in mod_doc.classes:
+                cls_info: dict[str, Any] = {"name": c.name}
+                if c.bases:
+                    cls_info["bases"] = c.bases
+                if c.docstring:
+                    first_line = c.docstring.split("\n")[0].strip()
+                    if first_line:
+                        cls_info["desc"] = first_line
+                # Method names only
+                if c.methods:
+                    cls_info["methods"] = [m.name for m in c.methods]
+                classes.append(cls_info)
+            mod_info["classes"] = classes
+
+        if mod_doc.submodules:
+            mod_info["submodules"] = mod_doc.submodules
+
+        if mod_info:
+            modules[mod_name] = mod_info
+
+    return {"package": package_name, "mode": "standard", "modules": modules}
+
+
+def _generate_detailed_summary(
+    package_name: str, docs: dict[str, ModuleDoc]
+) -> dict[str, Any]:
+    """Generate detailed summary (~5000 tokens) - full docstrings, parameters."""
+    modules = {}
+    for mod_name, mod_doc in sorted(docs.items()):
+        mod_info: dict[str, Any] = {}
+
+        if mod_doc.docstring:
+            mod_info["docstring"] = mod_doc.docstring
+
+        if mod_doc.functions:
+            mod_info["functions"] = [f.to_dict() for f in mod_doc.functions]
+
+        if mod_doc.classes:
+            mod_info["classes"] = [c.to_dict() for c in mod_doc.classes]
+
+        if mod_doc.submodules:
+            mod_info["submodules"] = mod_doc.submodules
+
+        if mod_doc.variables:
+            mod_info["variables"] = [
+                {"name": name, "type": type_} if type_ else {"name": name}
+                for name, type_ in mod_doc.variables
+            ]
+
+        if mod_info:
+            modules[mod_name] = mod_info
+
+    return {"package": package_name, "mode": "detailed", "modules": modules}
+
+
+def generate_summary_json(
+    package_name: str,
+    mode: SummaryMode = "standard",
+    include_private: bool = False,
+    max_depth: int | None = None,
+    indent: int = 2,
+) -> str:
+    """Generate token-efficient JSON summary of a Python package.
+
+    Args:
+        package_name: The package name
+        mode: Summary verbosity level (minimal, standard, detailed)
+        include_private: Whether to include private modules
+        max_depth: Maximum depth of submodules
+        indent: JSON indentation
+
+    Returns:
+        JSON string containing package summary
+    """
+    summary = generate_summary(package_name, mode, include_private, max_depth)
+    return json.dumps(summary, indent=indent)
+
+
+# HTML documentation build and serve
+
+
+def detect_python_project(path: Path | str = ".") -> dict[str, Any]:
+    """Detect Python project configuration.
+
+    Args:
+        path: Project directory path
+
+    Returns:
+        Dictionary with project info (name, version, source_dir, etc.)
+    """
+    path = Path(path)
+    result: dict[str, Any] = {"path": str(path.absolute()), "detected": False}
+
+    # Check pyproject.toml
+    pyproject = path / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            import tomllib
+        except ImportError:
+            import tomli as tomllib
+
+        content = pyproject.read_text()
+        data = tomllib.loads(content)
+
+        if "project" in data:
+            result["detected"] = True
+            result["name"] = data["project"].get("name")
+            result["version"] = data["project"].get("version")
+            result["config_file"] = "pyproject.toml"
+
+    # Check setup.py
+    setup_py = path / "setup.py"
+    if setup_py.exists() and not result["detected"]:
+        result["detected"] = True
+        result["config_file"] = "setup.py"
+
+    # Find source directory
+    for src_dir in ["src", "lib", "."]:
+        src_path = path / src_dir
+        if src_path.is_dir():
+            # Look for packages (directories with __init__.py)
+            packages = [
+                d.name
+                for d in src_path.iterdir()
+                if d.is_dir() and (d / "__init__.py").exists()
+            ]
+            if packages:
+                result["source_dir"] = src_dir
+                result["packages"] = packages
+                break
+
+    return result
+
+
+def build_html_docs(
+    package_name: str,
+    output_dir: Path | str = "docs/api",
+    logo: str | None = None,
+    favicon: str | None = None,
+) -> dict[str, Any]:
+    """Build HTML documentation using pdoc.
+
+    Args:
+        package_name: The package name to document
+        output_dir: Output directory for HTML files
+        logo: Optional path to logo image
+        favicon: Optional path to favicon
+
+    Returns:
+        Dictionary with build result (success, output_dir, files)
+
+    Raises:
+        RuntimeError: If pdoc fails to build documentation
+    """
+    if not PDOC_AVAILABLE:
+        raise ImportError(
+            "pdoc is not installed. Install with: pip install 'idlergear[docs]'"
+        )
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    # Build pdoc command
+    cmd = ["pdoc", package_name, "--output-directory", str(output_path)]
+    if logo:
+        cmd.extend(["--logo", logo])
+    if favicon:
+        cmd.extend(["--favicon", favicon])
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Create index redirect
+        index_html = output_path / "index.html"
+        if not index_html.exists():
+            index_html.write_text(
+                f"<!DOCTYPE html><html><head>"
+                f'<meta http-equiv="refresh" content="0; url={package_name}.html">'
+                f"</head></html>"
+            )
+
+        # List generated files
+        files = [str(f.relative_to(output_path)) for f in output_path.rglob("*.html")]
+
+        return {
+            "success": True,
+            "output_dir": str(output_path.absolute()),
+            "files": files,
+            "count": len(files),
+        }
+
+    except subprocess.CalledProcessError as e:
+        return {
+            "success": False,
+            "error": e.stderr or str(e),
+            "output_dir": str(output_path.absolute()),
+        }
+
+
+def serve_docs(
+    docs_dir: Path | str = "docs/api",
+    port: int = 8080,
+    host: str = "127.0.0.1",
+    open_browser: bool = True,
+) -> dict[str, Any]:
+    """Serve HTML documentation locally.
+
+    Args:
+        docs_dir: Directory containing HTML documentation
+        port: Port to serve on
+        host: Host to bind to
+        open_browser: Whether to open browser automatically
+
+    Returns:
+        Dictionary with server info (url, pid)
+    """
+    docs_path = Path(docs_dir)
+    if not docs_path.exists():
+        return {"success": False, "error": f"Directory not found: {docs_path}"}
+
+    # Check if docs exist
+    html_files = list(docs_path.glob("*.html"))
+    if not html_files:
+        return {"success": False, "error": f"No HTML files found in {docs_path}"}
+
+    url = f"http://{host}:{port}"
+
+    # Simple HTTP server
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, directory=str(docs_path), **kwargs)
+
+        def log_message(self, format: str, *args: Any) -> None:
+            pass  # Suppress logging
+
+    try:
+        with socketserver.TCPServer((host, port), Handler):
+            if open_browser:
+                import webbrowser
+
+                threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+
+            return {
+                "success": True,
+                "url": url,
+                "docs_dir": str(docs_path.absolute()),
+                "message": f"Serving docs at {url} - Press Ctrl+C to stop",
+                "blocking": True,
+            }
+    except OSError as e:
+        return {"success": False, "error": str(e)}
