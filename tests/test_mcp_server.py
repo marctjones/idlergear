@@ -318,7 +318,9 @@ class TestCallToolReference:
         result = await call_tool("idlergear_reference_list", {})
 
         data = json.loads(result[0].text)
-        assert len(data) == 2
+        # Count wiki references only (excludes pinned like VISION.md)
+        wiki_refs = [r for r in data if r.get("source") == "wiki"]
+        assert len(wiki_refs) == 2
 
     @pytest.mark.asyncio
     async def test_reference_search(self, mcp_project):

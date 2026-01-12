@@ -880,7 +880,7 @@ class TestAllHandlers:
         """Test reference.list handler."""
         from idlergear.daemon.handlers import register_handlers
         from idlergear.daemon.server import DaemonServer
-        from idlergear.reference import add_reference
+        from idlergear.reference import add_reference, ReferenceSource
 
         add_reference("Ref 1")
         add_reference("Ref 2")
@@ -897,7 +897,9 @@ class TestAllHandlers:
         handler = server._methods["reference.list"]
         result = await handler({}, conn)
 
-        assert len(result) == 2
+        # Count wiki references only (excludes pinned like VISION.md)
+        wiki_refs = [r for r in result if r.get("source") == ReferenceSource.WIKI.value]
+        assert len(wiki_refs) == 2
 
     @pytest.mark.asyncio
     async def test_reference_get_handler(self, temp_project):

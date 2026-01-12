@@ -659,11 +659,13 @@ class TestAdditionalReferenceCommands:
         assert result.exit_code == 0
         assert "No references found" in result.output
 
-    def test_reference_list_empty(self, cli_project):
+    def test_reference_list_includes_pinned(self, cli_project):
+        """Test that reference list includes pinned references like vision."""
         result = runner.invoke(app, ["--output", "human", "reference", "list"])
 
         assert result.exit_code == 0
-        assert "No reference documents" in result.output
+        # Should include vision (pinned reference)
+        assert "vision" in result.output.lower()
 
     def test_reference_sync(self, cli_project):
         # Test with --status since full sync requires GitHub access
