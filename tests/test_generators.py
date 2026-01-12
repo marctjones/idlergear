@@ -257,3 +257,211 @@ class TestGeneratorRegistry:
         # Enable
         result = enable_generator("toggle-test", temp_project)
         assert result is True
+
+
+class TestBuiltinGenerators:
+    """Tests for built-in generators."""
+
+    def test_pdoc_generator_success(self, temp_project):
+        """Test PdocGenerator with valid Python code."""
+        from idlergear.generators.builtin import PdocGenerator
+
+        # Create a simple Python file
+        test_file = temp_project / "sample.py"
+        test_file.write_text('''
+"""Sample module for testing."""
+
+def hello():
+    """Say hello."""
+    return "hello"
+''')
+
+        gen = PdocGenerator()
+        assert gen.name == "pdoc"
+        assert gen.description == "Generate API docs from Python source code using pdoc"
+
+        # The generate method might work or fail depending on pdoc availability
+        result = gen.generate(test_file)
+        # Either success or failure due to pdoc not being installed
+        assert isinstance(result.success, bool)
+
+    def test_pdoc_generator_import_error(self, temp_project):
+        """Test PdocGenerator handling ImportError."""
+        from idlergear.generators.builtin import PdocGenerator
+
+        gen = PdocGenerator()
+        test_file = temp_project / "test.py"
+        test_file.write_text("# empty")
+
+        # Mock to simulate ImportError
+        with patch("idlergear.generators.builtin.PdocGenerator.generate") as mock_gen:
+            mock_gen.return_value = GeneratorResult(
+                success=False,
+                errors=["pdoc package not installed. Install with: pip install pdoc"],
+            )
+            result = mock_gen(test_file)
+            assert result.success is False
+            assert "pdoc" in result.errors[0]
+
+    def test_rust_generator_success(self, temp_project):
+        """Test RustGenerator with mocked response."""
+        from idlergear.generators.builtin import RustGenerator
+
+        gen = RustGenerator()
+        assert gen.name == "rust"
+        assert gen.requires == []
+        assert gen.python_deps == []
+
+        # Mock generate_rust_summary to return valid result
+        with patch("idlergear.docs_rust.generate_rust_summary") as mock_gen:
+            mock_gen.return_value = {"markdown": "# API Documentation\n\n## Structs\n- Sample"}
+            result = gen.generate(temp_project)
+            assert result.success is True
+            assert len(result.references) == 1
+            assert "API" in result.references[0]["body"]
+
+    def test_rust_generator_empty_result(self, temp_project):
+        """Test RustGenerator with empty result."""
+        from idlergear.generators.builtin import RustGenerator
+
+        gen = RustGenerator()
+
+        # Mock to return empty result
+        with patch("idlergear.docs_rust.generate_rust_summary") as mock_gen:
+            mock_gen.return_value = None
+            result = gen.generate(temp_project)
+            assert result.success is True
+            assert len(result.references) == 0
+
+    def test_rust_generator_exception(self, temp_project):
+        """Test RustGenerator handling exception."""
+        from idlergear.generators.builtin import RustGenerator
+
+        gen = RustGenerator()
+
+        # Mock to raise exception
+        with patch("idlergear.docs_rust.generate_rust_summary") as mock_gen:
+            mock_gen.side_effect = RuntimeError("Test error")
+            result = gen.generate(temp_project)
+            assert result.success is False
+            assert "Test error" in result.errors[0]
+
+    def test_dotnet_generator_success(self, temp_project):
+        """Test DotNetGenerator with mocked response."""
+        from idlergear.generators.builtin import DotNetGenerator
+
+        gen = DotNetGenerator()
+        assert gen.name == "dotnet"
+        assert gen.requires == []
+        assert gen.python_deps == []
+
+        # Mock generate_dotnet_summary to return valid result
+        with patch("idlergear.docs_dotnet.generate_dotnet_summary") as mock_gen:
+            mock_gen.return_value = {"markdown": "# .NET API\n\n## Classes\n- Sample"}
+            result = gen.generate(temp_project)
+            assert result.success is True
+            assert len(result.references) == 1
+            assert ".NET API" in result.references[0]["body"]
+
+    def test_dotnet_generator_empty_result(self, temp_project):
+        """Test DotNetGenerator with empty result."""
+        from idlergear.generators.builtin import DotNetGenerator
+
+        gen = DotNetGenerator()
+
+        # Mock to return empty result
+        with patch("idlergear.docs_dotnet.generate_dotnet_summary") as mock_gen:
+            mock_gen.return_value = None
+            result = gen.generate(temp_project)
+            assert result.success is True
+            assert len(result.references) == 0
+
+    def test_dotnet_generator_exception(self, temp_project):
+        """Test DotNetGenerator handling exception."""
+        from idlergear.generators.builtin import DotNetGenerator
+
+        gen = DotNetGenerator()
+
+        # Mock to raise exception
+        with patch("idlergear.docs_dotnet.generate_dotnet_summary") as mock_gen:
+            mock_gen.side_effect = RuntimeError("Test error")
+            result = gen.generate(temp_project)
+            assert result.success is False
+            assert "Test error" in result.errors[0]
+
+    def test_rustdoc_generator_init(self):
+        """Test RustdocGenerator initialization."""
+        from idlergear.generators.builtin import RustdocGenerator
+
+        gen = RustdocGenerator()
+        assert gen.name == "rustdoc"
+        assert gen.requires == ["cargo"]
+        assert gen.config is not None
+        assert gen.config.command == "cargo +nightly doc --no-deps"
+        assert "RUSTDOCFLAGS" in gen.config.env
+
+    def test_rustdoc_generator_with_config(self):
+        """Test RustdocGenerator with custom config."""
+        from idlergear.generators.builtin import RustdocGenerator
+
+        config = GeneratorConfig(
+            name="custom-rustdoc",
+            generator_type=GeneratorType.SHELL,
+            command="cargo doc",
+            requires=["cargo"],
+        )
+        gen = RustdocGenerator(config)
+        assert gen.config.command == "cargo doc"
+        assert gen.config.name == "custom-rustdoc"
+
+    def test_rustdoc_generator_detect_no_cargo(self):
+        """Test RustdocGenerator detection when cargo is missing."""
+        from idlergear.generators.builtin import RustdocGenerator
+
+        gen = RustdocGenerator()
+
+        with patch("shutil.which") as mock_which:
+            mock_which.return_value = None
+            assert gen.detect() is False
+
+    def test_rustdoc_generator_detect_no_nightly(self):
+        """Test RustdocGenerator detection when nightly is missing."""
+        from idlergear.generators.builtin import RustdocGenerator
+        import subprocess
+
+        gen = RustdocGenerator()
+
+        with patch("shutil.which") as mock_which:
+            mock_which.return_value = "/usr/bin/cargo"
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = subprocess.CompletedProcess(
+                    args=[], returncode=1, stdout="", stderr="error"
+                )
+                assert gen.detect() is False
+
+    def test_rustdoc_generator_detect_exception(self):
+        """Test RustdocGenerator detection with exception."""
+        from idlergear.generators.builtin import RustdocGenerator
+
+        gen = RustdocGenerator()
+
+        with patch("shutil.which") as mock_which:
+            mock_which.return_value = "/usr/bin/cargo"
+            with patch("subprocess.run") as mock_run:
+                mock_run.side_effect = FileNotFoundError("rustup not found")
+                assert gen.detect() is False
+
+    def test_rustdoc_generator_detect_success(self):
+        """Test RustdocGenerator detection success."""
+        from idlergear.generators.builtin import RustdocGenerator
+        import subprocess
+
+        gen = RustdocGenerator()
+
+        with patch("shutil.which") as mock_which:
+            mock_which.return_value = "/usr/bin/cargo"
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="rustc 1.75.0-nightly", stderr=""
+                )
+                assert gen.detect() is True

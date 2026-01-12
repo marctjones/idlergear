@@ -373,35 +373,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["id", "to"],
             },
         ),
-        # Exploration tools (deprecated - aliases for notes with 'explore' tag)
-        Tool(
-            name="idlergear_explore_create",
-            description="DEPRECATED: Use idlergear_note_create with tags=['explore'] instead. Creates an exploration note.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "Exploration title"},
-                    "body": {"type": "string", "description": "Exploration body"},
-                },
-                "required": ["title"],
-            },
-        ),
-        Tool(
-            name="idlergear_explore_list",
-            description="DEPRECATED: Use idlergear_note_list with tag='explore' instead. Lists exploration notes.",
-            inputSchema={"type": "object", "properties": {}},
-        ),
-        Tool(
-            name="idlergear_explore_delete",
-            description="DEPRECATED: Use idlergear_note_delete instead. Deletes an exploration note.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer", "description": "Note ID to delete"},
-                },
-                "required": ["id"],
-            },
-        ),
         # Vision tools
         Tool(
             name="idlergear_vision_show",
@@ -2365,40 +2336,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             result = backend.promote(arguments["id"], arguments["to"])
             if result is None:
                 raise ValueError(f"Note #{arguments['id']} not found")
-            return _format_result(result)
-
-        # Exploration handlers (deprecated - redirect to notes with 'explore' tag)
-        elif name == "idlergear_explore_create":
-            # Combine title and body into note content
-            content = arguments["title"]
-            if arguments.get("body"):
-                content = f"{content}\n\n{arguments['body']}"
-            backend = get_backend("note")
-            result = backend.create(content, tags=["explore"])
-            result["deprecated"] = (
-                "Use idlergear_note_create with tags=['explore'] instead"
-            )
-            return _format_result(result)
-
-        elif name == "idlergear_explore_list":
-            backend = get_backend("note")
-            notes = backend.list(tag="explore")
-            result = {
-                "notes": notes,
-                "deprecated": "Use idlergear_note_list with tag='explore' instead",
-            }
-            return _format_result(result)
-
-        elif name == "idlergear_explore_delete":
-            note_id = arguments["id"]
-            backend = get_backend("note")
-            success = backend.delete(note_id)
-            result = {
-                "deleted": success,
-                "deprecated": "Use idlergear_note_delete instead",
-            }
-            if not success:
-                result["error"] = f"Note #{note_id} not found"
             return _format_result(result)
 
         # Vision handlers (using backend)

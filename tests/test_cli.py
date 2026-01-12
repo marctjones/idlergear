@@ -156,41 +156,6 @@ class TestNoteCommands:
         assert "Promoted" in result.output
 
 
-class TestExploreCommands:
-    """Tests for explore commands (deprecated - redirects to notes with --tag explore)."""
-
-    def test_explore_create(self, cli_project):
-        result = runner.invoke(app, ["explore", "create", "Test exploration"])
-
-        assert result.exit_code == 0
-        assert "Created exploration note #1" in result.output
-        assert "Tip: Use 'note create --tag explore'" in result.output
-
-    def test_explore_list(self, cli_project):
-        runner.invoke(app, ["explore", "create", "Exploration one"])
-
-        result = runner.invoke(app, ["explore", "list"])
-
-        assert result.exit_code == 0
-        assert "Exploration one" in result.output
-
-    def test_explore_show(self, cli_project):
-        runner.invoke(app, ["explore", "create", "Test", "--body", "Body text"])
-
-        result = runner.invoke(app, ["explore", "show", "1"])
-
-        assert result.exit_code == 0
-        assert "Test" in result.output
-
-    def test_explore_delete(self, cli_project):
-        runner.invoke(app, ["explore", "create", "To delete"])
-
-        result = runner.invoke(app, ["explore", "delete", "1"])
-
-        assert result.exit_code == 0
-        assert "Deleted note #1" in result.output
-
-
 class TestVisionCommands:
     """Tests for vision commands."""
 
@@ -462,14 +427,6 @@ class TestErrorHandling:
             assert result.exit_code == 1
             assert "Not in an IdlerGear project" in result.output
 
-    def test_explore_list_not_initialized(self, save_cwd):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            os.chdir(tmpdir)
-            result = runner.invoke(app, ["explore", "list"])
-
-            assert result.exit_code == 1
-            assert "Not in an IdlerGear project" in result.output
-
 
 class TestAdditionalTaskCommands:
     """Additional task command tests."""
@@ -550,28 +507,6 @@ class TestAdditionalNoteCommands:
 
         assert result.exit_code == 0
         assert "No notes found" in result.output
-
-
-class TestAdditionalExploreCommands:
-    """Additional explore command tests (deprecated - redirects to notes with --tag explore)."""
-
-    def test_explore_show_not_found(self, cli_project):
-        result = runner.invoke(app, ["--output", "human", "explore", "show", "999"])
-
-        assert result.exit_code == 1
-        assert "not found" in result.output
-
-    def test_explore_delete_not_found(self, cli_project):
-        result = runner.invoke(app, ["--output", "human", "explore", "delete", "999"])
-
-        assert result.exit_code == 1
-        assert "not found" in result.output
-
-    def test_explore_list_empty(self, cli_project):
-        result = runner.invoke(app, ["--output", "human", "explore", "list"])
-
-        assert result.exit_code == 0
-        assert "No exploration notes found" in result.output
 
 
 class TestAdditionalPlanCommands:

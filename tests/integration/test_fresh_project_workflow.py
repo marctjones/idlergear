@@ -140,24 +140,34 @@ class TestNoteWorkflow:
 
 
 class TestExploreWorkflow:
-    """Test exploration workflow."""
+    """Test exploration workflow (via notes with 'explore' tag)."""
 
     def test_create_exploration(self, fresh_project: Path) -> None:
-        """Test creating an exploration."""
+        """Test creating an exploration note."""
         result = run_idlergear(
-            fresh_project, "explore", "create", "How should we structure the API?"
+            fresh_project,
+            "note",
+            "create",
+            "How should we structure the API?",
+            "--tag",
+            "explore",
         )
         assert result.returncode == 0
 
     def test_list_explorations(self, fresh_project: Path) -> None:
-        """Test listing explorations."""
+        """Test listing exploration notes."""
         # Create an exploration first
         run_idlergear(
-            fresh_project, "explore", "create", "Exploration for listing test"
+            fresh_project,
+            "note",
+            "create",
+            "Exploration for listing test",
+            "--tag",
+            "explore",
         )
 
-        # List explorations
-        result = run_idlergear(fresh_project, "explore", "list")
+        # List exploration notes
+        result = run_idlergear(fresh_project, "note", "list", "--tag", "explore")
         assert result.returncode == 0
         assert "Exploration for listing test" in result.stdout
 
@@ -226,12 +236,14 @@ class TestDevelopmentWorkflow:
         )
         assert result.returncode == 0
 
-        # 4. Create exploration for research question
+        # 4. Create exploration for research question (via notes with explore tag)
         result = run_idlergear(
             project,
-            "explore",
+            "note",
             "create",
             "What testing framework should we use?",
+            "--tag",
+            "explore",
         )
         assert result.returncode == 0
 
@@ -244,7 +256,7 @@ class TestDevelopmentWorkflow:
         note_list = run_idlergear(project, "note", "list")
         assert "async" in note_list.stdout
 
-        explore_list = run_idlergear(project, "explore", "list")
+        explore_list = run_idlergear(project, "note", "list", "--tag", "explore")
         assert "testing framework" in explore_list.stdout
 
         # 6. Final context check

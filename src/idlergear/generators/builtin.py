@@ -85,19 +85,21 @@ class RustGenerator(BuiltinGenerator):
     ) -> GeneratorResult:
         """Generate Rust documentation."""
         try:
-            from idlergear.docs_rust import RustDocsParser
+            from idlergear.docs_rust import generate_rust_summary
 
-            parser = RustDocsParser()
-            result = parser.generate_summary(input_path, mode="standard")
+            result = generate_rust_summary(input_path, mode="standard")
 
             references = []
             if result:
-                references.append({
-                    "title": f"Rust API: {input_path.name}",
-                    "body": result,
-                    "source": "generated",
-                    "generator": self.name,
-                })
+                # Result is a dict with summary info
+                body = result.get("markdown", "") if isinstance(result, dict) else str(result)
+                if body:
+                    references.append({
+                        "title": f"Rust API: {input_path.name}",
+                        "body": body,
+                        "source": "generated",
+                        "generator": self.name,
+                    })
 
             return GeneratorResult(
                 success=True,
@@ -130,19 +132,21 @@ class DotNetGenerator(BuiltinGenerator):
     ) -> GeneratorResult:
         """Generate .NET documentation."""
         try:
-            from idlergear.docs_dotnet import DotNetDocsParser
+            from idlergear.docs_dotnet import generate_dotnet_summary
 
-            parser = DotNetDocsParser()
-            result = parser.generate_summary(input_path, mode="standard")
+            result = generate_dotnet_summary(input_path, mode="standard")
 
             references = []
             if result:
-                references.append({
-                    "title": f".NET API: {input_path.name}",
-                    "body": result,
-                    "source": "generated",
-                    "generator": self.name,
-                })
+                # Result is a dict with summary info
+                body = result.get("markdown", "") if isinstance(result, dict) else str(result)
+                if body:
+                    references.append({
+                        "title": f".NET API: {input_path.name}",
+                        "body": body,
+                        "source": "generated",
+                        "generator": self.name,
+                    })
 
             return GeneratorResult(
                 success=True,

@@ -1,6 +1,6 @@
 # IdlerGear MCP Tools Reference
 
-Complete reference for all 51+ MCP tools provided by IdlerGear.
+Complete reference for all 126 MCP tools provided by IdlerGear.
 
 ## Session Management (4 tools)
 
@@ -242,3 +242,133 @@ Search references.
 - `idlergear_otel_query_logs(service?, severity?, search?, start_time?, end_time?, limit?)` - Query logs
 - `idlergear_otel_stats()` - Log statistics
 - `idlergear_otel_recent_errors(service?, limit?)` - Recent errors
+
+## Documentation (6 tools)
+
+### idlergear_docs_check
+Check if pdoc is available for documentation generation.
+
+**Returns:** `{available: boolean}`
+
+### idlergear_docs_module
+Generate documentation for a single Python module.
+
+**Parameters:**
+- `module`: string (required) - Module name (e.g., "json", "idlergear.tasks")
+
+**Returns:** Structured JSON with functions, classes, docstrings.
+
+### idlergear_docs_generate
+Generate full documentation for a Python package.
+
+**Parameters:**
+- `package`: string (required) - Package name
+- `format`: "json" | "markdown" (default: "json")
+- `include_private`: boolean (default: false)
+- `max_depth`: integer (optional)
+
+### idlergear_docs_summary ⚡
+**TOKEN-EFFICIENT**: Generate compact API summary for AI consumption.
+
+**Parameters:**
+- `package`: string (required) - Package name
+- `mode`: "minimal" (~500 tokens) | "standard" (~2k) | "detailed" (~5k)
+- `include_private`: boolean (default: false)
+- `max_depth`: integer (optional)
+
+**Use this to quickly understand an API without consuming many tokens.**
+
+### idlergear_docs_build
+Build HTML documentation using pdoc.
+
+**Parameters:**
+- `package`: string (optional, auto-detects if not provided)
+- `output_dir`: string (default: "docs/api")
+- `logo`: string (optional)
+- `favicon`: string (optional)
+
+**Returns:** `{success, output_dir, files, count}`
+
+### idlergear_docs_detect
+Detect Python project configuration.
+
+**Parameters:**
+- `path`: string (default: current directory)
+
+**Returns:** `{detected, name, version, config_file, source_dir, packages}`
+
+## Test Framework (10 tools)
+
+- `idlergear_test_detect(path?)` - Detect test framework (pytest, cargo test, jest, etc.)
+- `idlergear_test_status(path?)` - Show last test run results
+- `idlergear_test_run(path?, args?)` - Run tests and parse results
+- `idlergear_test_history(path?, limit?)` - Show test run history
+- `idlergear_test_list(path?, files_only?)` - List all tests in project
+- `idlergear_test_coverage(path?, file?)` - Show test coverage mapping
+- `idlergear_test_uncovered(path?)` - List files without tests
+- `idlergear_test_changed(path?, since?, run?)` - Tests for changed files
+- `idlergear_test_sync(path?)` - Import external test runs
+- `idlergear_test_staleness(path?)` - Check how stale test results are
+
+## Watch Mode (3 tools)
+
+- `idlergear_watch_check(act?)` - One-shot project analysis (TODO/FIXME/HACK detection)
+- `idlergear_watch_act(suggestion_id)` - Execute action for a specific suggestion
+- `idlergear_watch_stats()` - Quick watch statistics (changed files, TODOs count)
+
+## Health & Utility (3 tools)
+
+- `idlergear_doctor(fix?)` - Check installation health and auto-fix issues
+- `idlergear_version()` - Show MCP server version
+- `idlergear_reload()` - Reload MCP server to pick up code changes
+
+## Configuration & Backend (4 tools)
+
+- `idlergear_config_get(key)` - Get a configuration value
+- `idlergear_config_set(key, value)` - Set a configuration value
+- `idlergear_backend_show()` - Show configured backends for all knowledge types
+- `idlergear_backend_set(type, backend)` - Set backend for a knowledge type
+
+## Run Management (5 tools)
+
+- `idlergear_run_start(command, name?)` - Start background script/command
+- `idlergear_run_list(limit?)` - List all runs
+- `idlergear_run_status(name)` - Get run status
+- `idlergear_run_logs(name, stream?, tail?)` - Get run logs
+- `idlergear_run_stop(name)` - Stop a running process
+
+## Project Boards (9 tools)
+
+- `idlergear_project_create(title, columns?, create_on_github?)` - Create Kanban board
+- `idlergear_project_list(include_github?)` - List all project boards
+- `idlergear_project_show(name)` - Show project with columns and tasks
+- `idlergear_project_delete(name, delete_on_github?)` - Delete project board
+- `idlergear_project_add_task(project_name, task_id, column?)` - Add task to board
+- `idlergear_project_remove_task(project_name, task_id)` - Remove task from board
+- `idlergear_project_move_task(project_name, task_id, column)` - Move task to column
+- `idlergear_project_sync(name)` - Sync to GitHub Projects v2
+- `idlergear_project_link(name, github_project_number)` - Link to existing GitHub Project
+
+## Multi-Agent Messaging (7 tools)
+
+- `idlergear_message_send(to_agent, message, ...)` - Send message to another agent
+- `idlergear_message_list(agent_id?, unread_only?, delivery?, limit?)` - Check inbox
+- `idlergear_message_process(agent_id?, create_tasks?)` - Process inbox messages
+- `idlergear_message_mark_read(agent_id?, message_ids?)` - Mark messages as read
+- `idlergear_message_clear(agent_id?, all_messages?)` - Clear read messages
+- `idlergear_message_test(test_message?)` - Test messaging pipeline
+
+## Daemon & Coordination (6 tools)
+
+- `idlergear_daemon_register_agent(name, agent_type?, metadata?)` - Register with daemon
+- `idlergear_daemon_list_agents()` - List active AI agents
+- `idlergear_daemon_queue_command(command, priority?, wait_for_result?)` - Queue command
+- `idlergear_daemon_broadcast(message, delivery?)` - Broadcast to all agents
+- `idlergear_daemon_update_status(agent_id, status)` - Update agent status
+- `idlergear_daemon_list_queue()` - List queued commands
+
+## Script Generation (3 tools)
+
+- `idlergear_generate_dev_script(name, command, ...)` - Generate dev environment script
+- `idlergear_list_script_templates()` - List available script templates
+- `idlergear_get_script_template(template_name)` - Get template details

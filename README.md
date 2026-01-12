@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.4.0)
+## Features (v0.3.29)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -48,14 +48,14 @@ IdlerGear works identically across all major AI coding assistants:
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
 - **Health Check** - Doctor command for configuration validation
 
-**Total: 62+ MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 126 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **62+ tools** via Model Context Protocol (universal)
+- **MCP Server** - **126 tools** via Model Context Protocol (universal)
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
 - **Goose Integration** - CLI + GUI support with `.goosehints`
 - **Token Efficiency** - 97% context reduction (17K → 570 tokens!)
@@ -210,13 +210,13 @@ idlergear config set KEY VAL      # Configure settings
 idlergear config get KEY          # Get config value
 ```
 
-### MCP Tools (62+ total - use via AI assistants)
+### MCP Tools (126 total - use via AI assistants)
 
 See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
 
 ## MCP Tools Reference
 
-IdlerGear provides **62+ MCP tools** across 8 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+IdlerGear provides **126 MCP tools** across 14 categories. All tools are **100% Python** with **zero Node.js dependencies**.
 
 ### Session Management (4 tools) ⚡ **Start here!**
 
@@ -393,7 +393,7 @@ vision = "github"    # Sync vision to repo
 - [Getting Started](https://github.com/marctjones/idlergear/wiki/Getting-Started) - Installation and setup
 - [Knowledge Types](https://github.com/marctjones/idlergear/wiki/Knowledge-Types) - All 6 knowledge types
 - [Commands Reference](https://github.com/marctjones/idlergear/wiki/Commands-Reference) - Full CLI reference
-- [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 62+ MCP tools
+- [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 126 MCP tools
 
 ### AI Assistant Guides
 - [AI Assistant Comparison](https://github.com/marctjones/idlergear/wiki/AI-Assistant-Comparison) - Feature comparison
