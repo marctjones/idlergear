@@ -13,6 +13,7 @@ import pytest
 
 from idlergear.backends.github import (
     GitHubBackendError,
+    GitHubDiscussionsNoteBackend,
     GitHubExploreBackend,
     GitHubTaskBackend,
     _map_issue_to_task,
@@ -438,3 +439,286 @@ class TestGitHubExploreBackend:
             assert "--label" in args
             label_idx = args.index("--label")
             assert args[label_idx + 1] == "exploration"
+
+
+class TestGitHubDiscussionsNoteBackend:
+    """Tests for GitHubDiscussionsNoteBackend."""
+
+    def test_discussions_not_enabled(self) -> None:
+        """Test error when discussions not enabled."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.return_value = "false"
+
+            with pytest.raises(GitHubBackendError) as exc_info:
+                backend.create("Test note")
+
+            assert "Discussions not enabled" in str(exc_info.value)
+
+    def test_list_when_discussions_disabled(self) -> None:
+        """Test list returns empty when discussions disabled."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.return_value = "false"
+
+            result = backend.list()
+            assert result == []
+
+    def test_get_when_discussions_disabled(self) -> None:
+        """Test get returns None when discussions disabled."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.return_value = "false"
+
+            result = backend.get(1)
+            assert result is None
+
+    def test_create_note(self) -> None:
+        """Test creating a note as a discussion."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.side_effect = [
+                "true",  # discussions enabled check
+                "R_repo123",  # get repo ID
+                json.dumps([{"id": "DIC_cat123", "name": "Ideas"}]),  # get categories
+                json.dumps(
+                    {
+                        "data": {
+                            "createDiscussion": {
+                                "discussion": {
+                                    "id": "D_disc123",
+                                    "number": 1,
+                                    "title": "Test note",
+                                    "body": "",
+                                    "createdAt": "2024-01-01T00:00:00Z",
+                                    "updatedAt": "2024-01-01T00:00:00Z",
+                                    "url": "https://github.com/owner/repo/discussions/1",
+                                }
+                            }
+                        }
+                    }
+                ),
+            ]
+
+            result = backend.create("Test note")
+
+            assert result["id"] == 1
+            assert "Test note" in result["content"]
+
+    def test_create_note_with_tags(self) -> None:
+        """Test creating a note with tags."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.side_effect = [
+                "true",  # discussions enabled check
+                "",  # label create for tag:explore
+                "R_repo123",  # get repo ID
+                json.dumps([{"id": "DIC_cat123", "name": "Ideas"}]),  # get categories
+                json.dumps(
+                    {
+                        "data": {
+                            "createDiscussion": {
+                                "discussion": {
+                                    "id": "D_disc123",
+                                    "number": 1,
+                                    "title": "Research idea",
+                                    "body": "Some details\n\n---\n_Tags: explore_",
+                                    "createdAt": "2024-01-01T00:00:00Z",
+                                    "updatedAt": "2024-01-01T00:00:00Z",
+                                    "url": "https://github.com/owner/repo/discussions/1",
+                                }
+                            }
+                        }
+                    }
+                ),
+            ]
+
+            result = backend.create("Research idea\nSome details", tags=["explore"])
+
+            assert result["id"] == 1
+            assert "explore" in result["tags"]
+
+    def test_list_notes(self) -> None:
+        """Test listing notes from discussions."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.side_effect = [
+                "true",  # discussions enabled check
+                json.dumps([{"id": "DIC_cat123", "name": "Ideas"}]),  # get categories
+                json.dumps(
+                    [
+                        {
+                            "id": "D_disc1",
+                            "number": 1,
+                            "title": "Note 1",
+                            "body": "",
+                            "createdAt": "2024-01-01T00:00:00Z",
+                            "updatedAt": "2024-01-01T00:00:00Z",
+                            "url": "https://github.com/owner/repo/discussions/1",
+                        },
+                        {
+                            "id": "D_disc2",
+                            "number": 2,
+                            "title": "Note 2",
+                            "body": "",
+                            "createdAt": "2024-01-02T00:00:00Z",
+                            "updatedAt": "2024-01-02T00:00:00Z",
+                            "url": "https://github.com/owner/repo/discussions/2",
+                        },
+                    ]
+                ),
+            ]
+
+            result = backend.list()
+
+            assert len(result) == 2
+            assert result[0]["id"] == 1
+            assert result[1]["id"] == 2
+
+    def test_list_notes_filtered_by_tag(self) -> None:
+        """Test filtering notes by tag."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.side_effect = [
+                "true",  # discussions enabled check
+                json.dumps([{"id": "DIC_cat123", "name": "Ideas"}]),  # get categories
+                json.dumps(
+                    [
+                        {
+                            "id": "D_disc1",
+                            "number": 1,
+                            "title": "Tagged note",
+                            "body": "Content\n\n---\n_Tags: explore_",
+                            "createdAt": "2024-01-01T00:00:00Z",
+                            "updatedAt": "2024-01-01T00:00:00Z",
+                            "url": "https://github.com/owner/repo/discussions/1",
+                        },
+                        {
+                            "id": "D_disc2",
+                            "number": 2,
+                            "title": "Untagged note",
+                            "body": "",
+                            "createdAt": "2024-01-02T00:00:00Z",
+                            "updatedAt": "2024-01-02T00:00:00Z",
+                            "url": "https://github.com/owner/repo/discussions/2",
+                        },
+                    ]
+                ),
+            ]
+
+            result = backend.list(tag="explore")
+
+            assert len(result) == 1
+            assert result[0]["id"] == 1
+
+    def test_get_note(self) -> None:
+        """Test getting a note by ID."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.side_effect = [
+                "true",  # discussions enabled check
+                json.dumps(
+                    {
+                        "id": "D_disc123",
+                        "number": 42,
+                        "title": "Test note",
+                        "body": "Body content",
+                        "createdAt": "2024-01-01T00:00:00Z",
+                        "updatedAt": "2024-01-01T00:00:00Z",
+                        "url": "https://github.com/owner/repo/discussions/42",
+                        "closed": False,
+                    }
+                ),
+            ]
+
+            result = backend.get(42)
+
+            assert result["id"] == 42
+            assert "Test note" in result["content"]
+            assert result["closed"] is False
+
+    def test_delete_note_closes_discussion(self) -> None:
+        """Test that delete closes the discussion."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            mock_run.side_effect = [
+                "true",  # discussions enabled check
+                json.dumps(
+                    {
+                        "id": "D_disc123",
+                        "number": 1,
+                        "title": "Test",
+                        "body": "",
+                        "createdAt": "",
+                        "updatedAt": "",
+                        "url": "",
+                        "closed": False,
+                    }
+                ),
+                json.dumps(
+                    {
+                        "data": {
+                            "closeDiscussion": {
+                                "discussion": {"id": "D_disc123", "closed": True}
+                            }
+                        }
+                    }
+                ),
+            ]
+
+            result = backend.delete(1)
+
+            assert result is True
+            # Verify close mutation was called
+            last_call_args = mock_run.call_args_list[-1][0][0]
+            assert "closeDiscussion" in str(last_call_args)
+
+    def test_map_to_note_extracts_tags(self) -> None:
+        """Test tag extraction from body."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        discussion = {
+            "number": 1,
+            "id": "D_abc",
+            "title": "Note with tags",
+            "body": "Content here\n\n---\n_Tags: explore, idea_",
+            "createdAt": "",
+            "updatedAt": "",
+            "url": "",
+        }
+
+        result = backend._map_to_note(discussion)
+
+        assert result["tags"] == ["explore", "idea"]
+        # Tags line should be removed from content
+        assert "---" not in result["content"]
+        assert "_Tags:" not in result["content"]
+
+    def test_map_to_note_without_tags(self) -> None:
+        """Test mapping when no tags present."""
+        backend = GitHubDiscussionsNoteBackend()
+
+        discussion = {
+            "number": 1,
+            "id": "D_abc",
+            "title": "Simple note",
+            "body": "Just content",
+            "createdAt": "",
+            "updatedAt": "",
+            "url": "",
+        }
+
+        result = backend._map_to_note(discussion)
+
+        assert result["tags"] == []
+        assert "Simple note" in result["content"]
+        assert "Just content" in result["content"]

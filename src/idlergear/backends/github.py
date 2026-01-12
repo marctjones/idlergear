@@ -1184,3 +1184,432 @@ class GitHubPlanBackend:
         # GitHub Projects v2 update is complex via GraphQL
         # For now, return the existing plan
         return self.get(name)
+
+
+class GitHubDiscussionsNoteBackend:
+    """GitHub Discussions as note backend.
+
+    Uses GitHub Discussions GraphQL API to store notes. Notes are stored in
+    a configurable category (default: "Ideas"). Tags are mapped to labels.
+
+    This provides cleaner separation between actionable work (Issues) and
+    ephemeral thinking/notes (Discussions).
+    """
+
+    DEFAULT_CATEGORY = "Ideas"  # Use Ideas category if Notes doesn't exist
+
+    def __init__(self, project_path: Path | None = None):
+        self.project_path = project_path
+        self._repo_id: str | None = None
+        self._category_id: str | None = None
+        self._discussions_enabled: bool | None = None
+
+    def _get_repo_id(self) -> str:
+        """Get the repository node ID for GraphQL."""
+        if self._repo_id:
+            return self._repo_id
+
+        output = _run_gh_command(
+            [
+                "api",
+                "graphql",
+                "-f",
+                'query={repository(owner:"{owner}", name:"{repo}") { id }}',
+                "--jq",
+                ".data.repository.id",
+            ]
+        )
+
+        if not output.strip():
+            raise GitHubBackendError("Could not get repository ID")
+
+        self._repo_id = output.strip()
+        return self._repo_id
+
+    def _get_category_id(self, category_name: str | None = None) -> str:
+        """Get the discussion category node ID.
+
+        Tries to find a "Notes" category first, falls back to "Ideas".
+        """
+        if self._category_id and category_name is None:
+            return self._category_id
+
+        # Query all discussion categories
+        output = _run_gh_command(
+            [
+                "api",
+                "graphql",
+                "-f",
+                'query={repository(owner:"{owner}", name:"{repo}") { '
+                "discussionCategories(first:20) { nodes { id name } } }}",
+                "--jq",
+                ".data.repository.discussionCategories.nodes",
+            ]
+        )
+
+        categories = _parse_json(output) or []
+        target_name = category_name or "Notes"
+
+        # Try to find the target category
+        for cat in categories:
+            if cat.get("name", "").lower() == target_name.lower():
+                self._category_id = cat["id"]
+                return self._category_id
+
+        # Fall back to Ideas category
+        for cat in categories:
+            if cat.get("name", "").lower() == self.DEFAULT_CATEGORY.lower():
+                self._category_id = cat["id"]
+                return self._category_id
+
+        # Use the first category if no match
+        if categories:
+            self._category_id = categories[0]["id"]
+            return self._category_id
+
+        raise GitHubBackendError("No discussion categories found. Enable discussions.")
+
+    def _check_discussions_enabled(self) -> bool:
+        """Check if discussions are enabled for the repository."""
+        if self._discussions_enabled is not None:
+            return self._discussions_enabled
+
+        try:
+            output = _run_gh_command(
+                [
+                    "api",
+                    "/repos/{owner}/{repo}",
+                    "--jq",
+                    ".has_discussions",
+                ]
+            )
+            self._discussions_enabled = output.strip().lower() == "true"
+        except GitHubBackendError:
+            self._discussions_enabled = False
+
+        return self._discussions_enabled
+
+    def _ensure_labels_exist(self, tags: list[str]) -> None:
+        """Ensure tag labels exist (tag:explore, tag:idea, etc.)."""
+        for tag in tags:
+            label_name = f"tag:{tag}"
+            try:
+                _run_gh_command(
+                    [
+                        "label",
+                        "create",
+                        label_name,
+                        "--description",
+                        f"IdlerGear note tag: {tag}",
+                        "--color",
+                        "C2E0C6",  # Light green
+                        "--force",
+                    ]
+                )
+            except GitHubBackendError:
+                pass  # Label might already exist
+
+    def create(
+        self,
+        content: str,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new note as a GitHub Discussion."""
+        if not self._check_discussions_enabled():
+            raise GitHubBackendError(
+                "Discussions not enabled. Enable in Settings → Features → Discussions"
+            )
+
+        if tags:
+            self._ensure_labels_exist(tags)
+
+        # Use first line as title, rest as body
+        lines = content.strip().split("\n", 1)
+        title = lines[0][:200] if lines else content[:200]
+        body = lines[1].strip() if len(lines) > 1 else ""
+
+        # Add tags as metadata at the end of body if present
+        if tags:
+            tags_line = f"\n\n---\n_Tags: {', '.join(tags)}_"
+            body += tags_line
+
+        repo_id = self._get_repo_id()
+        category_id = self._get_category_id()
+
+        # Create discussion using GraphQL mutation
+        mutation = """
+        mutation($repoId: ID!, $catId: ID!, $title: String!, $body: String!) {
+            createDiscussion(input: {
+                repositoryId: $repoId,
+                categoryId: $catId,
+                title: $title,
+                body: $body
+            }) {
+                discussion {
+                    id
+                    number
+                    title
+                    body
+                    createdAt
+                    updatedAt
+                    url
+                }
+            }
+        }
+        """
+
+        output = _run_gh_command(
+            [
+                "api",
+                "graphql",
+                "-f",
+                f"query={mutation}",
+                "-F",
+                f"repoId={repo_id}",
+                "-F",
+                f"catId={category_id}",
+                "-F",
+                f"title={title}",
+                "-F",
+                f"body={body}",
+            ]
+        )
+
+        result = _parse_json(output)
+        discussion = (
+            result.get("data", {}).get("createDiscussion", {}).get("discussion", {})
+        )
+
+        if not discussion:
+            errors = result.get("errors", [])
+            if errors:
+                raise GitHubBackendError(
+                    f"Failed to create discussion: {errors[0].get('message', 'Unknown error')}"
+                )
+            raise GitHubBackendError("Failed to create discussion")
+
+        return self._map_to_note(discussion, tags or [])
+
+    def list(self, tag: str | None = None) -> list[dict[str, Any]]:
+        """List notes (discussions), optionally filtered by tag."""
+        if not self._check_discussions_enabled():
+            return []
+
+        try:
+            category_id = self._get_category_id()
+        except GitHubBackendError:
+            return []
+
+        # Query discussions in the notes category
+        query = """
+        query($categoryId: ID!) {
+            repository(owner: "{owner}", name: "{repo}") {
+                discussions(first: 100, categoryId: $categoryId, orderBy: {field: CREATED_AT, direction: DESC}) {
+                    nodes {
+                        id
+                        number
+                        title
+                        body
+                        createdAt
+                        updatedAt
+                        url
+                    }
+                }
+            }
+        }
+        """
+
+        output = _run_gh_command(
+            [
+                "api",
+                "graphql",
+                "-f",
+                f"query={query}",
+                "-F",
+                f"categoryId={category_id}",
+                "--jq",
+                ".data.repository.discussions.nodes",
+            ]
+        )
+
+        discussions = _parse_json(output) or []
+        notes = []
+
+        for disc in discussions:
+            note = self._map_to_note(disc)
+            # Filter by tag if specified
+            if tag is None or tag in note.get("tags", []):
+                notes.append(note)
+
+        return notes
+
+    def get(self, note_id: int) -> dict[str, Any] | None:
+        """Get a note (discussion) by number."""
+        if not self._check_discussions_enabled():
+            return None
+
+        query = """
+        query($number: Int!) {
+            repository(owner: "{owner}", name: "{repo}") {
+                discussion(number: $number) {
+                    id
+                    number
+                    title
+                    body
+                    createdAt
+                    updatedAt
+                    url
+                    closed
+                }
+            }
+        }
+        """
+
+        try:
+            output = _run_gh_command(
+                [
+                    "api",
+                    "graphql",
+                    "-f",
+                    f"query={query}",
+                    "-F",
+                    f"number={note_id}",
+                    "--jq",
+                    ".data.repository.discussion",
+                ]
+            )
+
+            discussion = _parse_json(output)
+            if not discussion:
+                return None
+
+            return self._map_to_note(discussion)
+        except GitHubBackendError:
+            return None
+
+    def delete(self, note_id: int) -> bool:
+        """Delete a note (close the discussion).
+
+        Note: GitHub doesn't support deleting discussions via API,
+        so we close it instead (similar to how issue "delete" works).
+        """
+        note = self.get(note_id)
+        if not note:
+            return False
+
+        # Get the discussion node ID
+        node_id = note.get("node_id")
+        if not node_id:
+            return False
+
+        mutation = """
+        mutation($discussionId: ID!) {
+            closeDiscussion(input: {discussionId: $discussionId}) {
+                discussion {
+                    id
+                    closed
+                }
+            }
+        }
+        """
+
+        try:
+            _run_gh_command(
+                [
+                    "api",
+                    "graphql",
+                    "-f",
+                    f"query={mutation}",
+                    "-F",
+                    f"discussionId={node_id}",
+                ]
+            )
+            return True
+        except GitHubBackendError:
+            return False
+
+    def promote(self, note_id: int, to_type: str) -> dict[str, Any] | None:
+        """Promote a note (discussion) to another type.
+
+        For task: Creates a new GitHub issue with the discussion content.
+        For reference: Creates a wiki page with the discussion content.
+        """
+        note = self.get(note_id)
+        if not note:
+            return None
+
+        content = note.get("content", "")
+        lines = content.split("\n", 1)
+        title = lines[0][:80] if lines else content[:80]
+        body = lines[1].strip() if len(lines) > 1 else ""
+
+        try:
+            if to_type == "task":
+                # Create a GitHub issue
+                args = [
+                    "issue",
+                    "create",
+                    "--title",
+                    title,
+                    "--body",
+                    body,
+                ]
+                output = _run_gh_command(args)
+
+                # Parse issue number from URL
+                issue_number = _extract_issue_number_from_url(output)
+                if issue_number:
+                    # Close the discussion
+                    self.delete(note_id)
+                    return {
+                        "id": issue_number,
+                        "title": title,
+                        "body": body,
+                        "type": "task",
+                    }
+
+            elif to_type == "reference":
+                # For reference, we'd need to use the wiki backend
+                # For now, just return the note content
+                return {
+                    "id": note_id,
+                    "title": title,
+                    "body": body,
+                    "type": "reference",
+                }
+
+            return note
+        except GitHubBackendError:
+            return None
+
+    def _map_to_note(
+        self, discussion: dict[str, Any], tags: list[str] | None = None
+    ) -> dict[str, Any]:
+        """Map GitHub discussion to note format."""
+        title = discussion.get("title", "")
+        body = discussion.get("body", "")
+
+        # Reconstruct content from title and body
+        content = f"{title}\n{body}".strip() if body else title
+
+        # Extract tags from body (format: _Tags: explore, idea_)
+        extracted_tags = tags or []
+        if not extracted_tags and body:
+            import re
+
+            match = re.search(r"_Tags:\s*([^_]+)_", body)
+            if match:
+                extracted_tags = [t.strip() for t in match.group(1).split(",")]
+                # Remove the tags line from content
+                content = re.sub(r"\n*---\n_Tags:[^_]+_\s*$", "", content).strip()
+
+        return {
+            "id": discussion.get("number"),
+            "node_id": discussion.get("id"),
+            "content": content,
+            "tags": extracted_tags,
+            "created_at": discussion.get("createdAt", ""),
+            "updated_at": discussion.get("updatedAt", ""),
+            "url": discussion.get("url", ""),
+            "closed": discussion.get("closed", False),
+        }

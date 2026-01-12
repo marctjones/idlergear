@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from idlergear.backends.github import (
+    GitHubDiscussionsNoteBackend,
     GitHubExploreBackend,
     GitHubNoteBackend,
     GitHubPlanBackend,
@@ -32,7 +33,11 @@ BackendType = Literal["task", "note", "explore", "reference", "plan", "vision"]
 # Backend class registry (for built-in backends)
 _backend_classes: dict[str, dict[str, type]] = {
     "task": {"local": LocalTaskBackend, "github": GitHubTaskBackend},
-    "note": {"local": LocalNoteBackend, "github": GitHubNoteBackend},
+    "note": {
+        "local": LocalNoteBackend,
+        "github": GitHubNoteBackend,
+        "github-discussions": GitHubDiscussionsNoteBackend,
+    },
     "explore": {"local": LocalExploreBackend, "github": GitHubExploreBackend},
     "reference": {"local": LocalReferenceBackend, "github": GitHubReferenceBackend},
     "plan": {"local": LocalPlanBackend, "github": GitHubPlanBackend},
