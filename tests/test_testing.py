@@ -177,7 +177,9 @@ class TestDetectFramework:
     def test_detect_vitest(self, tmp_path):
         """Detect vitest from package.json (preferred over jest)."""
         package = tmp_path / "package.json"
-        package.write_text('{"devDependencies": {"vitest": "^1.0.0", "jest": "^29.0.0"}}')
+        package.write_text(
+            '{"devDependencies": {"vitest": "^1.0.0", "jest": "^29.0.0"}}'
+        )
 
         config = detect_framework(tmp_path)
         assert config.framework == "vitest"
@@ -419,11 +421,15 @@ Done.
 
     def test_parse_generic_infer_from_exit_code(self):
         """Infer result from exit code when output is unparseable."""
-        result = _parse_generic_output("unknown", "No recognizable output", "test", 1.0, 0)
+        result = _parse_generic_output(
+            "unknown", "No recognizable output", "test", 1.0, 0
+        )
         assert result.passed == 1
         assert result.total == 1
 
-        result = _parse_generic_output("unknown", "No recognizable output", "test", 1.0, 1)
+        result = _parse_generic_output(
+            "unknown", "No recognizable output", "test", 1.0, 1
+        )
         assert result.failed == 1
 
 
@@ -673,7 +679,7 @@ class TestCheckExternalTestRuns:
         """Handle project without cache files."""
         from idlergear.testing import check_external_test_runs
 
-        (tmp_path / "pyproject.toml").write_text('[tool.pytest]\n')
+        (tmp_path / "pyproject.toml").write_text("[tool.pytest]\n")
 
         runs = check_external_test_runs(tmp_path)
         assert runs == []
@@ -688,7 +694,7 @@ class TestCheckExternalTestRuns:
         import time
 
         # Set up project
-        (tmp_path / "pyproject.toml").write_text('[tool.pytest]\n')
+        (tmp_path / "pyproject.toml").write_text("[tool.pytest]\n")
         (tmp_path / ".idlergear").mkdir()
         (tmp_path / ".idlergear" / "tests").mkdir()
 
@@ -742,7 +748,9 @@ class TestParsePytestCache:
 
         cache = tmp_path / ".pytest_cache"
         (cache / "v" / "cache").mkdir(parents=True)
-        (cache / "v" / "cache" / "lastfailed").write_text('{"test_foo::test_bar": true}')
+        (cache / "v" / "cache" / "lastfailed").write_text(
+            '{"test_foo::test_bar": true}'
+        )
         (cache / "v" / "cache" / "nodeids").write_text('["test_a", "test_b"]')
 
         count, success = _parse_pytest_cache(cache)

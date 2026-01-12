@@ -17,7 +17,9 @@ class TestSyncResult:
 
     def test_str_with_pushed(self):
         """Result shows pushed items."""
-        result = SyncResult(pushed=["Page1", "Page2"], pulled=[], conflicts=[], errors=[])
+        result = SyncResult(
+            pushed=["Page1", "Page2"], pulled=[], conflicts=[], errors=[]
+        )
         output = str(result)
         assert "Pushed" in output
         assert "Page1" in output

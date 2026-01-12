@@ -38,7 +38,9 @@ class McpConfig:
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
-        return {"mcpServers": {name: srv.to_dict() for name, srv in self.servers.items()}}
+        return {
+            "mcpServers": {name: srv.to_dict() for name, srv in self.servers.items()}
+        }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "McpConfig":
@@ -104,7 +106,13 @@ def get_claude_code_config_path() -> Path:
     system = platform.system()
 
     if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Claude"
+            / "claude_desktop_config.json"
+        )
     elif system == "Windows":
         appdata = os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming"))
         return Path(appdata) / "Claude" / "claude_desktop_config.json"
@@ -150,11 +158,15 @@ def validate_mcp_config(config: McpConfig) -> ConfigValidationResult:
         if not shutil.which(server.command):
             # Check if it's a path
             if not Path(server.command).exists():
-                warnings.append(f"Server '{name}': command '{server.command}' not found in PATH")
+                warnings.append(
+                    f"Server '{name}': command '{server.command}' not found in PATH"
+                )
 
         # Validate type
         if server.type not in ("stdio", "sse", "http"):
-            issues.append(f"Server '{name}': invalid type '{server.type}' (must be stdio, sse, or http)")
+            issues.append(
+                f"Server '{name}': invalid type '{server.type}' (must be stdio, sse, or http)"
+            )
 
     return ConfigValidationResult(
         valid=len(issues) == 0,
@@ -199,7 +211,10 @@ def add_server_to_config(
         config = McpConfig()
 
     if server.name in config.servers and not overwrite:
-        return False, f"Server '{server.name}' already exists. Use --overwrite to replace."
+        return (
+            False,
+            f"Server '{server.name}' already exists. Use --overwrite to replace.",
+        )
 
     config.servers[server.name] = server
     config.save(config_path)
@@ -242,7 +257,9 @@ class McpTestResult:
     server_info: Optional[dict] = None
 
 
-async def test_mcp_server(server: McpServerConfig, timeout: float = 5.0) -> McpTestResult:
+async def test_mcp_server(
+    server: McpServerConfig, timeout: float = 5.0
+) -> McpTestResult:
     """Test if an MCP server is working by attempting to initialize it.
 
     This spawns the server process and sends an initialize request.

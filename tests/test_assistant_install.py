@@ -38,28 +38,36 @@ class TestDetectInstalledAssistants:
     @patch("shutil.which")
     def test_detect_claude(self, mock_which):
         """Detect Claude Code when installed."""
-        mock_which.side_effect = lambda cmd: "/usr/bin/claude" if cmd == "claude" else None
+        mock_which.side_effect = (
+            lambda cmd: "/usr/bin/claude" if cmd == "claude" else None
+        )
         detected = detect_installed_assistants()
         assert Assistant.CLAUDE in detected
 
     @patch("shutil.which")
     def test_detect_gemini(self, mock_which):
         """Detect Gemini CLI when installed."""
-        mock_which.side_effect = lambda cmd: "/usr/bin/gemini" if cmd == "gemini" else None
+        mock_which.side_effect = (
+            lambda cmd: "/usr/bin/gemini" if cmd == "gemini" else None
+        )
         detected = detect_installed_assistants()
         assert Assistant.GEMINI in detected
 
     @patch("shutil.which")
     def test_detect_aider(self, mock_which):
         """Detect Aider when installed."""
-        mock_which.side_effect = lambda cmd: "/usr/bin/aider" if cmd == "aider" else None
+        mock_which.side_effect = (
+            lambda cmd: "/usr/bin/aider" if cmd == "aider" else None
+        )
         detected = detect_installed_assistants()
         assert Assistant.AIDER in detected
 
     @patch("shutil.which")
     def test_detect_goose(self, mock_which):
         """Detect Goose when installed."""
-        mock_which.side_effect = lambda cmd: "/usr/bin/goose" if cmd == "goose" else None
+        mock_which.side_effect = (
+            lambda cmd: "/usr/bin/goose" if cmd == "goose" else None
+        )
         detected = detect_installed_assistants()
         assert Assistant.GOOSE in detected
 
@@ -111,7 +119,9 @@ class TestInstallForAssistant:
         # Initialize IdlerGear first
         (tmp_path / ".idlergear").mkdir()
 
-        with patch("idlergear.assistant_install.add_mcp_to_gemini_settings") as mock_mcp:
+        with patch(
+            "idlergear.assistant_install.add_mcp_to_gemini_settings"
+        ) as mock_mcp:
             mock_mcp.return_value = True
             results = install_for_assistant(Assistant.GEMINI, tmp_path)
 
@@ -123,7 +133,9 @@ class TestInstallForAssistant:
         (tmp_path / ".idlergear").mkdir()
         (tmp_path / "GEMINI.md").write_text("# Existing\n")
 
-        with patch("idlergear.assistant_install.add_mcp_to_gemini_settings") as mock_mcp:
+        with patch(
+            "idlergear.assistant_install.add_mcp_to_gemini_settings"
+        ) as mock_mcp:
             mock_mcp.return_value = False
             results = install_for_assistant(Assistant.GEMINI, tmp_path)
 

@@ -36,7 +36,9 @@ class TestMcpServerConfig:
 
     def test_to_dict_with_args(self):
         """to_dict includes args when present."""
-        config = McpServerConfig(name="test", command="test-cmd", args=["--flag", "value"])
+        config = McpServerConfig(
+            name="test", command="test-cmd", args=["--flag", "value"]
+        )
         result = config.to_dict()
         assert result["args"] == ["--flag", "value"]
 
@@ -180,9 +182,7 @@ class TestValidation:
 
     def test_empty_command(self):
         """Empty command is an error."""
-        config = McpConfig(
-            servers={"test": McpServerConfig(name="test", command="")}
-        )
+        config = McpConfig(servers={"test": McpServerConfig(name="test", command="")})
         result = validate_mcp_config(config)
         assert not result.valid
         assert any("no command" in issue for issue in result.issues)
@@ -190,7 +190,9 @@ class TestValidation:
     def test_invalid_type(self):
         """Invalid type is an error."""
         config = McpConfig(
-            servers={"test": McpServerConfig(name="test", command="cmd", type="invalid")}
+            servers={
+                "test": McpServerConfig(name="test", command="cmd", type="invalid")
+            }
         )
         result = validate_mcp_config(config)
         assert not result.valid

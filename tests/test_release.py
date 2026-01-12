@@ -90,22 +90,24 @@ class TestListReleases:
         """List releases parses JSON output."""
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout=json.dumps([
-                {
-                    "tagName": "v1.0.0",
-                    "name": "Version 1.0.0",
-                    "publishedAt": "2024-01-15T10:30:00Z",
-                    "isDraft": False,
-                    "isPrerelease": False,
-                },
-                {
-                    "tagName": "v0.9.0",
-                    "name": None,
-                    "publishedAt": None,
-                    "isDraft": True,
-                    "isPrerelease": False,
-                },
-            ])
+            stdout=json.dumps(
+                [
+                    {
+                        "tagName": "v1.0.0",
+                        "name": "Version 1.0.0",
+                        "publishedAt": "2024-01-15T10:30:00Z",
+                        "isDraft": False,
+                        "isPrerelease": False,
+                    },
+                    {
+                        "tagName": "v0.9.0",
+                        "name": None,
+                        "publishedAt": None,
+                        "isDraft": True,
+                        "isPrerelease": False,
+                    },
+                ]
+            ),
         )
 
         releases = list_releases(limit=10)
@@ -135,15 +137,17 @@ class TestGetRelease:
         """Get release returns Release object."""
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout=json.dumps({
-                "tagName": "v1.0.0",
-                "name": "Version 1.0.0",
-                "publishedAt": "2024-01-15T10:30:00Z",
-                "isDraft": False,
-                "isPrerelease": False,
-                "body": "Notes",
-                "url": "https://example.com",
-            })
+            stdout=json.dumps(
+                {
+                    "tagName": "v1.0.0",
+                    "name": "Version 1.0.0",
+                    "publishedAt": "2024-01-15T10:30:00Z",
+                    "isDraft": False,
+                    "isPrerelease": False,
+                    "body": "Notes",
+                    "url": "https://example.com",
+                }
+            ),
         )
 
         release = get_release("v1.0.0")

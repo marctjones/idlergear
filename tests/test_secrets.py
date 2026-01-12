@@ -353,7 +353,7 @@ class TestEnvFileParsing:
     def test_import_quoted_values(self, tmp_path):
         """Quoted values have quotes removed."""
         env_file = tmp_path / ".env"
-        env_file.write_text('DOUBLE="double quoted"\nSINGLE=\'single quoted\'\n')
+        env_file.write_text("DOUBLE=\"double quoted\"\nSINGLE='single quoted'\n")
 
         manager = SecretsManager(tmp_path)
         manager.initialize("password")

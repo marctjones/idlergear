@@ -216,3 +216,17 @@ def search_references(
             results.append(ref)
 
     return results
+
+
+def delete_reference(title: str, project_path: Path | None = None) -> bool:
+    """Delete a reference by title.
+
+    Returns True if deleted, False if not found.
+    """
+    ref = get_reference(title, project_path)
+    if ref is None:
+        return False
+
+    filepath = Path(ref["path"])
+    filepath.unlink()
+    return True

@@ -117,7 +117,12 @@ RUST_TEMPLATE = LanguageTemplate(
 
 JAVASCRIPT_TEMPLATE = LanguageTemplate(
     language=Language.JAVASCRIPT,
-    detection_files=["package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"],
+    detection_files=[
+        "package.json",
+        "package-lock.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+    ],
     commands={
         "install": {"cmd": "npm install", "desc": "Install dependencies"},
         "test": {"cmd": "npm test", "desc": "Run tests"},

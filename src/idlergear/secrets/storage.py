@@ -199,7 +199,9 @@ class EncryptedStorage:
         self.secrets_file.write_bytes(encrypted)
         os.chmod(self.secrets_file, 0o600)
 
-    def set(self, name: str, value: str, metadata: Optional[dict] = None) -> SecretEntry:
+    def set(
+        self, name: str, value: str, metadata: Optional[dict] = None
+    ) -> SecretEntry:
         """Set a secret value.
 
         Args:

@@ -2328,6 +2328,9 @@ def task_list(
     priority: str = typer.Option(
         None, "--priority", "-p", help="Filter by priority: high, medium, low"
     ),
+    labels: list[str] = typer.Option(
+        [], "--label", "-l", help="Filter by labels (can specify multiple)"
+    ),
     limit: int = typer.Option(None, "--limit", "-n", help="Limit number of results"),
     preview: bool = typer.Option(
         False,
@@ -2342,6 +2345,7 @@ def task_list(
         idlergear task list --limit 5        # Top 5 tasks only
         idlergear task list --preview        # Titles only (minimal tokens)
         idlergear task list --state all      # Include closed tasks
+        idlergear task list --label bug      # Only bug tasks
     """
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
@@ -2359,6 +2363,14 @@ def task_list(
     # Filter by priority if specified
     if priority:
         tasks = [t for t in tasks if t.get("priority") == priority]
+
+    # Filter by labels if specified
+    if labels:
+        tasks = [
+            t
+            for t in tasks
+            if any(label in t.get("labels", []) for label in labels)
+        ]
 
     # Apply limit if specified
     if limit:
@@ -2459,6 +2471,28 @@ def task_edit(
     typer.secho(f"Updated task #{task_id}", fg=typer.colors.GREEN)
 
 
+@task_app.command("reopen")
+def task_reopen(task_id: int):
+    """Reopen a closed task."""
+    from idlergear.backends.registry import get_backend
+    from idlergear.config import find_idlergear_root
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    backend = get_backend("task")
+    task = backend.reopen(task_id)
+    if task is None:
+        typer.secho(f"Task #{task_id} not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.secho(f"Reopened task #{task_id}: {task['title']}", fg=typer.colors.GREEN)
+
+
 @task_app.command("sync")
 def task_sync(target: str = typer.Argument("github")):
     """Sync tasks with remote."""
@@ -2531,6 +2565,41 @@ def note_show(ctx: typer.Context, note_id: int):
             raise typer.Exit(1)
 
     display(note, ctx.obj.output_format, "note")
+
+
+@note_app.command("edit")
+def note_edit(
+    note_id: int,
+    content: str = typer.Option(None, "--content", "-c", help="New content"),
+    tag: list[str] = typer.Option([], "--tag", "-t", help="Replace tags"),
+    add_tag: list[str] = typer.Option([], "--add-tag", help="Add tags"),
+):
+    """Edit a note."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.notes import get_note, update_note
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    # Determine new tags
+    tags = None
+    if tag:
+        tags = list(tag)
+    elif add_tag:
+        current = get_note(note_id)
+        if current:
+            tags = list(set(current.get("tags", []) + list(add_tag)))
+
+    note = update_note(note_id, content=content, tags=tags)
+    if note is None:
+        typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.secho(f"Updated note #{note_id}", fg=typer.colors.GREEN)
 
 
 @note_app.command("delete")
@@ -2862,6 +2931,73 @@ def plan_switch(name: str):
     typer.secho(f"Switched to plan: {plan['name']}", fg=typer.colors.GREEN)
 
 
+@plan_app.command("edit")
+def plan_edit(
+    name: str,
+    title: str = typer.Option(None, "--title", "-t", help="New title"),
+    body: str = typer.Option(None, "--body", "-b", help="New body"),
+    state: str = typer.Option(None, "--state", "-s", help="New state: active, completed"),
+):
+    """Edit a plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import update_plan
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    plan = update_plan(name, title=title, body=body, state=state)
+    if plan is None:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.secho(f"Updated plan: {plan['name']}", fg=typer.colors.GREEN)
+
+
+@plan_app.command("delete")
+def plan_delete(name: str):
+    """Delete a plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import delete_plan
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    if delete_plan(name):
+        typer.secho(f"Deleted plan: {name}", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("complete")
+def plan_complete(name: str):
+    """Mark a plan as completed."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import complete_plan
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    plan = complete_plan(name)
+    if plan is None:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.secho(f"Completed plan: {plan['name']}", fg=typer.colors.GREEN)
+
+
 @plan_app.command("sync")
 def plan_sync(target: str = typer.Argument("github")):
     """Sync plans with remote."""
@@ -2951,6 +3087,26 @@ def reference_edit(
         raise typer.Exit(1)
 
     typer.secho(f"Updated reference: {ref['title']}", fg=typer.colors.GREEN)
+
+
+@reference_app.command("delete")
+def reference_delete(title: str):
+    """Delete a reference document."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.reference import delete_reference
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    if delete_reference(title):
+        typer.secho(f"Deleted reference: {title}", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"Reference '{title}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 @reference_app.command("search")
@@ -3304,6 +3460,72 @@ def run_stop(name: str):
     else:
         typer.secho(f"Run '{name}' is not running or not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
+
+
+@run_app.command("delete")
+def run_delete(name: str):
+    """Delete a run and its logs."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.runs import delete_run
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    if delete_run(name):
+        typer.secho(f"Deleted run '{name}'", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"Run '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@run_app.command("cleanup")
+def run_cleanup(
+    older_than: int = typer.Option(
+        7, "--older-than", "-d", help="Delete runs older than N days (default: 7)"
+    ),
+    status: str = typer.Option(
+        None, "--status", "-s", help="Only delete runs with this status (e.g., stopped, failed)"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be deleted without deleting"
+    ),
+):
+    """Clean up old runs.
+
+    Examples:
+        idlergear run cleanup                    # Delete runs older than 7 days
+        idlergear run cleanup --older-than 30   # Delete runs older than 30 days
+        idlergear run cleanup --status failed    # Only delete failed runs
+        idlergear run cleanup --dry-run          # Preview what would be deleted
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.runs import cleanup_runs
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    deleted = cleanup_runs(older_than_days=older_than, status=status, dry_run=dry_run)
+
+    if not deleted:
+        typer.echo("No runs to clean up.")
+        return
+
+    action = "Would delete" if dry_run else "Deleted"
+    for name in deleted:
+        typer.echo(f"  {action}: {name}")
+
+    typer.secho(
+        f"{action} {len(deleted)} run(s)",
+        fg=typer.colors.YELLOW if dry_run else typer.colors.GREEN,
+    )
 
 
 @run_app.command("exec")

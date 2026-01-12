@@ -778,7 +778,11 @@ class TestAgentCoordination:
             # Update status to busy
             result = await client.call(
                 "agent.update_status",
-                {"agent_id": "test-agent", "status": "busy", "current_task": "task-123"},
+                {
+                    "agent_id": "test-agent",
+                    "status": "busy",
+                    "current_task": "task-123",
+                },
             )
             assert result["success"] is True
 
@@ -836,8 +840,12 @@ class TestAgentCoordination:
             assert work2["priority"] == 1
 
             # Complete work
-            await clients[0].call("queue.complete", {"id": cmd1["id"], "result": {"done": True}})
-            await clients[1].call("queue.complete", {"id": cmd2["id"], "result": {"done": True}})
+            await clients[0].call(
+                "queue.complete", {"id": cmd1["id"], "result": {"done": True}}
+            )
+            await clients[1].call(
+                "queue.complete", {"id": cmd2["id"], "result": {"done": True}}
+            )
 
             # No more pending commands
             work3 = await clients[0].call("queue.poll", {"agent_id": "agent-1"})
@@ -879,7 +887,9 @@ class TestAgentCoordination:
             assert result["acquired"] is False
 
             # Check lock status
-            result = await clients[1].call("lock.is_locked", {"resource": "src/main.py"})
+            result = await clients[1].call(
+                "lock.is_locked", {"resource": "src/main.py"}
+            )
             assert result["is_locked"] is True
             assert result["lock"]["agent_id"] == "agent-1"
 

@@ -27,7 +27,9 @@ class Release:
         return {
             "tag": self.tag,
             "name": self.name,
-            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "published_at": self.published_at.isoformat()
+            if self.published_at
+            else None,
             "is_draft": self.is_draft,
             "is_prerelease": self.is_prerelease,
             "body": self.body,
@@ -74,9 +76,13 @@ def list_releases(limit: int = 10) -> list[Release]:
     """
     result = subprocess.run(
         [
-            "gh", "release", "list",
-            "--limit", str(limit),
-            "--json", "tagName,name,publishedAt,isDraft,isPrerelease",
+            "gh",
+            "release",
+            "list",
+            "--limit",
+            str(limit),
+            "--json",
+            "tagName,name,publishedAt,isDraft,isPrerelease",
         ],
         capture_output=True,
         text=True,
@@ -99,15 +105,17 @@ def list_releases(limit: int = 10) -> list[Release]:
             except ValueError:
                 pass
 
-        releases.append(Release(
-            tag=item["tagName"],
-            name=item.get("name") or item["tagName"],
-            published_at=published_at,
-            is_draft=item.get("isDraft", False),
-            is_prerelease=item.get("isPrerelease", False),
-            body=None,  # Not available in list, use get_release for full details
-            url=None,
-        ))
+        releases.append(
+            Release(
+                tag=item["tagName"],
+                name=item.get("name") or item["tagName"],
+                published_at=published_at,
+                is_draft=item.get("isDraft", False),
+                is_prerelease=item.get("isPrerelease", False),
+                body=None,  # Not available in list, use get_release for full details
+                url=None,
+            )
+        )
 
     return releases
 
@@ -123,8 +131,12 @@ def get_release(tag: str) -> Optional[Release]:
     """
     result = subprocess.run(
         [
-            "gh", "release", "view", tag,
-            "--json", "tagName,name,publishedAt,isDraft,isPrerelease,body,url",
+            "gh",
+            "release",
+            "view",
+            tag,
+            "--json",
+            "tagName,name,publishedAt,isDraft,isPrerelease,body,url",
         ],
         capture_output=True,
         text=True,
@@ -243,7 +255,10 @@ def run_version_command(project_path: Optional[Path] = None) -> tuple[bool, str]
 
     version_command = get_config_value("release.version_command")
     if not version_command:
-        return False, "No version_command configured. Set release.version_command in config."
+        return (
+            False,
+            "No version_command configured. Set release.version_command in config.",
+        )
 
     try:
         result = subprocess.run(

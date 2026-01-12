@@ -503,6 +503,101 @@ def stop_run(name: str, project_path: Path | None = None) -> bool:
         return False
 
 
+def delete_run(name: str, project_path: Path | None = None) -> bool:
+    """Delete a run and its logs.
+
+    Stops the run first if it's still running.
+    Returns True if deleted, False if not found.
+    """
+    import shutil
+
+    runs_dir = get_runs_dir(project_path)
+    if runs_dir is None:
+        return False
+
+    run_dir = runs_dir / name
+    if not run_dir.exists():
+        return False
+
+    # Stop if running
+    run = get_run_info(name, project_path)
+    if run and run["status"] == "running":
+        stop_run(name, project_path)
+
+    # Delete the directory
+    shutil.rmtree(run_dir)
+    return True
+
+
+def cleanup_runs(
+    older_than_days: int = 7,
+    status: str | None = None,
+    dry_run: bool = False,
+    project_path: Path | None = None,
+) -> list[str]:
+    """Clean up old runs.
+
+    Args:
+        older_than_days: Delete runs older than this many days (default 7)
+        status: Only delete runs with this status (e.g., 'stopped', 'failed')
+        dry_run: If True, only list what would be deleted
+        project_path: Optional project path
+
+    Returns list of deleted (or would-be-deleted) run names.
+    """
+    import shutil
+    from datetime import datetime, timedelta, timezone
+
+    runs_dir = get_runs_dir(project_path)
+    if runs_dir is None or not runs_dir.exists():
+        return []
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+    deleted = []
+
+    for run_dir in runs_dir.iterdir():
+        if not run_dir.is_dir():
+            continue
+
+        run = get_run_info(run_dir.name, project_path)
+        if run is None:
+            continue
+
+        # Skip if still running
+        if run["status"] == "running":
+            continue
+
+        # Filter by status if specified
+        if status and run["status"] != status:
+            continue
+
+        # Check age using metadata or directory mtime
+        metadata_file = run_dir / "metadata.json"
+        try:
+            if metadata_file.exists():
+                metadata = json.loads(metadata_file.read_text())
+                started = metadata.get("started", "")
+                if started:
+                    run_time = datetime.fromisoformat(started.replace("Z", "+00:00"))
+                else:
+                    run_time = datetime.fromtimestamp(
+                        metadata_file.stat().st_mtime, tz=timezone.utc
+                    )
+            else:
+                run_time = datetime.fromtimestamp(
+                    run_dir.stat().st_mtime, tz=timezone.utc
+                )
+        except (json.JSONDecodeError, ValueError):
+            run_time = datetime.fromtimestamp(run_dir.stat().st_mtime, tz=timezone.utc)
+
+        if run_time < cutoff:
+            if not dry_run:
+                shutil.rmtree(run_dir)
+            deleted.append(run_dir.name)
+
+    return deleted
+
+
 # =============================================================================
 # PTY Runner for External Terminal Tracking (#148)
 # =============================================================================

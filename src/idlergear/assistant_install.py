@@ -285,11 +285,13 @@ def add_mcp_to_goose_config() -> bool:
             return False
 
     # Add IdlerGear
-    mcp_list.append({
-        "name": "idlergear",
-        "type": "stdio",
-        "command": "idlergear-mcp",
-    })
+    mcp_list.append(
+        {
+            "name": "idlergear",
+            "type": "stdio",
+            "command": "idlergear-mcp",
+        }
+    )
 
     with open(config_path, "w") as f:
         yaml.dump(config, f, default_flow_style=False)

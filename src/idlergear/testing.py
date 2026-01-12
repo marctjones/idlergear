@@ -1034,9 +1034,7 @@ def _enumerate_pytest_files(project_path: Path) -> TestEnumeration:
         framework=TestFramework.PYTEST.value,
         timestamp=now_iso(),
         test_files=sorted(test_files),
-        test_items=[
-            TestItem(name=f, file=f, kind="file") for f in sorted(test_files)
-        ],
+        test_items=[TestItem(name=f, file=f, kind="file") for f in sorted(test_files)],
         total_files=len(test_files),
         total_tests=len(test_files),  # Approximate - one per file
     )
@@ -1066,8 +1064,12 @@ def _enumerate_cargo(project_path: Path) -> TestEnumeration:
             test_items.append(TestItem(name=test_name, file="", kind="function"))
 
     # Find test files
-    test_files = [str(p.relative_to(project_path)) for p in project_path.rglob("*_test.rs")]
-    test_files.extend(str(p.relative_to(project_path)) for p in project_path.rglob("tests/*.rs"))
+    test_files = [
+        str(p.relative_to(project_path)) for p in project_path.rglob("*_test.rs")
+    ]
+    test_files.extend(
+        str(p.relative_to(project_path)) for p in project_path.rglob("tests/*.rs")
+    )
 
     return TestEnumeration(
         framework=TestFramework.CARGO.value,
@@ -1120,7 +1122,9 @@ def _enumerate_go(project_path: Path) -> TestEnumeration:
         if line.startswith("Test") or line.startswith("Benchmark"):
             test_items.append(TestItem(name=line, file="", kind="function"))
 
-    test_files = [str(p.relative_to(project_path)) for p in project_path.rglob("*_test.go")]
+    test_files = [
+        str(p.relative_to(project_path)) for p in project_path.rglob("*_test.go")
+    ]
 
     return TestEnumeration(
         framework=TestFramework.GO.value,
@@ -1134,7 +1138,9 @@ def _enumerate_go(project_path: Path) -> TestEnumeration:
 
 def _enumerate_go_files(project_path: Path) -> TestEnumeration:
     """Fallback: enumerate Go test files."""
-    test_files = [str(p.relative_to(project_path)) for p in project_path.rglob("*_test.go")]
+    test_files = [
+        str(p.relative_to(project_path)) for p in project_path.rglob("*_test.go")
+    ]
 
     return TestEnumeration(
         framework=TestFramework.GO.value,
@@ -1204,8 +1210,12 @@ def _enumerate_dotnet(project_path: Path) -> TestEnumeration:
         if in_test_list and line:
             test_items.append(TestItem(name=line, file="", kind="function"))
 
-    test_files = [str(p.relative_to(project_path)) for p in project_path.rglob("*Tests.cs")]
-    test_files.extend(str(p.relative_to(project_path)) for p in project_path.rglob("*Test.cs"))
+    test_files = [
+        str(p.relative_to(project_path)) for p in project_path.rglob("*Tests.cs")
+    ]
+    test_files.extend(
+        str(p.relative_to(project_path)) for p in project_path.rglob("*Test.cs")
+    )
 
     return TestEnumeration(
         framework=TestFramework.DOTNET.value,
@@ -1415,7 +1425,11 @@ def _get_source_files(project_path: Path, framework: str) -> list[str]:
         for pattern in ["src/**/*.js", "src/**/*.ts", "src/**/*.jsx", "src/**/*.tsx"]:
             for path in project_path.glob(pattern):
                 rel = str(path.relative_to(project_path))
-                if ".test." not in rel and ".spec." not in rel and "node_modules" not in rel:
+                if (
+                    ".test." not in rel
+                    and ".spec." not in rel
+                    and "node_modules" not in rel
+                ):
                     source_files.append(rel)
 
     elif framework == TestFramework.DOTNET.value:
@@ -1463,7 +1477,12 @@ def _find_tests_for_source(
                 matches.append(test_file)
 
         elif framework in (TestFramework.JEST.value, TestFramework.VITEST.value):
-            base_name = source_name.replace(".tsx", "").replace(".jsx", "").replace(".ts", "").replace(".js", "")
+            base_name = (
+                source_name.replace(".tsx", "")
+                .replace(".jsx", "")
+                .replace(".ts", "")
+                .replace(".js", "")
+            )
             if base_name in test_name:
                 matches.append(test_file)
 
@@ -1478,7 +1497,9 @@ def _find_tests_for_source(
     return matches
 
 
-def save_coverage_map(coverage_map: CoverageMap, project_path: Path | None = None) -> None:
+def save_coverage_map(
+    coverage_map: CoverageMap, project_path: Path | None = None
+) -> None:
     """Save coverage map to cache."""
     tests_dir = get_tests_dir(project_path)
     if tests_dir is None:

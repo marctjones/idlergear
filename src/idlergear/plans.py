@@ -173,3 +173,31 @@ def update_plan(
     filepath.write_text(new_content)
 
     return load_plan_from_file(filepath)
+
+
+def delete_plan(name: str, project_path: Path | None = None) -> bool:
+    """Delete a plan by name.
+
+    Returns True if deleted, False if not found.
+    """
+    plan = get_plan(name, project_path)
+    if plan is None:
+        return False
+
+    filepath = Path(plan["path"])
+    filepath.unlink()
+
+    # Clear current plan if it was the deleted plan
+    current = get_current_plan(project_path)
+    if current and current.get("name") == name:
+        set_config_value("plan.current", None, project_path)
+
+    return True
+
+
+def complete_plan(name: str, project_path: Path | None = None) -> dict[str, Any] | None:
+    """Mark a plan as completed.
+
+    Returns the updated plan data, or None if not found.
+    """
+    return update_plan(name, state="completed", project_path=project_path)

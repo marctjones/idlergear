@@ -124,7 +124,9 @@ class SecretsManager:
             )
         return self._storage
 
-    def set(self, name: str, value: str, metadata: Optional[dict] = None) -> SecretEntry:
+    def set(
+        self, name: str, value: str, metadata: Optional[dict] = None
+    ) -> SecretEntry:
         """Set a secret.
 
         Args:
@@ -216,7 +218,9 @@ class SecretsManager:
 
         for name, value in sorted(secrets.items()):
             # Escape special characters in value
-            escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            escaped = (
+                value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            )
             lines.append(f'{name}="{escaped}"')
 
         path.write_text("\n".join(lines) + "\n")

@@ -1,6 +1,5 @@
 """Tests for AGENTS.md generation and management."""
 
-
 from idlergear.agents import (
     Language,
     TEMPLATES,

@@ -127,6 +127,49 @@ def get_note(note_id: int, project_path: Path | None = None) -> dict[str, Any] |
     return None
 
 
+def update_note(
+    note_id: int,
+    content: str | None = None,
+    tags: list[str] | None = None,
+    project_path: Path | None = None,
+) -> dict[str, Any] | None:
+    """Update a note.
+
+    Args:
+        note_id: The note ID
+        content: New content (None to keep existing)
+        tags: New tags (None to keep existing)
+        project_path: Optional project path
+
+    Returns the updated note data, or None if not found.
+    """
+    note = get_note(note_id, project_path)
+    if note is None:
+        return None
+
+    filepath = Path(note["path"])
+    file_content = filepath.read_text()
+    frontmatter, old_content = parse_frontmatter(file_content)
+
+    # Update tags if provided
+    if tags is not None:
+        frontmatter["tags"] = tags
+
+    # Use new content or keep old
+    new_content = content if content is not None else old_content.strip()
+
+    new_file_content = render_frontmatter(frontmatter, new_content.strip() + "\n")
+    filepath.write_text(new_file_content)
+
+    return {
+        "id": note_id,
+        "content": new_content.strip(),
+        "tags": frontmatter.get("tags", []),
+        "created": frontmatter.get("created"),
+        "path": str(filepath),
+    }
+
+
 def delete_note(note_id: int, project_path: Path | None = None) -> bool:
     """Delete a note by ID.
 
