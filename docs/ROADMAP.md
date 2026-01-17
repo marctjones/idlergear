@@ -2,15 +2,16 @@
 
 ## Executive Summary
 
-**Total Open Issues:** 33
-- **Actionable Features:** 22
-- **Research/Notes:** 11 (knowledge capture, not blocking)
+**Total Open Issues:** 22
+- **Actionable Features:** 21
+- **Research/Notes:** 1 (knowledge capture, not blocking)
 
-**Current Version:** v0.3.68
+**Current Version:** v0.3.69
 
 **Recent Additions:**
-- #261 - Review official MCP servers (v0.6.0)
+- #263 - Priorities registry (v0.6.0) ⭐ NEW
 - #262 - Review AI assistant tools (v0.5.0)
+- #261 - Review official MCP servers (v0.6.0)
 
 ---
 
@@ -99,29 +100,33 @@
 **Priority:** Medium (team collaboration focus)
 **Target:** Q3 2026
 
-**Issues (4):**
-1. **#260** - Clarify Plans vs Milestones vs Projects vs Meta-Issues [HIGH] ⭐ NEW
-2. **#261** - Review official MCP servers for integration opportunities [medium] ⭐ NEW
-3. **#257** - GitHub Projects v2 Integration [medium → HIGH]
-4. **#256** - Report issues to upstream projects with AI disclaimer [medium]
+**Issues (5):**
+1. **#260** - Clarify Plans vs Milestones vs Projects vs Meta-Issues [HIGH] ⭐
+2. **#263** - Implement project priorities registry [HIGH] ⭐ NEW
+3. **#261** - Review official MCP servers for integration opportunities [medium] ⭐
+4. **#257** - GitHub Projects v2 Integration [HIGH]
+5. **#256** - Report issues to upstream projects with AI disclaimer [medium]
 
 **Dependencies:**
 - ✅ GitHub backend (fully implemented)
 - ✅ Label management (#206, #207, #209 - COMPLETE)
 
 **Implementation Order:**
-1. #260 - Clarify planning concepts (foundational, informs #257)
-2. #261 - Survey MCP servers (especially GitHub MCP, informs #257)
-3. #257 - Projects v2 sync (implements visual project management)
-4. #256 - Upstream issue reporting (builds on GitHub backend)
+1. #260 - Clarify planning concepts (foundational, informs all others)
+2. #263 - Priorities registry (defines what matters, informs #257)
+3. #261 - Survey MCP servers (especially GitHub MCP, informs #257)
+4. #257 - Projects v2 sync (implements visual project management with priorities)
+5. #256 - Upstream issue reporting (builds on GitHub backend)
 
 **Key Features:**
 - **Planning Concepts Clarification (#260)** - Clear distinction between Plans/Milestones/Projects/Epics
+- **Priorities Registry (#263)** - YAML-based registry for feature areas, backends, AI assistants with tiers, validation matrix, coverage requirements
 - **MCP Integration Survey (#261)** - Evaluate official GitHub/Anthropic/OpenAI MCP servers
 - Bi-directional GitHub Projects sync with improved architecture
-- Kanban boards auto-updated from IdlerGear
-- Custom field mapping (priority, effort, due dates)
+- Kanban boards auto-updated from IdlerGear with priority-based organization
+- Custom field mapping (priority, effort, due dates, validation status)
 - Milestone awareness and integration
+- Release readiness validation (check if requirements met)
 - Upstream issue reporting with AI attribution
 - Ethical disclosure templates
 - Local tracking of external issues
@@ -193,8 +198,9 @@
 ## Priority Changes Summary
 
 ### Upgraded to HIGH:
-- **#262** - AI assistant tools review (v0.5.0 foundational) ⭐ NEW
-- **#260** - Planning concepts clarification (v0.6.0 foundational) ⭐ NEW
+- **#263** - Priorities registry (v0.6.0 foundational) ⭐ NEW
+- **#262** - AI assistant tools review (v0.5.0 foundational) ⭐
+- **#260** - Planning concepts clarification (v0.6.0 foundational) ⭐
 - **#259** - AGENTS.md/SKILLS.md support (strategic importance)
 - **#257** - GitHub Projects v2 (high value, enables team workflows)
 
@@ -234,8 +240,9 @@ v0.6.0 (GitHub)
 ├── ✅ GitHub backend (DONE)
 ├── ✅ Label management (DONE)
 ├── #260 (Planning concepts) ⭐ FOUNDATIONAL
+├── #263 (Priorities registry) ⭐ FOUNDATIONAL → informs #257
 ├── #261 (MCP survey) → informs #257
-├── #257 (Projects sync)
+├── #257 (Projects sync) ← depends on #260, #263
 └── #256 (Upstream reporting)
 
 v0.7.0 (Dev Experience)
@@ -294,11 +301,11 @@ Based on recent progress (10 issues completed in 1 session):
 
 - **v0.4.0** (9 issues) - ~2-3 weeks
 - **v0.5.0** (5 issues, includes survey) - ~3-4 weeks
-- **v0.6.0** (4 issues, includes surveys) - ~2-3 weeks
+- **v0.6.0** (5 issues, includes surveys + registry) - ~3-4 weeks
 - **v0.7.0** (2 issues) - ~1 week
 - **v1.0.0** (polish) - ~2-4 weeks
 
-**Total estimated timeline:** ~10-17 weeks (Q1-Q2 2026)
+**Total estimated timeline:** ~11-18 weeks (Q1-Q2 2026)
 
 **Note:** Survey issues (#261, #262) may spawn additional child issues based on findings.
 
