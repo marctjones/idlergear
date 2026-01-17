@@ -2301,8 +2301,14 @@ def config_get(key: str):
 
 @config_app.command("set")
 def config_set(key: str, value: str):
-    """Set a configuration value."""
-    from idlergear.config import find_idlergear_root, set_config_value
+    """Set a configuration value.
+
+    Values are automatically converted to the correct type based on schema:
+    - Booleans: "true", "false", "yes", "no", "1", "0"
+    - Integers: "123", "456"
+    - Strings: anything else
+    """
+    from idlergear.config import CONFIG_SCHEMAS, find_idlergear_root, set_config_value
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2311,8 +2317,57 @@ def config_set(key: str, value: str):
         )
         raise typer.Exit(1)
 
-    set_config_value(key, value)
-    typer.secho(f"Set {key} = {value}", fg=typer.colors.GREEN)
+    # Parse value based on schema type
+    parsed_value: str | bool | int | float = value
+    parts = key.split(".")
+    if len(parts) >= 2 and parts[0] in CONFIG_SCHEMAS:
+        schema = CONFIG_SCHEMAS[parts[0]]
+        field_path = parts[1:]
+        current = schema
+        for part in field_path:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+
+        if isinstance(current, dict) and "type" in current:
+            expected_type = current["type"]
+
+            # Convert value to expected type
+            if expected_type == "boolean":
+                if value.lower() in ("true", "yes", "1"):
+                    parsed_value = True
+                elif value.lower() in ("false", "no", "0"):
+                    parsed_value = False
+                else:
+                    typer.secho(
+                        f"Invalid boolean value: {value}. Use: true, false, yes, no, 1, or 0",
+                        fg=typer.colors.RED,
+                    )
+                    raise typer.Exit(1)
+            elif expected_type == "integer":
+                try:
+                    parsed_value = int(value)
+                except ValueError:
+                    typer.secho(
+                        f"Invalid integer value: {value}",
+                        fg=typer.colors.RED,
+                    )
+                    raise typer.Exit(1)
+            elif expected_type == "float":
+                try:
+                    parsed_value = float(value)
+                except ValueError:
+                    typer.secho(
+                        f"Invalid float value: {value}",
+                        fg=typer.colors.RED,
+                    )
+                    raise typer.Exit(1)
+
+    try:
+        set_config_value(key, parsed_value)
+        typer.secho(f"Set {key} = {parsed_value}", fg=typer.colors.GREEN)
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 @config_app.command("backend")
