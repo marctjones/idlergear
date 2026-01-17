@@ -82,6 +82,33 @@ Before adding any dependency:
 - Create Pull Requests for review
 - Merge only after tests pass
 
+## GitHub Label Setup
+
+When contributing to IdlerGear, set up labels for proper issue tracking:
+
+```bash
+# Initialize all standard labels (one-time setup)
+idlergear label ensure-standards
+
+# Verify labels exist
+idlergear label list
+```
+
+**Standard labels created:**
+- Priority: `priority:critical`, `priority:high`, `priority:medium`, `priority:low`
+- Type: `bug`, `enhancement`, `documentation`, `tech-debt`, `question`
+- Status: `wontfix`, `duplicate`, `help wanted`, `good first issue`
+- IdlerGear: `exploration`, `note`, `tag:*`
+
+**When creating issues/tasks:**
+```bash
+# Always include type and priority
+idlergear task create "Fix auth bug" --label bug --priority high
+idlergear task create "Add dark mode" --label enhancement --priority medium
+```
+
+See [docs/github-labels.md](docs/github-labels.md) for complete label conventions and best practices.
+
 ## Python Practices
 
 - Formatter: `black`

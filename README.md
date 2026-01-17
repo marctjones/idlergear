@@ -412,6 +412,7 @@ vision = "github"    # Sync vision to repo
 
 ### Backends
 - [GitHub Integration](https://github.com/marctjones/idlergear/wiki/GitHub-Integration) - GitHub backend setup
+- [GitHub Label Conventions](docs/github-labels.md) - Label categories, setup, and best practices
 
 See [DESIGN.md](DESIGN.md) for the full knowledge model and architecture.
 
