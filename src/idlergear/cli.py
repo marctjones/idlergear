@@ -2118,6 +2118,167 @@ def mcp_test_cmd(
         typer.secho(f"All {len(results)} servers OK", fg=typer.colors.GREEN)
 
 
+@daemon_app.command("cleanup")
+def daemon_cleanup(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be removed without removing"),
+    all_agents: bool = typer.Option(False, "--all", help="Remove all presence files (nuclear option)"),
+):
+    """Clean up stale agent presence files.
+
+    An agent is considered stale if:
+    - Presence file exists but daemon is not running OR
+    - Agent is not in daemon's active registry OR
+    - last_heartbeat is older than 5 minutes
+
+    Examples:
+        idlergear daemon cleanup --dry-run    # Preview stale agents
+        idlergear daemon cleanup               # Remove stale agents
+        idlergear daemon cleanup --all         # Remove all presence files
+    """
+    import json
+    from datetime import datetime, timezone, timedelta
+    from idlergear.config import find_idlergear_root
+    from idlergear.daemon.lifecycle import DaemonLifecycle
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    idlergear_dir = root / ".idlergear"
+    agents_dir = idlergear_dir / "agents"
+
+    if not agents_dir.exists():
+        typer.echo("No agents directory found.")
+        return
+
+    # Get all presence files
+    presence_files = [f for f in agents_dir.glob("*.json") if f.name != "agents.json"]
+
+    if not presence_files:
+        typer.echo("No agent presence files found.")
+        return
+
+    # Check if daemon is running
+    lifecycle = DaemonLifecycle(idlergear_dir)
+    daemon_running = lifecycle.is_running()
+
+    # Get active agents from daemon registry
+    active_agent_ids = set()
+    if daemon_running:
+        try:
+            import asyncio
+            from idlergear.daemon.client import DaemonClient
+
+            async def get_active():
+                async with DaemonClient(root) as client:
+                    agents = await client.list_agents()
+                    return {a["agent_id"] for a in agents}
+
+            active_agent_ids = asyncio.run(get_active())
+        except Exception:
+            # If we can't get active agents, assume none are active
+            pass
+
+    # Identify stale presence files
+    stale_files = []
+    kept_files = []
+    staleness_cutoff = datetime.now(timezone.utc) - timedelta(minutes=5)
+
+    for presence_file in presence_files:
+        try:
+            data = json.loads(presence_file.read_text())
+            agent_id = data.get("agent_id", presence_file.stem)
+            last_heartbeat_str = data.get("last_heartbeat")
+
+            # Determine if stale
+            is_stale = False
+
+            if all_agents:
+                # --all flag: consider all files stale
+                is_stale = True
+            elif not daemon_running:
+                # Daemon not running: all are considered stale
+                is_stale = True
+            elif agent_id not in active_agent_ids:
+                # Not in daemon registry: stale
+                is_stale = True
+            elif last_heartbeat_str:
+                # Check heartbeat age
+                try:
+                    last_heartbeat = datetime.fromisoformat(last_heartbeat_str.replace("Z", "+00:00"))
+                    if last_heartbeat < staleness_cutoff:
+                        is_stale = True
+                except (ValueError, AttributeError):
+                    # Can't parse heartbeat, consider stale
+                    is_stale = True
+
+            if is_stale:
+                stale_files.append((presence_file, data))
+            else:
+                kept_files.append((presence_file, data))
+
+        except (json.JSONDecodeError, OSError):
+            # Malformed file, consider it stale
+            stale_files.append((presence_file, {}))
+
+    # Display results
+    if not stale_files:
+        typer.secho("✓ No stale agent presence files found.", fg=typer.colors.GREEN)
+        if kept_files:
+            typer.echo(f"  {len(kept_files)} active agent(s) present")
+        return
+
+    # Show what will be removed
+    typer.echo(f"\nFound {len(stale_files)} stale agent presence file(s):\n")
+
+    for presence_file, data in stale_files:
+        agent_id = data.get("agent_id", presence_file.stem)
+        agent_type = data.get("agent_type", "unknown")
+        connected_at = data.get("connected_at", "unknown")
+        last_hb = data.get("last_heartbeat", "unknown")
+
+        # Calculate age
+        try:
+            if last_hb and last_hb != "unknown":
+                hb_time = datetime.fromisoformat(last_hb.replace("Z", "+00:00"))
+                age = datetime.now(timezone.utc) - hb_time
+                age_str = f"{age.days}d {age.seconds // 3600}h ago" if age.days > 0 else f"{age.seconds // 3600}h {(age.seconds % 3600) // 60}m ago"
+            else:
+                age_str = "unknown"
+        except (ValueError, AttributeError):
+            age_str = "unknown"
+
+        typer.echo(f"  • {agent_id}")
+        typer.echo(f"    Type: {agent_type}")
+        typer.echo(f"    Last seen: {age_str}")
+        typer.echo()
+
+    if kept_files:
+        typer.echo(f"Keeping {len(kept_files)} active agent(s)\n")
+
+    # Dry run or actual cleanup
+    if dry_run:
+        typer.echo(f"Dry run: Would remove {len(stale_files)} presence file(s)")
+        typer.echo("Run without --dry-run to actually remove them")
+        return
+
+    # Actual cleanup
+    removed = 0
+    for presence_file, data in stale_files:
+        try:
+            presence_file.unlink()
+            removed += 1
+        except OSError as e:
+            agent_id = data.get("agent_id", presence_file.stem)
+            typer.secho(f"  ✗ Failed to remove {agent_id}: {e}", fg=typer.colors.RED)
+
+    typer.secho(f"\n✓ Removed {removed}/{len(stale_files)} stale presence file(s)", fg=typer.colors.GREEN)
+
+
 # Config commands
 @config_app.command("get")
 def config_get(key: str):
