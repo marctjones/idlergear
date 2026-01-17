@@ -2,11 +2,15 @@
 
 ## Executive Summary
 
-**Total Open Issues:** 31
-- **Actionable Features:** 20
+**Total Open Issues:** 33
+- **Actionable Features:** 22
 - **Research/Notes:** 11 (knowledge capture, not blocking)
 
-**Current Version:** v0.3.67
+**Current Version:** v0.3.68
+
+**Recent Additions:**
+- #261 - Review official MCP servers (v0.6.0)
+- #262 - Review AI assistant tools (v0.5.0)
 
 ---
 
@@ -55,33 +59,38 @@
 **Priority:** High (strategic differentiation)
 **Target:** Q2 2026
 
-**Issues (4):**
-1. **#259** - Token-efficient SKILLS.md and AGENTS.md support [medium → HIGH]
-2. **#213** - Enhanced Gemini Context in GEMINI.md [low → medium]
-3. **#212** - Implement Gemini CLI Slash Commands [low → medium]
-4. **#214** - Investigate Gemini CLI Lifecycle Hooks [research]
+**Issues (5):**
+1. **#262** - Review AI assistant tools for integration opportunities [HIGH] ⭐ NEW
+2. **#259** - Token-efficient SKILLS.md and AGENTS.md support [medium → HIGH]
+3. **#213** - Enhanced Gemini Context in GEMINI.md [low → medium]
+4. **#212** - Implement Gemini CLI Slash Commands [low → medium]
+5. **#214** - Investigate Gemini CLI Lifecycle Hooks [research]
 
 **Dependencies:**
 - Existing: CLAUDE.md, GEMINI.md, .goosehints support
 - MCP server (126 tools already implemented)
 
 **Implementation Order:**
-1. #214 - Research Gemini hooks (inform design)
-2. #259 - Core AGENTS.md/SKILLS.md compression (FOUNDATIONAL)
-3. #213 - Enhance GEMINI.md using #259 framework
-4. #212 - Gemini slash commands
+1. #262 - Survey AI assistant tools (inform all other work) ⭐ FOUNDATIONAL
+2. #214 - Research Gemini hooks specifically (inform design)
+3. #259 - Core AGENTS.md/SKILLS.md compression (implement universal context)
+4. #213 - Enhance GEMINI.md using #259 framework
+5. #212 - Gemini slash commands
 
 **Key Features:**
+- **Tool Integration Survey (#262)** - Comprehensive analysis of 5+ AI assistants
 - 90% token reduction (7000 → 700 tokens)
-- Single source: AGENTS.md generates CLAUDE.md, GEMINI.md, .goosehints, .aider.conf.yml
+- Single source: AGENTS.md generates CLAUDE.md, GEMINI.md, .goosehints, .aider.conf.yml, cursor-context.md
 - Smart caching (0 tokens for unchanged sessions)
 - Context compression: minimal/standard/full modes
 - MCP tool: `idlergear_inject_context`
+- Universal command integration across tools
 
 **Strategic Value:**
-- First tool with universal AI assistant support
+- First tool with universal AI assistant support (Claude, Gemini, Goose, Aider, Copilot CLI, Cursor)
 - Token efficiency as competitive advantage
 - Write once, run everywhere for context
+- Switch assistants without losing project knowledge
 
 ---
 
@@ -90,22 +99,29 @@
 **Priority:** Medium (team collaboration focus)
 **Target:** Q3 2026
 
-**Issues (2):**
-1. **#257** - GitHub Projects v2 Integration [medium → HIGH]
-2. **#256** - Report issues to upstream projects with AI disclaimer [medium]
+**Issues (4):**
+1. **#260** - Clarify Plans vs Milestones vs Projects vs Meta-Issues [HIGH] ⭐ NEW
+2. **#261** - Review official MCP servers for integration opportunities [medium] ⭐ NEW
+3. **#257** - GitHub Projects v2 Integration [medium → HIGH]
+4. **#256** - Report issues to upstream projects with AI disclaimer [medium]
 
 **Dependencies:**
 - ✅ GitHub backend (fully implemented)
 - ✅ Label management (#206, #207, #209 - COMPLETE)
 
 **Implementation Order:**
-1. #257 - Projects v2 sync (foundational, enables visual project management)
-2. #256 - Upstream issue reporting (builds on GitHub backend)
+1. #260 - Clarify planning concepts (foundational, informs #257)
+2. #261 - Survey MCP servers (especially GitHub MCP, informs #257)
+3. #257 - Projects v2 sync (implements visual project management)
+4. #256 - Upstream issue reporting (builds on GitHub backend)
 
 **Key Features:**
-- Bi-directional GitHub Projects sync
+- **Planning Concepts Clarification (#260)** - Clear distinction between Plans/Milestones/Projects/Epics
+- **MCP Integration Survey (#261)** - Evaluate official GitHub/Anthropic/OpenAI MCP servers
+- Bi-directional GitHub Projects sync with improved architecture
 - Kanban boards auto-updated from IdlerGear
 - Custom field mapping (priority, effort, due dates)
+- Milestone awareness and integration
 - Upstream issue reporting with AI attribution
 - Ethical disclosure templates
 - Local tracking of external issues
@@ -113,6 +129,8 @@
 **Use Cases:**
 - Team collaboration via visual boards
 - Sprint planning with Kanban
+- Release planning with milestones
+- Epic tracking with meta-issues
 - Contributing to dependencies
 - Multi-repo project tracking
 
@@ -175,10 +193,13 @@
 ## Priority Changes Summary
 
 ### Upgraded to HIGH:
+- **#262** - AI assistant tools review (v0.5.0 foundational) ⭐ NEW
+- **#260** - Planning concepts clarification (v0.6.0 foundational) ⭐ NEW
 - **#259** - AGENTS.md/SKILLS.md support (strategic importance)
 - **#257** - GitHub Projects v2 (high value, enables team workflows)
 
 ### Upgraded to MEDIUM:
+- **#261** - MCP servers review (informs GitHub integration) ⭐ NEW
 - **#163-166** - Test framework features (foundational for v0.4)
 - **#162** - Watch mode test coverage (completes test workflow)
 - **#144, #145** - Test phases (integration work)
@@ -203,14 +224,17 @@ v0.4.0 (Test & Run)
     └── #144, #145 (integration)
 
 v0.5.0 (Multi-Assistant)
-├── #214 (research)
-└── #259 (foundation)
+├── #262 (AI tools survey) ⭐ FOUNDATIONAL
+├── #214 (Gemini research)
+└── #259 (universal context)
     ├── #213 (Gemini context)
     └── #212 (Gemini commands)
 
 v0.6.0 (GitHub)
 ├── ✅ GitHub backend (DONE)
 ├── ✅ Label management (DONE)
+├── #260 (Planning concepts) ⭐ FOUNDATIONAL
+├── #261 (MCP survey) → informs #257
 ├── #257 (Projects sync)
 └── #256 (Upstream reporting)
 
@@ -269,12 +293,14 @@ These are knowledge capture, not actionable work items:
 Based on recent progress (10 issues completed in 1 session):
 
 - **v0.4.0** (9 issues) - ~2-3 weeks
-- **v0.5.0** (4 issues) - ~2-3 weeks
-- **v0.6.0** (2 issues) - ~1-2 weeks
+- **v0.5.0** (5 issues, includes survey) - ~3-4 weeks
+- **v0.6.0** (4 issues, includes surveys) - ~2-3 weeks
 - **v0.7.0** (2 issues) - ~1 week
 - **v1.0.0** (polish) - ~2-4 weeks
 
-**Total estimated timeline:** ~8-13 weeks (Q1-Q2 2026)
+**Total estimated timeline:** ~10-17 weeks (Q1-Q2 2026)
+
+**Note:** Survey issues (#261, #262) may spawn additional child issues based on findings.
 
 ---
 
