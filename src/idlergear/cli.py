@@ -88,6 +88,7 @@ vision_app = typer.Typer(help="Project vision management")
 plan_app = typer.Typer(help="Plan management (→ GitHub Projects)")
 reference_app = typer.Typer(help="Reference docs (→ GitHub Wiki)")
 run_app = typer.Typer(help="Script execution and logs")
+label_app = typer.Typer(help="Label management (→ GitHub Labels)")
 config_app = typer.Typer(help="Configuration management")
 daemon_app = typer.Typer(help="Daemon control")
 mcp_app = typer.Typer(help="MCP server management")
@@ -107,6 +108,7 @@ app.add_typer(vision_app, name="vision")
 app.add_typer(plan_app, name="plan")
 app.add_typer(reference_app, name="reference")
 app.add_typer(run_app, name="run")
+app.add_typer(label_app, name="label")
 app.add_typer(config_app, name="config")
 app.add_typer(daemon_app, name="daemon")
 app.add_typer(mcp_app, name="mcp")
@@ -119,6 +121,48 @@ app.add_typer(docs_app, name="docs")
 app.add_typer(agents_app, name="agents")
 app.add_typer(secrets_app, name="secrets")
 app.add_typer(release_app, name="release")
+
+
+# Helper functions
+def validate_labels(labels: list[str]) -> tuple[list[str], list[str]]:
+    """Validate that labels exist in the GitHub repository.
+
+    Args:
+        labels: List of label names to validate
+
+    Returns:
+        Tuple of (valid_labels, invalid_labels)
+    """
+    import subprocess
+    import json
+
+    if not labels:
+        return [], []
+
+    try:
+        # Get all existing labels
+        result = subprocess.run(
+            ["gh", "label", "list", "--json", "name"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        existing_labels = {label["name"] for label in json.loads(result.stdout)}
+
+        # Check which labels are invalid
+        valid = []
+        invalid = []
+        for label in labels:
+            if label in existing_labels:
+                valid.append(label)
+            else:
+                invalid.append(label)
+
+        return valid, invalid
+
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        # If gh command fails, skip validation (might not be in a git repo)
+        return labels, []
 
 
 @app.command()
@@ -2287,10 +2331,12 @@ def task_create(
         None, "--priority", "-p", help="Priority: high, medium, low"
     ),
     due: str = typer.Option(None, "--due", "-d", help="Due date (YYYY-MM-DD)"),
+    no_validate: bool = typer.Option(False, "--no-validate", help="Skip label validation"),
 ):
     """Create a new task."""
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
+    import subprocess
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2300,6 +2346,35 @@ def task_create(
         raise typer.Exit(1)
 
     backend = get_backend("task")
+
+    # Validate and potentially create labels if any were provided
+    if labels and not no_validate:
+        valid_labels, invalid_labels = validate_labels(labels)
+
+        if invalid_labels:
+            # Ask user if they want to create the missing labels
+            create = typer.confirm(
+                f"Create missing labels: {', '.join(invalid_labels)}?",
+                default=True,
+            )
+
+            if create:
+                for label in invalid_labels:
+                    try:
+                        subprocess.run(
+                            ["gh", "label", "create", label],
+                            capture_output=True,
+                            text=True,
+                            check=True,
+                        )
+                        typer.secho(f"  ✓ Created label: {label}", fg=typer.colors.GREEN)
+                    except subprocess.CalledProcessError:
+                        typer.secho(f"  ✗ Failed to create label: {label}", fg=typer.colors.RED)
+                        raise typer.Exit(1)
+            else:
+                typer.secho("Cancelled - cannot create task without valid labels.", fg=typer.colors.YELLOW)
+                raise typer.Exit(1)
+
     task = backend.create(
         title,
         body=body,
@@ -2491,15 +2566,322 @@ def task_sync(target: str = typer.Argument("github")):
     # TODO: Implement GitHub sync
 
 
+# Label commands
+@label_app.command("list")
+def label_list(
+    ctx: typer.Context,
+):
+    """List all labels in the repository.
+
+    Examples:
+        idlergear label list
+        idlergear label list --json
+    """
+    import subprocess
+
+    try:
+        # Use gh label list to get all labels
+        result = subprocess.run(
+            ["gh", "label", "list", "--json", "name,description,color"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        import json
+        labels = json.loads(result.stdout)
+
+        if ctx.obj.output_format == "json":
+            typer.echo(json.dumps(labels, indent=2))
+        else:
+            if not labels:
+                typer.echo("No labels found.")
+                return
+
+            typer.echo(f"\nFound {len(labels)} labels:\n")
+            for label in labels:
+                name = label.get("name", "")
+                desc = label.get("description", "")
+                color = label.get("color", "")
+
+                # Display with color if available
+                desc_str = f" - {desc}" if desc else ""
+                color_str = f" (#{color})" if color else ""
+                typer.echo(f"  • {name}{desc_str}{color_str}")
+            typer.echo()
+
+    except FileNotFoundError:
+        typer.secho(
+            "GitHub CLI (gh) not found. Install from: https://cli.github.com",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Error listing labels: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@label_app.command("create")
+def label_create(
+    name: str,
+    description: str = typer.Option(None, "--description", "-d", help="Label description"),
+    color: str = typer.Option(None, "--color", "-c", help="Label color (hex without #)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Update if exists"),
+):
+    """Create a new label.
+
+    Examples:
+        idlergear label create bug --description "Bug report" --color D73A4A
+        idlergear label create enhancement --force
+    """
+    import subprocess
+
+    try:
+        args = ["gh", "label", "create", name]
+
+        if description:
+            args.extend(["--description", description])
+        if color:
+            args.extend(["--color", color])
+        if force:
+            args.append("--force")
+
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        typer.secho(f"✓ Created label: {name}", fg=typer.colors.GREEN)
+
+    except FileNotFoundError:
+        typer.secho(
+            "GitHub CLI (gh) not found. Install from: https://cli.github.com",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        if "already exists" in e.stderr:
+            typer.secho(
+                f"Label '{name}' already exists. Use --force to update.",
+                fg=typer.colors.YELLOW,
+            )
+        else:
+            typer.secho(f"Error creating label: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@label_app.command("delete")
+def label_delete(
+    name: str,
+    confirm: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a label.
+
+    Examples:
+        idlergear label delete old-label
+        idlergear label delete old-label --yes
+    """
+    import subprocess
+
+    if not confirm:
+        confirmed = typer.confirm(f"Delete label '{name}'?")
+        if not confirmed:
+            typer.echo("Cancelled.")
+            raise typer.Exit(0)
+
+    try:
+        result = subprocess.run(
+            ["gh", "label", "delete", name, "--yes"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        typer.secho(f"✓ Deleted label: {name}", fg=typer.colors.GREEN)
+
+    except FileNotFoundError:
+        typer.secho(
+            "GitHub CLI (gh) not found. Install from: https://cli.github.com",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Error deleting label: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@label_app.command("edit")
+def label_edit(
+    name: str,
+    new_name: str = typer.Option(None, "--name", "-n", help="New label name"),
+    description: str = typer.Option(None, "--description", "-d", help="New description"),
+    color: str = typer.Option(None, "--color", "-c", help="New color (hex without #)"),
+):
+    """Edit an existing label.
+
+    Examples:
+        idlergear label edit bug --description "Critical bug"
+        idlergear label edit old-name --name new-name
+        idlergear label edit enhancement --color 00FF00
+    """
+    import subprocess
+
+    if not any([new_name, description, color]):
+        typer.secho(
+            "At least one of --name, --description, or --color must be specified.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+
+    try:
+        args = ["gh", "label", "edit", name]
+
+        if new_name:
+            args.extend(["--name", new_name])
+        if description:
+            args.extend(["--description", description])
+        if color:
+            args.extend(["--color", color])
+
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        display_name = new_name if new_name else name
+        typer.secho(f"✓ Updated label: {display_name}", fg=typer.colors.GREEN)
+
+    except FileNotFoundError:
+        typer.secho(
+            "GitHub CLI (gh) not found. Install from: https://cli.github.com",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Error editing label: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@label_app.command("ensure-standards")
+def label_ensure_standards(
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be created"),
+):
+    """Ensure GitHub best practice labels exist.
+
+    Creates standard labels recommended for project management:
+    - bug (D73A4A) - Something isn't working
+    - enhancement (A2EEEF) - New feature or request
+    - documentation (0075CA) - Improvements or additions to documentation
+    - good first issue (7057FF) - Good for newcomers
+    - help wanted (008672) - Extra attention is needed
+    - question (D876E3) - Further information is requested
+    - wontfix (FFFFFF) - This will not be worked on
+    - duplicate (CFD3D7) - This issue or pull request already exists
+    - invalid (E4E669) - This doesn't seem right
+    - tech-debt (FBCA04) - Technical debt
+    - decision (C5DEF5) - Design decision
+    - exploration (0E8A16) - Research or exploration
+
+    Examples:
+        idlergear label ensure-standards
+        idlergear label ensure-standards --dry-run
+    """
+    import subprocess
+    import json
+
+    # Standard GitHub labels with colors and descriptions
+    standard_labels = {
+        "bug": {"color": "D73A4A", "description": "Something isn't working"},
+        "enhancement": {"color": "A2EEEF", "description": "New feature or request"},
+        "documentation": {"color": "0075CA", "description": "Improvements or additions to documentation"},
+        "good first issue": {"color": "7057FF", "description": "Good for newcomers"},
+        "help wanted": {"color": "008672", "description": "Extra attention is needed"},
+        "question": {"color": "D876E3", "description": "Further information is requested"},
+        "wontfix": {"color": "FFFFFF", "description": "This will not be worked on"},
+        "duplicate": {"color": "CFD3D7", "description": "This issue or pull request already exists"},
+        "invalid": {"color": "E4E669", "description": "This doesn't seem right"},
+        "tech-debt": {"color": "FBCA04", "description": "Technical debt"},
+        "decision": {"color": "C5DEF5", "description": "Design decision"},
+        "exploration": {"color": "0E8A16", "description": "Research or exploration"},
+    }
+
+    try:
+        # Get existing labels
+        result = subprocess.run(
+            ["gh", "label", "list", "--json", "name"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        existing = {label["name"] for label in json.loads(result.stdout)}
+
+        # Determine which labels need to be created
+        to_create = {
+            name: details
+            for name, details in standard_labels.items()
+            if name not in existing
+        }
+
+        if not to_create:
+            typer.secho("✓ All standard labels already exist.", fg=typer.colors.GREEN)
+            return
+
+        if dry_run:
+            typer.echo(f"\nWould create {len(to_create)} labels:\n")
+            for name, details in to_create.items():
+                typer.echo(f"  • {name} (#{details['color']}) - {details['description']}")
+            typer.echo()
+            return
+
+        # Create missing labels
+        typer.echo(f"\nCreating {len(to_create)} standard labels:\n")
+        created = 0
+        for name, details in to_create.items():
+            try:
+                subprocess.run(
+                    [
+                        "gh", "label", "create", name,
+                        "--description", details["description"],
+                        "--color", details["color"],
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                typer.secho(f"  ✓ {name}", fg=typer.colors.GREEN)
+                created += 1
+            except subprocess.CalledProcessError as e:
+                typer.secho(f"  ✗ {name}: {e.stderr.strip()}", fg=typer.colors.RED)
+
+        typer.echo()
+        typer.secho(f"Created {created}/{len(to_create)} labels.", fg=typer.colors.GREEN)
+
+    except FileNotFoundError:
+        typer.secho(
+            "GitHub CLI (gh) not found. Install from: https://cli.github.com",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Error: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 # Note commands
 @note_app.command("create")
 def note_create(
     content: str,
     tag: list[str] = typer.Option([], "--tag", "-t", help="Tags (e.g., explore, idea)"),
+    no_validate: bool = typer.Option(False, "--no-validate", help="Skip tag label validation"),
 ):
     """Create a quick note."""
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
+    import subprocess
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2509,6 +2891,40 @@ def note_create(
         raise typer.Exit(1)
 
     backend = get_backend("note")
+
+    # Validate and potentially create tag labels if any were provided
+    # Tags are stored as "tag:tagname" labels
+    if tag and not no_validate:
+        tag_labels = [f"tag:{t}" for t in tag]
+        valid_labels, invalid_labels = validate_labels(tag_labels)
+
+        if invalid_labels:
+            # Extract tag names from "tag:name" format for display
+            missing_tags = [label.replace("tag:", "") for label in invalid_labels]
+
+            # Ask user if they want to create the missing tag labels
+            create = typer.confirm(
+                f"Create missing tag labels: {', '.join(missing_tags)}?",
+                default=True,
+            )
+
+            if create:
+                for label in invalid_labels:
+                    try:
+                        subprocess.run(
+                            ["gh", "label", "create", label, "--color", "C2E0C6"],
+                            capture_output=True,
+                            text=True,
+                            check=True,
+                        )
+                        typer.secho(f"  ✓ Created label: {label}", fg=typer.colors.GREEN)
+                    except subprocess.CalledProcessError:
+                        typer.secho(f"  ✗ Failed to create label: {label}", fg=typer.colors.RED)
+                        raise typer.Exit(1)
+            else:
+                typer.secho("Cancelled - cannot create note without valid tag labels.", fg=typer.colors.YELLOW)
+                raise typer.Exit(1)
+
     note = backend.create(content, tags=list(tag) if tag else None)
     tag_str = f" [{', '.join(note['tags'])}]" if note.get("tags") else ""
     typer.secho(f"Created note #{note['id']}{tag_str}", fg=typer.colors.GREEN)
