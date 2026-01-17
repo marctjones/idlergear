@@ -2498,8 +2498,8 @@ def note_create(
     tag: list[str] = typer.Option([], "--tag", "-t", help="Tags (e.g., explore, idea)"),
 ):
     """Create a quick note."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.notes import create_note
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2508,7 +2508,8 @@ def note_create(
         )
         raise typer.Exit(1)
 
-    note = create_note(content, tags=list(tag) if tag else None)
+    backend = get_backend("note")
+    note = backend.create(content, tags=list(tag) if tag else None)
     tag_str = f" [{', '.join(note['tags'])}]" if note.get("tags") else ""
     typer.secho(f"Created note #{note['id']}{tag_str}", fg=typer.colors.GREEN)
 
@@ -2521,8 +2522,8 @@ def note_list(
     ),
 ):
     """List notes."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.notes import list_notes
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2531,15 +2532,16 @@ def note_list(
         )
         raise typer.Exit(1)
 
-    notes = list_notes(tag=tag)
+    backend = get_backend("note")
+    notes = backend.list(tag=tag)
     display(notes, ctx.obj.output_format, "notes")
 
 
 @note_app.command("show")
 def note_show(ctx: typer.Context, note_id: int):
     """Show a note."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.notes import get_note
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2548,7 +2550,8 @@ def note_show(ctx: typer.Context, note_id: int):
         )
         raise typer.Exit(1)
 
-    note = get_note(note_id)
+    backend = get_backend("note")
+    note = backend.get(note_id)
     if note is None:
         # For JSON output, we want the display function to handle this.
         if ctx.obj.output_format == "human":
@@ -2566,8 +2569,8 @@ def note_edit(
     add_tag: list[str] = typer.Option([], "--add-tag", help="Add tags"),
 ):
     """Edit a note."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.notes import get_note, update_note
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2576,16 +2579,20 @@ def note_edit(
         )
         raise typer.Exit(1)
 
+    backend = get_backend("note")
+
     # Determine new tags
     tags = None
     if tag:
         tags = list(tag)
     elif add_tag:
-        current = get_note(note_id)
+        current = backend.get(note_id)
         if current:
             tags = list(set(current.get("tags", []) + list(add_tag)))
 
-    note = update_note(note_id, content=content, tags=tags)
+    # GitHub backend doesn't support partial updates easily, so we merge locally if needed
+    # But get_backend handles the appropriate backend implementation
+    note = backend.update(note_id, content=content, tags=tags)
     if note is None:
         typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2596,8 +2603,8 @@ def note_edit(
 @note_app.command("delete")
 def note_delete(note_id: int):
     """Delete a note."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.notes import delete_note
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2606,7 +2613,8 @@ def note_delete(note_id: int):
         )
         raise typer.Exit(1)
 
-    if delete_note(note_id):
+    backend = get_backend("note")
+    if backend.delete(note_id):
         typer.secho(f"Deleted note #{note_id}", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
@@ -2619,8 +2627,8 @@ def note_promote(
     to: str = typer.Option("task", "--to", "-t", help="Promote to: task, reference"),
 ):
     """Promote a note to another type."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.notes import promote_note
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2629,15 +2637,16 @@ def note_promote(
         )
         raise typer.Exit(1)
 
+    backend = get_backend("note")
     try:
-        result = promote_note(note_id, to)
+        result = backend.promote(note_id, to)
         if result is None:
             typer.secho(f"Note #{note_id} not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
         typer.secho(
             f"Promoted note #{note_id} to {to} #{result['id']}", fg=typer.colors.GREEN
         )
-    except ValueError as e:
+    except Exception as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
 
@@ -2653,8 +2662,8 @@ def note_sync(target: str = typer.Argument("github")):
 @vision_app.command("show")
 def vision_show(ctx: typer.Context):
     """Show the project vision."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.vision import get_vision
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2663,7 +2672,8 @@ def vision_show(ctx: typer.Context):
         )
         raise typer.Exit(1)
 
-    vision = get_vision()
+    backend = get_backend("vision")
+    vision = backend.get()
     display(vision, ctx.obj.output_format, "vision")
 
 
@@ -2676,8 +2686,8 @@ def vision_edit(
     import subprocess
     import tempfile
 
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.vision import get_vision, set_vision
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2686,15 +2696,17 @@ def vision_edit(
         )
         raise typer.Exit(1)
 
+    backend = get_backend("vision")
+
     if content is not None:
         # Direct content update
-        set_vision(content)
+        backend.set(content)
         typer.secho("Vision updated.", fg=typer.colors.GREEN)
         return
 
     # Open in editor
     editor = os.environ.get("EDITOR", "nano")
-    current_vision = get_vision() or "# Project Vision\n\n"
+    current_vision = backend.get() or "# Project Vision\n\n"
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
         f.write(current_vision)
@@ -2704,7 +2716,7 @@ def vision_edit(
         subprocess.run([editor, temp_path], check=True)
         with open(temp_path) as f:
             new_content = f.read()
-        set_vision(new_content)
+        backend.set(new_content)
         typer.secho("Vision updated.", fg=typer.colors.GREEN)
     except subprocess.CalledProcessError:
         typer.secho("Editor exited with error.", fg=typer.colors.RED)
@@ -2728,8 +2740,8 @@ def plan_create(
     body: str = typer.Option(None, "--body", "-b", help="Plan description"),
 ):
     """Create a plan."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import create_plan
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2738,10 +2750,11 @@ def plan_create(
         )
         raise typer.Exit(1)
 
+    backend = get_backend("plan")
     try:
-        plan = create_plan(name, title=title, body=body)
+        plan = backend.create(name, title=title, body=body)
         typer.secho(f"Created plan: {plan['name']}", fg=typer.colors.GREEN)
-    except ValueError as e:
+    except Exception as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
 
@@ -2749,8 +2762,8 @@ def plan_create(
 @plan_app.command("list")
 def plan_list(ctx: typer.Context):
     """List plans."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import get_current_plan, list_plans
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2759,13 +2772,18 @@ def plan_list(ctx: typer.Context):
         )
         raise typer.Exit(1)
 
-    plans = list_plans()
-    current = get_current_plan()
+    backend = get_backend("plan")
+    plans = backend.list()
+    
+    current = None
+    if hasattr(backend, "get_current"):
+        current = backend.get_current()
+    
     current_name = current["name"] if current else None
 
     # Augment data for the display function
     for plan in plans:
-        plan["is_current"] = plan["name"] == current_name
+        plan["is_current"] = (plan.get("current") or plan["name"] == current_name)
 
     display(plans, ctx.obj.output_format, "plans")
 
@@ -2776,8 +2794,8 @@ def plan_show(
     name: str = typer.Argument(None, help="Plan name (default: current)"),
 ):
     """Show a plan."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import get_current_plan, get_plan
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2786,16 +2804,18 @@ def plan_show(
         )
         raise typer.Exit(1)
 
+    backend = get_backend("plan")
     plan = None
     if name is None:
-        plan = get_current_plan()
+        if hasattr(backend, "get_current"):
+            plan = backend.get_current()
         if plan is None and ctx.obj.output_format == "human":
             typer.echo(
                 "No current plan set. Use 'idlergear plan switch <name>' to set one."
             )
             raise typer.Exit(0)
     else:
-        plan = get_plan(name)
+        plan = backend.get(name)
         if plan is None and ctx.obj.output_format == "human":
             typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
@@ -2806,8 +2826,8 @@ def plan_show(
 @plan_app.command("switch")
 def plan_switch(name: str):
     """Switch to a plan."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import switch_plan
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2816,7 +2836,8 @@ def plan_switch(name: str):
         )
         raise typer.Exit(1)
 
-    plan = switch_plan(name)
+    backend = get_backend("plan")
+    plan = backend.switch(name)
     if plan is None:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2832,8 +2853,8 @@ def plan_edit(
     state: str = typer.Option(None, "--state", "-s", help="New state: active, completed"),
 ):
     """Edit a plan."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import update_plan
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2842,7 +2863,8 @@ def plan_edit(
         )
         raise typer.Exit(1)
 
-    plan = update_plan(name, title=title, body=body, state=state)
+    backend = get_backend("plan")
+    plan = backend.update(name, title=title, body=body, state=state)
     if plan is None:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2853,8 +2875,8 @@ def plan_edit(
 @plan_app.command("delete")
 def plan_delete(name: str):
     """Delete a plan."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import delete_plan
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2863,7 +2885,8 @@ def plan_delete(name: str):
         )
         raise typer.Exit(1)
 
-    if delete_plan(name):
+    backend = get_backend("plan")
+    if backend.delete(name):
         typer.secho(f"Deleted plan: {name}", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
@@ -2873,8 +2896,8 @@ def plan_delete(name: str):
 @plan_app.command("complete")
 def plan_complete(name: str):
     """Mark a plan as completed."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.plans import complete_plan
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2883,7 +2906,8 @@ def plan_complete(name: str):
         )
         raise typer.Exit(1)
 
-    plan = complete_plan(name)
+    backend = get_backend("plan")
+    plan = backend.update(name, state="completed")
     if plan is None:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2905,8 +2929,8 @@ def reference_add(
     body: str = typer.Option(None, "--body", "-b", help="Reference body"),
 ):
     """Add a reference document."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.reference import add_reference
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2915,15 +2939,16 @@ def reference_add(
         )
         raise typer.Exit(1)
 
-    ref = add_reference(title, body=body)
+    backend = get_backend("reference")
+    ref = backend.add(title, body=body)
     typer.secho(f"Added reference: {ref['title']}", fg=typer.colors.GREEN)
 
 
 @reference_app.command("list")
 def reference_list(ctx: typer.Context):
     """List reference documents."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.reference import list_references
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2932,15 +2957,16 @@ def reference_list(ctx: typer.Context):
         )
         raise typer.Exit(1)
 
-    refs = list_references()
+    backend = get_backend("reference")
+    refs = backend.list()
     display(refs, ctx.obj.output_format, "references")
 
 
 @reference_app.command("show")
 def reference_show(ctx: typer.Context, title: str):
     """Show a reference document."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.reference import get_reference
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2949,7 +2975,8 @@ def reference_show(ctx: typer.Context, title: str):
         )
         raise typer.Exit(1)
 
-    ref = get_reference(title)
+    backend = get_backend("reference")
+    ref = backend.get(title)
     if ref is None and ctx.obj.output_format == "human":
         typer.secho(f"Reference '{title}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2964,8 +2991,8 @@ def reference_edit(
     body: str = typer.Option(None, "--body", "-b", help="New body"),
 ):
     """Edit a reference document."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.reference import update_reference
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2974,7 +3001,8 @@ def reference_edit(
         )
         raise typer.Exit(1)
 
-    ref = update_reference(title, new_title=new_title, body=body)
+    backend = get_backend("reference")
+    ref = backend.update(title, new_title=new_title, body=body)
     if ref is None:
         typer.secho(f"Reference '{title}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
@@ -2985,8 +3013,8 @@ def reference_edit(
 @reference_app.command("delete")
 def reference_delete(title: str):
     """Delete a reference document."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.reference import delete_reference
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2995,7 +3023,8 @@ def reference_delete(title: str):
         )
         raise typer.Exit(1)
 
-    if delete_reference(title):
+    backend = get_backend("reference")
+    if backend.delete(title):
         typer.secho(f"Deleted reference: {title}", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Reference '{title}' not found.", fg=typer.colors.RED)
@@ -3005,8 +3034,8 @@ def reference_delete(title: str):
 @reference_app.command("search")
 def reference_search(query: str):
     """Search reference documents."""
+    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
-    from idlergear.reference import search_references
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -3015,7 +3044,8 @@ def reference_search(query: str):
         )
         raise typer.Exit(1)
 
-    results = search_references(query)
+    backend = get_backend("reference")
+    results = backend.search(query)
     if not results:
         typer.echo(f"No references found matching '{query}'.")
         return

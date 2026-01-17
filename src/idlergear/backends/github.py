@@ -1100,6 +1100,8 @@ class GitHubPlanBackend:
                 "id": project.get("number"),
                 "body": body or "",
                 "current": False,
+                "state": "active",
+                "created": project.get("createdAt", ""),
             }
 
         except GitHubBackendError as e:
@@ -1136,6 +1138,8 @@ class GitHubPlanBackend:
                         "id": p.get("number"),
                         "body": "",
                         "current": plan_name == current_plan,
+                        "state": "active" if not p.get("closed") else "closed",
+                        "created": p.get("createdAt", ""),
                         "url": p.get("url", ""),
                     }
                 )
@@ -1184,6 +1188,19 @@ class GitHubPlanBackend:
         # GitHub Projects v2 update is complex via GraphQL
         # For now, return the existing plan
         return self.get(name)
+
+
+    def delete(self, name: str) -> bool:
+        """Delete a plan (GitHub Project)."""
+        plan = self.get(name)
+        if not plan:
+            return False
+
+        try:
+            _run_gh_command(["project", "delete", str(plan["id"]), "--format", "json"])
+            return True
+        except GitHubBackendError:
+            return False
 
 
 class GitHubDiscussionsNoteBackend:

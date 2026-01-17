@@ -438,6 +438,42 @@ async def list_tools() -> list[Tool]:
                 "required": ["name"],
             },
         ),
+        Tool(
+            name="idlergear_plan_edit",
+            description="Edit a plan",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "title": {"type": "string", "description": "New title"},
+                    "body": {"type": "string", "description": "New body"},
+                    "state": {"type": "string", "description": "New state: active, completed"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_delete",
+            description="Delete a plan",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_complete",
+            description="Mark a plan as completed",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                },
+                "required": ["name"],
+            },
+        ),
         # Reference tools
         Tool(
             name="idlergear_reference_add",
@@ -2380,6 +2416,32 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_plan_switch":
             backend = get_backend("plan")
             result = backend.switch(arguments["name"])
+            if result is None:
+                raise ValueError(f"Plan '{arguments['name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_plan_edit":
+            backend = get_backend("plan")
+            result = backend.update(
+                arguments["name"],
+                title=arguments.get("title"),
+                body=arguments.get("body"),
+                state=arguments.get("state"),
+            )
+            if result is None:
+                raise ValueError(f"Plan '{arguments['name']}' not found")
+            return _format_result(result)
+
+        elif name == "idlergear_plan_delete":
+            backend = get_backend("plan")
+            success = backend.delete(arguments["name"])
+            if not success:
+                raise ValueError(f"Plan '{arguments['name']}' not found")
+            return _format_result({"deleted": True, "name": arguments["name"]})
+
+        elif name == "idlergear_plan_complete":
+            backend = get_backend("plan")
+            result = backend.update(arguments["name"], state="completed")
             if result is None:
                 raise ValueError(f"Plan '{arguments['name']}' not found")
             return _format_result(result)

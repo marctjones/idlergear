@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.3.57)
+## Features (v0.3.58)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -133,6 +133,14 @@ idlergear note promote ID --to task  # Promote note to task
 
 idlergear vision show             # Show project vision
 idlergear vision edit             # Edit vision (opens editor)
+
+idlergear plan create NAME        # Create a plan
+idlergear plan list               # List all plans
+idlergear plan show [NAME]        # Show a plan (current if no name)
+idlergear plan switch NAME        # Switch to a plan
+idlergear plan edit NAME          # Edit plan title/body/state
+idlergear plan delete NAME        # Delete a plan
+idlergear plan complete NAME      # Mark plan as completed
 
 idlergear reference add TITLE     # Add reference documentation
 idlergear reference list          # List all references
