@@ -228,15 +228,23 @@ class ShellTaskBackend:
         except ShellBackendError:
             return None
 
-    def close(self, task_id: int) -> dict[str, Any] | None:
-        """Close a task."""
+    def close(self, task_id: int, comment: str | None = None) -> dict[str, Any] | None:
+        """Close a task.
+
+        Args:
+            task_id: Task ID to close
+            comment: Optional closing comment (passed as {comment} variable)
+        """
         cmd = self.commands.get("close")
         if not cmd:
             # Fall back to update with state=closed
             return self.update(task_id, state="closed")
 
         try:
-            output = _run_command(cmd, {"id": task_id})
+            variables = {"id": task_id}
+            if comment:
+                variables["comment"] = comment
+            output = _run_command(cmd, variables)
             return _parse_json_output(output, self.field_map)
         except ShellBackendError:
             return None

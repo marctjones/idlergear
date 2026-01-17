@@ -47,8 +47,13 @@ class TaskBackend(Protocol):
         """Update a task."""
         ...
 
-    def close(self, task_id: int) -> dict[str, Any] | None:
-        """Close a task."""
+    def close(self, task_id: int, comment: str | None = None) -> dict[str, Any] | None:
+        """Close a task.
+
+        Args:
+            task_id: Task ID to close
+            comment: Optional closing comment
+        """
         ...
 
     def reopen(self, task_id: int) -> dict[str, Any] | None:

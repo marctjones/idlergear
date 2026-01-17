@@ -356,10 +356,18 @@ class GitHubTaskBackend:
         except GitHubBackendError:
             return None
 
-    def close(self, task_id: int) -> dict[str, Any] | None:
-        """Close a GitHub issue."""
+    def close(self, task_id: int, comment: str | None = None) -> dict[str, Any] | None:
+        """Close a GitHub issue.
+
+        Args:
+            task_id: Issue number to close
+            comment: Optional closing comment
+        """
         try:
-            _run_gh_command(["issue", "close", str(task_id)])
+            cmd = ["issue", "close", str(task_id)]
+            if comment:
+                cmd.extend(["--comment", comment])
+            _run_gh_command(cmd)
             return self.get(task_id)
         except GitHubBackendError:
             return None

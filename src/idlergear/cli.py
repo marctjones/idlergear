@@ -2635,8 +2635,15 @@ def task_show(ctx: typer.Context, task_id: int):
 
 
 @task_app.command("close")
-def task_close(task_id: int):
-    """Close a task."""
+def task_close(
+    task_id: int,
+    comment: str = typer.Option(None, "--comment", "-c", help="Closing comment"),
+):
+    """Close a task.
+
+    Optionally provide a closing comment. When using GitHub backend,
+    the comment will be added to the issue.
+    """
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
 
@@ -2648,12 +2655,14 @@ def task_close(task_id: int):
         raise typer.Exit(1)
 
     backend = get_backend("task")
-    task = backend.close(task_id)
+    task = backend.close(task_id, comment=comment)
     if task is None:
         typer.secho(f"Task #{task_id} not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
     typer.secho(f"Closed task #{task_id}: {task['title']}", fg=typer.colors.GREEN)
+    if comment:
+        typer.secho(f"  Comment: {comment}", fg=typer.colors.CYAN)
 
 
 @task_app.command("edit")

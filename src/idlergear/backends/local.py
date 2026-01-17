@@ -72,9 +72,16 @@ class LocalTaskBackend:
             project_path=self.project_path,
         )
 
-    def close(self, task_id: int) -> dict[str, Any] | None:
+    def close(self, task_id: int, comment: str | None = None) -> dict[str, Any] | None:
+        """Close a task.
+
+        Args:
+            task_id: Task ID to close
+            comment: Optional closing comment (not stored in local backend)
+        """
         from idlergear.tasks import close_task
 
+        # Local backend doesn't support comments - just close the task
         return close_task(task_id, project_path=self.project_path)
 
     def reopen(self, task_id: int) -> dict[str, Any] | None:
