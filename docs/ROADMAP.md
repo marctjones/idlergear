@@ -2,14 +2,15 @@
 
 ## Executive Summary
 
-**Total Open Issues:** 22
-- **Actionable Features:** 21
+**Total Open Issues:** 23
+- **Actionable Features:** 22 (including 1 epic)
 - **Research/Notes:** 1 (knowledge capture, not blocking)
 
-**Current Version:** v0.3.69
+**Current Version:** v0.3.70
 
 **Recent Additions:**
-- #263 - Priorities registry (v0.6.0) ⭐ NEW
+- #264 - Structured info access system (v0.5.0) ⭐ NEW EPIC
+- #263 - Priorities registry (v0.6.0) ⭐
 - #262 - Review AI assistant tools (v0.5.0)
 - #261 - Review official MCP servers (v0.6.0)
 
@@ -60,38 +61,47 @@
 **Priority:** High (strategic differentiation)
 **Target:** Q2 2026
 
-**Issues (5):**
-1. **#262** - Review AI assistant tools for integration opportunities [HIGH] ⭐ NEW
-2. **#259** - Token-efficient SKILLS.md and AGENTS.md support [medium → HIGH]
-3. **#213** - Enhanced Gemini Context in GEMINI.md [low → medium]
-4. **#212** - Implement Gemini CLI Slash Commands [low → medium]
-5. **#214** - Investigate Gemini CLI Lifecycle Hooks [research]
+**Issues (6):**
+1. **#262** - Review AI assistant tools for integration opportunities [HIGH] ⭐
+2. **#264** - Token-efficient structured information access system [HIGH EPIC] ⭐ NEW
+3. **#259** - Token-efficient SKILLS.md and AGENTS.md support [HIGH]
+4. **#213** - Enhanced Gemini Context in GEMINI.md [medium]
+5. **#212** - Implement Gemini CLI Slash Commands [medium]
+6. **#214** - Investigate Gemini CLI Lifecycle Hooks [research]
 
 **Dependencies:**
 - Existing: CLAUDE.md, GEMINI.md, .goosehints support
 - MCP server (126 tools already implemented)
+- Context modes (#235) - pattern for token efficiency
 
 **Implementation Order:**
 1. #262 - Survey AI assistant tools (inform all other work) ⭐ FOUNDATIONAL
-2. #214 - Research Gemini hooks specifically (inform design)
-3. #259 - Core AGENTS.md/SKILLS.md compression (implement universal context)
-4. #213 - Enhance GEMINI.md using #259 framework
-5. #212 - Gemini slash commands
+2. #264 - Structured info system (enables priorities, API docs access) ⭐ FOUNDATIONAL
+3. #214 - Research Gemini hooks specifically (inform design)
+4. #259 - Core AGENTS.md/SKILLS.md compression (implement universal context)
+5. #213 - Enhance GEMINI.md using #259 framework
+6. #212 - Gemini slash commands
 
 **Key Features:**
 - **Tool Integration Survey (#262)** - Comprehensive analysis of 5+ AI assistants
-- 90% token reduction (7000 → 700 tokens)
+- **Structured Info System (#264)** - Universal token-efficient access to API docs, priorities, references
+  - 90-98% token savings for queries
+  - `idlergear info priorities`, `idlergear info api`, `idlergear info ref`
+  - Queryable: "show tier-1 only", "API for task.create"
+  - Cacheable and mode-based (minimal/standard/detailed/full)
+- 90% token reduction for context (7000 → 700 tokens)
 - Single source: AGENTS.md generates CLAUDE.md, GEMINI.md, .goosehints, .aider.conf.yml, cursor-context.md
 - Smart caching (0 tokens for unchanged sessions)
 - Context compression: minimal/standard/full modes
-- MCP tool: `idlergear_inject_context`
+- MCP tools: `idlergear_inject_context`, `idlergear_info_query`, `idlergear_info_api`
 - Universal command integration across tools
 
 **Strategic Value:**
 - First tool with universal AI assistant support (Claude, Gemini, Goose, Aider, Copilot CLI, Cursor)
-- Token efficiency as competitive advantage
+- Token efficiency as competitive advantage (context + structured info + API docs)
 - Write once, run everywhere for context
 - Switch assistants without losing project knowledge
+- Query any structured data efficiently (priorities, docs, references)
 
 ---
 
@@ -198,7 +208,8 @@
 ## Priority Changes Summary
 
 ### Upgraded to HIGH:
-- **#263** - Priorities registry (v0.6.0 foundational) ⭐ NEW
+- **#264** - Structured info access system (v0.5.0 EPIC) ⭐ NEW
+- **#263** - Priorities registry (v0.6.0 foundational) ⭐
 - **#262** - AI assistant tools review (v0.5.0 foundational) ⭐
 - **#260** - Planning concepts clarification (v0.6.0 foundational) ⭐
 - **#259** - AGENTS.md/SKILLS.md support (strategic importance)
@@ -231,8 +242,9 @@ v0.4.0 (Test & Run)
 
 v0.5.0 (Multi-Assistant)
 ├── #262 (AI tools survey) ⭐ FOUNDATIONAL
+├── #264 (Structured info system) ⭐ FOUNDATIONAL EPIC
 ├── #214 (Gemini research)
-└── #259 (universal context)
+└── #259 (universal context) ← uses #264 for docs
     ├── #213 (Gemini context)
     └── #212 (Gemini commands)
 
@@ -300,14 +312,16 @@ These are knowledge capture, not actionable work items:
 Based on recent progress (10 issues completed in 1 session):
 
 - **v0.4.0** (9 issues) - ~2-3 weeks
-- **v0.5.0** (5 issues, includes survey) - ~3-4 weeks
+- **v0.5.0** (6 issues including 1 epic, includes survey) - ~4-5 weeks
 - **v0.6.0** (5 issues, includes surveys + registry) - ~3-4 weeks
 - **v0.7.0** (2 issues) - ~1 week
 - **v1.0.0** (polish) - ~2-4 weeks
 
-**Total estimated timeline:** ~11-18 weeks (Q1-Q2 2026)
+**Total estimated timeline:** ~12-19 weeks (Q1-Q2 2026)
 
-**Note:** Survey issues (#261, #262) may spawn additional child issues based on findings.
+**Note:**
+- Epic #264 will spawn child issues for each phase
+- Survey issues (#261, #262) may spawn additional child issues based on findings.
 
 ---
 
