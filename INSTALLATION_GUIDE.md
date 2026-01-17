@@ -8,7 +8,7 @@ Created: 2026-01-07
 
 ## ✅ What Was Installed
 
-### 1. **IdlerGear Core (v0.3.1)**
+### 1. **IdlerGear Core (v0.3.57)**
 - Installed via: `pip install -e .`
 - Location: `/home/marc/Projects/idlergear`
 - Executable: `idlergear-mcp` at `/home/marc/.local/bin/`
