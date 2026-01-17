@@ -182,26 +182,26 @@
 
 ---
 
-### v1.0.0 - Stable Release
-**Theme:** Production-ready, comprehensive documentation, stable APIs
-**Priority:** Critical (milestone)
+### v0.8.0 - Polish & Documentation
+**Theme:** Refinement, comprehensive documentation, preparation for eventual 1.0
+**Priority:** High (quality milestone)
 **Target:** Q1 2027
 
-**Requirements:**
-- All v0.4-v0.7 features complete
+**Focus Areas:**
+- Polish existing features from v0.4-v0.7
 - Comprehensive documentation
-- Migration guides
-- Backward compatibility guarantees
-- Performance benchmarks
-- Security audit
-- API stability commitment
+- Performance optimization
+- Bug fixes and stability improvements
+- User experience refinement
 
-**Exit Criteria:**
-- No critical bugs
-- >90% test coverage
-- Documentation complete
-- 3+ real-world deployments
-- Performance baselines met
+**Goals:**
+- High test coverage (>85%)
+- Complete user documentation
+- Performance benchmarks established
+- Real-world deployments validated
+- Community feedback incorporated
+
+**Note:** v1.0 will come when the project is truly production-ready, not on a fixed timeline.
 
 ---
 
@@ -261,7 +261,7 @@ v0.7.0 (Dev Experience)
 ├── #258 (File management)
 └── #255 (Command queue)
 
-v1.0.0 (Release)
+v0.8.0 (Polish)
 ├── v0.4.0 complete
 ├── v0.5.0 complete
 ├── v0.6.0 complete
@@ -315,9 +315,9 @@ Based on recent progress (10 issues completed in 1 session):
 - **v0.5.0** (6 issues including 1 epic, includes survey) - ~4-5 weeks
 - **v0.6.0** (5 issues, includes surveys + registry) - ~3-4 weeks
 - **v0.7.0** (2 issues) - ~1 week
-- **v1.0.0** (polish) - ~2-4 weeks
+- **v0.8.0** (polish, docs, optimization) - ~2-4 weeks
 
-**Total estimated timeline:** ~12-19 weeks (Q1-Q2 2026)
+**Total estimated timeline:** ~12-19 weeks to v0.8.0 (Q1-Q2 2026 → Q1 2027)
 
 **Note:**
 - Epic #264 will spawn child issues for each phase
@@ -336,9 +336,10 @@ Based on recent progress (10 issues completed in 1 session):
 
 ### High Risk:
 - v0.5.0 - Multi-assistant support requires deep integration
-- v1.0.0 - Stability guarantees and API freeze
+- v0.8.0 - Comprehensive stability and documentation work
 
 **Mitigation:**
 - Phased rollout per milestone
 - Extensive testing for v0.5.0
-- Beta period before v1.0.0
+- Beta period and community feedback for v0.8.0
+- v1.0 will only happen when truly production-ready (no rush)
