@@ -125,6 +125,104 @@ def _map_issue_to_task(issue: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# Standard IdlerGear labels with colors and descriptions
+IDLERGEAR_LABELS = {
+    "exploration": {"color": "0E8A16", "description": "IdlerGear exploration"},
+    "note": {"color": "FBCA04", "description": "IdlerGear note"},
+    "tag": {"color": "C2E0C6", "description": "IdlerGear note tag"},
+}
+
+
+class LabelManager:
+    """Centralized GitHub label management with caching."""
+
+    def __init__(self):
+        """Initialize label manager with empty cache."""
+        self._label_cache: dict[str, bool] | None = None
+
+    def _load_labels(self) -> dict[str, bool]:
+        """Load all existing labels into cache."""
+        if self._label_cache is not None:
+            return self._label_cache
+
+        try:
+            output = _run_gh_command(["label", "list", "--json", "name"])
+            labels = _parse_json(output) or []
+            self._label_cache = {label["name"]: True for label in labels}
+        except GitHubBackendError:
+            self._label_cache = {}
+
+        return self._label_cache
+
+    def label_exists(self, name: str) -> bool:
+        """Check if a label exists (cached)."""
+        cache = self._load_labels()
+        return name in cache
+
+    def ensure_label(self, name: str, color: str, description: str) -> None:
+        """Ensure a label exists, creating it if necessary.
+
+        Args:
+            name: Label name
+            color: Hex color code (without #)
+            description: Label description
+        """
+        # Check cache first
+        if self.label_exists(name):
+            return
+
+        try:
+            _run_gh_command(
+                [
+                    "label",
+                    "create",
+                    name,
+                    "--description",
+                    description,
+                    "--color",
+                    color,
+                    "--force",
+                ]
+            )
+            # Update cache
+            if self._label_cache is not None:
+                self._label_cache[name] = True
+        except GitHubBackendError:
+            # Label might already exist, update cache anyway
+            if self._label_cache is not None:
+                self._label_cache[name] = True
+
+    def ensure_standard_label(self, label_type: str) -> None:
+        """Ensure a standard IdlerGear label exists.
+
+        Args:
+            label_type: Type of label (exploration, note, tag)
+        """
+        if label_type not in IDLERGEAR_LABELS:
+            raise ValueError(f"Unknown standard label type: {label_type}")
+
+        config = IDLERGEAR_LABELS[label_type]
+        self.ensure_label(label_type, config["color"], config["description"])
+
+    def ensure_tag_label(self, tag: str) -> None:
+        """Ensure a tag label exists (format: tag:tagname).
+
+        Args:
+            tag: Tag name (e.g., 'explore', 'idea')
+        """
+        label_name = f"tag:{tag}"
+        tag_config = IDLERGEAR_LABELS["tag"]
+        self.ensure_label(
+            label_name,
+            tag_config["color"],
+            f"IdlerGear note tag: {tag}",
+        )
+
+    def invalidate_cache(self) -> None:
+        """Invalidate the label cache."""
+        self._label_cache = None
+
+
 class GitHubTaskBackend:
     """GitHub Issues as task backend."""
 
@@ -282,24 +380,7 @@ class GitHubExploreBackend:
 
     def __init__(self, project_path: Path | None = None):
         self.project_path = project_path
-
-    def _ensure_label_exists(self) -> None:
-        """Ensure the exploration label exists."""
-        try:
-            _run_gh_command(
-                [
-                    "label",
-                    "create",
-                    self.EXPLORE_LABEL,
-                    "--description",
-                    "IdlerGear exploration",
-                    "--color",
-                    "0E8A16",
-                    "--force",
-                ]
-            )
-        except GitHubBackendError:
-            pass  # Label might already exist
+        self.label_manager = LabelManager()
 
     def create(
         self,
@@ -307,7 +388,7 @@ class GitHubExploreBackend:
         body: str | None = None,
     ) -> dict[str, Any]:
         """Create a new exploration as a GitHub issue."""
-        self._ensure_label_exists()
+        self.label_manager.ensure_standard_label("exploration")
 
         args = [
             "issue",
@@ -437,44 +518,7 @@ class GitHubNoteBackend:
     def __init__(self, project_path: Path | None = None):
         self.project_path = project_path
         self._next_local_id = 1  # For tracking notes locally
-
-    def _ensure_label_exists(self) -> None:
-        """Ensure the note label exists."""
-        try:
-            _run_gh_command(
-                [
-                    "label",
-                    "create",
-                    self.NOTE_LABEL,
-                    "--description",
-                    "IdlerGear note",
-                    "--color",
-                    "FBCA04",  # Yellow
-                    "--force",
-                ]
-            )
-        except GitHubBackendError:
-            pass  # Label might already exist
-
-    def _ensure_tag_labels_exist(self, tags: list[str]) -> None:
-        """Ensure tag labels exist (tag:explore, tag:idea, etc.)."""
-        for tag in tags:
-            label_name = f"tag:{tag}"
-            try:
-                _run_gh_command(
-                    [
-                        "label",
-                        "create",
-                        label_name,
-                        "--description",
-                        f"IdlerGear note tag: {tag}",
-                        "--color",
-                        "C2E0C6",  # Light green
-                        "--force",
-                    ]
-                )
-            except GitHubBackendError:
-                pass  # Label might already exist
+        self.label_manager = LabelManager()
 
     def create(
         self,
@@ -482,9 +526,10 @@ class GitHubNoteBackend:
         tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a new note as a GitHub issue with optional tags."""
-        self._ensure_label_exists()
+        self.label_manager.ensure_standard_label("note")
         if tags:
-            self._ensure_tag_labels_exist(tags)
+            for tag in tags:
+                self.label_manager.ensure_tag_label(tag)
 
         # Use first line as title, rest as body
         lines = content.strip().split("\n", 1)
@@ -1220,6 +1265,7 @@ class GitHubDiscussionsNoteBackend:
         self._repo_id: str | None = None
         self._category_id: str | None = None
         self._discussions_enabled: bool | None = None
+        self.label_manager = LabelManager()
 
     def _get_repo_id(self) -> str:
         """Get the repository node ID for GraphQL."""
@@ -1306,26 +1352,6 @@ class GitHubDiscussionsNoteBackend:
 
         return self._discussions_enabled
 
-    def _ensure_labels_exist(self, tags: list[str]) -> None:
-        """Ensure tag labels exist (tag:explore, tag:idea, etc.)."""
-        for tag in tags:
-            label_name = f"tag:{tag}"
-            try:
-                _run_gh_command(
-                    [
-                        "label",
-                        "create",
-                        label_name,
-                        "--description",
-                        f"IdlerGear note tag: {tag}",
-                        "--color",
-                        "C2E0C6",  # Light green
-                        "--force",
-                    ]
-                )
-            except GitHubBackendError:
-                pass  # Label might already exist
-
     def create(
         self,
         content: str,
@@ -1338,7 +1364,8 @@ class GitHubDiscussionsNoteBackend:
             )
 
         if tags:
-            self._ensure_labels_exist(tags)
+            for tag in tags:
+                self.label_manager.ensure_tag_label(tag)
 
         # Use first line as title, rest as body
         lines = content.strip().split("\n", 1)
