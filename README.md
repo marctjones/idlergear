@@ -36,7 +36,7 @@ IdlerGear works identically across all major AI coding assistants:
 - **References** - Store documentation and resources
 - **Session State** - Perfect continuity across AI sessions
 - **Runs** - Background process tracking with logs
-- **Secrets** - Secure encrypted local storage for sensitive data
+- **Secrets** - Secure encrypted local storage for sensitive data (CLI-only, no MCP tools for security)
 
 ### Python-Native MCP Servers (Zero Node.js!)
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
@@ -169,7 +169,8 @@ idlergear test coverage FILE      # Check if file has tests
 idlergear test uncovered          # Find files without tests
 idlergear test changed            # Tests for changed files
 
-# Secrets Management (NEW!)
+# Secrets Management (CLI-only for security)
+# Note: Intentionally no MCP tools - AI assistants should not access secrets
 idlergear secrets init            # Initialize encrypted storage
 idlergear secrets set KEY         # Store a secret (prompts for value)
 idlergear secrets get KEY         # Retrieve a secret
