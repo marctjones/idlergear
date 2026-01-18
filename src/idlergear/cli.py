@@ -8630,5 +8630,56 @@ def priorities_validate(
         raise typer.Exit(1)
 
 
+# ==============================================================================
+# DOCUMENTATION COVERAGE COMMANDS
+# ==============================================================================
+
+
+@app.command("doc-coverage")
+def doc_coverage(
+    ctx: typer.Context,
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show all undocumented items"),
+):
+    """Check documentation coverage for MCP tools and CLI commands.
+
+    Examples:
+        idlergear doc-coverage              # Show coverage summary
+        idlergear doc-coverage -v           # Show all undocumented items
+    """
+    from idlergear.doc_coverage import get_documentation_coverage, format_coverage_report
+
+    try:
+        coverage = get_documentation_coverage()
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+
+    if output_format == OutputFormat.JSON:
+        result = {
+            "mcp_tools": {
+                "total": len(coverage.mcp_tools),
+                "documented": len(coverage.documented_in_skills),
+                "coverage": coverage.mcp_coverage_skills,
+                "undocumented": [t.name for t in coverage.undocumented_mcp_tools],
+            },
+            "cli_commands": {
+                "total": len(coverage.cli_commands),
+                "documented": len(coverage.documented_in_readme),
+                "coverage": coverage.cli_coverage_readme,
+                "undocumented": [c.full_name for c in coverage.undocumented_cli_commands],
+            },
+        }
+        typer.echo(json.dumps(result, indent=2))
+    else:
+        report = format_coverage_report(coverage, verbose=verbose)
+        typer.echo(report)
+
+    # Exit with error if coverage is poor
+    if coverage.mcp_coverage_skills < 0.85 or coverage.cli_coverage_readme < 0.85:
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

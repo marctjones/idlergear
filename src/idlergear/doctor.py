@@ -649,6 +649,60 @@ def check_external_test_runs(project_path: Path) -> CheckResult:
         )
 
 
+def check_documentation_coverage(project_path: Path) -> CheckResult:
+    """Check documentation coverage for MCP tools and CLI commands."""
+    try:
+        from idlergear.doc_coverage import get_documentation_coverage
+
+        coverage = get_documentation_coverage(project_path)
+
+        mcp_pct = coverage.mcp_coverage_skills * 100
+        cli_pct = coverage.cli_coverage_readme * 100
+
+        # Determine status
+        if mcp_pct >= 95 and cli_pct >= 95:
+            status = CheckStatus.OK
+            message = f"Excellent doc coverage: MCP {mcp_pct:.0f}%, CLI {cli_pct:.0f}%"
+        elif mcp_pct >= 85 and cli_pct >= 85:
+            status = CheckStatus.OK
+            message = f"Good doc coverage: MCP {mcp_pct:.0f}%, CLI {cli_pct:.0f}%"
+        elif mcp_pct >= 70 and cli_pct >= 70:
+            status = CheckStatus.WARNING
+            message = f"Fair doc coverage: MCP {mcp_pct:.0f}%, CLI {cli_pct:.0f}%"
+        else:
+            status = CheckStatus.WARNING
+            message = f"Low doc coverage: MCP {mcp_pct:.0f}%, CLI {cli_pct:.0f}%"
+
+        details = {
+            "mcp_tools_total": len(coverage.mcp_tools),
+            "mcp_tools_documented": len(coverage.documented_in_skills),
+            "cli_commands_total": len(coverage.cli_commands),
+            "cli_commands_documented": len(coverage.documented_in_readme),
+            "undocumented_mcp": [t.name for t in coverage.undocumented_mcp_tools[:5]],
+            "undocumented_cli": [c.full_name for c in coverage.undocumented_cli_commands[:5]],
+        }
+
+        return CheckResult(
+            name="doc_coverage",
+            status=status,
+            message=message,
+            fix="Update SKILLS.md and README.md with missing documentation",
+            details=details,
+        )
+    except ImportError:
+        return CheckResult(
+            name="doc_coverage",
+            status=CheckStatus.OK,
+            message="Documentation coverage module not available",
+        )
+    except Exception as e:
+        return CheckResult(
+            name="doc_coverage",
+            status=CheckStatus.WARNING,
+            message=f"Could not check doc coverage: {e}",
+        )
+
+
 # ============================================================================
 # Lingering/Legacy File Checks
 # ============================================================================
@@ -885,6 +939,9 @@ def run_doctor(project_path: Path | None = None) -> DoctorReport:
     checks.append(check_test_failures(project_path))
     checks.append(check_test_coverage_gaps(project_path))
     checks.append(check_external_test_runs(project_path))
+
+    # Documentation coverage check
+    checks.append(check_documentation_coverage(project_path))
 
     return DoctorReport(
         checks=checks,
