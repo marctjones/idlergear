@@ -181,6 +181,7 @@ class SessionHistory:
             raise ValueError("Not in an IdlerGear project")
 
         self.sessions_dir = self.root / ".idlergear" / "sessions"
+        self.checkpoints_dir = self.sessions_dir / "checkpoints"
         self.index = SessionIndex(self.root)
 
         # Auto-migrate from old session_state.json if exists
@@ -371,6 +372,164 @@ class SessionHistory:
             current_id = snapshot.parent
 
         return history
+
+    def _get_last_checkpoint_time(self) -> Optional[datetime]:
+        """Get timestamp of the last checkpoint.
+
+        Returns:
+            Datetime of last checkpoint or None if no checkpoints exist
+        """
+        checkpoints = self.list_checkpoints()
+        if not checkpoints:
+            return None
+
+        # Get most recent checkpoint
+        latest = checkpoints[-1]
+        try:
+            return datetime.fromisoformat(latest["timestamp"])
+        except (ValueError, KeyError):
+            return None
+
+    def should_save_checkpoint(self, interval_minutes: int = 15) -> bool:
+        """Check if a checkpoint should be saved based on time interval.
+
+        Args:
+            interval_minutes: Checkpoint interval in minutes (default: 15)
+
+        Returns:
+            True if interval has elapsed since last checkpoint
+        """
+        last_checkpoint = self._get_last_checkpoint_time()
+        if last_checkpoint is None:
+            return True
+
+        elapsed = datetime.now() - last_checkpoint
+        return elapsed.total_seconds() >= (interval_minutes * 60)
+
+    def save_checkpoint(self, state: dict[str, Any]) -> Path:
+        """Save a lightweight checkpoint.
+
+        Args:
+            state: Essential state only (task, files, git commit)
+
+        Returns:
+            Path to saved checkpoint file
+        """
+        self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+        # Generate checkpoint ID (c001, c002, etc.)
+        existing = list(self.checkpoints_dir.glob("c*.json"))
+        if not existing:
+            checkpoint_id = "c001"
+        else:
+            # Extract numbers and find max
+            nums = []
+            for cp in existing:
+                if cp.stem.startswith("c"):
+                    try:
+                        nums.append(int(cp.stem[1:]))
+                    except ValueError:
+                        continue
+            next_num = max(nums) + 1 if nums else 1
+            checkpoint_id = f"c{next_num:03d}"
+
+        checkpoint_data = {
+            "checkpoint_id": checkpoint_id,
+            "timestamp": datetime.now().isoformat(),
+            "state": state,
+        }
+
+        checkpoint_file = self.checkpoints_dir / f"{checkpoint_id}.json"
+        checkpoint_file.write_text(json.dumps(checkpoint_data, indent=2))
+
+        return checkpoint_file
+
+    def load_checkpoint(self, checkpoint_id: Optional[str] = None) -> Optional[dict[str, Any]]:
+        """Load a checkpoint.
+
+        Args:
+            checkpoint_id: Checkpoint ID to load (e.g., c001). If None, loads latest.
+
+        Returns:
+            Checkpoint data or None if not found
+        """
+        if checkpoint_id is None:
+            # Load latest
+            checkpoints = self.list_checkpoints()
+            if not checkpoints:
+                return None
+            checkpoint_id = checkpoints[-1]["checkpoint_id"]
+
+        checkpoint_file = self.checkpoints_dir / f"{checkpoint_id}.json"
+        if not checkpoint_file.exists():
+            return None
+
+        try:
+            return json.loads(checkpoint_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def list_checkpoints(self) -> list[dict[str, Any]]:
+        """List all checkpoints.
+
+        Returns:
+            List of checkpoint metadata dicts
+        """
+        if not self.checkpoints_dir.exists():
+            return []
+
+        checkpoints = []
+        for checkpoint_file in sorted(self.checkpoints_dir.glob("c*.json")):
+            try:
+                data = json.loads(checkpoint_file.read_text())
+                checkpoints.append(
+                    {
+                        "checkpoint_id": data["checkpoint_id"],
+                        "timestamp": data["timestamp"],
+                        "file": str(checkpoint_file),
+                    }
+                )
+            except (json.JSONDecodeError, KeyError, OSError):
+                continue
+
+        return checkpoints
+
+    def recover_from_checkpoint(self) -> Optional[dict[str, Any]]:
+        """Recover state from the latest checkpoint.
+
+        Returns:
+            Recovered state or None if no checkpoint exists
+        """
+        checkpoint = self.load_checkpoint()
+        if checkpoint:
+            return checkpoint.get("state")
+        return None
+
+    def cleanup_old_checkpoints(self, keep_last_n: int = 10) -> int:
+        """Clean up old checkpoints, keeping only the most recent N.
+
+        Args:
+            keep_last_n: Number of recent checkpoints to keep
+
+        Returns:
+            Number of checkpoints deleted
+        """
+        checkpoints = self.list_checkpoints()
+        if len(checkpoints) <= keep_last_n:
+            return 0
+
+        # Delete oldest checkpoints
+        to_delete = checkpoints[:-keep_last_n]
+        deleted = 0
+
+        for cp in to_delete:
+            try:
+                Path(cp["file"]).unlink()
+                deleted += 1
+            except OSError:
+                continue
+
+        return deleted
 
 
 def migrate_from_old_session_state() -> bool:

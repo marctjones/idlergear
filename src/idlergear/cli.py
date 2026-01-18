@@ -5278,16 +5278,21 @@ def session_diff(
 
 
 @session_app.command("checkpoints")
-def session_checkpoints():
+def session_checkpoints(
+    limit: int = typer.Option(10, "--limit", "-l", help="Number of checkpoints to show"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+):
     """List auto-saved checkpoints.
 
     Checkpoints are lightweight auto-saves created every 15 minutes
     for crash recovery.
 
     Examples:
-        idlergear session checkpoints  # List all checkpoints
+        idlergear session checkpoints         # List recent checkpoints
+        idlergear session checkpoints --limit 20  # Show more
     """
     from idlergear.config import find_idlergear_root
+    from idlergear.session_history import SessionHistory
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -5296,9 +5301,126 @@ def session_checkpoints():
         )
         raise typer.Exit(1)
 
-    # For now, just show a message that checkpoints aren't implemented yet
-    typer.secho("Auto-checkpoint feature coming soon!", fg=typer.colors.YELLOW)
-    typer.echo("Checkpoints will save session state every 15 minutes for crash recovery.")
+    try:
+        history = SessionHistory()
+        checkpoints = history.list_checkpoints()
+
+        if not checkpoints:
+            typer.secho("No checkpoints found.", fg=typer.colors.YELLOW)
+            typer.echo("Checkpoints are auto-saved every 15 minutes during active sessions.")
+            return
+
+        # Limit results
+        if limit:
+            checkpoints = checkpoints[-limit:]
+
+        if json_output:
+            import json
+
+            print(json.dumps(checkpoints, indent=2))
+            return
+
+        typer.secho(f"\n📌 Session Checkpoints (showing {len(checkpoints)}):\n", bold=True)
+
+        for cp in reversed(checkpoints):  # Show newest first
+            checkpoint_id = cp["checkpoint_id"]
+            timestamp = cp["timestamp"]
+
+            # Format timestamp
+            try:
+                from datetime import datetime
+
+                dt = datetime.fromisoformat(timestamp)
+                elapsed = datetime.now() - dt
+                hours = int(elapsed.total_seconds() / 3600)
+                if hours < 1:
+                    minutes = int(elapsed.total_seconds() / 60)
+                    time_ago = f"{minutes}m ago"
+                elif hours < 24:
+                    time_ago = f"{hours}h ago"
+                else:
+                    days = hours // 24
+                    time_ago = f"{days}d ago"
+            except (ValueError, TypeError):
+                time_ago = "unknown"
+
+            typer.echo(f"  {checkpoint_id}  {time_ago}  ({timestamp})")
+
+        typer.echo()
+    except Exception as e:
+        typer.secho(f"Error listing checkpoints: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("recover")
+def session_recover(
+    checkpoint_id: str = typer.Option(None, "--checkpoint", "-c", help="Specific checkpoint ID (default: latest)"),
+):
+    """Recover session state from a checkpoint.
+
+    Loads the checkpoint state and displays it. Use this to recover from a crash
+    or to see what state was auto-saved.
+
+    Examples:
+        idlergear session recover            # Recover from latest checkpoint
+        idlergear session recover --checkpoint c005  # Recover from specific checkpoint
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_history import SessionHistory
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        history = SessionHistory()
+
+        if checkpoint_id:
+            checkpoint = history.load_checkpoint(checkpoint_id)
+        else:
+            checkpoint = history.load_checkpoint()
+
+        if not checkpoint:
+            typer.secho("No checkpoint found.", fg=typer.colors.YELLOW)
+            if checkpoint_id:
+                typer.echo(f"Checkpoint {checkpoint_id} does not exist.")
+            else:
+                typer.echo("No checkpoints available. They are created every 15 minutes during active sessions.")
+            return
+
+        # Display checkpoint info
+        cp_id = checkpoint["checkpoint_id"]
+        timestamp = checkpoint["timestamp"]
+        state = checkpoint.get("state", {})
+
+        typer.secho(f"\n💾 Recovered Checkpoint: {cp_id}\n", bold=True, fg=typer.colors.GREEN)
+        typer.echo(f"Saved at: {timestamp}\n")
+
+        # Show state
+        typer.secho("State:", bold=True)
+        if state.get("current_task_id"):
+            typer.echo(f"  Current task: #{state['current_task_id']}")
+        else:
+            typer.echo("  Current task: None")
+
+        if state.get("working_files"):
+            typer.echo(f"  Working files ({len(state['working_files'])}):")
+            for f in state["working_files"][:5]:
+                typer.echo(f"    - {f}")
+            if len(state["working_files"]) > 5:
+                typer.echo(f"    ... and {len(state['working_files']) - 5} more")
+
+        if state.get("notes"):
+            typer.echo(f"  Notes: {state['notes']}")
+
+        typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Error recovering checkpoint: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 # Goose commands
