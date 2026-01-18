@@ -5614,7 +5614,7 @@ def watch_check(
     else:
         status = analyze()
         actions = []
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
 
     if output_format == OutputFormat.JSON:
         result = status.to_dict()
@@ -8337,6 +8337,297 @@ def release_notes(
 
     notes = generate_notes_from_tasks(since_tag=since)
     typer.echo(notes)
+
+
+# ==============================================================================
+# PRIORITIES COMMANDS
+# ==============================================================================
+
+priorities_app = typer.Typer(help="Manage project priorities registry")
+app.add_typer(priorities_app, name="priorities")
+
+
+@priorities_app.command("show")
+def priorities_show(
+    ctx: typer.Context,
+    tier: Optional[str] = typer.Option(None, "--tier", "-t", help="Filter by tier"),
+    milestone: Optional[str] = typer.Option(
+        None, "--milestone", "-m", help="Filter by milestone"
+    ),
+):
+    """Show current priorities registry."""
+    from idlergear.priorities import PrioritiesRegistry
+
+    try:
+        registry = PrioritiesRegistry.load()
+    except (ValueError, FileNotFoundError):
+        typer.secho(
+            "No priorities registry found. Run 'idlergear priorities init' to create one.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(registry.model_dump_json(indent=2, exclude_none=True))
+        return
+
+    # Human-readable output
+    typer.secho("\n=== Project Priorities ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.echo(f"Last updated: {registry.last_updated}\n")
+
+    # Show feature areas
+    typer.secho("Feature Areas:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+    for tier_name, features in registry.feature_areas.items():
+        if tier and tier_name.value != tier:
+            continue
+        if not features:
+            continue
+
+        typer.secho(f"\n  {tier_name.value}:", fg=typer.colors.YELLOW)
+        for feature in features:
+            if milestone and feature.milestone != milestone:
+                continue
+
+            status_icon = "✅" if feature.status.value == "complete" else "⬜"
+            typer.echo(
+                f"    {status_icon} {feature.full_name} "
+                f"({feature.completion}% - {feature.milestone or 'unplanned'})"
+            )
+            if feature.notes:
+                typer.echo(f"       {feature.notes}")
+
+    # Show backends
+    typer.secho("\n\nBackends:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+    for tier_name, backends in registry.backends.items():
+        if tier and tier_name.value != tier:
+            continue
+        if not backends:
+            continue
+
+        typer.secho(f"\n  {tier_name.value}:", fg=typer.colors.YELLOW)
+        for backend in backends:
+            status_icon = "✅" if backend.status.value == "complete" else "⬜"
+            typer.echo(f"    {status_icon} {backend.name} ({backend.status.value})")
+            if backend.features:
+                for feature_name, feature_status in backend.features.items():
+                    typer.echo(f"       - {feature_name}: {feature_status}")
+
+    # Show AI assistants
+    typer.secho("\n\nAI Assistants:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+    for tier_name, assistants in registry.ai_assistants.items():
+        if tier and tier_name.value != tier:
+            continue
+        if not assistants:
+            continue
+
+        typer.secho(f"\n  {tier_name.value}:", fg=typer.colors.YELLOW)
+        for assistant in assistants:
+            status_icon = "✅" if assistant.status.value == "excellent" else "⚠️"
+            typer.echo(f"    {status_icon} {assistant.name} ({assistant.status.value})")
+            if assistant.context:
+                typer.echo(f"       Context: {assistant.context}")
+
+
+@priorities_app.command("init")
+def priorities_init(
+    ctx: typer.Context,
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Overwrite existing registry"
+    ),
+):
+    """Initialize priorities registry with defaults."""
+    from idlergear.priorities import PrioritiesRegistry
+    from idlergear.config import find_idlergear_root
+
+    root = find_idlergear_root()
+    if not root:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    priorities_file = root / ".idlergear" / "priorities.yaml"
+
+    if priorities_file.exists() and not force:
+        typer.secho(
+            "Priorities registry already exists. Use --force to overwrite.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+
+    registry = PrioritiesRegistry.create_default()
+    registry.save(root)
+
+    typer.secho(
+        f"✅ Created priorities registry at {priorities_file}", fg=typer.colors.GREEN
+    )
+
+
+@priorities_app.command("matrix")
+def priorities_matrix(ctx: typer.Context):
+    """Show validation matrix."""
+    from idlergear.priorities import PrioritiesRegistry
+
+    try:
+        registry = PrioritiesRegistry.load()
+    except (ValueError, FileNotFoundError):
+        typer.secho(
+            "No priorities registry found. Run 'idlergear priorities init' to create one.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(registry.validation_matrix.model_dump_json(indent=2))
+        return
+
+    # Human-readable matrix
+    typer.secho(
+        "\n=== Validation Matrix ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True
+    )
+
+    # Backend × Feature matrix
+    if registry.validation_matrix.backend_features:
+        typer.secho("Backend × Feature:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+        for backend_name, features in registry.validation_matrix.backend_features.items():
+            typer.secho(f"\n  {backend_name}:", fg=typer.colors.YELLOW)
+            for feature_name, status in features.items():
+                typer.echo(f"    {feature_name}: {status}")
+
+    # Assistant × Feature matrix
+    if registry.validation_matrix.assistant_features:
+        typer.secho("\n\nAssistant × Feature:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+        for assistant_name, features in registry.validation_matrix.assistant_features.items():
+            typer.secho(f"\n  {assistant_name}:", fg=typer.colors.YELLOW)
+            for feature_name, status in features.items():
+                typer.echo(f"    {feature_name}: {status}")
+
+
+@priorities_app.command("coverage")
+def priorities_coverage(ctx: typer.Context):
+    """Show coverage requirements and status."""
+    from idlergear.priorities import PrioritiesRegistry
+
+    try:
+        registry = PrioritiesRegistry.load()
+    except (ValueError, FileNotFoundError):
+        typer.secho(
+            "No priorities registry found. Run 'idlergear priorities init' to create one.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+
+    if output_format == OutputFormat.JSON:
+        typer.echo(registry.coverage_requirements.model_dump_json(indent=2))
+        return
+
+    # Human-readable coverage
+    typer.secho(
+        "\n=== Coverage Requirements ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True
+    )
+
+    typer.secho("Tier 1 Feature:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+    for req in registry.coverage_requirements.tier_1_feature:
+        typer.echo(f"  ✓ {req}")
+
+    typer.secho("\nCritical Backend:", fg=typer.colors.BRIGHT_GREEN, bold=True)
+    for req in registry.coverage_requirements.critical_backend:
+        typer.echo(f"  ✓ {req}")
+
+
+@priorities_app.command("validate")
+def priorities_validate(
+    ctx: typer.Context,
+    milestone: Optional[str] = typer.Option(
+        None, "--milestone", "-m", help="Validate specific milestone"
+    ),
+):
+    """Check if ready for release based on requirements."""
+    from idlergear.priorities import PrioritiesRegistry
+
+    try:
+        registry = PrioritiesRegistry.load()
+    except (ValueError, FileNotFoundError):
+        typer.secho(
+            "No priorities registry found. Run 'idlergear priorities init' to create one.",
+            fg=typer.colors.YELLOW,
+        )
+        raise typer.Exit(1)
+
+    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+
+    # Calculate validation status
+    ready = True
+    issues = []
+
+    # Check feature coverage
+    tier_1_features = registry.feature_areas.get("tier_1", [])
+    if milestone:
+        tier_1_features = [f for f in tier_1_features if f.milestone == milestone]
+
+    incomplete_features = [
+        f for f in tier_1_features if f.status.value != "complete"
+    ]
+    if incomplete_features:
+        ready = False
+        for feature in incomplete_features:
+            issues.append(
+                f"Feature '{feature.full_name}' not complete ({feature.completion}%)"
+            )
+
+    # Check backend coverage
+    critical_backends = registry.backends.get("critical", [])
+    incomplete_backends = [
+        b for b in critical_backends if b.status.value != "complete"
+    ]
+    if incomplete_backends:
+        ready = False
+        for backend in incomplete_backends:
+            issues.append(f"Backend '{backend.name}' not complete ({backend.status.value})")
+
+    # Check blocking bugs
+    if registry.v1_0_requirements.bugs_blocking_release:
+        ready = False
+        issues.append(
+            f"Blocking bugs: {', '.join(f'#{b}' for b in registry.v1_0_requirements.bugs_blocking_release)}"
+        )
+
+    if output_format == OutputFormat.JSON:
+        result = {"ready": ready, "issues": issues}
+        typer.echo(json.dumps(result, indent=2))
+        return
+
+    # Human-readable validation
+    if milestone:
+        typer.secho(
+            f"\n=== Release Validation: {milestone} ===\n",
+            fg=typer.colors.BRIGHT_CYAN,
+            bold=True,
+        )
+    else:
+        typer.secho(
+            "\n=== Release Validation: v1.0 ===\n",
+            fg=typer.colors.BRIGHT_CYAN,
+            bold=True,
+        )
+
+    if ready:
+        typer.secho("✅ READY FOR RELEASE", fg=typer.colors.GREEN, bold=True)
+    else:
+        typer.secho("🔴 NOT READY", fg=typer.colors.RED, bold=True)
+        typer.echo("\nIssues:")
+        for issue in issues:
+            typer.secho(f"  ❌ {issue}", fg=typer.colors.RED)
+
+    if not ready:
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
