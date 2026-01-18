@@ -9152,6 +9152,34 @@ def doc_coverage(
         raise typer.Exit(1)
 
 
+@app.command("monitor")
+def monitor(
+    session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
+):
+    """Monitor active session in real-time.
+
+    Watch your Claude Code session as it happens. See tool calls,
+    task operations, file changes, and more—all in a beautiful TUI.
+
+    Shortcut for: idlergear session monitor
+    Also available as standalone command: idlewatch
+
+    Examples:
+        idlergear monitor                     # Monitor current session
+        idlergear monitor --file /path/to/session.jsonl
+        idlewatch                              # Shortcut command
+    """
+    from pathlib import Path
+    from idlergear.tui import run_monitor
+
+    session_path = Path(session_file) if session_file else None
+
+    try:
+        run_monitor(session_path)
+    except KeyboardInterrupt:
+        pass
+
+
 def monitor_shortcut():
     """Entry point for idlewatch standalone command.
 

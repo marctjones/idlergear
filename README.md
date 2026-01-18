@@ -62,6 +62,22 @@ IdlerGear works identically across all major AI coding assistants:
 - **Session Persistence** - Perfect state restoration across sessions
 - **Auto Error Capture** - OpenTelemetry errors → tasks/notes automatically
 
+### 🔍 Live Session Monitoring
+
+Watch your AI coding session in real-time with **idlewatch**:
+
+```bash
+idlewatch  # See every tool call, file change, and decision as it happens
+```
+
+Beautiful TUI showing:
+- Tool calls in real-time (Read, Edit, Write, Bash, etc.)
+- Task operations (create, update, close)
+- File changes and git operations
+- Session timeline and statistics
+
+Also available as: `idlergear monitor` or `idlergear session monitor`
+
 ## Roadmap
 
 **See [ROADMAP.md](docs/ROADMAP.md) for full release plan.**
