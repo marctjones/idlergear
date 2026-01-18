@@ -391,9 +391,9 @@ class TestGitHubExploreBackend:
         backend = GitHubExploreBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
-            # First two calls are label create (may fail) and issue create
-            # Third call is issue view to get details
+            # Call sequence: label list, label create (optional), issue create, issue view
             mock_run.side_effect = [
+                json.dumps([]),  # label list (empty, so label will be created)
                 "",  # label create succeeds (or fails silently)
                 "https://github.com/owner/repo/issues/1",  # issue create
                 json.dumps(
@@ -410,8 +410,8 @@ class TestGitHubExploreBackend:
             result = backend.create("Exploration")
 
             assert result["id"] == 1
-            # Check that exploration label is added (second call was the create)
-            args = mock_run.call_args_list[1][0][0]
+            # Check that exploration label is added (third call was the create)
+            args = mock_run.call_args_list[2][0][0]
             assert "--label" in args
             assert "exploration" in args
 
@@ -514,8 +514,10 @@ class TestGitHubDiscussionsNoteBackend:
         backend = GitHubDiscussionsNoteBackend()
 
         with patch("idlergear.backends.github._run_gh_command") as mock_run:
+            # Call sequence: discussions check, label list, label create, repo ID, categories, create discussion
             mock_run.side_effect = [
                 "true",  # discussions enabled check
+                json.dumps([]),  # label list (empty, so tag label will be created)
                 "",  # label create for tag:explore
                 "R_repo123",  # get repo ID
                 json.dumps([{"id": "DIC_cat123", "name": "Ideas"}]),  # get categories
