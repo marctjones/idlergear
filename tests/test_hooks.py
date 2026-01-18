@@ -521,3 +521,190 @@ class TestHookIntegration:
             },
         )
         assert "note" in result["stderr"].lower()
+
+
+class TestPreCommitHook:
+    """Tests for the git pre-commit hook (auto_version.sh)."""
+
+    @pytest.fixture
+    def hook_path(self):
+        return get_hook_path("auto_version.sh")
+
+    @pytest.fixture
+    def git_repo(self):
+        """Create a temporary git repository for testing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_path = Path(tmpdir)
+
+            # Initialize git repo
+            subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+            )
+
+            # Initialize IdlerGear
+            subprocess.run(["idlergear", "init"], cwd=repo_path, check=True, capture_output=True)
+
+            # Create initial commit
+            subprocess.run(["git", "add", "."], cwd=repo_path, check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "Initial commit"],
+                cwd=repo_path,
+                check=True,
+                capture_output=True,
+            )
+
+            yield repo_path
+
+    def test_hook_warns_on_stale_tests(self, hook_path, git_repo):
+        """Should warn when committing source files with stale tests."""
+        if not hook_path.exists():
+            pytest.skip("Hook not found")
+
+        # Check if jq is available (required for the feature)
+        jq_check = subprocess.run(["which", "jq"], capture_output=True)
+        if jq_check.returncode != 0:
+            pytest.skip("jq not available, skipping staleness warning test")
+
+        # Manually create a stale test result (2 hours old)
+        from datetime import datetime, timedelta, timezone
+
+        test_results_dir = git_repo / ".idlergear" / "test_results"
+        test_results_dir.mkdir(parents=True, exist_ok=True)
+
+        old_timestamp = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        test_result = {
+            "framework": "pytest",
+            "timestamp": old_timestamp,
+            "passed": 1,
+            "failed": 0,
+            "skipped": 0,
+            "total": 1,
+            "duration": 0.1,
+        }
+
+        import json
+        (test_results_dir / "last_result.json").write_text(json.dumps(test_result))
+
+        # Enable test staleness warnings
+        subprocess.run(
+            ["idlergear", "config", "set", "test.warn_stale_on_commit", "true"],
+            cwd=git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Set threshold to 1 hour (3600 seconds)
+        subprocess.run(
+            ["idlergear", "config", "set", "test.stale_threshold_seconds", "3600"],
+            cwd=git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create and stage a source file
+        (git_repo / "src.py").write_text("def hello(): pass\n")
+        subprocess.run(["git", "add", "src.py"], cwd=git_repo, check=True, capture_output=True)
+
+        # Copy hook to git hooks
+        git_hooks_dir = git_repo / ".git" / "hooks"
+        git_hooks_dir.mkdir(exist_ok=True)
+        pre_commit_hook = git_hooks_dir / "pre-commit"
+        pre_commit_hook.write_text(hook_path.read_text())
+        pre_commit_hook.chmod(0o755)
+
+        # Run the hook
+        result = subprocess.run(
+            [str(pre_commit_hook)],
+            cwd=git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        # Should warn about stale tests
+        assert result.returncode == 0  # Warning, not blocking
+        # Check both stdout and stderr as bash echo can go to either
+        output = result.stdout + result.stderr
+        assert "Warning" in output or "warning" in output.lower()
+
+    def test_hook_no_warn_on_test_files(self, hook_path, git_repo):
+        """Should not warn when only committing test files."""
+        if not hook_path.exists():
+            pytest.skip("Hook not found")
+
+        # Enable test staleness warnings
+        subprocess.run(
+            ["idlergear", "config", "set", "test.warn_stale_on_commit", "true"],
+            cwd=git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create and stage a test file
+        (git_repo / "test_src.py").write_text("def test_hello(): pass\n")
+        subprocess.run(["git", "add", "test_src.py"], cwd=git_repo, check=True, capture_output=True)
+
+        # Copy hook to git hooks
+        git_hooks_dir = git_repo / ".git" / "hooks"
+        git_hooks_dir.mkdir(exist_ok=True)
+        pre_commit_hook = git_hooks_dir / "pre-commit"
+        pre_commit_hook.write_text(hook_path.read_text())
+        pre_commit_hook.chmod(0o755)
+
+        # Run the hook
+        result = subprocess.run(
+            [str(pre_commit_hook)],
+            cwd=git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        # Should not warn for test files
+        assert result.returncode == 0
+        assert "Warning" not in result.stdout
+
+    def test_hook_disabled_by_default(self, hook_path, git_repo):
+        """Test staleness warning should be disabled by default."""
+        if not hook_path.exists():
+            pytest.skip("Hook not found")
+
+        # Explicitly set to false to be sure (default should be false anyway)
+        subprocess.run(
+            ["idlergear", "config", "set", "test.warn_stale_on_commit", "false"],
+            cwd=git_repo,
+            check=True,
+            capture_output=True,
+        )
+
+        # Create and stage a source file
+        (git_repo / "src.py").write_text("def hello(): pass\n")
+        subprocess.run(["git", "add", "src.py"], cwd=git_repo, check=True, capture_output=True)
+
+        # Copy hook to git hooks
+        git_hooks_dir = git_repo / ".git" / "hooks"
+        git_hooks_dir.mkdir(exist_ok=True)
+        pre_commit_hook = git_hooks_dir / "pre-commit"
+        pre_commit_hook.write_text(hook_path.read_text())
+        pre_commit_hook.chmod(0o755)
+
+        # Run the hook
+        result = subprocess.run(
+            [str(pre_commit_hook)],
+            cwd=git_repo,
+            capture_output=True,
+            text=True,
+        )
+
+        # Should not warn when disabled
+        assert result.returncode == 0
+        output = result.stdout + result.stderr
+        assert "Warning" not in output or "stale" not in output.lower()

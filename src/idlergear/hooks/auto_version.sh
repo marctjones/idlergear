@@ -4,13 +4,19 @@
 #   1. Auto-version: Increments patch version on each commit
 #   2. Watch check: Creates tasks from TODO/FIXME/HACK in staged changes
 #   3. Test failure check: Blocks commit if tests failing (when enabled)
+#   4. Test staleness warning: Warns if committing code without recent tests (when enabled)
 #
 # Skip auto-bump: SKIP_VERSION=1 git commit -m "..."
 # Skip watch:     SKIP_WATCH=1 git commit -m "..."
 # Skip all:       git commit --no-verify -m "..."
 #
 # Manual major/minor bumps are detected and respected.
-# Test blocking enabled via: idlergear config set test.block_on_failure true
+#
+# Configuration:
+#   test.block_on_failure: true/false - Block commits when tests are failing
+#   test.warn_stale_on_commit: true/false - Warn when tests are stale
+#   test.stale_threshold_seconds: number - Seconds before tests considered stale (default: 3600)
+#   watch.enabled: true/false - Enable watch check for TODO/FIXME/HACK
 
 set -e
 
@@ -48,6 +54,49 @@ if command -v idlergear &> /dev/null; then
         else
             # jq not available, warn but don't block
             echo "⚠️  Warning: jq not found, skipping test failure check"
+        fi
+    fi
+fi
+
+# --- IdlerGear Test Staleness Warning ---
+# Warn if committing source files without recent test runs (when enabled)
+if command -v idlergear &> /dev/null && command -v jq &> /dev/null; then
+    warn_stale=$(idlergear config get test.warn_stale_on_commit 2>/dev/null | grep -oE '(true|True|false|False)$' || echo "false")
+
+    if [ "$warn_stale" = "true" ] || [ "$warn_stale" = "True" ]; then
+        # Check if source files are being committed (excluding test files)
+        source_files=$(git diff --cached --name-only | grep -E '\.(py|rs|go|js|ts|jsx|tsx|java|rb|php)$' | grep -vE '(test|spec)' || true)
+
+        if [ -n "$source_files" ]; then
+            # Get test staleness
+            staleness=$(idlergear test staleness --json 2>/dev/null || echo "{}")
+            seconds_ago=$(echo "$staleness" | jq -r '.seconds_ago // 999999' 2>/dev/null || echo "999999")
+
+            # Get threshold from config (default 1 hour = 3600 seconds)
+            threshold=$(idlergear config get test.stale_threshold_seconds 2>/dev/null | grep -oE '[0-9]+$' || echo "3600")
+
+            # Validate threshold is a number
+            if ! [[ "$threshold" =~ ^[0-9]+$ ]]; then
+                threshold=3600
+            fi
+
+            # Warn if tests are older than threshold
+            if [ "$seconds_ago" != "null" ] && [ "$seconds_ago" -gt "$threshold" ]; then
+                echo ""
+                if [ "$seconds_ago" -lt 3600 ]; then
+                    mins=$((seconds_ago / 60))
+                    echo "⚠️  Warning: Tests last run ${mins} minute(s) ago"
+                elif [ "$seconds_ago" -lt 86400 ]; then
+                    hours=$((seconds_ago / 3600))
+                    echo "⚠️  Warning: Tests last run ${hours} hour(s) ago"
+                else
+                    days=$((seconds_ago / 86400))
+                    echo "⚠️  Warning: Tests last run ${days} day(s) ago"
+                fi
+                echo "   Consider running: idlergear test run"
+                echo "   Or disable: idlergear config set test.warn_stale_on_commit false"
+                echo ""
+            fi
         fi
     fi
 fi
