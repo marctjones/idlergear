@@ -65,7 +65,7 @@ class IdleWatchApp(App):
             yield Header()
             yield Static(
                 "❌ No active Claude Code session found.\n\n"
-                "Start Claude Code in another terminal, then run idlewatch again.",
+                "Start Claude Code in another terminal, then run idlerwatch again.",
                 id="header",
             )
             yield Footer()
@@ -75,7 +75,7 @@ class IdleWatchApp(App):
         project = metadata.get("project", "unknown")
 
         yield Header()
-        yield Static(f"🟢 idlewatch - Monitoring session: {project}", id="header")
+        yield Static(f"🟢 idlerwatch - Monitoring session: {project}", id="header")
         yield ScrollableContainer(DataTable(id="activity"))
         yield Footer()
 
@@ -152,7 +152,7 @@ class IdleWatchApp(App):
 
         header = self.query_one("#header", Static)
         header.update(
-            f"🟢 idlewatch - Monitoring session: {project} "
+            f"🟢 idlerwatch - Monitoring session: {project} "
             f"({self.event_count} events)"
         )
 
@@ -191,7 +191,7 @@ class HelpScreen(Static):
 
 ## Keyboard Shortcuts
 
-- **q** - Quit idlewatch
+- **q** - Quit idlerwatch
 - **r** - Refresh display (re-read session file)
 - **c** - Clear event log
 - **h** - Show this help

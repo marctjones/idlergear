@@ -64,10 +64,10 @@ IdlerGear works identically across all major AI coding assistants:
 
 ### 🔍 Live Session Monitoring
 
-Watch your AI coding session in real-time with **idlewatch**:
+Watch your AI coding session in real-time with **idlerwatch**:
 
 ```bash
-idlewatch  # See every tool call, file change, and decision as it happens
+idlerwatch  # See every tool call, file change, and decision as it happens
 ```
 
 Beautiful TUI showing:

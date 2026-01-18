@@ -5432,12 +5432,12 @@ def session_monitor(
     Watch your Claude Code session as it happens. See tool calls,
     task operations, file changes, and more—all in a beautiful TUI.
 
-    Also available as standalone command: idlewatch
+    Also available as standalone command: idlerwatch
 
     Examples:
         idlergear session monitor           # Monitor current session
         idlergear session monitor --file /path/to/session.jsonl
-        idlewatch                            # Shortcut command
+        idlerwatch                            # Shortcut command
     """
     from pathlib import Path
     from idlergear.tui import run_monitor
@@ -9162,12 +9162,12 @@ def monitor(
     task operations, file changes, and more—all in a beautiful TUI.
 
     Shortcut for: idlergear session monitor
-    Also available as standalone command: idlewatch
+    Also available as standalone command: idlerwatch
 
     Examples:
         idlergear monitor                     # Monitor current session
         idlergear monitor --file /path/to/session.jsonl
-        idlewatch                              # Shortcut command
+        idlerwatch                              # Shortcut command
     """
     from pathlib import Path
     from idlergear.tui import run_monitor
@@ -9181,7 +9181,7 @@ def monitor(
 
 
 def monitor_shortcut():
-    """Entry point for idlewatch standalone command.
+    """Entry point for idlerwatch standalone command.
 
     This is a shortcut for: idlergear session monitor
     """
@@ -9189,7 +9189,7 @@ def monitor_shortcut():
 
     # Show help if requested
     if "--help" in sys.argv or "-h" in sys.argv:
-        print("""idlewatch - Real-time session monitoring for IdlerGear
+        print("""idlerwatch - Real-time session monitoring for IdlerGear
 
 Watch your Claude Code session as it happens. See tool calls,
 task operations, file changes, and more—all in a beautiful TUI.
@@ -9197,11 +9197,11 @@ task operations, file changes, and more—all in a beautiful TUI.
 This is a shortcut for: idlergear session monitor
 
 Usage:
-  idlewatch [options]
+  idlerwatch [options]
 
 Examples:
-  idlewatch                  # Monitor current session
-  idlewatch --file /path/to/session.jsonl
+  idlerwatch                  # Monitor current session
+  idlerwatch --file /path/to/session.jsonl
 
 Options:
   -h, --help                 Show this help message
