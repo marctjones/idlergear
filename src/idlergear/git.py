@@ -39,6 +39,40 @@ class GitCommit:
     files: List[str]
 
 
+def is_test_file(filepath: str) -> bool:
+    """
+    Check if a file is a test file based on common naming conventions.
+
+    Args:
+        filepath: Path to check
+
+    Returns:
+        True if file appears to be a test file
+    """
+    filepath_lower = filepath.lower()
+    path_parts = Path(filepath).parts
+
+    # Check for test directories
+    test_dirs = {'test', 'tests', '__tests__', 'spec', 'specs'}
+    if any(part.lower() in test_dirs for part in path_parts):
+        return True
+
+    # Check for test file patterns
+    filename = Path(filepath).name.lower()
+    test_patterns = [
+        'test_',      # test_*.py (Python pytest)
+        '_test.',     # *_test.go (Go)
+        '.test.',     # *.test.js (JavaScript)
+        '.spec.',     # *.spec.js (JavaScript)
+        '_spec.',     # *_spec.rb (Ruby RSpec)
+    ]
+
+    if any(pattern in filename for pattern in test_patterns):
+        return True
+
+    return False
+
+
 class GitServer:
     """Git operations server for MCP."""
 
@@ -666,4 +700,44 @@ class GitServer:
             ),
             "tasks_found": list(task_commits.keys()),
             "note": "Full task sync requires task backend integration",
+        }
+
+    def get_task_test_coverage(
+        self, task_id: int, repo_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Check if task commits include test files (IdlerGear-specific).
+
+        Args:
+            task_id: Task ID
+            repo_path: Repository path
+
+        Returns:
+            Test coverage info with test files added
+        """
+        commits = self.task_commits(task_id, repo_path=repo_path)
+
+        test_files_added = []
+        all_files = []
+        commits_with_tests = []
+
+        for commit in commits:
+            commit_has_test = False
+            for filepath in commit.files:
+                all_files.append(filepath)
+                if is_test_file(filepath):
+                    if filepath not in test_files_added:
+                        test_files_added.append(filepath)
+                    commit_has_test = True
+
+            if commit_has_test:
+                commits_with_tests.append(commit.short_hash)
+
+        return {
+            "task_id": task_id,
+            "has_tests": len(test_files_added) > 0,
+            "test_files": test_files_added,
+            "total_commits": len(commits),
+            "commits_with_tests": commits_with_tests,
+            "total_files": len(all_files),
         }

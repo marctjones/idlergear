@@ -2683,6 +2683,7 @@ def task_show(ctx: typer.Context, task_id: int):
     """Show a task."""
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
+    from idlergear.git import GitServer
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2697,6 +2698,15 @@ def task_show(ctx: typer.Context, task_id: int):
     if task is None and ctx.obj.output_format == "human":
         typer.secho(f"Task #{task_id} not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
+
+    # Add test coverage info if in a git repo
+    try:
+        git = GitServer()
+        coverage = git.get_task_test_coverage(task_id)
+        task["test_coverage"] = coverage
+    except Exception:
+        # Not in a git repo or other error - continue without coverage info
+        pass
 
     display(task, ctx.obj.output_format, "task")
 

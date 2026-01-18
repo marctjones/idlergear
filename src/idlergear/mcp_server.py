@@ -2300,10 +2300,22 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_task_show":
+            from idlergear.git import GitServer
+
             backend = get_backend("task")
             result = backend.get(arguments["id"])
             if result is None:
                 raise ValueError(f"Task #{arguments['id']} not found")
+
+            # Add test coverage info if in a git repo
+            try:
+                git = GitServer()
+                coverage = git.get_task_test_coverage(arguments["id"])
+                result["test_coverage"] = coverage
+            except Exception:
+                # Not in a git repo or other error - continue without coverage info
+                pass
+
             return _format_result(result)
 
         elif name == "idlergear_task_close":

@@ -304,3 +304,100 @@ def test_git_add_all(temp_repo):
     # Verify all staged
     status = git.status(repo_path=str(temp_repo))
     assert len(status.staged) == 3
+
+
+def test_is_test_file():
+    """Test test file detection."""
+    from idlergear.git import is_test_file
+
+    # Python pytest patterns
+    assert is_test_file("test_utils.py") is True
+    assert is_test_file("tests/test_config.py") is True
+    assert is_test_file("src/tests/test_api.py") is True
+
+    # Go test patterns
+    assert is_test_file("utils_test.go") is True
+    assert is_test_file("api/handler_test.go") is True
+
+    # JavaScript patterns
+    assert is_test_file("component.test.js") is True
+    assert is_test_file("utils.spec.ts") is True
+    assert is_test_file("__tests__/index.js") is True
+
+    # Ruby RSpec patterns
+    assert is_test_file("user_spec.rb") is True
+    assert is_test_file("spec/models/user_spec.rb") is True
+
+    # Non-test files
+    assert is_test_file("utils.py") is False
+    assert is_test_file("src/config.py") is False
+    assert is_test_file("README.md") is False
+
+
+def test_get_task_test_coverage_no_commits(temp_repo):
+    """Test test coverage for task with no commits."""
+    git = GitServer(allowed_repos=[str(temp_repo)])
+    coverage = git.get_task_test_coverage(999, repo_path=str(temp_repo))
+
+    assert coverage["task_id"] == 999
+    assert coverage["has_tests"] is False
+    assert coverage["test_files"] == []
+    assert coverage["total_commits"] == 0
+    assert coverage["commits_with_tests"] == []
+
+
+def test_get_task_test_coverage_with_test_files(temp_repo):
+    """Test test coverage for task with test file commits."""
+    git = GitServer(allowed_repos=[str(temp_repo)])
+
+    # Create source file commit
+    (temp_repo / "utils.py").write_text("def add(a, b): return a + b\n")
+    subprocess.run(["git", "add", "utils.py"], cwd=temp_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Add utils\n\nTask: #42"],
+        cwd=temp_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    # Create test file commit
+    (temp_repo / "test_utils.py").write_text("def test_add(): assert add(1, 2) == 3\n")
+    subprocess.run(["git", "add", "test_utils.py"], cwd=temp_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Add tests for utils\n\nTask: #42"],
+        cwd=temp_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    coverage = git.get_task_test_coverage(42, repo_path=str(temp_repo))
+
+    assert coverage["task_id"] == 42
+    assert coverage["has_tests"] is True
+    assert "test_utils.py" in coverage["test_files"]
+    assert coverage["total_commits"] == 2
+    assert len(coverage["commits_with_tests"]) == 1
+    assert coverage["total_files"] == 2
+
+
+def test_get_task_test_coverage_without_tests(temp_repo):
+    """Test test coverage for task without test files."""
+    git = GitServer(allowed_repos=[str(temp_repo)])
+
+    # Create only source file commits (no tests)
+    (temp_repo / "api.py").write_text("def handler(): pass\n")
+    subprocess.run(["git", "add", "api.py"], cwd=temp_repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "Add API handler\n\nTask: #100"],
+        cwd=temp_repo,
+        check=True,
+        capture_output=True,
+    )
+
+    coverage = git.get_task_test_coverage(100, repo_path=str(temp_repo))
+
+    assert coverage["task_id"] == 100
+    assert coverage["has_tests"] is False
+    assert coverage["test_files"] == []
+    assert coverage["total_commits"] == 1
+    assert coverage["commits_with_tests"] == []
