@@ -1,37 +1,37 @@
-# IdlerGear Roadmap & Issue Prioritization
+# IdlerGear Roadmap & Release Plan
 
 ## Executive Summary
 
 **Total Open Issues:** 23
-- **Actionable Features:** 22 (including 1 epic)
-- **Research/Notes:** 1 (knowledge capture, not blocking)
+- **v0.4.0:** 9 issues (test & run management)
+- **v0.5.0:** 5 issues (planning & foundation) ⭐ QUICK WINS
+- **v0.6.0:** 2 issues (structured information + POC)
+- **v0.7.0:** 7 issues (multi-assistant & collaboration)
+- **v0.8.0:** 2 issues + polish (developer experience)
 
-**Current Version:** v0.3.70
+**Current Version:** v0.3.72
 
-**Recent Additions:**
-- #264 - Structured info access system (v0.5.0) ⭐ NEW EPIC
-- #263 - Priorities registry (v0.6.0) ⭐
-- #262 - Review AI assistant tools (v0.5.0)
-- #261 - Review official MCP servers (v0.6.0)
+**Philosophy:** Ship incrementally stable releases with useful features. Each milestone is independently valuable and can be adopted immediately.
 
 ---
 
-## Milestone Structure
+## Milestone Releases
 
-### v0.4.0 - Test & Run Management
+### v0.4.0 - Test & Run Awareness ✅ READY TO SHIP
 **Theme:** Complete test framework integration and run management polish
 **Priority:** High (foundational for developer workflows)
-**Target:** Q1 2026
+**Target:** Q1 2026 (2-3 weeks)
+**Status:** Well-structured, clear dependencies, ready to implement
 
 **Issues (9):**
 1. **#163** - Add --needs-tests flag to task create [medium]
 2. **#164** - Track test file changes in task commits [medium]
 3. **#165** - Warn on task close if needs-tests but no tests added [medium]
-4. **#166** - Add test staleness warning to pre-commit hook [low → medium]
-5. **#162** - Detect new files without test coverage in watch mode [low → medium]
-6. **#144** - ig test Phase 3: Task integration [low → medium]
-7. **#145** - ig test Phase 4: Hook integration [low → medium]
-8. **#154** - Add ig run history and clean commands [low → medium]
+4. **#166** - Add test staleness warning to pre-commit hook [medium]
+5. **#162** - Detect new files without test coverage in watch mode [medium]
+6. **#144** - ig test Phase 3: Task integration [medium]
+7. **#145** - ig test Phase 4: Hook integration [medium]
+8. **#154** - Add ig run history and clean commands [medium]
 9. **#141** - ig run Phase 4: Polish and documentation [low]
 
 **Dependencies:**
@@ -47,152 +47,199 @@
 6. #144, #145 - Full integration (depends on 1-3)
 7. #154, #141 - Run management polish
 
-**Key Features:**
-- Tasks track test requirements
-- Pre-commit warns about stale tests
-- Watch mode detects untested code
-- Complete hook integration
-- Run history and cleanup commands
+**Immediate Value:**
+- ✅ Tasks track test requirements
+- ✅ Pre-commit warns about stale tests
+- ✅ Watch mode detects untested code
+- ✅ Complete hook integration
+- ✅ Run history and cleanup commands
 
 ---
 
-### v0.5.0 - Multi-Assistant Context
-**Theme:** Universal AGENTS.md/SKILLS.md support with token efficiency
-**Priority:** High (strategic differentiation)
-**Target:** Q2 2026
-
-**Issues (6):**
-1. **#262** - Review AI assistant tools for integration opportunities [HIGH] ⭐
-2. **#264** - Token-efficient structured information access system [HIGH EPIC] ⭐ NEW
-3. **#259** - Token-efficient SKILLS.md and AGENTS.md support [HIGH]
-4. **#213** - Enhanced Gemini Context in GEMINI.md [medium]
-5. **#212** - Implement Gemini CLI Slash Commands [medium]
-6. **#214** - Investigate Gemini CLI Lifecycle Hooks [research]
-
-**Dependencies:**
-- Existing: CLAUDE.md, GEMINI.md, .goosehints support
-- MCP server (126 tools already implemented)
-- Context modes (#235) - pattern for token efficiency
-
-**Implementation Order:**
-1. #262 - Survey AI assistant tools (inform all other work) ⭐ FOUNDATIONAL
-2. #264 - Structured info system (enables priorities, API docs access) ⭐ FOUNDATIONAL
-3. #214 - Research Gemini hooks specifically (inform design)
-4. #259 - Core AGENTS.md/SKILLS.md compression (implement universal context)
-5. #213 - Enhance GEMINI.md using #259 framework
-6. #212 - Gemini slash commands
-
-**Key Features:**
-- **Tool Integration Survey (#262)** - Comprehensive analysis of 5+ AI assistants
-- **Structured Info System (#264)** - Universal token-efficient access to API docs, priorities, references
-  - 90-98% token savings for queries
-  - `idlergear info priorities`, `idlergear info api`, `idlergear info ref`
-  - Queryable: "show tier-1 only", "API for task.create"
-  - Cacheable and mode-based (minimal/standard/detailed/full)
-- 90% token reduction for context (7000 → 700 tokens)
-- Single source: AGENTS.md generates CLAUDE.md, GEMINI.md, .goosehints, .aider.conf.yml, cursor-context.md
-- Smart caching (0 tokens for unchanged sessions)
-- Context compression: minimal/standard/full modes
-- MCP tools: `idlergear_inject_context`, `idlergear_info_query`, `idlergear_info_api`
-- Universal command integration across tools
-
-**Strategic Value:**
-- First tool with universal AI assistant support (Claude, Gemini, Goose, Aider, Copilot CLI, Cursor)
-- Token efficiency as competitive advantage (context + structured info + API docs)
-- Write once, run everywhere for context
-- Switch assistants without losing project knowledge
-- Query any structured data efficiently (priorities, docs, references)
-
----
-
-### v0.6.0 - GitHub Integration
-**Theme:** Enhanced GitHub Projects v2 and upstream collaboration
-**Priority:** Medium (team collaboration focus)
-**Target:** Q3 2026
+### v0.5.0 - Planning & Foundation ⭐ QUICK WINS
+**Theme:** Foundational improvements enabling future features
+**Priority:** High (unblocks v0.7.0)
+**Target:** Q1 2026 (2-3 weeks after v0.4.0)
+**Status:** All foundational items, no dependencies, fast to ship
 
 **Issues (5):**
 1. **#260** - Clarify Plans vs Milestones vs Projects vs Meta-Issues [HIGH] ⭐
-2. **#263** - Implement project priorities registry [HIGH] ⭐ NEW
-3. **#261** - Review official MCP servers for integration opportunities [medium] ⭐
-4. **#257** - GitHub Projects v2 Integration [HIGH]
-5. **#256** - Report issues to upstream projects with AI disclaimer [medium]
+2. **#263** - Implement project priorities registry [HIGH] ⭐
+3. **#265** - Add GitHub GraphQL API support [HIGH] ⭐
+4. **#266** - Implement documentation coverage tracking [HIGH] ⭐
+5. **#261** - Review official MCP servers for integration opportunities [medium]
 
 **Dependencies:**
-- ✅ GitHub backend (fully implemented)
-- ✅ Label management (#206, #207, #209 - COMPLETE)
+- None (all foundational)
 
 **Implementation Order:**
-1. #260 - Clarify planning concepts (foundational, informs all others)
-2. #263 - Priorities registry (defines what matters, informs #257)
-3. #261 - Survey MCP servers (especially GitHub MCP, informs #257)
-4. #257 - Projects v2 sync (implements visual project management with priorities)
-5. #256 - Upstream issue reporting (builds on GitHub backend)
+1. #260 - Planning concepts (clarifies terminology, informs all future work)
+2. #265 - GraphQL API (enables #257 in v0.7.0)
+3. #263 - Priorities registry (organizational foundation)
+4. #261 - MCP servers review (1-2 day research)
+5. #266 - Documentation coverage (automated enforcement)
 
-**Key Features:**
-- **Planning Concepts Clarification (#260)** - Clear distinction between Plans/Milestones/Projects/Epics
-- **Priorities Registry (#263)** - YAML-based registry for feature areas, backends, AI assistants with tiers, validation matrix, coverage requirements
-- **MCP Integration Survey (#261)** - Evaluate official GitHub/Anthropic/OpenAI MCP servers
-- Bi-directional GitHub Projects sync with improved architecture
-- Kanban boards auto-updated from IdlerGear with priority-based organization
-- Custom field mapping (priority, effort, due dates, validation status)
-- Milestone awareness and integration
-- Release readiness validation (check if requirements met)
-- Upstream issue reporting with AI attribution
-- Ethical disclosure templates
-- Local tracking of external issues
+**Immediate Value:**
+- ✅ **Priorities tracking:** YAML-based registry with tiers, validation matrix
+- ✅ **Planning clarity:** Clear distinction between Plans/Milestones/Projects/Epics
+- ✅ **GraphQL API ready:** For GitHub Projects v2 in v0.7.0
+- ✅ **Documentation enforcement:** Pre-commit hooks prevent docs drift
+- ✅ **MCP integration options:** Know what's available for future integration
 
-**Use Cases:**
-- Team collaboration via visual boards
-- Sprint planning with Kanban
-- Release planning with milestones
-- Epic tracking with meta-issues
-- Contributing to dependencies
-- Multi-repo project tracking
+**Enables Future Work:**
+- Unblocks #257 (GitHub Projects v2) in v0.7.0
+- Informs #264 (structured info system) in v0.6.0
+- Provides priorities for #264 to query
 
 ---
 
-### v0.7.0 - Developer Experience
-**Theme:** Quality of life improvements for IdlerGear users
-**Priority:** Low-Medium (polish & convenience)
-**Target:** Q4 2026
+### v0.6.0 - Structured Information 🎯 FOCUSED EPIC
+**Theme:** Token-efficient structured information access with knowledge graph POC
+**Priority:** High (strategic differentiation)
+**Target:** Q2 2026 (4-5 weeks after v0.5.0)
+**Status:** Research + epic, well-scoped
 
 **Issues (2):**
+1. **#267** - Investigate NetworkX for knowledge graph POC [HIGH RESEARCH] ⭐
+2. **#264** - Token-efficient structured information access system [HIGH EPIC] ⭐
+
+**Dependencies:**
+- Optional: #263 (priorities registry from v0.5.0) provides data to query
+
+**Implementation Order:**
+1. **#267 - NetworkX POC (1 week)** ⭐ RESEARCH FIRST
+   - Standalone program: `tools/knowledge_graph_poc.py`
+   - Load IdlerGear data, build graph, demonstrate queries
+   - Measure token efficiency (targeting 70%+ savings)
+   - **Decision point:** Proceed with graph integration or stay with current approach
+
+2. **#264 - Structured Info System (3-4 weeks)** ⭐ EPIC
+   - Phase 1: Document parser (pandoc-based, section extraction)
+   - Phase 2: Info command (`idlergear info priorities`, `idlergear info api`)
+   - Phase 3: MCP tools (`idlergear_info_query`, `idlergear_info_api`)
+   - Phase 4: May use graph representation if #267 POC succeeds
+   - **Note:** Will spawn child issues for each phase
+
+**Immediate Value:**
+- ✅ **70-90% token savings** for context queries
+- ✅ **Query priorities:** `idlergear info priorities --tier tier-1`
+- ✅ **Query API docs:** `idlergear info api task.create`
+- ✅ **Query references:** `idlergear info ref "token-efficient-context"`
+- ✅ **Query documents:** `idlergear info doc README.md --section "Installation"`
+- ✅ **GitHub wiki access:** `idlergear info wiki "Architecture" --section "MCP Server"`
+- ✅ **Mode-based queries:** minimal/standard/detailed/full for token efficiency
+- ✅ **Smart caching:** 0 tokens for unchanged data
+
+**Strategic Value:**
+- First tool with universal structured information access
+- Works with any document format (via pandoc)
+- Query subsections instead of full documents
+- Knowledge graph foundation (if POC succeeds)
+
+---
+
+### v0.7.0 - Multi-Assistant & Collaboration 🌐 COMBINED VALUE
+**Theme:** Universal AI assistant support and GitHub Projects v2 integration
+**Priority:** High (strategic + high-value team features)
+**Target:** Q2-Q3 2026 (4-5 weeks after v0.6.0)
+**Status:** Combines multi-assistant strategy with GitHub collaboration
+
+**Issues (7):**
+
+**Multi-Assistant Support:**
+1. **#262** - Review AI assistant tools for integration opportunities [HIGH] ⭐
+2. **#259** - Token-efficient SKILLS.md and AGENTS.md support [HIGH]
+3. **#213** - Enhanced Gemini Context in GEMINI.md [medium]
+4. **#212** - Implement Gemini CLI Slash Commands [medium]
+5. **#214** - Investigate Gemini CLI Lifecycle Hooks [research]
+
+**GitHub Collaboration:**
+6. **#257** - GitHub Projects v2 Integration [HIGH]
+7. **#256** - Report issues to upstream projects with AI disclaimer [medium]
+
+**Dependencies:**
+- #257 requires: #260, #263, #265 from v0.5.0 ✅
+- #259 informed by: #262 survey results
+- #213, #212 can use: #259 framework
+
+**Implementation Order:**
+1. **#262 - AI tools survey (1 week)** ⭐ FOUNDATIONAL
+   - Analyze: Claude Code, Gemini CLI, Goose, Aider, Copilot CLI, Cursor
+   - Identify integration opportunities
+   - Inform #259 design
+
+2. **#259 - AGENTS.md/SKILLS.md support (2 weeks)**
+   - Single source: AGENTS.md generates tool-specific files
+   - CLAUDE.md, GEMINI.md, .goosehints, .aider.conf.yml, cursor-context.md
+   - 90% token reduction (7000 → 700 tokens)
+   - Smart caching, context compression modes
+
+3. **#213, #212, #214 - Gemini enhancements (1 week)**
+   - Use #259 framework for Gemini
+   - Slash commands, enhanced context
+   - Hooks investigation (research)
+
+4. **#257 - GitHub Projects v2 (2 weeks)**
+   - Bi-directional sync with improved architecture
+   - Uses #260 (planning concepts), #263 (priorities), #265 (GraphQL)
+   - Kanban boards, custom fields, milestone awareness
+   - Release readiness validation
+
+5. **#256 - Upstream issue reporting (3 days)**
+   - Use GitHub credentials to report issues
+   - AI-generated disclaimer, ethical templates
+   - Local tracking of external issues
+
+**Immediate Value:**
+- ✅ **Universal AI assistant support:** Works with Claude, Gemini, Goose, Aider, Cursor, Copilot CLI
+- ✅ **Write once, run everywhere:** Single AGENTS.md for all tools
+- ✅ **90% token savings:** Smart context compression
+- ✅ **Visual project boards:** GitHub Projects v2 Kanban
+- ✅ **Upstream contributions:** Report issues to dependencies with AI attribution
+- ✅ **Switch tools freely:** No vendor lock-in, preserve project knowledge
+
+**Strategic Value:**
+- First tool with universal AI assistant support
+- Token efficiency as competitive advantage
+- Team collaboration via visual boards
+- Ethical AI-generated issue reporting
+
+---
+
+### v0.8.0 - Developer Experience & Polish 💎 PRODUCTION READY
+**Theme:** Quality of life improvements, comprehensive documentation, production readiness
+**Priority:** Medium-High (polish & stability)
+**Target:** Q4 2026 - Q1 2027 (2-4 weeks after v0.7.0)
+**Status:** Independent improvements + comprehensive polish
+
+**Issues (2 + polish):**
 1. **#258** - Auto-mark managed files for exclusion [medium]
 2. **#255** - External Command Queue for IPC [medium]
 
-**Dependencies:**
-- None (independent improvements)
+**Plus:**
+- Comprehensive documentation review
+- Performance optimization
+- Bug fixes and stability improvements
+- User experience refinement
+- Test coverage improvements (>85%)
+- Real-world deployment validation
 
 **Implementation Order:**
 1. #258 - Managed file exclusion (helps with #255)
 2. #255 - Command queue (advanced IPC)
+3. Documentation pass (all features from v0.4-v0.7)
+4. Performance profiling and optimization
+5. Bug triage and fixes
+6. UX improvements based on usage
 
-**Key Features:**
-- Auto-update .gitignore for IdlerGear files
-- Manifest of managed files
-- File-based command queue for external processes
-- Test runners can notify Claude Code sessions
-- Background jobs send completion notifications
-
-**Use Cases:**
-- Cleaner repository (no IdlerGear noise)
-- AI agents ignore infrastructure files
-- Long-running tests notify on completion
-- CI/CD integration with active sessions
-
----
-
-### v0.8.0 - Polish & Documentation
-**Theme:** Refinement, comprehensive documentation, preparation for eventual 1.0
-**Priority:** High (quality milestone)
-**Target:** Q1 2027
-
-**Focus Areas:**
-- Polish existing features from v0.4-v0.7
-- Comprehensive documentation
-- Performance optimization
-- Bug fixes and stability improvements
-- User experience refinement
+**Immediate Value:**
+- ✅ **Cleaner repositories:** Auto-update .gitignore for IdlerGear files
+- ✅ **Better IPC:** File-based command queue for external processes
+- ✅ **Test notifications:** Long-running tests notify on completion
+- ✅ **CI/CD integration:** Background jobs communicate with sessions
+- ✅ **Complete documentation:** All features fully documented
+- ✅ **Production quality:** Performance benchmarks, high test coverage
+- ✅ **Stable API:** Ready for broader adoption
 
 **Goals:**
 - High test coverage (>85%)
@@ -200,146 +247,167 @@
 - Performance benchmarks established
 - Real-world deployments validated
 - Community feedback incorporated
-
-**Note:** v1.0 will come when the project is truly production-ready, not on a fixed timeline.
-
----
-
-## Priority Changes Summary
-
-### Upgraded to HIGH:
-- **#264** - Structured info access system (v0.5.0 EPIC) ⭐ NEW
-- **#263** - Priorities registry (v0.6.0 foundational) ⭐
-- **#262** - AI assistant tools review (v0.5.0 foundational) ⭐
-- **#260** - Planning concepts clarification (v0.6.0 foundational) ⭐
-- **#259** - AGENTS.md/SKILLS.md support (strategic importance)
-- **#257** - GitHub Projects v2 (high value, enables team workflows)
-
-### Upgraded to MEDIUM:
-- **#261** - MCP servers review (informs GitHub integration) ⭐ NEW
-- **#163-166** - Test framework features (foundational for v0.4)
-- **#162** - Watch mode test coverage (completes test workflow)
-- **#144, #145** - Test phases (integration work)
-- **#154** - Run history (polish existing feature)
-- **#213, #212** - Gemini features (support growing user base)
-
-### Maintained LOW:
-- **#141** - Run documentation (polish only)
-
-### Research (Non-Blocking):
-- **#214** - Gemini hooks investigation
+- **Note:** v1.0 will come when truly production-ready, not on fixed timeline
 
 ---
 
 ## Dependencies Graph
 
 ```
-v0.4.0 (Test & Run)
-├── ✅ #168 Test config (DONE)
-├── ✅ #167 Test blocking (DONE)
+v0.4.0 (Test & Run) - No dependencies
+├── ✅ #168 Test config (COMPLETE)
+├── ✅ #167 Test blocking (COMPLETE)
 └── #163 → #164 → #165 → #166
     └── #144, #145 (integration)
+    └── #154, #141 (polish)
 
-v0.5.0 (Multi-Assistant)
-├── #262 (AI tools survey) ⭐ FOUNDATIONAL
-├── #264 (Structured info system) ⭐ FOUNDATIONAL EPIC
-├── #214 (Gemini research)
-└── #259 (universal context) ← uses #264 for docs
-    ├── #213 (Gemini context)
-    └── #212 (Gemini commands)
-
-v0.6.0 (GitHub)
-├── ✅ GitHub backend (DONE)
-├── ✅ Label management (DONE)
+v0.5.0 (Planning & Foundation) - No dependencies ⭐ QUICK WINS
 ├── #260 (Planning concepts) ⭐ FOUNDATIONAL
-├── #263 (Priorities registry) ⭐ FOUNDATIONAL → informs #257
-├── #261 (MCP survey) → informs #257
-├── #257 (Projects sync) ← depends on #260, #263
-└── #256 (Upstream reporting)
+├── #265 (GraphQL API) ⭐ ENABLES v0.7.0
+├── #263 (Priorities registry) ⭐ FOUNDATIONAL
+├── #261 (MCP survey - 1-2 day research)
+└── #266 (Documentation coverage)
 
-v0.7.0 (Dev Experience)
+v0.6.0 (Structured Information) - Optional dependency on v0.5.0
+├── #267 (NetworkX POC) ⭐ RESEARCH FIRST (1 week)
+│   └── Decision: graph-based or traditional
+└── #264 (Structured info system) ⭐ EPIC (3-4 weeks)
+    ├── May use #267 graph representation
+    ├── Can query #263 priorities (from v0.5.0)
+    └── Will spawn child issues
+
+v0.7.0 (Multi-Assistant & Collaboration) - Depends on v0.5.0
+├── #262 (AI tools survey) ⭐ FOUNDATIONAL (1 week)
+├── #259 (AGENTS.md/SKILLS.md) ← informed by #262 (2 weeks)
+│   ├── #213 (Gemini context)
+│   ├── #212 (Gemini commands)
+│   └── #214 (Gemini hooks - research)
+└── GitHub collaboration
+    ├── #257 (Projects v2) ← REQUIRES #260, #263, #265 from v0.5.0 ✅
+    └── #256 (Upstream reporting)
+
+v0.8.0 (Developer Experience & Polish) - No dependencies
 ├── #258 (File management)
-└── #255 (Command queue)
-
-v0.8.0 (Polish)
-├── v0.4.0 complete
-├── v0.5.0 complete
-├── v0.6.0 complete
-└── v0.7.0 complete
+├── #255 (Command queue)
+└── Comprehensive polish
+    ├── Documentation (all v0.4-v0.7 features)
+    ├── Performance optimization
+    ├── Bug fixes
+    └── UX improvements
 ```
 
 ---
 
-## Research/Note Issues (Non-Blocking)
+## Priority Tiers
 
-These are knowledge capture, not actionable work items:
+### HIGH (Foundational - Ship First):
+- **v0.5.0 all issues** (#260, #263, #265, #266, #261) ⭐ QUICK WINS
+- **v0.6.0 all issues** (#267, #264) ⭐ STRATEGIC
+- **v0.7.0 surveys + key features** (#262, #259, #257)
 
-- #217 - Daemon architecture notes
-- #218 - Project status analysis
-- #219 - Session summary
-- #220 - Goose integration analysis
-- #221 - Tool usage analysis
-- #222 - MCP opportunities
-- #223 - Naming convention decision
-- #224 - MCP filesystem research
-- #225 - MCP git research
-- #226 - MCP environment research
-- #227 - MCP dependency analysis
-- #228 - Node.js replacement decision
-- #232 - OTel database evaluation
-- #235 - Context modes implementation note
-- #249 - Messaging limitation note
+### MEDIUM (Important - Ship After Foundation):
+- **v0.4.0 all issues** (#163-166, #162, #144, #145, #154)
+- **v0.7.0 enhancements** (#213, #212, #256)
+- **v0.8.0 all issues** (#258, #255)
 
-**Action:** These should be:
-1. Converted to reference documents (if valuable)
-2. Closed (if obsolete)
-3. Promoted to tasks (if actionable)
+### LOW (Polish):
+- **v0.4.0 documentation** (#141)
+
+### RESEARCH (Inform Implementation):
+- **v0.6.0 POC** (#267) ⭐ BLOCKING (informs #264 architecture)
+- **v0.7.0 surveys** (#262, #214) ⭐ FOUNDATIONAL (informs #259)
 
 ---
 
-## Next Steps
-
-1. **Assign issues to milestones** (via GitHub CLI)
-2. **Update priority labels** (low → medium/high as noted)
-3. **Close/convert note issues** (research → references or tasks)
-4. **Document roadmap** (add to README.md)
-5. **Start v0.4.0** (next minor release)
-
----
-
-## Implementation Velocity Estimate
+## Implementation Timeline
 
 Based on recent progress (10 issues completed in 1 session):
 
-- **v0.4.0** (9 issues) - ~2-3 weeks
-- **v0.5.0** (6 issues including 1 epic, includes survey) - ~4-5 weeks
-- **v0.6.0** (5 issues, includes surveys + registry) - ~3-4 weeks
-- **v0.7.0** (2 issues) - ~1 week
-- **v0.8.0** (polish, docs, optimization) - ~2-4 weeks
+| Milestone | Duration | Target | Cumulative |
+|-----------|----------|--------|------------|
+| v0.4.0 - Test & Run | 2-3 weeks | Q1 2026 | ~3 weeks |
+| v0.5.0 - Planning & Foundation ⭐ | 2-3 weeks | Q1 2026 | ~6 weeks |
+| v0.6.0 - Structured Information | 4-5 weeks | Q2 2026 | ~11 weeks |
+| v0.7.0 - Multi-Assistant & Collaboration | 4-5 weeks | Q2-Q3 2026 | ~16 weeks |
+| v0.8.0 - Developer Experience & Polish | 2-4 weeks | Q4 2026 - Q1 2027 | ~20 weeks |
 
-**Total estimated timeline:** ~12-19 weeks to v0.8.0 (Q1-Q2 2026 → Q1 2027)
+**Total estimated timeline:** ~14-20 weeks to v0.8.0 (Q1 2026 → Q1 2027)
 
-**Note:**
+**Key Changes from Previous Plan:**
+- ✅ v0.5.0 ships **2-3 weeks faster** (was 5-6 weeks, now 2-3 weeks)
+- ✅ Each milestone has **immediate value** (no research-only releases)
+- ✅ v0.7.0 combines related features for **coherent release**
+- ✅ Dependencies respected (v0.5.0 unblocks v0.7.0)
+- ✅ Similar total timeline but **better incremental adoption**
+
+**Notes:**
 - Epic #264 will spawn child issues for each phase
-- Survey issues (#261, #262) may spawn additional child issues based on findings.
+- POC #267 will inform #264 architecture (graph-based or traditional)
+- Survey issues (#261, #262) may spawn child issues based on findings
+- Each milestone can be adopted independently
 
 ---
 
 ## Risk Assessment
 
-### Low Risk:
-- v0.4.0 - Incremental improvements to existing features
-- v0.7.0 - Independent quality improvements
+### Low Risk (Ready to Ship):
+- **v0.4.0** - Incremental improvements to existing features
+- **v0.5.0** - All foundational, no dependencies, clear scope ⭐ FASTEST
 
-### Medium Risk:
-- v0.6.0 - GitHub API complexity, bidirectional sync
+### Medium Risk (Well-Scoped):
+- **v0.6.0** - Research-informed implementation, POC validates approach
+- **v0.8.0** - Independent quality improvements, well-understood work
 
-### High Risk:
-- v0.5.0 - Multi-assistant support requires deep integration
-- v0.8.0 - Comprehensive stability and documentation work
+### High Risk (Requires Careful Implementation):
+- **v0.7.0** - GitHub API complexity, bidirectional sync, multi-assistant integration
 
-**Mitigation:**
-- Phased rollout per milestone
-- Extensive testing for v0.5.0
-- Beta period and community feedback for v0.8.0
-- v1.0 will only happen when truly production-ready (no rush)
+**Mitigation Strategies:**
+- **Phased rollout per milestone** - Each release is independently stable
+- **POC before architecture** - #267 validates NetworkX before #264 implementation
+- **Surveys inform design** - #262, #261 research before #259 implementation
+- **Extensive testing for v0.7.0** - High-risk milestone gets extra attention
+- **Beta period for v0.8.0** - Community feedback before final polish
+- **v1.0 when ready** - No rush, ship when truly production-ready
+
+---
+
+## Incremental Value Proposition
+
+Each milestone ships immediately useful features:
+
+| After v0.4.0 | After v0.5.0 ⭐ | After v0.6.0 | After v0.7.0 | After v0.8.0 |
+|--------------|----------------|--------------|--------------|--------------|
+| ✅ Test tracking | ✅ Priorities registry | ✅ Token-efficient queries | ✅ Universal AI support | ✅ Production quality |
+| ✅ Run history | ✅ Planning clarity | ✅ Query API docs | ✅ Visual project boards | ✅ Complete docs |
+| ✅ Hook integration | ✅ GraphQL ready | ✅ Query priorities | ✅ Upstream contributions | ✅ Performance optimized |
+| | ✅ Docs enforcement | ✅ Document parser | ✅ Switch AI tools freely | ✅ High test coverage |
+| | | ✅ GitHub wiki access | | ✅ Stable API |
+
+**Philosophy:** You can start using features from each milestone immediately. No waiting for "v1.0" to get value.
+
+---
+
+## Next Steps
+
+1. ✅ **Issues assigned to new milestones** (COMPLETE)
+2. ✅ **Old empty milestones closed** (#7, #8 closed)
+3. ✅ **Obsolete note issues closed** (#232 closed)
+4. ✅ **ROADMAP.md updated** (this document)
+5. **Start v0.4.0 implementation** - First stable release with test awareness
+6. **Communicate roadmap** - Share with users, gather feedback
+7. **Update README.md** - Link to roadmap, highlight v0.5.0 quick wins
+
+---
+
+## Changelog from Previous Roadmap
+
+**Major Restructuring:**
+1. **v0.5.0 split** - Foundation items moved to new quick-wins v0.5.0
+2. **v0.6.0 refocused** - Now purely structured information + POC (was GitHub Integration)
+3. **v0.7.0 expanded** - Combined multi-assistant + GitHub collaboration (related features together)
+4. **v0.8.0 enhanced** - Added developer experience to polish milestone
+5. **Timeline optimized** - v0.5.0 now ships 2-3 weeks faster (was 5-6 weeks)
+6. **Dependencies clarified** - v0.5.0 unblocks v0.7.0, v0.6.0 POC informs implementation
+7. **Incremental value emphasized** - Each milestone independently useful
+
+**Result:** Better incremental adoption, faster time-to-value, clearer dependencies.

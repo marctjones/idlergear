@@ -110,6 +110,16 @@ def _map_issue_to_task(issue: dict[str, Any]) -> dict[str, Any]:
             priority = label.split(":", 1)[1]
             break
 
+    # Extract milestone if present
+    milestone = None
+    if issue.get("milestone"):
+        milestone_data = issue["milestone"]
+        if isinstance(milestone_data, dict):
+            milestone = {
+                "number": milestone_data.get("number"),
+                "title": milestone_data.get("title"),
+            }
+
     return {
         "id": issue.get("number"),
         "title": issue.get("title", ""),
@@ -119,6 +129,7 @@ def _map_issue_to_task(issue: dict[str, Any]) -> dict[str, Any]:
         "assignees": assignees,
         "priority": priority,
         "due": None,  # GitHub doesn't have native due dates
+        "milestone": milestone,
         "url": issue.get("url", ""),
         "created_at": issue.get("createdAt", ""),
         "updated_at": issue.get("updatedAt", ""),
@@ -242,6 +253,7 @@ class GitHubTaskBackend:
         assignees: list[str] | None = None,
         priority: str | None = None,
         due: str | None = None,
+        milestone: str | None = None,
     ) -> dict[str, Any]:
         """Create a new GitHub issue."""
         args = ["issue", "create", "--title", title]
@@ -259,6 +271,9 @@ class GitHubTaskBackend:
 
         for assignee in assignees or []:
             args.extend(["--assignee", assignee])
+
+        if milestone:
+            args.extend(["--milestone", milestone])
 
         # gh issue create returns the issue URL, not JSON
         output = _run_gh_command(args)
@@ -288,7 +303,7 @@ class GitHubTaskBackend:
             "--state",
             gh_state,
             "--json",
-            "number,title,body,state,labels,assignees,url,createdAt,updatedAt",
+            "number,title,body,state,labels,assignees,milestone,url,createdAt,updatedAt",
             "--limit",
             "100",
         ]
@@ -304,7 +319,7 @@ class GitHubTaskBackend:
             "view",
             str(task_id),
             "--json",
-            "number,title,body,state,labels,assignees,url,createdAt,updatedAt",
+            "number,title,body,state,labels,assignees,milestone,url,createdAt,updatedAt",
         ]
 
         try:

@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.3.58)
+## Features (v0.3.72)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -61,6 +61,24 @@ IdlerGear works identically across all major AI coding assistants:
 - **Token Efficiency** - 97% context reduction (17K → 570 tokens!)
 - **Session Persistence** - Perfect state restoration across sessions
 - **Auto Error Capture** - OpenTelemetry errors → tasks/notes automatically
+
+## Roadmap
+
+**See [ROADMAP.md](docs/ROADMAP.md) for full release plan.**
+
+IdlerGear ships **incrementally stable releases** with immediately useful features. Each milestone can be adopted independently.
+
+| Milestone | Theme | Timeline | Key Features |
+|-----------|-------|----------|--------------|
+| **v0.4.0** | Test & Run Awareness | Q1 2026 (2-3 weeks) | Test coverage tracking, run history, hook integration |
+| **v0.5.0** ⭐ | Planning & Foundation | Q1 2026 (2-3 weeks) | Priorities registry, GraphQL API, planning clarity, docs enforcement |
+| **v0.6.0** 🎯 | Structured Information | Q2 2026 (4-5 weeks) | 70-90% token savings, query API docs/priorities, knowledge graphs |
+| **v0.7.0** 🌐 | Multi-Assistant & Collaboration | Q2-Q3 2026 (4-5 weeks) | Universal AI support, GitHub Projects v2, upstream contributions |
+| **v0.8.0** 💎 | Developer Experience & Polish | Q4 2026 - Q1 2027 (2-4 weeks) | Production quality, complete docs, performance optimization |
+
+**Philosophy:** Ship features users can adopt immediately. No waiting for "v1.0" to get value.
+
+**Quick Wins (v0.5.0):** Planning foundation ships in 2-3 weeks with priorities tracking, GraphQL API, and documentation enforcement - all features you can use right away!
 
 ## Why Not Just AGENTS.md?
 
@@ -403,6 +421,7 @@ vision = "github"    # Sync vision to repo
 - [Knowledge Types](https://github.com/marctjones/idlergear/wiki/Knowledge-Types) - All 6 knowledge types
 - [Commands Reference](https://github.com/marctjones/idlergear/wiki/Commands-Reference) - Full CLI reference
 - [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 126 MCP tools
+- [Roadmap](docs/ROADMAP.md) - Release plan with 5 incremental milestones
 
 ### AI Assistant Guides
 - [AI Assistant Comparison](https://github.com/marctjones/idlergear/wiki/AI-Assistant-Comparison) - Feature comparison
