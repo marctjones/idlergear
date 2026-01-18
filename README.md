@@ -98,10 +98,11 @@ The difference:
 ## Quick Start
 
 ```bash
-# Install
-git clone https://github.com/marctjones/idlergear.git
-cd idlergear
-pip install -e .
+# Install (recommended)
+pipx install idlergear
+
+# Or with pip
+pip install idlergear
 
 # Initialize a project
 cd my-project
