@@ -2723,6 +2723,7 @@ def task_close(
     """
     from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
+    from idlergear.git import GitServer
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2732,6 +2733,38 @@ def task_close(
         raise typer.Exit(1)
 
     backend = get_backend("task")
+
+    # Get task first to check labels before closing
+    task = backend.get(task_id)
+    if task is None:
+        typer.secho(f"Task #{task_id} not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    # Check if task needs tests but none were added
+    if task.get("labels") and "needs-tests" in task["labels"]:
+        try:
+            git = GitServer()
+            coverage = git.get_task_test_coverage(task_id)
+            if not coverage["has_tests"]:
+                typer.secho(
+                    "⚠️  Warning: Task marked 'needs-tests' but no test files in commits",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.secho(
+                    "   Consider adding tests before closing.",
+                    fg=typer.colors.YELLOW,
+                )
+                if not typer.confirm("Close anyway?", default=False):
+                    typer.secho("Task close aborted.", fg=typer.colors.CYAN)
+                    raise typer.Abort()
+        except typer.Abort:
+            # Re-raise Abort to allow it to propagate
+            raise
+        except Exception:
+            # Not in a git repo or other error - continue without check
+            pass
+
+    # Proceed with close
     task = backend.close(task_id, comment=comment)
     if task is None:
         typer.secho(f"Task #{task_id} not found.", fg=typer.colors.RED)

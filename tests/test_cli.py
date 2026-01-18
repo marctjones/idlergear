@@ -1,6 +1,7 @@
 """Tests for CLI commands."""
 
 import os
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -24,6 +25,45 @@ def cli_project():
             # Initialize project
             result = runner.invoke(app, ["init"])
             assert result.exit_code == 0
+
+            yield project_path
+    finally:
+        os.chdir(old_cwd)
+
+
+@pytest.fixture
+def cli_git_project():
+    """Create a temporary project with git initialized for CLI tests."""
+    old_cwd = os.getcwd()
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_path = Path(tmpdir)
+            os.chdir(project_path)
+
+            # Initialize git repo
+            subprocess.run(["git", "init"], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test User"],
+                check=True,
+                capture_output=True,
+            )
+
+            # Initialize IdlerGear project
+            result = runner.invoke(app, ["init"])
+            assert result.exit_code == 0
+
+            # Create initial commit
+            subprocess.run(["git", "add", "."], check=True, capture_output=True)
+            subprocess.run(
+                ["git", "commit", "-m", "Initial commit"],
+                check=True,
+                capture_output=True,
+            )
 
             yield project_path
     finally:
@@ -149,6 +189,101 @@ class TestTaskCommands:
         task_data = json.loads(show_result.output)
         assert "needs-tests" in task_data["labels"]
         assert "enhancement" in task_data["labels"]
+
+    def test_task_close_needs_tests_without_tests_abort(self, cli_git_project):
+        """Test aborting task close when needs-tests but no tests added."""
+        # Create task with needs-tests label
+        runner.invoke(app, ["task", "create", "Add auth", "--needs-tests"])
+
+        # Make a commit without test files
+        (cli_git_project / "auth.py").write_text("def login(): pass\n")
+        subprocess.run(["git", "add", "auth.py"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add auth\n\nTask: #1"],
+            check=True,
+            capture_output=True,
+        )
+
+        # Try to close task, decline confirmation
+        result = runner.invoke(app, ["task", "close", "1"], input="n\n")
+
+        assert result.exit_code == 1
+        assert "Warning: Task marked 'needs-tests'" in result.output
+        assert "no test files in commits" in result.output
+        assert "Consider adding tests before closing" in result.output
+        assert "Task close aborted" in result.output
+
+    def test_task_close_needs_tests_without_tests_proceed(self, cli_git_project):
+        """Test proceeding with task close despite warning."""
+        # Create task with needs-tests label
+        runner.invoke(app, ["task", "create", "Add auth", "--needs-tests"])
+
+        # Make a commit without test files
+        (cli_git_project / "auth.py").write_text("def login(): pass\n")
+        subprocess.run(["git", "add", "auth.py"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add auth\n\nTask: #1"],
+            check=True,
+            capture_output=True,
+        )
+
+        # Close task, confirm despite warning
+        result = runner.invoke(app, ["task", "close", "1"], input="y\n")
+
+        assert result.exit_code == 0
+        assert "Warning: Task marked 'needs-tests'" in result.output
+        assert "Closed task #1" in result.output
+
+    def test_task_close_needs_tests_with_tests(self, cli_git_project):
+        """Test no warning when tests are present."""
+        # Create task with needs-tests label
+        runner.invoke(app, ["task", "create", "Add auth", "--needs-tests"])
+
+        # Make commit with source file
+        (cli_git_project / "auth.py").write_text("def login(): pass\n")
+        subprocess.run(["git", "add", "auth.py"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add auth\n\nTask: #1"],
+            check=True,
+            capture_output=True,
+        )
+
+        # Make commit with test file
+        (cli_git_project / "test_auth.py").write_text("def test_login(): pass\n")
+        subprocess.run(["git", "add", "test_auth.py"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add auth tests\n\nTask: #1"],
+            check=True,
+            capture_output=True,
+        )
+
+        # Close task - should proceed without warning
+        result = runner.invoke(app, ["task", "close", "1"])
+
+        assert result.exit_code == 0
+        assert "Warning" not in result.output
+        assert "Closed task #1" in result.output
+
+    def test_task_close_without_needs_tests_label(self, cli_git_project):
+        """Test no warning when needs-tests label not present."""
+        # Create task without needs-tests label
+        runner.invoke(app, ["task", "create", "Add feature"])
+
+        # Make a commit without test files
+        (cli_git_project / "feature.py").write_text("def feature(): pass\n")
+        subprocess.run(["git", "add", "feature.py"], check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Add feature\n\nTask: #1"],
+            check=True,
+            capture_output=True,
+        )
+
+        # Close task - should proceed without warning
+        result = runner.invoke(app, ["task", "close", "1"])
+
+        assert result.exit_code == 0
+        assert "Warning" not in result.output
+        assert "Closed task #1" in result.output
 
 
 class TestNoteCommands:
