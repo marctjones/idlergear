@@ -5423,6 +5423,37 @@ def session_recover(
         raise typer.Exit(1)
 
 
+@session_app.command("monitor")
+def session_monitor(
+    session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
+):
+    """Monitor active session in real-time.
+
+    Watch your Claude Code session as it happens. See tool calls,
+    task operations, file changes, and more—all in a beautiful TUI.
+
+    Also available as standalone command: idlewatch
+
+    Examples:
+        idlergear session monitor           # Monitor current session
+        idlergear session monitor --file /path/to/session.jsonl
+        idlewatch                            # Shortcut command
+    """
+    from pathlib import Path
+    from idlergear.tui import run_monitor
+
+    session_path = Path(session_file) if session_file else None
+
+    try:
+        run_monitor(session_path)
+    except KeyboardInterrupt:
+        # Clean exit on Ctrl+C
+        pass
+    except Exception as e:
+        typer.secho(f"Error running monitor: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 # Goose commands
 @goose_app.command("init")
 def goose_init(
@@ -9119,6 +9150,72 @@ def doc_coverage(
     # Exit with error if coverage is poor
     if coverage.mcp_coverage_skills < 0.85 or coverage.cli_coverage_readme < 0.85:
         raise typer.Exit(1)
+
+
+def monitor_shortcut():
+    """Entry point for idlewatch standalone command.
+
+    This is a shortcut for: idlergear session monitor
+    """
+    import sys
+
+    # Show help if requested
+    if "--help" in sys.argv or "-h" in sys.argv:
+        print("""idlewatch - Real-time session monitoring for IdlerGear
+
+Watch your Claude Code session as it happens. See tool calls,
+task operations, file changes, and more—all in a beautiful TUI.
+
+This is a shortcut for: idlergear session monitor
+
+Usage:
+  idlewatch [options]
+
+Examples:
+  idlewatch                  # Monitor current session
+  idlewatch --file /path/to/session.jsonl
+
+Options:
+  -h, --help                 Show this help message
+  -f, --file FILE            Session file to monitor (auto-detect if not provided)
+
+Keyboard Shortcuts (once running):
+  q                          Quit
+  r                          Refresh display
+  c                          Clear event log
+  h                          Show help
+
+For more information: idlergear session monitor --help
+""")
+        sys.exit(0)
+
+    # Parse arguments and call monitor command
+    from pathlib import Path
+    from idlergear.tui import run_monitor
+
+    session_path = None
+
+    # Simple argument parsing
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg in ("-f", "--file"):
+            if i + 1 < len(sys.argv):
+                session_path = Path(sys.argv[i + 1])
+                i += 2
+            else:
+                print("Error: --file requires a value")
+                sys.exit(1)
+        else:
+            i += 1
+
+    try:
+        run_monitor(session_path)
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

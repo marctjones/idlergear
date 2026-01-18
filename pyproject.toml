@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "idlergear"
-version = "0.4.9"
+version = "0.4.10"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,6 +21,8 @@ dependencies = [
     "opentelemetry-proto>=1.20.0",
     "grpcio>=1.60.0",
     "protobuf>=4.25.0",
+    "textual>=0.47.0",
+    "watchdog>=3.0.0",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +42,7 @@ docs = [
 [project.scripts]
 idlergear = "idlergear.cli:app"
 ig = "idlergear.cli:app"  # Short alias
+idlewatch = "idlergear.cli:monitor_shortcut"  # Session monitoring TUI
 idlergear-mcp = "idlergear.mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
