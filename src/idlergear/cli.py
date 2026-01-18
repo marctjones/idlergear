@@ -86,6 +86,7 @@ task_app = typer.Typer(help="Task management (→ GitHub Issues)")
 note_app = typer.Typer(help="Quick notes capture")
 vision_app = typer.Typer(help="Project vision management")
 plan_app = typer.Typer(help="Plan management (→ GitHub Projects)")
+milestone_app = typer.Typer(help="Milestone management (→ GitHub Milestones)")
 reference_app = typer.Typer(help="Reference docs (→ GitHub Wiki)")
 run_app = typer.Typer(help="Script execution and logs")
 label_app = typer.Typer(help="Label management (→ GitHub Labels)")
@@ -106,6 +107,7 @@ app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
 app.add_typer(vision_app, name="vision")
 app.add_typer(plan_app, name="plan")
+app.add_typer(milestone_app, name="milestone")
 app.add_typer(reference_app, name="reference")
 app.add_typer(run_app, name="run")
 app.add_typer(label_app, name="label")
@@ -2547,6 +2549,7 @@ def task_create(
         None, "--priority", "-p", help="Priority: high, medium, low"
     ),
     due: str = typer.Option(None, "--due", "-d", help="Due date (YYYY-MM-DD)"),
+    milestone: str = typer.Option(None, "--milestone", "-m", help="Milestone number or title"),
     no_validate: bool = typer.Option(False, "--no-validate", help="Skip label validation"),
 ):
     """Create a new task."""
@@ -2597,6 +2600,7 @@ def task_create(
         labels=labels if labels else None,
         priority=priority,
         due=due,
+        milestone=milestone,
     )
     typer.secho(f"Created task #{task['id']}: {task['title']}", fg=typer.colors.GREEN)
 
@@ -3561,6 +3565,268 @@ def plan_sync(target: str = typer.Argument("github")):
     """Sync plans with remote."""
     typer.echo(f"Syncing plans to {target}...")
     # TODO: Implement GitHub Projects sync
+
+
+# Milestone commands
+@milestone_app.command("create")
+def milestone_create(
+    title: str,
+    description: str = typer.Option(None, "--description", "-d", help="Milestone description"),
+    due_on: str = typer.Option(None, "--due", help="Due date (YYYY-MM-DD)"),
+):
+    """Create a GitHub milestone."""
+    import subprocess
+
+    try:
+        # Build API request
+        data = {"title": title, "state": "open"}
+        if description:
+            data["description"] = description
+        if due_on:
+            data["due_on"] = f"{due_on}T00:00:00Z"
+
+        # Get repo info
+        repo_info = subprocess.run(
+            ["gh", "repo", "view", "--json", "owner,name"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        import json
+        repo = json.loads(repo_info.stdout)
+        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        name = repo["name"]
+
+        # Create milestone
+        result = subprocess.run(
+            [
+                "gh", "api",
+                f"repos/{owner}/{name}/milestones",
+                "-f", f"title={title}",
+                "-f", "state=open",
+            ] + (["-f", f"description={description}"] if description else [])
+              + (["-f", f"due_on={due_on}T00:00:00Z"] if due_on else []),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        milestone = json.loads(result.stdout)
+        typer.secho(
+            f"Created milestone: {milestone['title']} (#{milestone['number']})",
+            fg=typer.colors.GREEN,
+        )
+
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Failed to create milestone: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@milestone_app.command("list")
+def milestone_list(
+    ctx: typer.Context,
+    state: str = typer.Option("open", "--state", "-s", help="Filter by state: open, closed, all"),
+):
+    """List GitHub milestones."""
+    import subprocess
+    import json
+
+    try:
+        # Get repo info
+        repo_info = subprocess.run(
+            ["gh", "repo", "view", "--json", "owner,name"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        repo = json.loads(repo_info.stdout)
+        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        name = repo["name"]
+
+        # Fetch milestones
+        url = f"repos/{owner}/{name}/milestones"
+        if state in ("open", "closed"):
+            url += f"?state={state}"
+
+        result = subprocess.run(
+            ["gh", "api", url],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        milestones = json.loads(result.stdout)
+
+        # Format for display
+        formatted = []
+        for m in milestones:
+            total = m["open_issues"] + m["closed_issues"]
+            progress = (m["closed_issues"] / total * 100) if total > 0 else 0
+
+            formatted.append({
+                "number": m["number"],
+                "title": m["title"],
+                "state": m["state"],
+                "open_issues": m["open_issues"],
+                "closed_issues": m["closed_issues"],
+                "progress": f"{progress:.0f}%",
+                "due_on": m.get("due_on", ""),
+                "description": m.get("description", ""),
+            })
+
+        display(formatted, ctx.obj.output_format, "milestones")
+
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Failed to list milestones: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@milestone_app.command("show")
+def milestone_show(
+    ctx: typer.Context,
+    milestone: str = typer.Argument(..., help="Milestone number or title"),
+):
+    """Show milestone details."""
+    import subprocess
+    import json
+
+    try:
+        # Get repo info
+        repo_info = subprocess.run(
+            ["gh", "repo", "view", "--json", "owner,name"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        repo = json.loads(repo_info.stdout)
+        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        name = repo["name"]
+
+        # Fetch all milestones to find by title if needed
+        result = subprocess.run(
+            ["gh", "api", f"repos/{owner}/{name}/milestones"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        milestones = json.loads(result.stdout)
+
+        # Find milestone by number or title
+        found = None
+        for m in milestones:
+            if str(m["number"]) == milestone or m["title"].lower() == milestone.lower():
+                found = m
+                break
+
+        if not found:
+            typer.secho(f"Milestone '{milestone}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        # Get issues for this milestone
+        issues_result = subprocess.run(
+            ["gh", "issue", "list", "--milestone", found["title"], "--json", "number,title,state", "--limit", "1000"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        issues = json.loads(issues_result.stdout)
+
+        total = found["open_issues"] + found["closed_issues"]
+        progress = (found["closed_issues"] / total * 100) if total > 0 else 0
+
+        # Format for display
+        display_data = {
+            "number": found["number"],
+            "title": found["title"],
+            "state": found["state"],
+            "description": found.get("description", ""),
+            "open_issues": found["open_issues"],
+            "closed_issues": found["closed_issues"],
+            "progress": f"{progress:.0f}%",
+            "due_on": found.get("due_on", ""),
+            "created_at": found.get("created_at", ""),
+            "updated_at": found.get("updated_at", ""),
+            "issues": issues,
+        }
+
+        display(display_data, ctx.obj.output_format, "milestone")
+
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Failed to show milestone: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@milestone_app.command("close")
+def milestone_close(
+    milestone: str = typer.Argument(..., help="Milestone number or title"),
+):
+    """Close a milestone."""
+    import subprocess
+    import json
+
+    try:
+        # Get repo info
+        repo_info = subprocess.run(
+            ["gh", "repo", "view", "--json", "owner,name"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        repo = json.loads(repo_info.stdout)
+        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        name = repo["name"]
+
+        # Find milestone
+        result = subprocess.run(
+            ["gh", "api", f"repos/{owner}/{name}/milestones"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        milestones = json.loads(result.stdout)
+        found = None
+        for m in milestones:
+            if str(m["number"]) == milestone or m["title"].lower() == milestone.lower():
+                found = m
+                break
+
+        if not found:
+            typer.secho(f"Milestone '{milestone}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        # Close milestone
+        subprocess.run(
+            [
+                "gh", "api",
+                f"repos/{owner}/{name}/milestones/{found['number']}",
+                "-X", "PATCH",
+                "-f", "state=closed",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        typer.secho(f"Closed milestone: {found['title']}", fg=typer.colors.GREEN)
+
+    except subprocess.CalledProcessError as e:
+        typer.secho(f"Failed to close milestone: {e.stderr}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 # Reference commands
@@ -4897,6 +5163,162 @@ def session_clear():
         print("Session state cleared")
     else:
         print("No session state to clear")
+
+
+@app.command()
+def session_snapshot(
+    notes: str = typer.Option("", "--notes", "-n", help="Session notes"),
+    task_id: Optional[int] = typer.Option(None, "--task", "-t", help="Current task ID"),
+    duration: int = typer.Option(0, "--duration", "-d", help="Session duration in minutes"),
+):
+    """Create a session snapshot (full history record).
+
+    Saves current session state as a snapshot in the session history.
+    Unlike session-save (which overwrites), this creates a permanent record.
+
+    Examples:
+        idlergear session-snapshot --notes "Completed indexer design"
+        idlergear session-snapshot --task 270 --duration 45
+    """
+    from .session import SessionState
+    from .session_history import SessionHistory
+    import subprocess
+
+    # Get current session state
+    session_state = SessionState()
+    state_data = session_state.load() or {}
+
+    # Get git context
+    try:
+        git_branch = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+        git_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()[:7]
+
+        git_dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+        ).stdout.strip() != ""
+    except Exception:
+        git_branch = "unknown"
+        git_commit = "unknown"
+        git_dirty = False
+
+    # Build snapshot state
+    snapshot_state = {
+        "current_task_id": task_id or state_data.get("current_task_id"),
+        "working_files": state_data.get("working_files", []),
+        "git_branch": git_branch,
+        "git_commit": git_commit,
+        "uncommitted_changes": git_dirty,
+        "notes": notes or state_data.get("notes"),
+    }
+
+    # Create snapshot
+    history = SessionHistory()
+    snapshot = history.create_snapshot(
+        state=snapshot_state,
+        duration_seconds=duration * 60,
+        outcome={
+            "status": "saved",
+            "goals_achieved": [],
+        },
+    )
+
+    print(f"✓ Created session snapshot: {snapshot.session_id}")
+    print(f"  Branch: {snapshot.branch}")
+    print(f"  Timestamp: {snapshot.timestamp}")
+    if task_id:
+        print(f"  Task: #{task_id}")
+
+
+@app.command()
+def session_history(
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Max sessions to show"),
+):
+    """List session history (snapshots).
+
+    Shows all session snapshots in chronological order.
+
+    Examples:
+        idlergear session-history              # Show last 10 sessions
+        idlergear session-history --limit 20   # Show last 20
+        idlergear session-history --branch experiment
+    """
+    from .session_history import SessionHistory
+
+    history = SessionHistory()
+    snapshots = history.list_sessions(branch)
+
+    if not snapshots:
+        print(f"No session history for branch '{branch}'")
+        return
+
+    # Show most recent first
+    snapshots = list(reversed(snapshots))[:limit]
+
+    print(f"Session History (branch: {branch})")
+    print("=" * 70)
+
+    for snapshot in snapshots:
+        state = snapshot.state
+        duration_min = snapshot.duration_seconds // 60
+
+        status = snapshot.outcome.get("status", "unknown")
+        status_icon = {
+            "success": "✅",
+            "incomplete": "⚠️",
+            "abandoned": "❌",
+            "saved": "💾",
+            "migrated": "🔄",
+        }.get(status, "·")
+
+        print(f"\n{status_icon} {snapshot.session_id} ({snapshot.timestamp})")
+        if duration_min > 0:
+            print(f"   Duration: {duration_min} minutes")
+        if state.get("current_task_id"):
+            print(f"   Task: #{state['current_task_id']}")
+        if state.get("git_commit"):
+            print(f"   Git: {state.get('git_branch')} @ {state['git_commit']}")
+        if state.get("notes"):
+            notes_preview = state["notes"][:60]
+            print(f"   Notes: {notes_preview}{'...' if len(state['notes']) > 60 else ''}")
+
+
+@app.command()
+def session_show(
+    session_id: str = typer.Argument(..., help="Session ID (e.g., s001)"),
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
+):
+    """Show details of a specific session snapshot.
+
+    Examples:
+        idlergear session-show s003
+        idlergear session-show s001 --branch experiment
+    """
+    from .session_history import SessionHistory
+
+    history = SessionHistory()
+    snapshot = history.load_snapshot(session_id, branch)
+
+    if not snapshot:
+        print(f"Session {session_id} not found in branch '{branch}'")
+        return
+
+    # Pretty print the full snapshot
+    import json
+    print(json.dumps(snapshot.to_dict(), indent=2))
 
 
 # Hooks commands

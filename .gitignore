@@ -139,7 +139,10 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 # IdlerGear project data (don't commit)
-.idlergear/
+.idlergear/              # All IdlerGear data (tasks, notes, references, sessions, cache)
+.idlergear/sessions/     # Session history (personal, large files, frequent changes)
+.idlergear/checkpoints/  # Auto-saved session checkpoints
+.idlergear/cache/        # Temporary cached data
 daemon.pid
 
 # Generated API documentation (built by GitHub Actions)
