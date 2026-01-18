@@ -4259,6 +4259,73 @@ def run_list():
         typer.echo("")
 
 
+@run_app.command("history")
+def run_history(
+    failed: bool = typer.Option(
+        False, "--failed", "-f", help="Show only failed runs"
+    ),
+    status: str = typer.Option(
+        None, "--status", "-s", help="Filter by status (running, stopped, completed, failed)"
+    ),
+    limit: int = typer.Option(
+        None, "--limit", "-l", help="Limit number of results"
+    ),
+):
+    """Show run history.
+
+    Examples:
+        idlergear run history              # Recent runs with status
+        idlergear run history --failed     # Only failed runs
+        idlergear run history --limit 20   # Limit results
+        idlergear run history --status completed  # Only completed runs
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.runs import list_runs
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    runs = list_runs()
+    if not runs:
+        typer.echo("No runs found.")
+        return
+
+    # Filter by status
+    if failed:
+        runs = [r for r in runs if r["status"] == "failed"]
+    elif status:
+        runs = [r for r in runs if r["status"] == status]
+
+    # Apply limit
+    if limit:
+        runs = runs[:limit]
+
+    if not runs:
+        typer.echo("No matching runs found.")
+        return
+
+    # Display runs with more detailed information
+    for run in runs:
+        status_color = {
+            "running": typer.colors.GREEN,
+            "completed": typer.colors.BLUE,
+            "failed": typer.colors.RED,
+            "stopped": typer.colors.YELLOW,
+        }.get(run["status"], typer.colors.WHITE)
+
+        typer.echo(f"  {run['name']}", nl=False)
+        typer.secho(f"  [{run['status']}]", fg=status_color, nl=False)
+        if run.get("command"):
+            typer.echo(f"  {run['command']}", nl=False)
+        if run.get("pid") and run["status"] == "running":
+            typer.echo(f"  (PID {run['pid']})", nl=False)
+        typer.echo("")
+
+
 @run_app.command("status")
 def run_status(name: str):
     """Check run status."""
@@ -4407,6 +4474,30 @@ def run_cleanup(
         f"{action} {len(deleted)} run(s)",
         fg=typer.colors.YELLOW if dry_run else typer.colors.GREEN,
     )
+
+
+@run_app.command("clean")
+def run_clean(
+    older_than: int = typer.Option(
+        7, "--older-than", "-d", help="Delete runs older than N days (default: 7)"
+    ),
+    status: str = typer.Option(
+        None, "--status", "-s", help="Only delete runs with this status (e.g., stopped, failed)"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", "-n", help="Show what would be deleted without deleting"
+    ),
+):
+    """Clean up old runs (alias for cleanup).
+
+    Examples:
+        idlergear run clean                    # Delete runs older than 7 days
+        idlergear run clean --older-than 30   # Delete runs older than 30 days
+        idlergear run clean --status failed    # Only delete failed runs
+        idlergear run clean --dry-run          # Preview what would be deleted
+    """
+    # Just call the cleanup function
+    run_cleanup(older_than=older_than, status=status, dry_run=dry_run)
 
 
 @run_app.command("exec")
