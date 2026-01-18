@@ -54,6 +54,7 @@ def create_task(
     assignees: list[str] | None = None,
     priority: str | None = None,
     due: str | None = None,
+    milestone: str | None = None,
     project_path: Path | None = None,
 ) -> dict[str, Any]:
     """Create a new task.
@@ -65,6 +66,7 @@ def create_task(
         assignees: List of assignees
         priority: Priority level (high, medium, low, or None)
         due: Due date as ISO date string (YYYY-MM-DD) or None
+        milestone: Milestone name or number (local backend stores as string)
         project_path: Optional project path override
 
     Returns the created task data including its ID.
@@ -95,6 +97,8 @@ def create_task(
         frontmatter["priority"] = priority
     if due:
         frontmatter["due"] = due
+    if milestone:
+        frontmatter["milestone"] = milestone
 
     content = render_frontmatter(frontmatter, (body or "").strip() + "\n")
     filepath.write_text(content)

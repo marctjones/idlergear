@@ -152,6 +152,7 @@ class ShellTaskBackend:
         assignees: list[str] | None = None,
         priority: str | None = None,
         due: str | None = None,
+        milestone: str | None = None,
     ) -> dict[str, Any]:
         """Create a new task."""
         cmd = self.commands.get("create")
@@ -167,6 +168,7 @@ class ShellTaskBackend:
                 "assignees": assignees or [],
                 "priority": priority or "",
                 "due": due or "",
+                "milestone": milestone or "",
             },
         )
 

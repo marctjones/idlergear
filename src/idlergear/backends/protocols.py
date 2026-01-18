@@ -21,6 +21,7 @@ class TaskBackend(Protocol):
         assignees: list[str] | None = None,
         priority: str | None = None,
         due: str | None = None,
+        milestone: str | None = None,
     ) -> dict[str, Any]:
         """Create a new task."""
         ...

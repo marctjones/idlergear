@@ -24,6 +24,7 @@ class LocalTaskBackend:
         assignees: list[str] | None = None,
         priority: str | None = None,
         due: str | None = None,
+        milestone: str | None = None,
     ) -> dict[str, Any]:
         from idlergear.tasks import create_task
 
@@ -34,6 +35,7 @@ class LocalTaskBackend:
             assignees=assignees,
             priority=priority,
             due=due,
+            milestone=milestone,
             project_path=self.project_path,
         )
 
