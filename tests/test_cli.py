@@ -112,6 +112,44 @@ class TestTaskCommands:
         assert result.exit_code == 0
         assert "Updated task #1" in result.output
 
+    def test_task_create_with_needs_tests_flag(self, cli_project):
+        """Test creating a task with --needs-tests flag."""
+        result = runner.invoke(app, ["task", "create", "Add authentication", "--needs-tests"])
+
+        assert result.exit_code == 0
+        assert "Created task #1" in result.output
+
+        # Verify the label was added
+        show_result = runner.invoke(app, ["--output", "json", "task", "show", "1"])
+        import json
+        task_data = json.loads(show_result.output)
+        assert "needs-tests" in task_data["labels"]
+
+    def test_task_create_with_needs_tests_and_other_labels(self, cli_project):
+        """Test --needs-tests combines with other labels."""
+        result = runner.invoke(
+            app,
+            [
+                "task",
+                "create",
+                "Refactor database",
+                "--needs-tests",
+                "--label",
+                "enhancement",
+                "--no-validate",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Created task #1" in result.output
+
+        # Verify both labels were added
+        show_result = runner.invoke(app, ["--output", "json", "task", "show", "1"])
+        import json
+        task_data = json.loads(show_result.output)
+        assert "needs-tests" in task_data["labels"]
+        assert "enhancement" in task_data["labels"]
+
 
 class TestNoteCommands:
     """Tests for note commands."""

@@ -2550,6 +2550,9 @@ def task_create(
     ),
     due: str = typer.Option(None, "--due", "-d", help="Due date (YYYY-MM-DD)"),
     milestone: str = typer.Option(None, "--milestone", "-m", help="Milestone number or title"),
+    needs_tests: bool = typer.Option(
+        False, "--needs-tests", help="Mark task as requiring test coverage"
+    ),
     no_validate: bool = typer.Option(False, "--no-validate", help="Skip label validation"),
 ):
     """Create a new task."""
@@ -2566,9 +2569,14 @@ def task_create(
 
     backend = get_backend("task")
 
+    # Add needs-tests label if flag is set
+    labels_list = list(labels) if labels else []
+    if needs_tests and "needs-tests" not in labels_list:
+        labels_list.append("needs-tests")
+
     # Validate and potentially create labels if any were provided
-    if labels and not no_validate:
-        valid_labels, invalid_labels = validate_labels(labels)
+    if labels_list and not no_validate:
+        valid_labels, invalid_labels = validate_labels(labels_list)
 
         if invalid_labels:
             # Ask user if they want to create the missing labels
@@ -2597,7 +2605,7 @@ def task_create(
     task = backend.create(
         title,
         body=body,
-        labels=labels if labels else None,
+        labels=labels_list if labels_list else None,
         priority=priority,
         due=due,
         milestone=milestone,
