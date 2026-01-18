@@ -198,6 +198,66 @@ def scan_diff_for_todos(project_root: Path) -> list[dict[str, Any]]:
     return todos
 
 
+def get_newly_added_files(project_root: Path) -> list[str]:
+    """Get list of newly added files from git diff and untracked files.
+
+    Returns:
+        List of file paths that are new to the repository
+    """
+    new_files = []
+
+    # Get files added in staged changes (status code A)
+    returncode, stdout, _ = _run_git(["diff", "--cached", "--name-status"], cwd=project_root)
+    if returncode == 0:
+        for line in stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split("\t", 1)
+            if len(parts) >= 2 and parts[0].startswith("A"):
+                new_files.append(parts[1])
+
+    # Get files added in unstaged changes (status code A)
+    returncode, stdout, _ = _run_git(["diff", "--name-status"], cwd=project_root)
+    if returncode == 0:
+        for line in stdout.strip().split("\n"):
+            if not line:
+                continue
+            parts = line.split("\t", 1)
+            if len(parts) >= 2 and parts[0].startswith("A"):
+                new_files.append(parts[1])
+
+    # Get untracked files (files not in git at all)
+    returncode, stdout, _ = _run_git(["ls-files", "--others", "--exclude-standard"], cwd=project_root)
+    if returncode == 0:
+        for line in stdout.strip().split("\n"):
+            if line:
+                new_files.append(line)
+
+    return list(set(new_files))  # Remove duplicates
+
+
+def is_source_file(filepath: str) -> bool:
+    """Check if a file is a source code file (not a test file).
+
+    Args:
+        filepath: Path to the file
+
+    Returns:
+        True if it's a source file, False if it's a test file or non-code file
+    """
+    # Ignore test files
+    if "test" in filepath.lower():
+        return False
+    if filepath.startswith("tests/"):
+        return False
+    if filepath.startswith("spec/"):
+        return False
+
+    # Check for source code extensions
+    source_extensions = {".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java", ".rb", ".cs"}
+    return any(filepath.endswith(ext) for ext in source_extensions)
+
+
 def check_reference_staleness(project_root: Path) -> list[dict[str, Any]]:
     """Check if any references are stale compared to related code files."""
     stale = []
@@ -528,6 +588,31 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
                     context=stale,
                 )
             )
+
+    # Check for new files without test coverage (#162)
+    try:
+        from idlergear.testing import get_tests_for_file
+
+        new_files = get_newly_added_files(project_root)
+        new_source_files = [f for f in new_files if is_source_file(f)]
+
+        for new_file in new_source_files:
+            tests = get_tests_for_file(new_file, project_root)
+            if not tests:
+                suggestions.append(
+                    Suggestion(
+                        id=next_id(),
+                        category="test",
+                        message=f"New file '{new_file}' has no tests",
+                        severity="warning",
+                        context={
+                            "file": new_file,
+                            "fix": f"Create test file for {new_file}",
+                        },
+                    )
+                )
+    except ImportError:
+        pass  # Testing module not available
 
     return WatchStatus(
         files_changed=total_files,

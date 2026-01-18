@@ -801,3 +801,156 @@ class TestAnalyzeTestSuggestions:
         test_suggestions = [s for s in status.suggestions if s.category == "test"]
         assert len(test_suggestions) >= 1
         assert any("test files changed" in s.message.lower() for s in test_suggestions)
+
+
+# =============================================================================
+# Tests for New File Coverage Detection (Issue #162)
+# =============================================================================
+
+
+class TestNewFileCoverageDetection:
+    """Tests for detecting new files without test coverage."""
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    @patch("idlergear.watch.get_newly_added_files")
+    def test_new_file_without_tests(
+        self,
+        mock_new_files,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """Warn when new source files are added without tests."""
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 1,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 50,
+            "lines_deleted": 0,
+            "modified_files": [],
+            "staged_files": [],
+            "untracked_files": ["src/new_module.py"],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+        mock_new_files.return_value = ["src/new_module.py"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            # Mock get_tests_for_file to return no tests
+            with patch("idlergear.testing.get_tests_for_file", return_value=[]):
+                status = analyze(project_root)
+
+        # Should have a suggestion about new file without tests
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        assert len(test_suggestions) >= 1
+        new_file_suggestions = [
+            s for s in test_suggestions if "new file" in s.message.lower()
+        ]
+        assert len(new_file_suggestions) >= 1
+        assert "new_module.py" in new_file_suggestions[0].message
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    @patch("idlergear.watch.get_newly_added_files")
+    def test_new_file_with_tests(
+        self,
+        mock_new_files,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """No warning when new source files have corresponding tests."""
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 1,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 50,
+            "lines_deleted": 0,
+            "modified_files": [],
+            "staged_files": [],
+            "untracked_files": ["src/new_module.py"],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+        mock_new_files.return_value = ["src/new_module.py"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            # Mock get_tests_for_file to return test files
+            with patch(
+                "idlergear.testing.get_tests_for_file",
+                return_value=["tests/test_new_module.py"],
+            ):
+                status = analyze(project_root)
+
+        # Should NOT have a suggestion about new file without tests
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        new_file_suggestions = [
+            s for s in test_suggestions if "new file" in s.message.lower()
+        ]
+        assert len(new_file_suggestions) == 0
+
+    @patch("idlergear.watch.get_config_value")
+    @patch("idlergear.watch.get_git_status")
+    @patch("idlergear.watch.get_minutes_since_last_commit")
+    @patch("idlergear.watch.scan_diff_for_todos")
+    @patch("idlergear.watch.check_reference_staleness")
+    @patch("idlergear.watch.get_newly_added_files")
+    def test_new_test_file_ignored(
+        self,
+        mock_new_files,
+        mock_staleness,
+        mock_todos,
+        mock_minutes,
+        mock_git_status,
+        mock_config,
+    ):
+        """Test files themselves should not trigger coverage warnings."""
+        mock_config.return_value = None
+        mock_git_status.return_value = {
+            "files_changed": 1,
+            "files_staged": 0,
+            "files_untracked": 0,
+            "lines_added": 50,
+            "lines_deleted": 0,
+            "modified_files": [],
+            "staged_files": [],
+            "untracked_files": ["tests/test_new_module.py"],
+        }
+        mock_minutes.return_value = 5
+        mock_todos.return_value = []
+        mock_staleness.return_value = []
+        mock_new_files.return_value = ["tests/test_new_module.py"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            (project_root / ".idlergear").mkdir()
+
+            status = analyze(project_root)
+
+        # Should NOT have a suggestion about test file needing tests
+        test_suggestions = [s for s in status.suggestions if s.category == "test"]
+        new_file_suggestions = [
+            s for s in test_suggestions if "new file" in s.message.lower()
+        ]
+        assert len(new_file_suggestions) == 0
