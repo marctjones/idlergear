@@ -7,9 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from rich.table import Table
 from textual.app import App, ComposeResult
-from textual.containers import Container, ScrollableContainer
+from textual.containers import ScrollableContainer
 from textual.widgets import DataTable, Footer, Header, Static
 
 from idlergear.tui.monitor import SessionTailer, parse_event
@@ -59,6 +58,11 @@ class IdleWatchApp(App):
         self.monitor_task: Optional[asyncio.Task] = None
         self.event_count = 0
 
+        # Initialize enricher
+        from idlergear.tui.enricher import EventEnricher
+
+        self.enricher = EventEnricher()
+
     def compose(self) -> ComposeResult:
         """Compose the UI."""
         if not self.session_file:
@@ -86,7 +90,7 @@ class IdleWatchApp(App):
 
         # Set up table
         table = self.query_one("#activity", DataTable)
-        table.add_columns("Time", "Type", "Details")
+        table.add_columns("Time", "Type", "Details", "Context")
         table.cursor_type = "row"
 
         # Start monitoring
@@ -100,7 +104,8 @@ class IdleWatchApp(App):
 
         def handle_event(event: dict) -> None:
             """Handle a new event from the session file."""
-            parsed = parse_event(event)
+            # Pass enricher to parse_event
+            parsed = parse_event(event, enricher=self.enricher)
 
             # Format timestamp
             timestamp = parsed.get("timestamp", "")
@@ -118,6 +123,7 @@ class IdleWatchApp(App):
 
             event_type = parsed["type"]
             details = parsed.get("details", "")
+            context = parsed.get("context", "")
 
             # Color code by type
             if parsed.get("error"):
@@ -129,7 +135,7 @@ class IdleWatchApp(App):
             else:
                 type_display = event_type
 
-            table.add_row(time_str, type_display, details)
+            table.add_row(time_str, type_display, details, context)
 
             # Auto-scroll to bottom
             table.scroll_end(animate=False)
@@ -143,18 +149,36 @@ class IdleWatchApp(App):
         await asyncio.to_thread(self.tailer.tail, handle_event, interval=0.5)
 
     def update_header(self) -> None:
-        """Update the header with event count."""
+        """Update the header with enriched context."""
         if not self.session_file:
             return
 
         metadata = get_session_metadata(self.session_file)
         project = metadata.get("project", "unknown")
 
+        # Get git and task context
+        git_ctx = self.enricher.git.get()
+        task_ctx = self.enricher.tasks.get_current()
+
+        # Format header
+        parts = [f"🟢 idlerwatch - {project}"]
+
+        # Add task if present
+        if task_ctx:
+            parts.append(f"Task: #{task_ctx.id} {task_ctx.title}")
+
+        # Add git context
+        dirty_marker = "●" if git_ctx.dirty else ""
+        parts.append(f"{git_ctx.branch} @ {git_ctx.commit} {dirty_marker}")
+
+        if git_ctx.uncommitted_count > 0:
+            parts.append(f"{git_ctx.uncommitted_count} uncommitted")
+
+        # Add event count
+        parts.append(f"({self.event_count} events)")
+
         header = self.query_one("#header", Static)
-        header.update(
-            f"🟢 idlerwatch - Monitoring session: {project} "
-            f"({self.event_count} events)"
-        )
+        header.update(" | ".join(parts))
 
     def action_refresh(self) -> None:
         """Refresh the display."""

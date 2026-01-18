@@ -25,7 +25,9 @@ class SessionTailer:
             # Seek to end of file
             self.position = session_file.stat().st_size
 
-    def tail(self, callback: Callable[[dict[str, Any]], None], interval: float = 0.5) -> None:
+    def tail(
+        self, callback: Callable[[dict[str, Any]], None], interval: float = 0.5
+    ) -> None:
         """Tail the session file and call callback for each new event.
 
         Args:
@@ -85,15 +87,22 @@ class SessionTailer:
         return events
 
 
-def parse_event(event: dict[str, Any]) -> dict[str, Any]:
+def parse_event(
+    event: dict[str, Any], enricher: Optional[Any] = None
+) -> dict[str, Any]:
     """Parse a session event into a display-friendly format.
 
     Args:
         event: Raw event from session file
+        enricher: Optional enricher to add context
 
     Returns:
-        Parsed event with type, details, timestamp
+        Parsed event with type, details, timestamp, and context
     """
+    # Enrich event first if enricher provided
+    if enricher:
+        event = enricher.enrich(event)
+
     event_type = event.get("type", "unknown")
     timestamp = event.get("timestamp", "")
 
@@ -151,7 +160,6 @@ def parse_event(event: dict[str, Any]) -> dict[str, Any]:
 
     elif event_type == "tool_result":
         # Tool result
-        tool_id = event.get("tool_use_id", "")
         is_error = event.get("is_error", False)
         result["details"] = "Error" if is_error else "Success"
         result["error"] = is_error
@@ -160,4 +168,41 @@ def parse_event(event: dict[str, Any]) -> dict[str, Any]:
         # Unknown event type
         result["details"] = str(event)[:80]
 
+    # Add context field for display
+    result["context"] = _format_context(event)
+
     return result
+
+
+def _format_context(event: dict[str, Any]) -> str:
+    """Format context column from enriched event."""
+    context_parts = []
+
+    # Show task if present
+    if event.get("current_task"):
+        task = event["current_task"]
+        context_parts.append(f"#{task['id']}")
+
+    # Show git status for file operations
+    if event.get("file_git_status"):
+        status = event["file_git_status"]
+        if status != "unchanged":
+            # Use first letter: m/s/u
+            status_short = status[0] if status != "unknown" else "?"
+            context_parts.append(f"git:{status_short}")
+
+    # Show special operation markers
+    if event.get("is_task_operation"):
+        action = event.get("task_action", "")
+        if action:
+            context_parts.append(f"task:{action}")
+        else:
+            context_parts.append("task-op")
+    elif event.get("is_git_operation"):
+        git_op = event.get("git_operation", "")
+        if git_op:
+            context_parts.append(f"git:{git_op}")
+        else:
+            context_parts.append("git-op")
+
+    return " ".join(context_parts) if context_parts else ""

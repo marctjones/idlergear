@@ -73,7 +73,7 @@ def get_session_metadata(session_file: Path) -> dict:
         with open(session_file, "r") as f:
             first_line = f.readline()
             if first_line:
-                data = json.loads(first_line)
+                json.loads(first_line)  # Validate JSON format
                 return {
                     "file": str(session_file),
                     "project": session_file.parent.name,
