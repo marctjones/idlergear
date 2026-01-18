@@ -169,11 +169,12 @@ class SessionIndex:
 class SessionHistory:
     """Manages session history with snapshots and branching."""
 
-    def __init__(self, root: Optional[Path] = None):
+    def __init__(self, root: Optional[Path] = None, auto_migrate: bool = True):
         """Initialize session history manager.
 
         Args:
             root: IdlerGear root directory. If None, auto-detect.
+            auto_migrate: If True, automatically migrate old session_state.json
         """
         self.root = root or find_idlergear_root()
         if not self.root:
@@ -181,6 +182,10 @@ class SessionHistory:
 
         self.sessions_dir = self.root / ".idlergear" / "sessions"
         self.index = SessionIndex(self.root)
+
+        # Auto-migrate from old session_state.json if exists
+        if auto_migrate:
+            migrate_from_old_session_state()
 
     def _get_session_file(self, session_id: str, branch: str = "main") -> Path:
         """Get path to session file.
@@ -389,8 +394,8 @@ def migrate_from_old_session_state() -> bool:
         # Load old state
         old_state = json.loads(old_state_file.read_text())
 
-        # Create first session snapshot from old state
-        history = SessionHistory(root)
+        # Create first session snapshot from old state (disable auto-migrate to avoid recursion)
+        history = SessionHistory(root, auto_migrate=False)
         history.create_snapshot(
             state={
                 "current_task_id": old_state.get("current_task_id"),

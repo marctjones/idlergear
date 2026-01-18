@@ -5125,6 +5125,182 @@ def session_list(
             typer.echo(f"  {name:30s} {time_str:12s}{task_str}")
 
 
+@session_app.command("show")
+def session_show(
+    session_id: str = typer.Argument(..., help="Session ID to show (e.g., s001)"),
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
+):
+    """Show detailed session snapshot.
+
+    Examples:
+        idlergear session show s001       # Show session details
+        idlergear session show s003 --json  # JSON output
+    """
+    import json
+
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_history import SessionHistory
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        history = SessionHistory()
+        snapshot = history.load_snapshot(session_id, branch)
+
+        if snapshot is None:
+            typer.secho(f"Session '{session_id}' not found in branch '{branch}'.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        if json_output:
+            typer.echo(json.dumps(snapshot.to_dict(), indent=2))
+        else:
+            # Format human-readable output
+            typer.secho(f"\nSession: {snapshot.session_id}", fg=typer.colors.CYAN, bold=True)
+            typer.echo(f"Branch: {snapshot.branch}")
+            typer.echo(f"Timestamp: {snapshot.timestamp}")
+            typer.echo(f"Duration: {snapshot.duration_seconds}s")
+
+            if snapshot.parent:
+                typer.echo(f"Parent: {snapshot.parent}")
+
+            # State
+            state = snapshot.state
+            if state:
+                typer.echo("\nState:")
+                if state.get("current_task_id"):
+                    typer.echo(f"  Task: #{state['current_task_id']}")
+                if state.get("working_files"):
+                    typer.echo(f"  Files: {', '.join(state['working_files'][:3])}")
+                if state.get("notes"):
+                    typer.echo(f"  Notes: {state['notes']}")
+
+            # Outcome
+            outcome = snapshot.outcome
+            if outcome:
+                typer.echo("\nOutcome:")
+                if outcome.get("status"):
+                    typer.echo(f"  Status: {outcome['status']}")
+                if outcome.get("goals_achieved"):
+                    typer.echo(f"  Goals: {', '.join(outcome['goals_achieved'])}")
+                if outcome.get("next_steps"):
+                    typer.echo(f"  Next: {', '.join(outcome['next_steps'])}")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("diff")
+def session_diff(
+    session1: str = typer.Argument(..., help="First session ID (e.g., s001)"),
+    session2: str = typer.Argument(..., help="Second session ID (e.g., s002)"),
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
+):
+    """Compare two session snapshots.
+
+    Examples:
+        idlergear session diff s001 s002  # Compare two sessions
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_history import SessionHistory
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        history = SessionHistory()
+        snap1 = history.load_snapshot(session1, branch)
+        snap2 = history.load_snapshot(session2, branch)
+
+        if snap1 is None:
+            typer.secho(f"Session '{session1}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        if snap2 is None:
+            typer.secho(f"Session '{session2}' not found.", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+        typer.secho(f"\nComparing {session1} vs {session2}:", fg=typer.colors.CYAN, bold=True)
+
+        # Compare timestamps
+        typer.echo(f"\nTime:")
+        typer.echo(f"  {session1}: {snap1.timestamp}")
+        typer.echo(f"  {session2}: {snap2.timestamp}")
+
+        # Compare durations
+        typer.echo(f"\nDuration:")
+        typer.echo(f"  {session1}: {snap1.duration_seconds}s")
+        typer.echo(f"  {session2}: {snap2.duration_seconds}s")
+
+        # Compare tasks
+        task1 = snap1.state.get("current_task_id")
+        task2 = snap2.state.get("current_task_id")
+        if task1 != task2:
+            typer.echo(f"\nTask changed:")
+            typer.echo(f"  {session1}: #{task1}" if task1 else f"  {session1}: None")
+            typer.echo(f"  {session2}: #{task2}" if task2 else f"  {session2}: None")
+
+        # Compare files
+        files1 = set(snap1.state.get("working_files", []))
+        files2 = set(snap2.state.get("working_files", []))
+
+        added_files = files2 - files1
+        removed_files = files1 - files2
+
+        if added_files or removed_files:
+            typer.echo(f"\nFiles changed:")
+            if added_files:
+                typer.secho(f"  Added: {', '.join(added_files)}", fg=typer.colors.GREEN)
+            if removed_files:
+                typer.secho(f"  Removed: {', '.join(removed_files)}", fg=typer.colors.RED)
+
+        # Compare outcomes
+        outcome1 = snap1.outcome.get("status")
+        outcome2 = snap2.outcome.get("status")
+        if outcome1 != outcome2:
+            typer.echo(f"\nOutcome:")
+            typer.echo(f"  {session1}: {outcome1}")
+            typer.echo(f"  {session2}: {outcome2}")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("checkpoints")
+def session_checkpoints():
+    """List auto-saved checkpoints.
+
+    Checkpoints are lightweight auto-saves created every 15 minutes
+    for crash recovery.
+
+    Examples:
+        idlergear session checkpoints  # List all checkpoints
+    """
+    from idlergear.config import find_idlergear_root
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    # For now, just show a message that checkpoints aren't implemented yet
+    typer.secho("Auto-checkpoint feature coming soon!", fg=typer.colors.YELLOW)
+    typer.echo("Checkpoints will save session state every 15 minutes for crash recovery.")
+
+
 # Goose commands
 @goose_app.command("init")
 def goose_init(
