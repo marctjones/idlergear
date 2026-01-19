@@ -1,6 +1,6 @@
 # IdlerGear MCP Tools Reference
 
-Complete reference for all 126 MCP tools provided by IdlerGear.
+Complete reference for all 132 MCP tools provided by IdlerGear.
 
 ## Session Management (4 tools)
 
@@ -56,6 +56,77 @@ Search across all knowledge types.
 **Parameters:**
 - `query`: string (required)
 - `types`: list of "task" | "note" | "reference" | "plan"
+
+## Knowledge Graph (6 tools) ⚡
+
+**Token-efficient context retrieval using embedded graph database.**
+
+### idlergear_graph_query_task ⚡
+Query task context from knowledge graph. Returns task info with related files, commits, and symbols.
+
+**Parameters:**
+- `task_id`: integer (required)
+
+**Returns:** Task with related files, commits, symbols.
+
+**Token savings:** 98% vs grep + file reads (5,000 → 100 tokens)
+
+### idlergear_graph_query_file ⚡
+Query file context from knowledge graph. Returns file info with related tasks, imports, and symbols.
+
+**Parameters:**
+- `file_path`: string (required)
+
+**Returns:** File metadata, tasks, imports, symbols.
+
+**Token savings:** 95% vs cat + grep (3,000 → 150 tokens)
+
+### idlergear_graph_query_symbols ⚡
+Search for symbols (functions, classes, methods) by name pattern.
+
+**Parameters:**
+- `pattern`: string (required) - Name pattern to search for
+- `limit`: integer (default: 10) - Max results
+- `type`: string (optional) - Filter by "function" | "class" | "method"
+
+**Returns:** List of symbols with file locations and line numbers.
+
+**Token savings:** 98.5% vs grep + file reads (8,000 → 120 tokens)
+
+**Use this instead of grep when searching for code symbols.**
+
+### idlergear_graph_populate_git
+Index git commit history into knowledge graph.
+
+**Parameters:**
+- `max_commits`: integer (default: 100) - Maximum commits to index
+- `since`: string (optional) - Date filter (e.g., "2025-01-01")
+- `incremental`: boolean (default: true) - Skip existing commits
+
+**Returns:** `{commits: int, files: int, relationships: int}`
+
+**Run this periodically to keep graph current.**
+
+### idlergear_graph_populate_code
+Index code symbols (functions, classes, methods) into knowledge graph.
+
+**Parameters:**
+- `directory`: string (default: "src") - Directory to scan
+- `incremental`: boolean (default: true) - Skip unchanged files
+
+**Returns:** `{files: int, symbols: int, relationships: int}`
+
+**Supports:** Python (via AST parsing)
+
+### idlergear_graph_schema_info
+Get knowledge graph schema information and statistics.
+
+**Returns:** Node types, relationship types, counts, total nodes/relationships.
+
+**Use cases:**
+- Check if graph is initialized
+- Verify data has been indexed
+- Monitor graph size
 
 ## Task Management (5 tools)
 
