@@ -163,13 +163,20 @@ At the end of your session, call idlergear_session_end() to save state for next 
 Available tool categories:
 - Session Management (4 tools) - Start/end sessions with state persistence
 - Context & Knowledge (6 tools) - Vision, plans, tasks, notes, references
+- Knowledge Graph (6 tools) - Token-efficient queries for tasks, files, symbols
 - Filesystem (11 tools) - File operations with gitignore support
 - Git Integration (18 tools) - Git operations + task linking
 - Process Management (11 tools) - System info, process control
 - Environment (4 tools) - Python/Node/Rust detection, venv finder
 - OpenTelemetry (3 tools) - Log collection and querying
 
-All tools return structured JSON for token efficiency.""",
+All tools return structured JSON for token efficiency.
+
+Knowledge Graph Usage:
+1. First-time setup: Call idlergear_graph_populate_git() and idlergear_graph_populate_code()
+2. Query efficiently: Use idlergear_graph_query_symbols() instead of grep for finding functions
+3. Get context: Use idlergear_graph_query_task() for token-efficient task context
+4. Incremental updates: Re-run populate tools periodically to stay current""",
 )
 
 
@@ -703,6 +710,98 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["type", "backend"],
             },
+        ),
+        # Knowledge graph tools
+        Tool(
+            name="idlergear_graph_query_task",
+            description="Query knowledge graph for task context. Returns task info with related files, commits, and symbols. Token-efficient alternative to grep/file reads.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "integer", "description": "Task ID to query"},
+                },
+                "required": ["task_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_query_file",
+            description="Query knowledge graph for file context. Returns file info with related tasks, imports, and symbols.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Relative file path (e.g., 'src/main.py')",
+                    },
+                },
+                "required": ["file_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_query_symbols",
+            description="Search knowledge graph for symbols by name pattern. Returns functions, classes, and methods matching the pattern with their locations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Symbol name pattern (case-insensitive contains)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results (default: 10)",
+                        "default": 10,
+                    },
+                },
+                "required": ["pattern"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_populate_git",
+            description="Populate knowledge graph with git history. Indexes commits and file changes for token-efficient queries.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "max_commits": {
+                        "type": "integer",
+                        "description": "Maximum number of commits to index (default: 100)",
+                        "default": 100,
+                    },
+                    "since": {
+                        "type": "string",
+                        "description": "Only index commits since this date (e.g., '2025-01-01')",
+                    },
+                    "incremental": {
+                        "type": "boolean",
+                        "description": "Skip commits already in database (default: true)",
+                        "default": True,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_graph_populate_code",
+            description="Populate knowledge graph with code symbols from Python files. Indexes functions, classes, and methods for fast symbol lookup.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "directory": {
+                        "type": "string",
+                        "description": "Directory to scan (relative to repo root, default: 'src')",
+                        "default": "src",
+                    },
+                    "incremental": {
+                        "type": "boolean",
+                        "description": "Skip files that haven't changed (default: true)",
+                        "default": True,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_graph_schema_info",
+            description="Get knowledge graph schema information. Returns node types, relationship types, and counts.",
+            inputSchema={"type": "object", "properties": {}},
         ),
         # Server management tools
         Tool(
@@ -2609,6 +2708,157 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "set": True,
                 }
             )
+
+        # Knowledge graph handlers
+        elif name == "idlergear_graph_query_task":
+            from idlergear.graph import get_database, query_task_context
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            # Ensure schema exists
+            try:
+                result = query_task_context(db, arguments["task_id"])
+                if not result:
+                    return _format_result(
+                        {
+                            "error": f"Task #{arguments['task_id']} not found in graph",
+                            "hint": "Run idlergear_graph_populate_git to index task history",
+                        }
+                    )
+                return _format_result(result)
+            except Exception as e:
+                if "does not exist" in str(e).lower():
+                    # Schema not initialized
+                    initialize_schema(db)
+                    return _format_result(
+                        {
+                            "error": "Knowledge graph not initialized",
+                            "hint": "Run idlergear_graph_populate_git and idlergear_graph_populate_code to build the graph",
+                        }
+                    )
+                raise
+
+        elif name == "idlergear_graph_query_file":
+            from idlergear.graph import get_database, query_file_context
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            try:
+                result = query_file_context(db, arguments["file_path"])
+                if not result:
+                    return _format_result(
+                        {
+                            "error": f"File '{arguments['file_path']}' not found in graph",
+                            "hint": "Run idlergear_graph_populate_code to index files",
+                        }
+                    )
+                return _format_result(result)
+            except Exception as e:
+                if "does not exist" in str(e).lower():
+                    initialize_schema(db)
+                    return _format_result(
+                        {
+                            "error": "Knowledge graph not initialized",
+                            "hint": "Run idlergear_graph_populate_git and idlergear_graph_populate_code",
+                        }
+                    )
+                raise
+
+        elif name == "idlergear_graph_query_symbols":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_symbols_by_name
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            try:
+                result = query_symbols_by_name(
+                    db,
+                    arguments["pattern"],
+                    limit=arguments.get("limit", 10),
+                )
+                return _format_result({"symbols": result, "count": len(result)})
+            except Exception as e:
+                if "does not exist" in str(e).lower():
+                    initialize_schema(db)
+                    return _format_result(
+                        {
+                            "error": "Knowledge graph not initialized",
+                            "hint": "Run idlergear_graph_populate_code to index symbols",
+                        }
+                    )
+                raise
+
+        elif name == "idlergear_graph_populate_git":
+            from idlergear.graph import get_database
+            from idlergear.graph.populators import GitPopulator
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            # Ensure schema exists
+            try:
+                from idlergear.graph.schema import get_schema_info
+
+                get_schema_info(db)
+            except Exception:
+                initialize_schema(db)
+
+            populator = GitPopulator(db)
+            result = populator.populate(
+                max_commits=arguments.get("max_commits", 100),
+                since=arguments.get("since"),
+                incremental=arguments.get("incremental", True),
+            )
+            return _format_result(
+                {
+                    "status": "completed",
+                    "commits_indexed": result["commits"],
+                    "files_indexed": result["files"],
+                    "relationships_created": result["relationships"],
+                }
+            )
+
+        elif name == "idlergear_graph_populate_code":
+            from idlergear.graph import get_database
+            from idlergear.graph.populators import CodePopulator
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            # Ensure schema exists
+            try:
+                from idlergear.graph.schema import get_schema_info
+
+                get_schema_info(db)
+            except Exception:
+                initialize_schema(db)
+
+            populator = CodePopulator(db)
+            result = populator.populate_directory(
+                directory=arguments.get("directory", "src"),
+                incremental=arguments.get("incremental", True),
+            )
+            return _format_result(
+                {
+                    "status": "completed",
+                    "files_processed": result["files"],
+                    "symbols_indexed": result["symbols"],
+                    "relationships_created": result["relationships"],
+                }
+            )
+
+        elif name == "idlergear_graph_schema_info":
+            from idlergear.graph import get_database
+            from idlergear.graph.schema import get_schema_info, initialize_schema
+
+            db = get_database()
+            try:
+                result = get_schema_info(db)
+                return _format_result(result)
+            except Exception as e:
+                if "does not exist" in str(e).lower():
+                    initialize_schema(db)
+                    result = get_schema_info(db)
+                    return _format_result(result)
+                raise
 
         # Server management handlers
         elif name == "idlergear_version":

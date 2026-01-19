@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "idlergear"
-version = "0.4.15"
+version = "0.4.16"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,6 +23,7 @@ dependencies = [
     "protobuf>=4.25.0",
     "textual>=0.47.0",
     "watchdog>=3.0.0",
+    "kuzu>=0.11.3",
 ]
 
 [project.optional-dependencies]
