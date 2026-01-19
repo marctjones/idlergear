@@ -110,8 +110,10 @@ class TestCallToolTasks:
 
         assert len(result) == 1
         data = json.loads(result[0].text)
-        assert data["title"] == "Test task"
-        assert data["id"] == 1
+        assert data["task"]["title"] == "Test task"
+        assert data["task"]["id"] == 1
+        assert "added_to_project" in data
+        assert isinstance(data["added_to_project"], bool)
 
     @pytest.mark.asyncio
     async def test_task_list(self, mcp_project):
