@@ -119,17 +119,16 @@ The difference:
 ## Quick Start
 
 ```bash
-# Install (recommended - isolated environment)
-pipx install idlergear
+# Install from source (development)
+git clone https://github.com/marctjones/idlergear.git
+cd idlergear
+pip install -e .
 
-# Or upgrade existing installation
-pipx upgrade idlergear
+# Or install from PyPI (once published)
+# pipx install idlergear
 
 # Or with pip
-pip install idlergear
-
-# Upgrade with pip
-pip install --upgrade idlergear
+# pip install idlergear
 
 # Initialize a project
 cd my-project
