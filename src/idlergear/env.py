@@ -319,65 +319,268 @@ def find_virtualenv(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
     return None
 
 
-def activate_project_env(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
-    """Automatically detect and activate project virtual environment.
+def find_rust_toolchain(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Find Rust toolchain specification in the project directory.
 
-    This function modifies os.environ to activate a detected virtualenv,
-    ensuring subprocess calls use the correct Python interpreter.
+    Args:
+        path: Directory to search (default: current directory)
+
+    Returns:
+        Dictionary with toolchain info, or None if not found
+    """
+    if path is None:
+        path = Path.cwd()
+    else:
+        path = Path(path)
+
+    # Check for rust-toolchain.toml (TOML format)
+    toolchain_toml = path / "rust-toolchain.toml"
+    if toolchain_toml.exists():
+        try:
+            # Use tomllib (built-in for Python 3.11+) or tomli (fallback)
+            try:
+                import tomllib
+            except ImportError:
+                import tomli as tomllib
+
+            with open(toolchain_toml, "rb") as f:
+                data = tomllib.load(f)
+                toolchain = data.get("toolchain", {})
+                channel = toolchain.get("channel", "stable")
+                return {
+                    "type": "rust-toolchain",
+                    "file": str(toolchain_toml),
+                    "toolchain": channel,
+                    "components": toolchain.get("components", []),
+                    "targets": toolchain.get("targets", []),
+                }
+        except Exception:
+            pass
+
+    # Check for rust-toolchain (plain text format)
+    toolchain_file = path / "rust-toolchain"
+    if toolchain_file.exists():
+        try:
+            toolchain = toolchain_file.read_text().strip()
+            return {
+                "type": "rust-toolchain",
+                "file": str(toolchain_file),
+                "toolchain": toolchain,
+            }
+        except Exception:
+            pass
+
+    # Check for Cargo.toml (indicates Rust project but no specific toolchain)
+    cargo_toml = path / "Cargo.toml"
+    if cargo_toml.exists():
+        return {
+            "type": "cargo-project",
+            "file": str(cargo_toml),
+            "toolchain": None,  # Use default
+        }
+
+    return None
+
+
+def find_dotnet_sdk(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Find .NET SDK specification in the project directory.
+
+    Args:
+        path: Directory to search (default: current directory)
+
+    Returns:
+        Dictionary with SDK info, or None if not found
+    """
+    if path is None:
+        path = Path.cwd()
+    else:
+        path = Path(path)
+
+    # Check for global.json
+    global_json = path / "global.json"
+    if global_json.exists():
+        try:
+            import json
+
+            with open(global_json) as f:
+                data = json.load(f)
+                sdk = data.get("sdk", {})
+                version = sdk.get("version")
+                return {
+                    "type": "global.json",
+                    "file": str(global_json),
+                    "sdk_version": version,
+                    "roll_forward": sdk.get("rollForward", "latestPatch"),
+                }
+        except Exception:
+            pass
+
+    # Check for .csproj, .fsproj, .vbproj (indicates .NET project)
+    for pattern in ["*.csproj", "*.fsproj", "*.vbproj"]:
+        if list(path.glob(pattern)):
+            return {
+                "type": "dotnet-project",
+                "file": str(path),
+                "sdk_version": None,  # Use default
+            }
+
+    # Check for .sln (solution file)
+    if list(path.glob("*.sln")):
+        return {
+            "type": "dotnet-solution",
+            "file": str(path),
+            "sdk_version": None,  # Use default
+        }
+
+    return None
+
+
+def activate_project_env(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Automatically detect and activate project development environments.
+
+    This function modifies os.environ to activate detected environments:
+    - Python: virtualenv, poetry, pipenv
+    - Rust: rust-toolchain.toml, rust-toolchain
+    - .NET: global.json
 
     Args:
         path: Project directory to search (default: current directory)
 
     Returns:
-        Dictionary with activation info, or None if no venv found
+        Dictionary with activation info, or None if no environment found
 
     Example:
         >>> info = activate_project_env()
         >>> if info:
-        >>>     print(f"Activated {info['type']} at {info['path']}")
+        >>>     print(f"Activated {info['type']} at {info.get('path', 'N/A')}")
     """
     import os
 
+    if path is None:
+        path = Path.cwd()
+    else:
+        path = Path(path)
+
+    activated = []
+
+    # Python environment activation
     venv_info = find_virtualenv(path)
-    if not venv_info:
+    if venv_info:
+        venv_type = venv_info["type"]
+
+        if venv_type == "venv":
+            # Standard venv - activate by setting environment variables
+            venv_path = Path(venv_info["path"])
+            python_path = venv_info["python"]
+
+            # Set VIRTUAL_ENV
+            os.environ["VIRTUAL_ENV"] = str(venv_path)
+
+            # Unset PYTHONHOME if set (can interfere with venv)
+            os.environ.pop("PYTHONHOME", None)
+
+            # Add venv bin directory to PATH (prepend so it takes precedence)
+            bin_dir = (
+                venv_path / "bin"
+                if (venv_path / "bin").exists()
+                else venv_path / "Scripts"
+            )
+            current_path = os.environ.get("PATH", "")
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{current_path}"
+
+            activated.append(
+                {
+                    "language": "python",
+                    "activated": True,
+                    "type": venv_type,
+                    "path": str(venv_path),
+                    "python": python_path,
+                    "method": "environment",
+                }
+            )
+
+        elif venv_type in ("poetry", "pipenv"):
+            # Poetry/Pipenv - store info but don't modify environment
+            activated.append(
+                {
+                    "language": "python",
+                    "activated": False,
+                    "type": venv_type,
+                    "path": venv_info.get("path"),
+                    "command": venv_info.get("command"),
+                    "method": "wrapper",
+                    "note": f"Use '{venv_info.get('command')}' to run commands",
+                }
+            )
+
+    # Rust toolchain activation
+    rust_info = find_rust_toolchain(path)
+    if rust_info:
+        toolchain = rust_info.get("toolchain")
+        if toolchain:
+            # Set RUSTUP_TOOLCHAIN to use specific toolchain
+            os.environ["RUSTUP_TOOLCHAIN"] = toolchain
+            activated.append(
+                {
+                    "language": "rust",
+                    "activated": True,
+                    "type": rust_info["type"],
+                    "toolchain": toolchain,
+                    "file": rust_info["file"],
+                    "method": "environment",
+                }
+            )
+        else:
+            # Rust project but no specific toolchain
+            activated.append(
+                {
+                    "language": "rust",
+                    "activated": False,
+                    "type": rust_info["type"],
+                    "file": rust_info.get("file"),
+                    "note": "Rust project detected, using default toolchain",
+                }
+            )
+
+    # .NET SDK activation
+    dotnet_info = find_dotnet_sdk(path)
+    if dotnet_info:
+        sdk_version = dotnet_info.get("sdk_version")
+        if sdk_version:
+            # Note: .NET SDK selection is typically handled by dotnet CLI reading global.json
+            # We just log that it was detected
+            activated.append(
+                {
+                    "language": "dotnet",
+                    "activated": True,
+                    "type": dotnet_info["type"],
+                    "sdk_version": sdk_version,
+                    "file": dotnet_info["file"],
+                    "method": "dotnet-cli",
+                    "note": "dotnet CLI will automatically use SDK version from global.json",
+                }
+            )
+        else:
+            # .NET project but no specific SDK version
+            activated.append(
+                {
+                    "language": "dotnet",
+                    "activated": False,
+                    "type": dotnet_info["type"],
+                    "file": dotnet_info.get("file"),
+                    "note": ".NET project detected, using default SDK",
+                }
+            )
+
+    # Return results
+    if not activated:
         return None
-
-    venv_type = venv_info["type"]
-
-    if venv_type == "venv":
-        # Standard venv - activate by setting environment variables
-        venv_path = Path(venv_info["path"])
-        python_path = venv_info["python"]
-
-        # Set VIRTUAL_ENV
-        os.environ["VIRTUAL_ENV"] = str(venv_path)
-
-        # Unset PYTHONHOME if set (can interfere with venv)
-        os.environ.pop("PYTHONHOME", None)
-
-        # Add venv bin directory to PATH (prepend so it takes precedence)
-        bin_dir = venv_path / "bin" if (venv_path / "bin").exists() else venv_path / "Scripts"
-        current_path = os.environ.get("PATH", "")
-        os.environ["PATH"] = f"{bin_dir}{os.pathsep}{current_path}"
-
+    elif len(activated) == 1:
+        return activated[0]
+    else:
+        # Multiple environments detected
         return {
-            "activated": True,
-            "type": venv_type,
-            "path": str(venv_path),
-            "python": python_path,
-            "method": "environment",
+            "multiple": True,
+            "environments": activated,
+            "count": len(activated),
         }
-
-    elif venv_type in ("poetry", "pipenv"):
-        # Poetry/Pipenv - store info but don't modify environment
-        # These tools manage their own environments
-        return {
-            "activated": False,
-            "type": venv_type,
-            "path": venv_info.get("path"),
-            "command": venv_info.get("command"),
-            "method": "wrapper",
-            "note": f"Use '{venv_info.get('command')}' to run commands",
-        }
-
-    return None

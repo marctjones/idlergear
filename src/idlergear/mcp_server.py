@@ -45,10 +45,10 @@ def _cleanup_pid_file() -> None:
 
 
 def _activate_project_environment() -> None:
-    """Detect and activate project virtual environment.
+    """Detect and activate project development environments.
 
     This runs when the MCP server starts to ensure subprocess calls
-    use the correct Python interpreter and dependencies.
+    use the correct interpreters and toolchains (Python, Rust, .NET).
     """
     import sys
 
@@ -63,18 +63,63 @@ def _activate_project_environment() -> None:
             # Fall back to current directory
             env_info = activate_project_env()
 
-        if env_info and env_info.get("activated"):
-            # Log to stderr so it doesn't interfere with MCP protocol
+        if not env_info:
+            return
+
+        # Handle multiple environments
+        if env_info.get("multiple"):
+            envs = env_info.get("environments", [])
             print(
-                f"[IdlerGear MCP] Activated {env_info['type']} environment: {env_info['path']}",
+                f"[IdlerGear MCP] Detected {len(envs)} project environment(s):",
                 file=sys.stderr,
             )
-        elif env_info and not env_info.get("activated"):
-            # Poetry/Pipenv detected but not auto-activated
-            print(
-                f"[IdlerGear MCP] Detected {env_info['type']} environment: {env_info.get('note', '')}",
-                file=sys.stderr,
-            )
+            for env in envs:
+                lang = env.get("language", "unknown")
+                if env.get("activated"):
+                    if lang == "python":
+                        print(
+                            f"  ✓ Python: {env['type']} at {env.get('path', 'N/A')}",
+                            file=sys.stderr,
+                        )
+                    elif lang == "rust":
+                        print(
+                            f"  ✓ Rust: toolchain '{env.get('toolchain')}' from {env.get('file')}",
+                            file=sys.stderr,
+                        )
+                    elif lang == "dotnet":
+                        print(
+                            f"  ✓ .NET: SDK {env.get('sdk_version')} from {env.get('file')}",
+                            file=sys.stderr,
+                        )
+                else:
+                    print(
+                        f"  ℹ {lang.capitalize()}: {env.get('note', 'detected')}",
+                        file=sys.stderr,
+                    )
+        else:
+            # Single environment
+            lang = env_info.get("language", "unknown")
+            if env_info.get("activated"):
+                if lang == "python":
+                    print(
+                        f"[IdlerGear MCP] Activated Python {env_info['type']}: {env_info.get('path')}",
+                        file=sys.stderr,
+                    )
+                elif lang == "rust":
+                    print(
+                        f"[IdlerGear MCP] Activated Rust toolchain '{env_info.get('toolchain')}' from {env_info.get('file')}",
+                        file=sys.stderr,
+                    )
+                elif lang == "dotnet":
+                    print(
+                        f"[IdlerGear MCP] Detected .NET SDK {env_info.get('sdk_version')} from {env_info.get('file')}",
+                        file=sys.stderr,
+                    )
+            else:
+                print(
+                    f"[IdlerGear MCP] Detected {lang} environment: {env_info.get('note', '')}",
+                    file=sys.stderr,
+                )
     except Exception as e:
         # Don't crash the server if environment detection fails
         print(
@@ -1341,7 +1386,7 @@ This ensures messages don't derail your work - only context ones are shown immed
         ),
         Tool(
             name="idlergear_env_active",
-            description="Show the currently active virtual environment. Returns info about the environment that was auto-detected and activated when the MCP server started. Use this to verify that subprocess calls will use the correct Python interpreter.",
+            description="Show currently active development environments (Python venv, Rust toolchain, .NET SDK). Returns info about environments that were auto-detected and activated when the MCP server started. Use this to verify subprocess calls will use correct interpreters and toolchains.",
             inputSchema={"type": "object", "properties": {}},
         ),
         # Filesystem tools
@@ -3414,34 +3459,78 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_env_active":
-            # Show currently active environment by checking environment variables
+            # Show currently active environments (Python, Rust, .NET)
             import os
             import sys
 
-            result = {
-                "active": False,
-                "python_executable": sys.executable,
-                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            environments = []
+
+            # Python environment
+            python_env = {
+                "language": "python",
+                "executable": sys.executable,
+                "version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
             }
 
             # Check if we're in a virtualenv
             if os.environ.get("VIRTUAL_ENV"):
-                result["active"] = True
-                result["type"] = "venv"
-                result["path"] = os.environ["VIRTUAL_ENV"]
-                result["activated_by"] = "idlergear"
-                result["note"] = "Virtual environment was auto-detected and activated by IdlerGear MCP server"
+                python_env["active"] = True
+                python_env["type"] = "venv"
+                python_env["path"] = os.environ["VIRTUAL_ENV"]
+                python_env["activated_by"] = "idlergear"
             elif hasattr(sys, "real_prefix") or (
                 hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
             ):
-                # Running in a venv but VIRTUAL_ENV not set (shouldn't happen with our activation)
-                result["active"] = True
-                result["type"] = "venv"
-                result["path"] = sys.prefix
-                result["activated_by"] = "external"
-                result["note"] = "Virtual environment was active before MCP server started"
+                # Running in a venv but VIRTUAL_ENV not set
+                python_env["active"] = True
+                python_env["type"] = "venv"
+                python_env["path"] = sys.prefix
+                python_env["activated_by"] = "external"
             else:
-                result["note"] = "No virtual environment active. Using system Python."
+                python_env["active"] = False
+
+            environments.append(python_env)
+
+            # Rust environment
+            if os.environ.get("RUSTUP_TOOLCHAIN"):
+                rust_env = {
+                    "language": "rust",
+                    "active": True,
+                    "toolchain": os.environ["RUSTUP_TOOLCHAIN"],
+                    "activated_by": "idlergear",
+                }
+                environments.append(rust_env)
+
+            # .NET environment (check if dotnet is available)
+            import shutil
+
+            if shutil.which("dotnet"):
+                dotnet_env = {
+                    "language": "dotnet",
+                    "active": True,
+                    "note": "dotnet CLI will automatically use SDK version from global.json if present",
+                }
+                # Try to get dotnet version
+                try:
+                    import subprocess
+
+                    result = subprocess.run(
+                        ["dotnet", "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2,
+                    )
+                    if result.returncode == 0:
+                        dotnet_env["version"] = result.stdout.strip()
+                except Exception:
+                    pass
+
+                environments.append(dotnet_env)
+
+            result = {
+                "environments": environments,
+                "count": len(environments),
+            }
 
             return _format_result(result)
 

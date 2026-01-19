@@ -425,7 +425,7 @@ idlergear_git_commit_task(
 
 ---
 
-### Environment Detection (5 tools) 🎯 **Auto-Activates venv!**
+### Environment Detection (5 tools) 🎯 **Auto-Activates Python, Rust & .NET!**
 
 | Tool | Description |
 |------|-------------|
@@ -433,9 +433,14 @@ idlergear_git_commit_task(
 | `idlergear_env_which` | Enhanced `which` showing ALL PATH matches |
 | `idlergear_env_detect` | Project type detection (Python, Node, Rust, .NET, Go, etc.) |
 | `idlergear_env_find_venv` | Find virtual environments (venv, poetry, conda) |
-| `idlergear_env_active` | Show currently active venv (auto-activated by MCP server) ⭐ NEW! |
+| `idlergear_env_active` | Show currently active environments (Python/Rust/.NET) ⭐ NEW! |
 
-**Killer Feature**: The MCP server **automatically detects and activates** your project's virtualenv on startup! No more AI assistants installing packages globally or using the wrong Python interpreter.
+**Killer Feature**: The MCP server **automatically detects and activates** development environments on startup:
+- **Python**: venv, poetry, pipenv → Sets VIRTUAL_ENV, prepends to PATH
+- **Rust**: rust-toolchain.toml, rust-toolchain → Sets RUSTUP_TOOLCHAIN
+- **.NET**: global.json → Detected for dotnet CLI to use
+
+**No more AI assistants installing packages globally or using wrong toolchains!**
 
 **Fills Gap**: No other MCP server provides this!
 **Token Savings**: ~60% vs multiple shell commands
@@ -446,9 +451,15 @@ idlergear_git_commit_task(
 idlergear_env_info()
 # Returns: Python 3.11, venv active, Node 20.x, Rust 1.75, etc.
 
-# Check which venv was auto-activated
+# Check which environments were auto-activated
 idlergear_env_active()
-# Returns: {activated: true, path: "/project/venv", type: "venv"}
+# Returns: {
+#   environments: [
+#     {language: "python", active: true, path: "/project/venv"},
+#     {language: "rust", active: true, toolchain: "stable"},
+#     {language: "dotnet", active: true, version: "8.0.100"}
+#   ]
+# }
 ```
 
 ---

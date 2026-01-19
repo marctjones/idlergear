@@ -24,19 +24,32 @@ See DEVELOPMENT.md for practices.
 
 ## Automatic Environment Activation
 
-**The IdlerGear MCP server automatically detects and activates your project's virtual environment.**
+**The IdlerGear MCP server automatically detects and activates your project's development environments.**
 
-When the MCP server starts:
-1. It searches for virtualenv directories (`venv`, `.venv`, `env`, etc.)
-2. If found, it activates the venv by setting environment variables
-3. All subprocess calls will use the project's Python interpreter and packages
+When the MCP server starts, it detects and activates:
+
+### Python
+- Searches for: `venv`, `.venv`, `env`, `virtualenv`, `poetry.lock`, `Pipfile`
+- Activates by: Setting `VIRTUAL_ENV`, prepending venv/bin to `PATH`
+- All subprocess calls use the project's Python interpreter and packages
+
+### Rust
+- Searches for: `rust-toolchain.toml`, `rust-toolchain`, `Cargo.toml`
+- Activates by: Setting `RUSTUP_TOOLCHAIN` environment variable
+- cargo and rustc commands use the specified toolchain
+
+### .NET
+- Searches for: `global.json`, `*.csproj`, `*.sln`
+- Detection only: dotnet CLI automatically reads `global.json`
+- Ensures correct SDK version is used
 
 **This prevents AI assistants from:**
 - Installing packages globally on the host system
-- Using the wrong Python interpreter
-- Missing project dependencies
+- Using the wrong interpreter or toolchain
+- Missing project-specific dependencies
+- Using incorrect SDK versions
 
-Use `idlergear_env_active` tool to verify which environment is active.
+Use `idlergear_env_active` tool to verify which environments are active.
 
 ## CRITICAL: IdlerGear Usage Rules
 
