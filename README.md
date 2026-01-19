@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.3.72)
+## Features (v0.5.0)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -37,30 +37,35 @@ IdlerGear works identically across all major AI coding assistants:
 - **Session State** - Perfect continuity across AI sessions
 - **Runs** - Background process tracking with logs
 - **Secrets** - Secure encrypted local storage for sensitive data (CLI-only, no MCP tools for security)
+- **Projects** - Kanban boards with GitHub Projects v2 sync (NEW in v0.5.0!)
 
 ### Python-Native MCP Servers (Zero Node.js!)
+- **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries) ⭐ NEW!
+- **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks) ⭐ NEW!
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
 - **Git + Task Integration** - 18 tools (commit-task linking, status, diff, branches)
 - **Process Management** - 11 tools (list, monitor, IdlerGear runs integration)
 - **Environment Detection** - 4 tools (auto-detect Python/Node/Rust/.NET/venv)
-- **OpenTelemetry Logs** - 3 tools (query, stats, recent errors)
+- **OpenTelemetry Logs** - 3 tools (query, logs, recent errors)
 - **Session Management** - 4 tools (start, save, end, status)
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
 - **Health Check** - Doctor command for configuration validation
 
-**Total: 126 MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 132 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **126 tools** via Model Context Protocol (universal)
+- **MCP Server** - **132 tools** via Model Context Protocol (universal)
+- **Knowledge Graph** - 95-98% token savings for context retrieval ⭐ NEW!
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
 - **Goose Integration** - CLI + GUI support with `.goosehints`
-- **Token Efficiency** - 97% context reduction (17K → 570 tokens!)
+- **Token Efficiency** - Up to 98% context reduction (15K → 200 tokens!)
 - **Session Persistence** - Perfect state restoration across sessions
 - **Auto Error Capture** - OpenTelemetry errors → tasks/notes automatically
+- **Auto-Add Projects** - Tasks automatically assigned to boards ⭐ NEW!
 
 ### 🔍 Live Session Monitoring
 
@@ -114,11 +119,17 @@ The difference:
 ## Quick Start
 
 ```bash
-# Install (recommended)
+# Install (recommended - isolated environment)
 pipx install idlergear
+
+# Or upgrade existing installation
+pipx upgrade idlergear
 
 # Or with pip
 pip install idlergear
+
+# Upgrade with pip
+pip install --upgrade idlergear
 
 # Initialize a project
 cd my-project
@@ -254,13 +265,13 @@ idlergear config set KEY VAL      # Configure settings
 idlergear config get KEY          # Get config value
 ```
 
-### MCP Tools (126 total - use via AI assistants)
+### MCP Tools (132 total - use via AI assistants)
 
 See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
 
 ## MCP Tools Reference
 
-IdlerGear provides **126 MCP tools** across 14 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+IdlerGear provides **132 MCP tools** across 16 categories. All tools are **100% Python** with **zero Node.js dependencies**.
 
 ### Session Management (4 tools) ⚡ **Start here!**
 
@@ -279,6 +290,60 @@ result = idlergear_session_start(context_mode="minimal")
 ```
 
 **Benefits**: Perfect continuity, ~570 tokens (vs 17K!), eliminates "where did we leave off?" questions
+
+---
+
+### Knowledge Graph (6 tools) ⭐ **NEW in v0.5.0!**
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_graph_query_task` | Get task context: related files, commits, symbols |
+| `idlergear_graph_query_file` | Get file context: tasks, imports, symbols, changes |
+| `idlergear_graph_query_symbols` | Search code symbols by name pattern |
+| `idlergear_graph_populate_git` | Index git history into graph |
+| `idlergear_graph_populate_code` | Index code symbols (Python AST) |
+| `idlergear_graph_schema_info` | Get schema and statistics |
+
+**Token Savings**: 95-98% reduction for context queries!
+- Traditional: 15,000 tokens (grep + file reads)
+- Graph: 200 tokens (structured query)
+
+**Example:**
+```python
+# Get all files and commits related to task #123
+result = idlergear_graph_query_task(task_id=123)
+# Returns: files, commits, symbols in <40ms
+```
+
+**Documentation**: [docs/guides/knowledge-graph.md](docs/guides/knowledge-graph.md)
+
+---
+
+### Project Boards (9 tools) ⭐ **NEW in v0.5.0!**
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_project_create` | Create Kanban board |
+| `idlergear_project_list` | List all project boards |
+| `idlergear_project_show` | Show project with columns and tasks |
+| `idlergear_project_delete` | Delete project board |
+| `idlergear_project_add_task` | Add task to board |
+| `idlergear_project_remove_task` | Remove task from board |
+| `idlergear_project_move_task` | Move task to different column |
+| `idlergear_project_sync` | Sync to GitHub Projects v2 |
+| `idlergear_project_link` | Link to existing GitHub Project |
+
+**Auto-Add Configuration**: Configure `projects.auto_add = true` to automatically assign new tasks to project boards.
+
+**Example:**
+```python
+# Create project and configure auto-add
+idlergear_project_create(title="Sprint Backlog")
+# Configure: projects.auto_add = true, projects.default_project = "sprint-backlog"
+# Now: idlergear_task_create() returns {task: {...}, added_to_project: true}
+```
+
+**Documentation**: [docs/guides/github-projects.md](docs/guides/github-projects.md)
 
 ---
 
