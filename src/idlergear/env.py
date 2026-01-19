@@ -317,3 +317,67 @@ def find_virtualenv(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
         }
 
     return None
+
+
+def activate_project_env(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+    """Automatically detect and activate project virtual environment.
+
+    This function modifies os.environ to activate a detected virtualenv,
+    ensuring subprocess calls use the correct Python interpreter.
+
+    Args:
+        path: Project directory to search (default: current directory)
+
+    Returns:
+        Dictionary with activation info, or None if no venv found
+
+    Example:
+        >>> info = activate_project_env()
+        >>> if info:
+        >>>     print(f"Activated {info['type']} at {info['path']}")
+    """
+    import os
+
+    venv_info = find_virtualenv(path)
+    if not venv_info:
+        return None
+
+    venv_type = venv_info["type"]
+
+    if venv_type == "venv":
+        # Standard venv - activate by setting environment variables
+        venv_path = Path(venv_info["path"])
+        python_path = venv_info["python"]
+
+        # Set VIRTUAL_ENV
+        os.environ["VIRTUAL_ENV"] = str(venv_path)
+
+        # Unset PYTHONHOME if set (can interfere with venv)
+        os.environ.pop("PYTHONHOME", None)
+
+        # Add venv bin directory to PATH (prepend so it takes precedence)
+        bin_dir = venv_path / "bin" if (venv_path / "bin").exists() else venv_path / "Scripts"
+        current_path = os.environ.get("PATH", "")
+        os.environ["PATH"] = f"{bin_dir}{os.pathsep}{current_path}"
+
+        return {
+            "activated": True,
+            "type": venv_type,
+            "path": str(venv_path),
+            "python": python_path,
+            "method": "environment",
+        }
+
+    elif venv_type in ("poetry", "pipenv"):
+        # Poetry/Pipenv - store info but don't modify environment
+        # These tools manage their own environments
+        return {
+            "activated": False,
+            "type": venv_type,
+            "path": venv_info.get("path"),
+            "command": venv_info.get("command"),
+            "method": "wrapper",
+            "note": f"Use '{venv_info.get('command')}' to run commands",
+        }
+
+    return None

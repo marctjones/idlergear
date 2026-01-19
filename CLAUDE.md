@@ -22,6 +22,22 @@ source venv/bin/activate
 
 See DEVELOPMENT.md for practices.
 
+## Automatic Environment Activation
+
+**The IdlerGear MCP server automatically detects and activates your project's virtual environment.**
+
+When the MCP server starts:
+1. It searches for virtualenv directories (`venv`, `.venv`, `env`, etc.)
+2. If found, it activates the venv by setting environment variables
+3. All subprocess calls will use the project's Python interpreter and packages
+
+**This prevents AI assistants from:**
+- Installing packages globally on the host system
+- Using the wrong Python interpreter
+- Missing project dependencies
+
+Use `idlergear_env_active` tool to verify which environment is active.
+
 ## CRITICAL: IdlerGear Usage Rules
 
 ### Session Start

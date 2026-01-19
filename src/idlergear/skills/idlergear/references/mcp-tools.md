@@ -301,12 +301,15 @@ Search references.
 - `idlergear_pm_task_runs(task_id)` - Runs for task
 - `idlergear_pm_quick_start(executable, args?)` - Foreground process
 
-## Environment (4 tools)
+## Environment (5 tools)
+
+**Auto-activation**: The MCP server automatically detects and activates project virtualenvs on startup.
 
 - `idlergear_env_info()` - Python/Node/Rust versions, venvs, PATH
 - `idlergear_env_which(command)` - Find all matches in PATH
 - `idlergear_env_detect(path?)` - Detect project type
 - `idlergear_env_find_venv(path?)` - Find virtual environments
+- `idlergear_env_active()` - Show currently active venv (auto-activated)
 
 ## OpenTelemetry (3 tools)
 

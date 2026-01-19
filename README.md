@@ -45,7 +45,7 @@ IdlerGear works identically across all major AI coding assistants:
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
 - **Git + Task Integration** - 18 tools (commit-task linking, status, diff, branches)
 - **Process Management** - 11 tools (list, monitor, IdlerGear runs integration)
-- **Environment Detection** - 4 tools (auto-detect Python/Node/Rust/.NET/venv)
+- **Environment Detection** - 5 tools (auto-activate venv, Python/Node/Rust/.NET detection)
 - **OpenTelemetry Logs** - 3 tools (query, logs, recent errors)
 - **Session Management** - 4 tools (start, save, end, status)
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
@@ -425,7 +425,7 @@ idlergear_git_commit_task(
 
 ---
 
-### Environment Detection (4 tools)
+### Environment Detection (5 tools) 🎯 **Auto-Activates venv!**
 
 | Tool | Description |
 |------|-------------|
@@ -433,6 +433,9 @@ idlergear_git_commit_task(
 | `idlergear_env_which` | Enhanced `which` showing ALL PATH matches |
 | `idlergear_env_detect` | Project type detection (Python, Node, Rust, .NET, Go, etc.) |
 | `idlergear_env_find_venv` | Find virtual environments (venv, poetry, conda) |
+| `idlergear_env_active` | Show currently active venv (auto-activated by MCP server) ⭐ NEW! |
+
+**Killer Feature**: The MCP server **automatically detects and activates** your project's virtualenv on startup! No more AI assistants installing packages globally or using the wrong Python interpreter.
 
 **Fills Gap**: No other MCP server provides this!
 **Token Savings**: ~60% vs multiple shell commands
@@ -442,6 +445,10 @@ idlergear_git_commit_task(
 # One call instead of 10+ shell commands
 idlergear_env_info()
 # Returns: Python 3.11, venv active, Node 20.x, Rust 1.75, etc.
+
+# Check which venv was auto-activated
+idlergear_env_active()
+# Returns: {activated: true, path: "/project/venv", type: "venv"}
 ```
 
 ---

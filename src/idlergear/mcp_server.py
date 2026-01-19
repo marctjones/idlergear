@@ -44,6 +44,45 @@ def _cleanup_pid_file() -> None:
         pass
 
 
+def _activate_project_environment() -> None:
+    """Detect and activate project virtual environment.
+
+    This runs when the MCP server starts to ensure subprocess calls
+    use the correct Python interpreter and dependencies.
+    """
+    import sys
+
+    from idlergear.env import activate_project_env
+
+    try:
+        # Try to find idlergear root first
+        project_root = find_idlergear_root()
+        if project_root:
+            env_info = activate_project_env(project_root)
+        else:
+            # Fall back to current directory
+            env_info = activate_project_env()
+
+        if env_info and env_info.get("activated"):
+            # Log to stderr so it doesn't interfere with MCP protocol
+            print(
+                f"[IdlerGear MCP] Activated {env_info['type']} environment: {env_info['path']}",
+                file=sys.stderr,
+            )
+        elif env_info and not env_info.get("activated"):
+            # Poetry/Pipenv detected but not auto-activated
+            print(
+                f"[IdlerGear MCP] Detected {env_info['type']} environment: {env_info.get('note', '')}",
+                file=sys.stderr,
+            )
+    except Exception as e:
+        # Don't crash the server if environment detection fails
+        print(
+            f"[IdlerGear MCP] Warning: Failed to detect project environment: {e}",
+            file=sys.stderr,
+        )
+
+
 def _signal_handler(signum: int, frame: Any) -> None:
     """Handle reload signal (SIGUSR1).
 
@@ -1299,6 +1338,11 @@ This ensures messages don't derail your work - only context ones are shown immed
                     },
                 },
             },
+        ),
+        Tool(
+            name="idlergear_env_active",
+            description="Show the currently active virtual environment. Returns info about the environment that was auto-detected and activated when the MCP server started. Use this to verify that subprocess calls will use the correct Python interpreter.",
+            inputSchema={"type": "object", "properties": {}},
         ),
         # Filesystem tools
         Tool(
@@ -3369,6 +3413,38 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 result = {"found": False, "message": "No virtual environment detected"}
             return _format_result(result)
 
+        elif name == "idlergear_env_active":
+            # Show currently active environment by checking environment variables
+            import os
+            import sys
+
+            result = {
+                "active": False,
+                "python_executable": sys.executable,
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+            }
+
+            # Check if we're in a virtualenv
+            if os.environ.get("VIRTUAL_ENV"):
+                result["active"] = True
+                result["type"] = "venv"
+                result["path"] = os.environ["VIRTUAL_ENV"]
+                result["activated_by"] = "idlergear"
+                result["note"] = "Virtual environment was auto-detected and activated by IdlerGear MCP server"
+            elif hasattr(sys, "real_prefix") or (
+                hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+            ):
+                # Running in a venv but VIRTUAL_ENV not set (shouldn't happen with our activation)
+                result["active"] = True
+                result["type"] = "venv"
+                result["path"] = sys.prefix
+                result["activated_by"] = "external"
+                result["note"] = "Virtual environment was active before MCP server started"
+            else:
+                result["note"] = "No virtual environment active. Using system Python."
+
+            return _format_result(result)
+
         # Filesystem handlers
         elif name == "idlergear_fs_read_file":
             fs = _get_fs_server()
@@ -4429,6 +4505,9 @@ async def run_server():
 
     # Write PID file so CLI can find and signal us
     _write_pid_file()
+
+    # Auto-detect and activate project virtual environment
+    _activate_project_environment()
 
     try:
         async with stdio_server() as (read_stream, write_stream):
