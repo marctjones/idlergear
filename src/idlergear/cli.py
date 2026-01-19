@@ -2612,6 +2612,17 @@ def task_create(
     )
     typer.secho(f"Created task #{task['id']}: {task['title']}", fg=typer.colors.GREEN)
 
+    # Auto-add to project if configured
+    from idlergear.projects import auto_add_task_if_configured
+    from idlergear.config import get_config_value
+
+    if auto_add_task_if_configured(task['id']):
+        default_project = get_config_value("projects.default_project")
+        typer.secho(
+            f"  ✓ Added to project '{default_project}'",
+            fg=typer.colors.GREEN
+        )
+
 
 @task_app.command("list")
 def task_list(

@@ -5,6 +5,7 @@ import pytest
 from idlergear.projects import (
     DEFAULT_COLUMNS,
     add_task_to_project,
+    auto_add_task_if_configured,
     create_project,
     delete_project,
     get_project,
@@ -183,3 +184,114 @@ def test_task_only_in_one_column(project_dir, monkeypatch):
     # Task should only be in In Progress, not Backlog
     assert "1" not in project["tasks"]["Backlog"]
     assert "1" in project["tasks"]["In Progress"]
+
+
+def test_auto_add_disabled(project_dir, monkeypatch):
+    """Test that auto-add does nothing when disabled."""
+    monkeypatch.chdir(project_dir)
+
+    create_project("My Sprint")
+    # Don't set auto_add config
+
+    result = auto_add_task_if_configured("123")
+
+    assert result is False
+
+
+def test_auto_add_no_default_project(project_dir, monkeypatch):
+    """Test that auto-add does nothing when no default project is set."""
+    monkeypatch.chdir(project_dir)
+    import tomli_w
+
+    config_path = project_dir / ".idlergear" / "config.toml"
+    config_path.write_text("")
+
+    # Enable auto-add but don't set default project
+    with open(config_path, "wb") as f:
+        tomli_w.dump({"projects": {"auto_add": True}}, f)
+
+    result = auto_add_task_if_configured("123")
+
+    assert result is False
+
+
+def test_auto_add_enabled(project_dir, monkeypatch):
+    """Test that auto-add works when properly configured."""
+    monkeypatch.chdir(project_dir)
+    import tomli_w
+
+    create_project("My Sprint")
+
+    config_path = project_dir / ".idlergear" / "config.toml"
+    with open(config_path, "wb") as f:
+        tomli_w.dump(
+            {
+                "projects": {
+                    "auto_add": True,
+                    "default_project": "my-sprint",
+                    "default_column": "Backlog",
+                }
+            },
+            f,
+        )
+
+    result = auto_add_task_if_configured("123")
+
+    assert result is True
+
+    # Verify task was added
+    project = get_project("my-sprint")
+    assert "123" in project["tasks"]["Backlog"]
+
+
+def test_auto_add_custom_column(project_dir, monkeypatch):
+    """Test that auto-add uses custom column."""
+    monkeypatch.chdir(project_dir)
+    import tomli_w
+
+    create_project("My Sprint")
+
+    config_path = project_dir / ".idlergear" / "config.toml"
+    with open(config_path, "wb") as f:
+        tomli_w.dump(
+            {
+                "projects": {
+                    "auto_add": True,
+                    "default_project": "my-sprint",
+                    "default_column": "In Progress",
+                }
+            },
+            f,
+        )
+
+    result = auto_add_task_if_configured("123")
+
+    assert result is True
+
+    # Verify task was added to custom column
+    project = get_project("my-sprint")
+    assert "123" in project["tasks"]["In Progress"]
+    assert "123" not in project["tasks"]["Backlog"]
+
+
+def test_auto_add_project_not_found(project_dir, monkeypatch):
+    """Test that auto-add fails silently if project doesn't exist."""
+    monkeypatch.chdir(project_dir)
+    import tomli_w
+
+    config_path = project_dir / ".idlergear" / "config.toml"
+    with open(config_path, "wb") as f:
+        tomli_w.dump(
+            {
+                "projects": {
+                    "auto_add": True,
+                    "default_project": "nonexistent",
+                }
+            },
+            f,
+        )
+
+    # Should not raise, just return False
+    result = auto_add_task_if_configured("123")
+
+    assert result is False

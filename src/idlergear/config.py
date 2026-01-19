@@ -34,9 +34,30 @@ TEST_CONFIG_SCHEMA = {
     }
 }
 
+PROJECTS_CONFIG_SCHEMA = {
+    "projects": {
+        "default_project": {
+            "type": "string",
+            "default": None,
+            "description": "Default project board for new tasks",
+        },
+        "default_column": {
+            "type": "string",
+            "default": "Backlog",
+            "description": "Default column for auto-added tasks",
+        },
+        "auto_add": {
+            "type": "boolean",
+            "default": False,
+            "description": "Automatically add new tasks to default project",
+        },
+    }
+}
+
 # Combined schema registry
 CONFIG_SCHEMAS = {
     "test": TEST_CONFIG_SCHEMA["test"],
+    "projects": PROJECTS_CONFIG_SCHEMA["projects"],
 }
 
 

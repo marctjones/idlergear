@@ -410,6 +410,8 @@ Detect Python project configuration.
 
 ## Project Boards (9 tools)
 
+**Auto-add Configuration:** Tasks can be automatically added to a default project by setting `projects.auto_add = true`, `projects.default_project`, and `projects.default_column` in config.toml. When configured, `idlergear_task_create()` will automatically add new tasks to the project and return `added_to_project: true` in the response.
+
 - `idlergear_project_create(title, columns?, create_on_github?)` - Create Kanban board
 - `idlergear_project_list(include_github?)` - List all project boards
 - `idlergear_project_show(name)` - Show project with columns and tasks

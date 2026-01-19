@@ -2372,13 +2372,24 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         # Task handlers - use configured backend
         if name == "idlergear_task_create":
             backend = get_backend("task")
-            result = backend.create(
+            task = backend.create(
                 arguments["title"],
                 body=arguments.get("body"),
                 labels=arguments.get("labels"),
                 priority=arguments.get("priority"),
                 due=arguments.get("due"),
             )
+
+            # Auto-add to project if configured
+            from idlergear.projects import auto_add_task_if_configured
+
+            added_to_project = auto_add_task_if_configured(task["id"])
+
+            # Include in response
+            result = {
+                "task": task,
+                "added_to_project": added_to_project,
+            }
             return _format_result(result)
 
         elif name == "idlergear_task_list":

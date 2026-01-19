@@ -439,3 +439,45 @@ def link_to_github_project(
     filepath.write_text(json.dumps(save_data, indent=2))
 
     return project
+
+
+def auto_add_task_if_configured(
+    task_id: str | int,
+    project_path: Path | None = None,
+) -> bool:
+    """Automatically add task to default project if configured.
+
+    Args:
+        task_id: Task ID to add
+        project_path: Override project path
+
+    Returns:
+        True if task was added, False otherwise
+    """
+    from idlergear.config import get_config_value
+
+    # Check if auto-add is enabled
+    auto_add = get_config_value("projects.auto_add", project_path)
+    if not auto_add:
+        return False
+
+    # Get default project
+    default_project = get_config_value("projects.default_project", project_path)
+    if not default_project:
+        return False
+
+    # Get default column
+    default_column = get_config_value("projects.default_column", project_path)
+
+    # Add task to project
+    try:
+        result = add_task_to_project(
+            project_name=default_project,
+            task_id=str(task_id),
+            column=default_column,
+            project_path=project_path,
+        )
+        return result is not None
+    except Exception:
+        # Silently fail - don't break task creation if project add fails
+        return False
