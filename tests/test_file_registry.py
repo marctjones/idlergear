@@ -258,3 +258,308 @@ def test_file_registry_remove_pattern():
 
         # Remove non-existent pattern
         assert registry.remove_pattern("*.tmp") is False
+
+# Annotation tests (NEW in v0.6.0)
+
+
+def test_file_registry_annotate_file():
+    """Test annotating a file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate new file
+        entry = registry.annotate_file(
+            "src/api/auth.py",
+            description="REST API endpoints for authentication",
+            tags=["api", "auth", "jwt"],
+            components=["AuthController", "login"],
+            related_files=["src/models/user.py"],
+        )
+
+        assert entry.path == "src/api/auth.py"
+        assert entry.description == "REST API endpoints for authentication"
+        assert entry.tags == ["api", "auth", "jwt"]
+        assert entry.components == ["AuthController", "login"]
+        assert entry.related_files == ["src/models/user.py"]
+        assert entry.status == FileStatus.CURRENT  # Default status
+
+
+def test_file_registry_annotate_existing_file():
+    """Test annotating an existing file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Register file first
+        registry.register_file("test.py", FileStatus.CURRENT)
+
+        # Annotate it
+        entry = registry.annotate_file(
+            "test.py",
+            description="Test file",
+            tags=["test"],
+        )
+
+        assert entry.path == "test.py"
+        assert entry.description == "Test file"
+        assert entry.tags == ["test"]
+        assert entry.status == FileStatus.CURRENT  # Preserves existing status
+
+
+def test_file_registry_annotate_partial():
+    """Test annotating with partial fields."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate with only description
+        entry = registry.annotate_file("test.py", description="Test file")
+
+        assert entry.description == "Test file"
+        assert entry.tags == []
+        assert entry.components == []
+        assert entry.related_files == []
+
+
+def test_file_registry_search_files_by_query():
+    """Test searching files by description query."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate files
+        registry.annotate_file(
+            "auth.py",
+            description="Authentication endpoints for REST API",
+            tags=["api", "auth"],
+        )
+        registry.annotate_file(
+            "user.py", description="User model and database operations", tags=["model"]
+        )
+        registry.annotate_file(
+            "payment.py", description="Payment processing API", tags=["api", "payment"]
+        )
+
+        # Search by query (case-insensitive)
+        results = registry.search_files(query="authentication")
+        assert len(results) == 1
+        assert results[0].path == "auth.py"
+
+        # Search by different query
+        results = registry.search_files(query="API")
+        assert len(results) == 2  # auth.py and payment.py
+
+
+def test_file_registry_search_files_by_tags():
+    """Test searching files by tags."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate files
+        registry.annotate_file("auth.py", tags=["api", "auth"])
+        registry.annotate_file("user.py", tags=["model", "database"])
+        registry.annotate_file("payment.py", tags=["api", "payment"])
+
+        # Search by single tag
+        results = registry.search_files(tags=["api"])
+        assert len(results) == 2  # auth.py and payment.py
+
+        # Search by multiple tags (OR logic)
+        results = registry.search_files(tags=["auth", "payment"])
+        assert len(results) == 2
+
+
+def test_file_registry_search_files_by_components():
+    """Test searching files by components."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate files
+        registry.annotate_file("auth.py", components=["AuthController", "login"])
+        registry.annotate_file("user.py", components=["UserModel", "save"])
+        registry.annotate_file("payment.py", components=["PaymentService"])
+
+        # Search by component
+        results = registry.search_files(components=["AuthController"])
+        assert len(results) == 1
+        assert results[0].path == "auth.py"
+
+        # Search by multiple components (OR logic)
+        results = registry.search_files(components=["UserModel", "PaymentService"])
+        assert len(results) == 2
+
+
+def test_file_registry_search_files_by_status():
+    """Test searching files by status."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate files with different statuses
+        registry.annotate_file("current.py", description="Current")
+        registry.register_file("current.py", FileStatus.CURRENT)
+
+        registry.annotate_file("deprecated.py", description="Deprecated")
+        registry.deprecate_file("deprecated.py", reason="Old")
+
+        # Search by status
+        results = registry.search_files(status=FileStatus.CURRENT)
+        assert len(results) == 1
+        assert results[0].path == "current.py"
+
+        results = registry.search_files(status=FileStatus.DEPRECATED)
+        assert len(results) == 1
+        assert results[0].path == "deprecated.py"
+
+
+def test_file_registry_search_files_combined():
+    """Test searching files with combined filters."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Register files first, then annotate
+        registry.register_file("auth.py", FileStatus.CURRENT)
+        registry.annotate_file(
+            "auth.py",
+            description="Authentication API",
+            tags=["api", "auth"],
+        )
+
+        registry.register_file("payment.py", FileStatus.CURRENT)
+        registry.annotate_file(
+            "payment.py",
+            description="Payment API endpoints",
+            tags=["api", "payment"],
+        )
+
+        registry.deprecate_file("old_auth.py", reason="Deprecated")
+        registry.annotate_file(
+            "old_auth.py",
+            description="Old authentication code",
+            tags=["api", "auth"],
+        )
+
+        # Search: tags=["api"] AND status=CURRENT
+        results = registry.search_files(tags=["api"], status=FileStatus.CURRENT)
+        assert len(results) == 2
+        assert all(r.status == FileStatus.CURRENT for r in results)
+
+        # Search: query="auth" AND tags=["api"] AND status=CURRENT
+        results = registry.search_files(
+            query="auth", tags=["api"], status=FileStatus.CURRENT
+        )
+        assert len(results) == 1
+        assert results[0].path == "auth.py"
+
+
+def test_file_registry_search_files_no_results():
+    """Test searching with no matches."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        registry.annotate_file("test.py", description="Test file", tags=["test"])
+
+        # No match
+        results = registry.search_files(query="nonexistent")
+        assert len(results) == 0
+
+        results = registry.search_files(tags=["nonexistent"])
+        assert len(results) == 0
+
+
+def test_file_registry_get_annotation():
+    """Test getting annotation for a file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate file
+        registry.annotate_file(
+            "test.py",
+            description="Test file",
+            tags=["test"],
+            components=["TestClass"],
+        )
+
+        # Get annotation
+        entry = registry.get_annotation("test.py")
+        assert entry is not None
+        assert entry.path == "test.py"
+        assert entry.description == "Test file"
+        assert entry.tags == ["test"]
+        assert entry.components == ["TestClass"]
+
+        # Get non-existent
+        entry = registry.get_annotation("nonexistent.py")
+        assert entry is None
+
+
+def test_file_registry_list_tags():
+    """Test listing all tags with usage counts."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        # Annotate files with various tags
+        registry.annotate_file("auth.py", tags=["api", "auth"])
+        registry.annotate_file("user.py", tags=["model", "database"])
+        registry.annotate_file("payment.py", tags=["api", "payment"])
+        registry.annotate_file("order.py", tags=["api", "model"])
+
+        # List tags
+        tag_map = registry.list_tags()
+
+        assert "api" in tag_map
+        assert tag_map["api"]["count"] == 3
+        assert len(tag_map["api"]["files"]) == 3
+
+        assert "model" in tag_map
+        assert tag_map["model"]["count"] == 2
+
+        assert "auth" in tag_map
+        assert tag_map["auth"]["count"] == 1
+
+        assert "database" in tag_map
+        assert "payment" in tag_map
+
+
+def test_file_registry_list_tags_empty():
+    """Test listing tags when no files annotated."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+        registry = FileRegistry(registry_path)
+
+        tag_map = registry.list_tags()
+        assert tag_map == {}
+
+
+def test_file_registry_annotations_persistence():
+    """Test that annotations are saved and loaded correctly."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+
+        # Create and annotate
+        registry1 = FileRegistry(registry_path)
+        registry1.annotate_file(
+            "test.py",
+            description="Test file",
+            tags=["test", "unit"],
+            components=["TestClass"],
+            related_files=["helper.py"],
+        )
+        registry1.save()
+
+        # Load in new instance
+        registry2 = FileRegistry(registry_path)
+        entry = registry2.get_annotation("test.py")
+
+        assert entry is not None
+        assert entry.description == "Test file"
+        assert entry.tags == ["test", "unit"]
+        assert entry.components == ["TestClass"]
+        assert entry.related_files == ["helper.py"]
