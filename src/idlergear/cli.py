@@ -3,7 +3,7 @@
 import json
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from importlib.metadata import version as get_version
 
@@ -102,6 +102,7 @@ docs_app = typer.Typer(help="Python API documentation generation")
 agents_app = typer.Typer(help="AGENTS.md generation and management")
 secrets_app = typer.Typer(help="Secure local secrets management")
 release_app = typer.Typer(help="Release management (GitHub Releases)")
+file_app = typer.Typer(help="File registry and annotations (track file status)")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -123,6 +124,7 @@ app.add_typer(docs_app, name="docs")
 app.add_typer(agents_app, name="agents")
 app.add_typer(secrets_app, name="secrets")
 app.add_typer(release_app, name="release")
+app.add_typer(file_app, name="file")
 
 
 # Helper functions
@@ -9317,6 +9319,292 @@ For more information: idlergear session monitor --help
     except Exception as e:
         print(f"Error: {e}")
         sys.exit(1)
+
+
+# ============================================
+# File Registry Commands
+# ============================================
+
+
+@file_app.command("register")
+def file_register(
+    path: str = typer.Argument(..., help="File path to register"),
+    status: str = typer.Option("current", "--status", "-s", help="File status: current, deprecated, archived, problematic"),
+    reason: Optional[str] = typer.Option(None, "--reason", "-r", help="Reason for status"),
+):
+    """Register a file with explicit status."""
+    from idlergear.file_registry import FileRegistry, FileStatus
+
+    try:
+        status_enum = FileStatus(status)
+    except ValueError:
+        typer.secho(f"Invalid status: {status}. Must be one of: current, deprecated, archived, problematic", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    registry = FileRegistry()
+    registry.register_file(path, status_enum, reason=reason)
+
+    # Status color mapping
+    color = {
+        FileStatus.CURRENT: typer.colors.GREEN,
+        FileStatus.DEPRECATED: typer.colors.YELLOW,
+        FileStatus.ARCHIVED: typer.colors.BLUE,
+        FileStatus.PROBLEMATIC: typer.colors.RED,
+    }[status_enum]
+
+    typer.secho(f"✅ Registered {path} as {status}", fg=color)
+    if reason:
+        typer.secho(f"   Reason: {reason}", fg=typer.colors.BRIGHT_BLACK)
+
+
+@file_app.command("deprecate")
+def file_deprecate(
+    path: str = typer.Argument(..., help="File path to deprecate"),
+    successor: Optional[str] = typer.Option(None, "--successor", "-s", help="Current version path"),
+    reason: str = typer.Option(..., "--reason", "-r", help="Reason for deprecation"),
+):
+    """Mark a file as deprecated."""
+    from idlergear.file_registry import FileRegistry
+
+    registry = FileRegistry()
+    registry.deprecate_file(path, successor=successor, reason=reason)
+
+    typer.secho(f"⚠️  Deprecated {path}", fg=typer.colors.YELLOW)
+    if successor:
+        typer.secho(f"   Current version: {successor}", fg=typer.colors.GREEN)
+    typer.secho(f"   Reason: {reason}", fg=typer.colors.BRIGHT_BLACK)
+
+
+@file_app.command("status")
+def file_status(
+    path: str = typer.Argument(..., help="File path to check"),
+):
+    """Show status of a file."""
+    from idlergear.file_registry import FileRegistry
+
+    registry = FileRegistry()
+    entry = registry.get_entry(path)
+
+    if not entry:
+        typer.secho(f"File not registered: {path}", fg=typer.colors.BRIGHT_BLACK)
+        status = registry.get_status(path)
+        if status:
+            typer.secho(f"Matches pattern rule: {status.value}", fg=typer.colors.YELLOW)
+        else:
+            typer.secho("No status information available", fg=typer.colors.BRIGHT_BLACK)
+        raise typer.Exit(0)
+
+    # Status color mapping
+    color = {
+        "current": typer.colors.GREEN,
+        "deprecated": typer.colors.YELLOW,
+        "archived": typer.colors.BLUE,
+        "problematic": typer.colors.RED,
+    }[entry.status.value]
+
+    status_symbols = {
+        "current": "✅",
+        "deprecated": "⚠️ ",
+        "archived": "📦",
+        "problematic": "❌",
+    }
+
+    symbol = status_symbols[entry.status.value]
+    typer.secho(f"\n{symbol} {path}", fg=color, bold=True)
+    typer.secho(f"Status: {entry.status.value}", fg=color)
+
+    if entry.reason:
+        typer.secho(f"Reason: {entry.reason}", fg=typer.colors.BRIGHT_BLACK)
+
+    if entry.current_version:
+        typer.secho(f"Current version: {entry.current_version}", fg=typer.colors.GREEN)
+
+    if entry.deprecated_at:
+        typer.secho(f"Deprecated at: {entry.deprecated_at}", fg=typer.colors.BRIGHT_BLACK)
+
+    if entry.description:
+        typer.secho(f"\nDescription: {entry.description}", fg=typer.colors.CYAN)
+
+    if entry.tags:
+        typer.secho(f"Tags: {', '.join(entry.tags)}", fg=typer.colors.MAGENTA)
+
+    if entry.components:
+        typer.secho(f"Components: {', '.join(entry.components)}", fg=typer.colors.BLUE)
+
+    if entry.related_files:
+        typer.secho(f"Related files:", fg=typer.colors.YELLOW)
+        for rf in entry.related_files:
+            typer.secho(f"  - {rf}", fg=typer.colors.BRIGHT_BLACK)
+
+    typer.echo()
+
+
+@file_app.command("list")
+def file_list(
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+):
+    """List all registered files."""
+    from idlergear.file_registry import FileRegistry, FileStatus
+
+    registry = FileRegistry()
+
+    status_filter = None
+    if status:
+        try:
+            status_filter = FileStatus(status)
+        except ValueError:
+            typer.secho(f"Invalid status: {status}. Must be one of: current, deprecated, archived, problematic", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+    files = registry.list_files(status_filter)
+
+    if not files:
+        typer.secho("No files registered", fg=typer.colors.BRIGHT_BLACK)
+        raise typer.Exit(0)
+
+    # Group by status
+    by_status = {}
+    for entry in files:
+        status_key = entry.status.value
+        if status_key not in by_status:
+            by_status[status_key] = []
+        by_status[status_key].append(entry)
+
+    # Display
+    typer.secho(f"\n📁 Registered Files ({len(files)} total)\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+
+    status_order = ["current", "deprecated", "archived", "problematic"]
+    status_colors = {
+        "current": typer.colors.GREEN,
+        "deprecated": typer.colors.YELLOW,
+        "archived": typer.colors.BLUE,
+        "problematic": typer.colors.RED,
+    }
+    status_symbols = {
+        "current": "✅",
+        "deprecated": "⚠️ ",
+        "archived": "📦",
+        "problematic": "❌",
+    }
+
+    for status_key in status_order:
+        if status_key not in by_status:
+            continue
+
+        entries = by_status[status_key]
+        color = status_colors[status_key]
+        symbol = status_symbols[status_key]
+
+        typer.secho(f"{symbol} {status_key.upper()} ({len(entries)} files)", fg=color, bold=True)
+
+        for entry in sorted(entries, key=lambda e: e.path):
+            typer.secho(f"  {entry.path}", fg=color)
+            if entry.reason:
+                typer.secho(f"    → {entry.reason}", fg=typer.colors.BRIGHT_BLACK)
+            if entry.current_version:
+                typer.secho(f"    → Use: {entry.current_version}", fg=typer.colors.GREEN)
+
+        typer.echo()
+
+
+@file_app.command("annotate")
+def file_annotate(
+    path: str = typer.Argument(..., help="File path to annotate"),
+    description: Optional[str] = typer.Option(None, "--description", "-d", help="File description"),
+    tags: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Tags (can be specified multiple times)"),
+    components: Optional[List[str]] = typer.Option(None, "--component", "-c", help="Components (can be specified multiple times)"),
+):
+    """Annotate a file with description, tags, and components."""
+    from idlergear.file_registry import FileRegistry
+
+    registry = FileRegistry()
+    entry = registry.annotate_file(
+        path,
+        description=description,
+        tags=tags or [],
+        components=components or [],
+    )
+
+    typer.secho(f"✅ Annotated {path}", fg=typer.colors.GREEN)
+
+    if description:
+        typer.secho(f"   Description: {description}", fg=typer.colors.CYAN)
+    if tags:
+        typer.secho(f"   Tags: {', '.join(tags)}", fg=typer.colors.MAGENTA)
+    if components:
+        typer.secho(f"   Components: {', '.join(components)}", fg=typer.colors.BLUE)
+
+
+@file_app.command("search")
+def file_search(
+    query: Optional[str] = typer.Option(None, "--query", "-q", help="Search in descriptions"),
+    tags: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Filter by tags"),
+    components: Optional[List[str]] = typer.Option(None, "--component", "-c", help="Filter by components"),
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+):
+    """Search files by annotations."""
+    from idlergear.file_registry import FileRegistry, FileStatus
+
+    registry = FileRegistry()
+
+    status_filter = None
+    if status:
+        try:
+            status_filter = FileStatus(status)
+        except ValueError:
+            typer.secho(f"Invalid status: {status}", fg=typer.colors.RED)
+            raise typer.Exit(1)
+
+    results = registry.search_files(
+        query=query,
+        tags=tags or [],
+        components=components or [],
+        status=status_filter,
+    )
+
+    if not results:
+        typer.secho("No files found", fg=typer.colors.BRIGHT_BLACK)
+        raise typer.Exit(0)
+
+    typer.secho(f"\n🔍 Found {len(results)} files\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+
+    for entry in results:
+        # Status color
+        color = {
+            "current": typer.colors.GREEN,
+            "deprecated": typer.colors.YELLOW,
+            "archived": typer.colors.BLUE,
+            "problematic": typer.colors.RED,
+        }.get(entry.status.value, typer.colors.WHITE)
+
+        typer.secho(f"📄 {entry.path}", fg=color, bold=True)
+
+        if entry.description:
+            typer.secho(f"   {entry.description}", fg=typer.colors.BRIGHT_BLACK)
+
+        if entry.tags:
+            typer.secho(f"   Tags: {', '.join(entry.tags)}", fg=typer.colors.MAGENTA)
+
+        if entry.components:
+            typer.secho(f"   Components: {', '.join(entry.components)}", fg=typer.colors.BLUE)
+
+        typer.echo()
+
+
+@file_app.command("unregister")
+def file_unregister(
+    path: str = typer.Argument(..., help="File path to unregister"),
+):
+    """Remove a file from the registry."""
+    from idlergear.file_registry import FileRegistry
+
+    registry = FileRegistry()
+
+    if not registry.unregister(path):
+        typer.secho(f"File not registered: {path}", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+    typer.secho(f"✅ Unregistered {path}", fg=typer.colors.GREEN)
 
 
 if __name__ == "__main__":
