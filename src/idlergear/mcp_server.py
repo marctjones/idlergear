@@ -2531,6 +2531,90 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
+        # File annotation tools (NEW v0.6.0)
+        Tool(
+            name="idlergear_file_annotate",
+            description="Annotate file with purpose description, tags, components, and related files for token-efficient discovery. USE THIS: After creating new files, after understanding existing files, when refactoring. This enables 93% token savings on future file searches.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to annotate",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "What this file does (optional)",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Searchable tags (optional)",
+                    },
+                    "components": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Key classes/functions in file (optional)",
+                    },
+                    "related_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Related file paths (optional)",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
+        Tool(
+            name="idlergear_file_search",
+            description="Search files by description text, tags, components, or status. USE THIS FIRST before grep! Token-efficient alternative to grep + reading multiple files. Returns file descriptions and metadata in ~200 tokens vs 15,000 tokens for grep + reading files. Always search annotations before using grep.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Full-text search in descriptions (optional, case-insensitive)",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by tags - matches if any tag matches (optional)",
+                    },
+                    "components": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by component names (optional)",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["current", "deprecated", "archived", "problematic"],
+                        "description": "Filter by file status (optional)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_file_get_annotation",
+            description="Get full annotation for a specific file including description, tags, components, and related files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to get annotation for",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
+        Tool(
+            name="idlergear_file_list_tags",
+            description="List all tags used in file annotations with usage counts and file lists. Useful for discovering tag vocabulary.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
 
 
@@ -4781,6 +4865,129 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 {
                     "count": len(files),
                     "files": files,
+                }
+            )
+
+        # File annotation handlers (NEW v0.6.0)
+        elif name == "idlergear_file_annotate":
+            from idlergear.file_registry import FileRegistry
+
+            registry = FileRegistry()
+            entry = registry.annotate_file(
+                arguments["path"],
+                description=arguments.get("description"),
+                tags=arguments.get("tags"),
+                components=arguments.get("components"),
+                related_files=arguments.get("related_files"),
+            )
+
+            return _format_result(
+                {
+                    "success": True,
+                    "path": entry.path,
+                    "status": entry.status.value,
+                    "description": entry.description,
+                    "tags": entry.tags,
+                    "components": entry.components,
+                    "related_files": entry.related_files,
+                }
+            )
+
+        elif name == "idlergear_file_search":
+            from idlergear.file_registry import FileRegistry, FileStatus
+
+            registry = FileRegistry()
+
+            # Convert status string to enum if provided
+            status_filter = None
+            if "status" in arguments:
+                status_filter = FileStatus(arguments["status"])
+
+            results = registry.search_files(
+                query=arguments.get("query"),
+                tags=arguments.get("tags"),
+                components=arguments.get("components"),
+                status=status_filter,
+            )
+
+            # Convert to dict format
+            files = []
+            for entry in results:
+                files.append(
+                    {
+                        "path": entry.path,
+                        "status": entry.status.value,
+                        "description": entry.description,
+                        "tags": entry.tags,
+                        "components": entry.components,
+                        "related_files": entry.related_files,
+                        "reason": entry.reason,
+                        "current_version": entry.current_version,
+                    }
+                )
+
+            return _format_result(
+                {
+                    "count": len(files),
+                    "files": files,
+                }
+            )
+
+        elif name == "idlergear_file_get_annotation":
+            from idlergear.file_registry import FileRegistry
+
+            registry = FileRegistry()
+            entry = registry.get_annotation(arguments["path"])
+
+            if not entry:
+                return _format_result(
+                    {
+                        "found": False,
+                        "path": arguments["path"],
+                    }
+                )
+
+            return _format_result(
+                {
+                    "found": True,
+                    "path": entry.path,
+                    "status": entry.status.value,
+                    "description": entry.description,
+                    "tags": entry.tags,
+                    "components": entry.components,
+                    "related_files": entry.related_files,
+                    "reason": entry.reason,
+                    "current_version": entry.current_version,
+                    "deprecated_at": entry.deprecated_at,
+                    "replaces": entry.replaces,
+                    "deprecated_versions": entry.deprecated_versions,
+                }
+            )
+
+        elif name == "idlergear_file_list_tags":
+            from idlergear.file_registry import FileRegistry
+
+            registry = FileRegistry()
+            tag_map = registry.list_tags()
+
+            # Convert to list format for better display
+            tags = []
+            for tag, info in tag_map.items():
+                tags.append(
+                    {
+                        "tag": tag,
+                        "count": info["count"],
+                        "files": info["files"],
+                    }
+                )
+
+            # Sort by count (descending)
+            tags.sort(key=lambda x: x["count"], reverse=True)
+
+            return _format_result(
+                {
+                    "count": len(tags),
+                    "tags": tags,
                 }
             )
 

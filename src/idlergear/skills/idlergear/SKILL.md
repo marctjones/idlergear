@@ -70,6 +70,62 @@ Track which files are current, deprecated, archived, or problematic to prevent u
 - `archived` - Old version kept for reference
 - `problematic` - Has known issues
 
+### File Annotations (Token-Efficient Discovery) ⭐
+
+**IMPORTANT: Annotate files proactively to enable 93% token savings on file discovery!**
+
+Instead of grep + reading 10-15 files (~15,000 tokens), annotate once and search efficiently (~200 tokens).
+
+| Action | MCP Tool |
+|--------|----------|
+| Annotate file | `idlergear_file_annotate(path="...", description="...", tags=[], components=[])` |
+| Find files | `idlergear_file_search(query="authentication")` or `tags=["api"]` |
+| Get annotation | `idlergear_file_get_annotation(path="...")` |
+| List all tags | `idlergear_file_list_tags()` |
+
+**When to Annotate:**
+- ✅ After creating a new file (immediate context for future sessions)
+- ✅ When you understand what a file does (capture that knowledge)
+- ✅ When refactoring (update annotations to stay accurate)
+- ✅ When you see missing annotations during file search
+
+**Good Annotation Practices:**
+1. **Description**: Clear, concise summary (1-2 sentences)
+   - Good: "REST API endpoints for user authentication, JWT generation, session management"
+   - Bad: "API stuff" (too vague)
+
+2. **Tags**: 2-5 searchable keywords
+   - Good: `["api", "auth", "endpoints", "jwt"]`
+   - Bad: `["file", "code"]` (too generic)
+
+3. **Components**: Key classes/functions users will search for
+   - Good: `["AuthController", "TokenManager", "login", "verify_token"]`
+   - Bad: `["helper", "utils"]` (not specific)
+
+4. **Related Files**: Files that work together
+   - Good: `["src/models/user.py", "src/middleware/auth.py"]`
+
+**Workflow Example:**
+
+```python
+# User: "Where is the authentication code?"
+
+# Step 1: Search efficiently (200 tokens instead of 15,000!)
+result = idlergear_file_search(query="authentication")
+# Returns: [{"path": "src/api/auth.py", "description": "REST API endpoints...", "components": ["AuthController"]}]
+
+# Step 2: Read only the right file (1,000 tokens)
+content = idlergear_fs_read_file(path="src/api/auth.py")
+
+# Total: 1,200 tokens vs 15,000 (93% savings!)
+```
+
+**Proactive Annotation Strategy:**
+- Annotate as you work (don't wait until the end)
+- When reading a file to understand it, annotate it
+- When creating new files, annotate immediately
+- Keep annotations updated when code changes
+
 See `references/mcp-tools.md` for detailed documentation.
 
 ### Task Labels

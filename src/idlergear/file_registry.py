@@ -36,6 +36,12 @@ class FileEntry:
     deprecated_versions: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    # Annotation fields (NEW in v0.6.0)
+    description: Optional[str] = None
+    tags: List[str] = field(default_factory=list)
+    components: List[str] = field(default_factory=list)
+    related_files: List[str] = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -46,6 +52,11 @@ class FileEntry:
             "replaces": self.replaces,
             "deprecated_versions": self.deprecated_versions,
             "metadata": self.metadata,
+            # Annotation fields
+            "description": self.description,
+            "tags": self.tags,
+            "components": self.components,
+            "related_files": self.related_files,
         }
 
     @classmethod
@@ -60,6 +71,11 @@ class FileEntry:
             replaces=data.get("replaces", []),
             deprecated_versions=data.get("deprecated_versions", []),
             metadata=data.get("metadata", {}),
+            # Annotation fields (backward compatible)
+            description=data.get("description"),
+            tags=data.get("tags", []),
+            components=data.get("components", []),
+            related_files=data.get("related_files", []),
         )
 
 
@@ -392,3 +408,129 @@ class FileRegistry:
             self.save()
             return True
         return False
+
+    # Annotation methods (NEW in v0.6.0)
+
+    def annotate_file(
+        self,
+        path: str,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        components: Optional[List[str]] = None,
+        related_files: Optional[List[str]] = None,
+    ) -> FileEntry:
+        """Annotate file with purpose, tags, and components.
+
+        Args:
+            path: Path to file
+            description: What this file does
+            tags: Searchable tags
+            components: Key classes/functions in file
+            related_files: Related file paths
+
+        Returns:
+            Updated or created FileEntry
+        """
+        # Get or create file entry
+        if path not in self.files:
+            self.files[path] = FileEntry(path=path, status=FileStatus.CURRENT)
+
+        entry = self.files[path]
+
+        # Update annotations (only if provided)
+        if description is not None:
+            entry.description = description
+        if tags is not None:
+            entry.tags = tags
+        if components is not None:
+            entry.components = components
+        if related_files is not None:
+            entry.related_files = related_files
+
+        self._clear_cache()
+        self.save()
+        return entry
+
+    def search_files(
+        self,
+        query: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        components: Optional[List[str]] = None,
+        status: Optional[FileStatus] = None,
+    ) -> List[FileEntry]:
+        """Search files by description, tags, or components.
+
+        Args:
+            query: Full-text search in descriptions (case-insensitive)
+            tags: Filter by tags (OR logic - matches if any tag matches)
+            components: Filter by component names (OR logic)
+            status: Filter by file status
+
+        Returns:
+            List of matching FileEntry objects
+        """
+        results = []
+
+        for entry in self.files.values():
+            # Filter by status
+            if status and entry.status != status:
+                continue
+
+            # Full-text search in description
+            if query:
+                if not entry.description:
+                    continue
+                if query.lower() not in entry.description.lower():
+                    continue
+
+            # Filter by tags (OR logic)
+            if tags:
+                if not entry.tags:
+                    continue
+                if not any(tag in entry.tags for tag in tags):
+                    continue
+
+            # Filter by components (OR logic)
+            if components:
+                if not entry.components:
+                    continue
+                if not any(comp in entry.components for comp in components):
+                    continue
+
+            results.append(entry)
+
+        return results
+
+    def get_annotation(self, path: str) -> Optional[FileEntry]:
+        """Get full annotation for a specific file.
+
+        Args:
+            path: Path to file
+
+        Returns:
+            FileEntry with annotations, or None if not registered
+        """
+        return self.files.get(path)
+
+    def list_tags(self) -> Dict[str, Dict[str, Any]]:
+        """List all tags used in annotations with usage counts.
+
+        Returns:
+            Dictionary mapping tag names to metadata:
+            {
+                "tag_name": {
+                    "count": 5,
+                    "files": ["path1", "path2", ...]
+                }
+            }
+        """
+        tag_map: Dict[str, Dict[str, Any]] = {}
+
+        for entry in self.files.values():
+            for tag in entry.tags:
+                if tag not in tag_map:
+                    tag_map[tag] = {"count": 0, "files": []}
+                tag_map[tag]["count"] += 1
+                tag_map[tag]["files"].append(entry.path)
+
+        return tag_map

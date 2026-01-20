@@ -105,6 +105,46 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 | Start background process | `idlergear run start "command" --name <name>` |
 | Check background runs | `idlergear run list` |
 
+### MANDATORY: File Annotations (Proactive)
+
+**You MUST annotate files proactively to enable token-efficient discovery.**
+
+**When to annotate** (do NOT skip these):
+1. **After creating a new file** - Annotate immediately with purpose
+2. **After reading a file to understand it** - Capture that knowledge
+3. **When refactoring** - Update annotations to stay accurate
+4. **Instead of grep for finding files** - Search annotations first
+
+**How to annotate:**
+```python
+# When you create or understand a file:
+idlergear_file_annotate(
+    path="src/api/auth.py",
+    description="REST API endpoints for user authentication, JWT generation, session management",
+    tags=["api", "auth", "endpoints", "jwt"],
+    components=["AuthController", "TokenManager", "login"],
+    related_files=["src/models/user.py"]
+)
+```
+
+**Finding files efficiently:**
+```python
+# Instead of: grep + reading 10 files (15,000 tokens)
+# Do this: search annotations (200 tokens, 93% savings!)
+result = idlergear_file_search(query="authentication")
+# Returns: [{"path": "src/api/auth.py", "description": "...", "tags": ["auth"]}]
+
+# Then read only the right file
+idlergear_fs_read_file(path="src/api/auth.py")
+```
+
+**Rules:**
+- ✅ Annotate new files immediately
+- ✅ Search annotations before grep
+- ✅ Update annotations when refactoring
+- ❌ Don't leave files unannotated
+- ❌ Don't use grep when annotations exist
+
 ### Knowledge Flow
 
 ```

@@ -39,12 +39,12 @@ IdlerGear works identically across all major AI coding assistants:
 - **Secrets** - Secure encrypted local storage for sensitive data (CLI-only, no MCP tools for security)
 - **Projects** - Kanban boards with GitHub Projects v2 sync (NEW in v0.5.0!)
 - **Data File Versioning** - Detect when code references old data files (CSV, JSON, etc.) ⭐ NEW!
-- **File Registry** - Track file status (current/deprecated/archived/problematic) to prevent using outdated code ⭐ NEW!
+- **File Registry** - Track file status (current/deprecated/archived/problematic) + **File Annotations** for token-efficient discovery (93% token savings!) ⭐ NEW!
 
 ### Python-Native MCP Servers (Zero Node.js!)
 - **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries) ⭐ NEW!
 - **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks) ⭐ NEW!
-- **File Registry** - 4 tools (track file status, prevent deprecated file usage) ⭐ NEW!
+- **File Registry** - 8 tools (file status, annotations, token-efficient search) ⭐ NEW!
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
 - **Git + Task Integration** - 18 tools (commit-task linking, status, diff, branches)
 - **Process Management** - 11 tools (list, monitor, IdlerGear runs integration)
@@ -54,16 +54,16 @@ IdlerGear works identically across all major AI coding assistants:
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
 - **Health Check** - Doctor command for configuration validation
 
-**Total: 136 MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 140 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **136 tools** via Model Context Protocol (universal)
+- **MCP Server** - **140 tools** via Model Context Protocol (universal)
 - **Knowledge Graph** - 95-98% token savings for context retrieval ⭐ NEW!
-- **File Registry** - Track file status to prevent deprecated file usage ⭐ NEW!
+- **File Registry + Annotations** - Track file status + annotate files for 93% token-efficient discovery ⭐ NEW!
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
 - **Goose Integration** - CLI + GUI support with `.goosehints`
 - **Token Efficiency** - Up to 98% context reduction (15K → 200 tokens!)
