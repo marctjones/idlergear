@@ -103,6 +103,7 @@ agents_app = typer.Typer(help="AGENTS.md generation and management")
 secrets_app = typer.Typer(help="Secure local secrets management")
 release_app = typer.Typer(help="Release management (GitHub Releases)")
 file_app = typer.Typer(help="File registry and annotations (track file status)")
+plugin_app = typer.Typer(help="Plugin management and integration (Langfuse, LlamaIndex, Mem0)")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -125,6 +126,7 @@ app.add_typer(agents_app, name="agents")
 app.add_typer(secrets_app, name="secrets")
 app.add_typer(release_app, name="release")
 app.add_typer(file_app, name="file")
+app.add_typer(plugin_app, name="plugin")
 
 
 # Helper functions
@@ -9605,6 +9607,223 @@ def file_unregister(
         raise typer.Exit(1)
 
     typer.secho(f"✅ Unregistered {path}", fg=typer.colors.GREEN)
+
+
+# Plugin commands
+@plugin_app.command("list")
+def plugin_list(
+    loaded_only: bool = typer.Option(
+        False, "--loaded", "-l", help="Only show loaded plugins"
+    ),
+):
+    """List available and loaded plugins."""
+    from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin, PluginRegistry
+
+    registry = PluginRegistry()
+
+    # Register available plugins
+    registry.register_plugin_class(LangfusePlugin)
+    registry.register_plugin_class(LlamaIndexPlugin)
+
+    if loaded_only:
+        plugins = registry.list_loaded_plugins()
+        title = "Loaded Plugins"
+    else:
+        plugins = registry.list_available_plugins()
+        title = "Available Plugins"
+        loaded = registry.list_loaded_plugins()
+
+    if not plugins:
+        typer.secho(f"No plugins {'loaded' if loaded_only else 'available'}", fg=typer.colors.YELLOW)
+        return
+
+    typer.secho(f"\n{title} ({len(plugins)} total):", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+    for name in plugins:
+        enabled = registry.config.is_plugin_enabled(name)
+        is_loaded = name in (loaded if not loaded_only else plugins)
+
+        # Status symbol
+        if is_loaded:
+            symbol = "●"
+            color = typer.colors.GREEN
+        elif enabled:
+            symbol = "○"
+            color = typer.colors.YELLOW
+        else:
+            symbol = "○"
+            color = typer.colors.WHITE
+
+        typer.secho(f"  {symbol} {name}", fg=color, end="")
+
+        # Status text
+        if is_loaded:
+            typer.secho(" (loaded)", fg=typer.colors.GREEN)
+        elif enabled:
+            typer.secho(" (enabled, not loaded)", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(" (available)", fg=typer.colors.WHITE)
+
+
+@plugin_app.command("status")
+def plugin_status(
+    plugin_name: Optional[str] = typer.Argument(None, help="Plugin name (omit for all)"),
+):
+    """Show detailed plugin status."""
+    from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin, PluginRegistry
+
+    registry = PluginRegistry()
+
+    # Register available plugins
+    registry.register_plugin_class(LangfusePlugin)
+    registry.register_plugin_class(LlamaIndexPlugin)
+
+    if plugin_name:
+        # Show status for specific plugin
+        plugin = registry.get_plugin(plugin_name)
+        if not plugin:
+            # Try to load it
+            plugin = registry.load_plugin(plugin_name)
+
+        if plugin:
+            typer.secho(f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(f"  Status: Loaded", fg=typer.colors.GREEN)
+            typer.secho(f"  Initialized: {plugin.is_initialized()}", fg=typer.colors.WHITE)
+            typer.secho(f"  Healthy: {plugin.health_check()}", fg=typer.colors.WHITE)
+            typer.secho(f"  Capabilities:", fg=typer.colors.WHITE)
+            for cap in plugin.capabilities():
+                typer.secho(f"    - {cap.value}", fg=typer.colors.WHITE)
+        else:
+            enabled = registry.config.is_plugin_enabled(plugin_name)
+            available = plugin_name in registry.list_available_plugins()
+
+            typer.secho(f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(f"  Status: Not loaded", fg=typer.colors.YELLOW)
+            typer.secho(f"  Enabled: {enabled}", fg=typer.colors.WHITE)
+            typer.secho(f"  Available: {available}", fg=typer.colors.WHITE)
+    else:
+        # Show status for all plugins
+        typer.secho("\nPlugin Status:", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+        for name in registry.list_available_plugins():
+            plugin = registry.get_plugin(name)
+            enabled = registry.config.is_plugin_enabled(name)
+
+            if plugin:
+                symbol = "●"
+                color = typer.colors.GREEN
+                status = "loaded"
+            elif enabled:
+                symbol = "○"
+                color = typer.colors.YELLOW
+                status = "enabled, not loaded"
+            else:
+                symbol = "○"
+                color = typer.colors.WHITE
+                status = "available"
+
+            typer.secho(f"  {symbol} {name}: {status}", fg=color)
+
+
+@plugin_app.command("enable")
+def plugin_enable(
+    plugin_name: str = typer.Argument(..., help="Plugin name (e.g., langfuse, llamaindex)"),
+):
+    """Enable a plugin in config.toml."""
+    import toml
+    from pathlib import Path
+
+    config_path = Path.cwd() / ".idlergear" / "config.toml"
+    if config_path.exists():
+        config = toml.load(config_path)
+    else:
+        config = {}
+
+    # Update plugin config
+    if "plugins" not in config:
+        config["plugins"] = {}
+    if plugin_name not in config["plugins"]:
+        config["plugins"][plugin_name] = {}
+
+    config["plugins"][plugin_name]["enabled"] = True
+
+    # Write back
+    with open(config_path, "w") as f:
+        toml.dump(config, f)
+
+    typer.secho(f"✅ Enabled plugin: {plugin_name}", fg=typer.colors.GREEN)
+    typer.secho(f"   Config: {config_path}", fg=typer.colors.WHITE)
+
+
+@plugin_app.command("disable")
+def plugin_disable(
+    plugin_name: str = typer.Argument(..., help="Plugin name"),
+):
+    """Disable a plugin in config.toml."""
+    import toml
+    from pathlib import Path
+
+    config_path = Path.cwd() / ".idlergear" / "config.toml"
+    if config_path.exists():
+        config = toml.load(config_path)
+    else:
+        config = {}
+
+    # Update plugin config
+    if "plugins" not in config:
+        config["plugins"] = {}
+    if plugin_name not in config["plugins"]:
+        config["plugins"][plugin_name] = {}
+
+    config["plugins"][plugin_name]["enabled"] = False
+
+    # Write back
+    with open(config_path, "w") as f:
+        toml.dump(config, f)
+
+    typer.secho(f"✅ Disabled plugin: {plugin_name}", fg=typer.colors.YELLOW)
+    typer.secho(f"   Config: {config_path}", fg=typer.colors.WHITE)
+
+
+@plugin_app.command("search")
+def plugin_search(
+    query: str = typer.Argument(..., help="Search query"),
+    top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results to return"),
+    knowledge_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by type: reference or note"),
+):
+    """Semantic search using LlamaIndex plugin."""
+    from idlergear.plugins import LlamaIndexPlugin, PluginRegistry
+
+    registry = PluginRegistry()
+
+    # Register and load LlamaIndex plugin
+    registry.register_plugin_class(LlamaIndexPlugin)
+    plugin = registry.load_plugin("llamaindex")
+
+    if not plugin:
+        typer.secho("❌ LlamaIndex plugin not enabled", fg=typer.colors.RED)
+        typer.secho("   Enable it first: idlergear plugin enable llamaindex", fg=typer.colors.YELLOW)
+        raise typer.Exit(1)
+
+    # Perform search
+    results = plugin.search(query, top_k=top_k, knowledge_type=knowledge_type)
+
+    if not results:
+        typer.secho(f"No results found for: {query}", fg=typer.colors.YELLOW)
+        return
+
+    typer.secho(f"\nSearch Results ({len(results)} found):", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho(f"Query: {query}\n", fg=typer.colors.WHITE)
+
+    for i, result in enumerate(results, 1):
+        score = result.get("score", 0)
+        text = result.get("text", "")[:200]  # Truncate long text
+        metadata = result.get("metadata", {})
+
+        typer.secho(f"{i}. Score: {score:.3f}", fg=typer.colors.GREEN)
+        typer.secho(f"   Type: {metadata.get('type', 'unknown')}", fg=typer.colors.WHITE)
+        typer.secho(f"   {text}...", fg=typer.colors.WHITE)
+        typer.secho("")
 
 
 if __name__ == "__main__":
