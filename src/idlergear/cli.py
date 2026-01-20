@@ -6162,6 +6162,68 @@ def watch_check(
                 typer.secho(f"  ✗ {action.message}", fg=typer.colors.RED)
 
 
+@watch_app.command("versions")
+def watch_versions(
+    ctx: typer.Context,
+):
+    """Check for stale file version references in Python code.
+
+    Detects when Python scripts reference old versions of data files
+    (CSV, JSON, etc.) and suggests using the current version instead.
+
+    Examples:
+        idlergear watch versions              # Check for stale data file references
+        idlergear --output json watch versions  # JSON output for AI agents
+    """
+    from idlergear.watch import check_stale_data_references
+    from idlergear.config import find_idlergear_root
+
+    project_root = find_idlergear_root()
+    if project_root is None:
+        if ctx.obj["output"] == "json":
+            typer.echo('{"error": "Not in an IdlerGear project"}')
+        else:
+            typer.secho("Error: Not in an IdlerGear project", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    warnings = check_stale_data_references(project_root)
+
+    if ctx.obj["output"] == "json":
+        import json
+        typer.echo(json.dumps({"warnings": warnings}, indent=2))
+    else:
+        if not warnings:
+            typer.secho("✓ No stale file version references found", fg=typer.colors.GREEN)
+        else:
+            typer.secho(
+                f"\nFile Version Analysis ({len(warnings)} issues found)",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
+            typer.echo()
+
+            for warning in warnings:
+                typer.secho(
+                    f"⚠️  {warning['source_file']}:{warning['line']}",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo(f"    References stale: {warning['stale_file']}")
+                if warning.get("current_file"):
+                    typer.secho(
+                        f"    → Use instead: {warning['current_file']}",
+                        fg=typer.colors.GREEN,
+                    )
+                if warning.get("function"):
+                    typer.echo(f"    Function: {warning['function']}")
+                typer.echo()
+
+            typer.echo()
+            typer.secho(
+                f"Summary: {len(warnings)} stale file references detected",
+                fg=typer.colors.YELLOW,
+            )
+
+
 @watch_app.command("start")
 def watch_start(
     interval: int = typer.Option(

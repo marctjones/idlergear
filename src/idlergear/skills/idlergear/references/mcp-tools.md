@@ -1,6 +1,6 @@
 # IdlerGear MCP Tools Reference
 
-Complete reference for all 132 MCP tools provided by IdlerGear.
+Complete reference for all 136 MCP tools provided by IdlerGear.
 
 ## Session Management (4 tools)
 
@@ -268,6 +268,90 @@ Search references.
 - `idlergear_fs_file_info(path)` - File metadata
 - `idlergear_fs_file_checksum(path, algorithm?)` - File hash
 - `idlergear_fs_allowed_directories()` - Security boundary
+
+## File Registry (4 tools)
+
+**Track file status (current/deprecated/archived/problematic) to prevent AI from accessing outdated files.**
+
+### idlergear_file_register
+Register a file with explicit status.
+
+**Parameters:**
+- `path`: string (required) - File path relative to project root
+- `status`: "current" | "deprecated" | "archived" | "problematic" (required)
+- `reason`: string (optional) - Reason for this status
+
+**Example:**
+```
+idlergear_file_register(path="api_v2.py", status="current")
+```
+
+### idlergear_file_deprecate
+Mark a file as deprecated with optional successor.
+
+**Parameters:**
+- `path`: string (required) - File to deprecate
+- `successor`: string (optional) - Path to current version
+- `reason`: string (optional) - Reason for deprecation
+
+**Example:**
+```
+idlergear_file_deprecate(
+    path="api.py",
+    successor="api_v2.py",
+    reason="Refactored to use async/await"
+)
+```
+
+**Use this when creating new file versions to explicitly mark old ones as deprecated.**
+
+### idlergear_file_status
+Get status of a file.
+
+**Parameters:**
+- `path`: string (required) - File path to check
+
+**Returns:**
+- `registered`: boolean
+- `status`: "current" | "deprecated" | "archived" | "problematic" (if registered)
+- `reason`: string (optional)
+- `current_version`: string (optional) - Path to current version if deprecated
+- `deprecated_at`: timestamp (optional)
+- `replaces`: list of strings (optional)
+- `deprecated_versions`: list of strings (optional)
+
+**Example:**
+```
+result = idlergear_file_status(path="api.py")
+# Returns: {"status": "deprecated", "current_version": "api_v2.py", ...}
+```
+
+**Check this before accessing files to avoid using outdated code.**
+
+### idlergear_file_list
+List all registered files, optionally filtered by status.
+
+**Parameters:**
+- `status`: "current" | "deprecated" | "archived" | "problematic" (optional)
+
+**Returns:**
+- `count`: integer - Number of files
+- `files`: list of file entries with full metadata
+
+**Example:**
+```
+# List all deprecated files
+result = idlergear_file_list(status="deprecated")
+# Returns: {"count": 3, "files": [...]}
+```
+
+**Condensed reference:**
+- `idlergear_file_register(path, status, reason?)` - Register file
+- `idlergear_file_deprecate(path, successor?, reason?)` - Mark as deprecated
+- `idlergear_file_status(path)` - Check file status
+- `idlergear_file_list(status?)` - List registered files
+
+**See also:** `docs/guides/file-registry.md` for full documentation.
 
 ## Git Integration (18 tools)
 

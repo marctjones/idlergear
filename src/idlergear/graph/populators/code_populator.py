@@ -125,7 +125,7 @@ class CodePopulator:
     def _populate_file(
         self, rel_path: str, full_path: Path
     ) -> Optional[Dict[str, int]]:
-        """Populate symbols from a single file."""
+        """Populate symbols and imports from a single file."""
         try:
             content = full_path.read_text()
         except (UnicodeDecodeError, PermissionError):
@@ -137,8 +137,8 @@ class CodePopulator:
         except SyntaxError:
             return None  # Skip files with syntax errors
 
-        # Extract symbols
-        symbols = self._extract_symbols(tree, rel_path)
+        # Extract symbols and imports
+        symbols, imports = self._extract_symbols_and_imports(tree, rel_path)
 
         # Ensure file node exists
         self._ensure_file_node(rel_path, full_path)
@@ -159,15 +159,34 @@ class CodePopulator:
                 if self._create_contains_relationship(rel_path, symbol_id):
                     relationships_added += 1
 
+        # Process imports and create IMPORTS relationships
+        for import_info in imports:
+            resolved_path = self._resolve_import_path(
+                import_info["module"], rel_path
+            )
+            if resolved_path and self._create_imports_relationship(
+                rel_path, resolved_path, import_info["line"]
+            ):
+                relationships_added += 1
+
         return {"symbols": symbols_added, "relationships": relationships_added}
 
-    def _extract_symbols(self, tree: ast.AST, file_path: str) -> List[Dict[str, Any]]:
-        """Extract functions, classes, and methods from AST."""
-        symbols = []
+    def _extract_symbols_and_imports(
+        self, tree: ast.AST, file_path: str
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Extract functions, classes, methods, and imports from AST.
 
-        for node in ast.walk(tree):
+        Returns:
+            Tuple of (symbols, imports)
+        """
+        symbols = []
+        imports = []
+
+        # Only iterate through module body to avoid double-counting
+        # ast.walk() would find methods both in class body and as standalone nodes
+        for node in tree.body:
             if isinstance(node, ast.FunctionDef):
-                # Extract function/method
+                # Extract top-level function
                 symbols.append({
                     "name": node.name,
                     "type": "function",
@@ -200,7 +219,29 @@ class CodePopulator:
                             "file_path": file_path,
                         })
 
-        return symbols
+            elif isinstance(node, ast.Import):
+                # Extract import statements: import foo, bar
+                for alias in node.names:
+                    imports.append({
+                        "module": alias.name,
+                        "names": [],
+                        "line": node.lineno,
+                        "type": "import",
+                    })
+
+            elif isinstance(node, ast.ImportFrom):
+                # Extract from imports: from foo import bar, baz
+                module_name = node.module or ""
+                names = [alias.name for alias in node.names]
+                imports.append({
+                    "module": module_name,
+                    "names": names,
+                    "line": node.lineno,
+                    "type": "from_import",
+                    "level": node.level,  # For relative imports
+                })
+
+        return symbols, imports
 
     def _ensure_file_node(self, rel_path: str, full_path: Path) -> None:
         """Ensure file node exists in database."""
@@ -300,6 +341,118 @@ class CodePopulator:
             MATCH (f:File {{path: '{file_path}'}})
             MATCH (s:Symbol {{id: '{symbol_id}'}})
             CREATE (f)-[:CONTAINS]->(s)
+        """)
+
+        return True
+
+    def _resolve_import_path(
+        self, module_name: str, from_file: str
+    ) -> Optional[str]:
+        """Resolve import module name to file path.
+
+        Args:
+            module_name: Module name (e.g., 'api_old', 'utils.helper')
+            from_file: Path of file containing the import
+
+        Returns:
+            Resolved file path or None if can't resolve
+        """
+        if not module_name:
+            return None
+
+        # Get directory of importing file
+        from_path = Path(from_file).parent
+
+        # Handle relative imports (e.g., from . import foo, from ..utils import bar)
+        # For now, we'll focus on simple module-based imports
+        # Relative imports would need level information from ast.ImportFrom
+
+        # Try to find matching .py file
+        # Strategy: Look for module_name.py in common locations
+
+        # 1. Try as direct path relative to repo root
+        candidates = [
+            # Direct module name as file
+            f"{module_name}.py",
+            f"{module_name}/__init__.py",
+            # In same directory as importing file
+            str(from_path / f"{module_name}.py"),
+            str(from_path / module_name / "__init__.py"),
+            # In src/ directory
+            f"src/{module_name}.py",
+            f"src/{module_name}/__init__.py",
+        ]
+
+        # Handle dotted imports (e.g., utils.helper -> utils/helper.py)
+        if "." in module_name:
+            module_path = module_name.replace(".", "/")
+            candidates.extend([
+                f"{module_path}.py",
+                f"{module_path}/__init__.py",
+                f"src/{module_path}.py",
+                f"src/{module_path}/__init__.py",
+            ])
+
+        # Check which candidate exists
+        for candidate in candidates:
+            full_path = self.repo_path / candidate
+            if full_path.exists() and full_path.is_file():
+                # Return relative path
+                try:
+                    return str(Path(candidate))
+                except ValueError:
+                    continue
+
+        return None
+
+    def _create_imports_relationship(
+        self, from_file: str, to_file: str, line: int
+    ) -> bool:
+        """Create IMPORTS relationship between two files.
+
+        Args:
+            from_file: Path of file doing the import
+            to_file: Path of file being imported
+            line: Line number of import statement
+
+        Returns:
+            True if relationship was created, False if it already existed
+        """
+        conn = self.db.get_connection()
+
+        # Ensure both file nodes exist
+        for file_path in [from_file, to_file]:
+            result = conn.execute(f"""
+                MATCH (f:File {{path: '{file_path}'}})
+                RETURN COUNT(f) AS count
+            """)
+            exists = result.get_next()[0] > 0 if result.has_next() else False
+
+            if not exists:
+                # Create minimal file node if it doesn't exist
+                conn.execute(f"""
+                    CREATE (f:File {{
+                        path: '{file_path}',
+                        file_exists: false
+                    }})
+                """)
+
+        # Check if relationship already exists
+        result = conn.execute(f"""
+            MATCH (f1:File {{path: '{from_file}'}})-[r:IMPORTS]->(f2:File {{path: '{to_file}'}})
+            RETURN COUNT(r) AS count
+        """)
+
+        exists = result.get_next()[0] > 0 if result.has_next() else False
+
+        if exists:
+            return False
+
+        # Create IMPORTS relationship
+        conn.execute(f"""
+            MATCH (f1:File {{path: '{from_file}'}})
+            MATCH (f2:File {{path: '{to_file}'}})
+            CREATE (f1)-[:IMPORTS {{line: {line}, import_type: 'python'}}]->(f2)
         """)
 
         return True

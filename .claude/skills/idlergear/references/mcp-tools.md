@@ -1,6 +1,6 @@
 # IdlerGear MCP Tools Reference
 
-Complete reference for all 126 MCP tools provided by IdlerGear.
+Complete reference for all 136 MCP tools provided by IdlerGear.
 
 ## Session Management (4 tools)
 
@@ -56,6 +56,77 @@ Search across all knowledge types.
 **Parameters:**
 - `query`: string (required)
 - `types`: list of "task" | "note" | "reference" | "plan"
+
+## Knowledge Graph (6 tools) ⚡
+
+**Token-efficient context retrieval using embedded graph database.**
+
+### idlergear_graph_query_task ⚡
+Query task context from knowledge graph. Returns task info with related files, commits, and symbols.
+
+**Parameters:**
+- `task_id`: integer (required)
+
+**Returns:** Task with related files, commits, symbols.
+
+**Token savings:** 98% vs grep + file reads (5,000 → 100 tokens)
+
+### idlergear_graph_query_file ⚡
+Query file context from knowledge graph. Returns file info with related tasks, imports, and symbols.
+
+**Parameters:**
+- `file_path`: string (required)
+
+**Returns:** File metadata, tasks, imports, symbols.
+
+**Token savings:** 95% vs cat + grep (3,000 → 150 tokens)
+
+### idlergear_graph_query_symbols ⚡
+Search for symbols (functions, classes, methods) by name pattern.
+
+**Parameters:**
+- `pattern`: string (required) - Name pattern to search for
+- `limit`: integer (default: 10) - Max results
+- `type`: string (optional) - Filter by "function" | "class" | "method"
+
+**Returns:** List of symbols with file locations and line numbers.
+
+**Token savings:** 98.5% vs grep + file reads (8,000 → 120 tokens)
+
+**Use this instead of grep when searching for code symbols.**
+
+### idlergear_graph_populate_git
+Index git commit history into knowledge graph.
+
+**Parameters:**
+- `max_commits`: integer (default: 100) - Maximum commits to index
+- `since`: string (optional) - Date filter (e.g., "2025-01-01")
+- `incremental`: boolean (default: true) - Skip existing commits
+
+**Returns:** `{commits: int, files: int, relationships: int}`
+
+**Run this periodically to keep graph current.**
+
+### idlergear_graph_populate_code
+Index code symbols (functions, classes, methods) into knowledge graph.
+
+**Parameters:**
+- `directory`: string (default: "src") - Directory to scan
+- `incremental`: boolean (default: true) - Skip unchanged files
+
+**Returns:** `{files: int, symbols: int, relationships: int}`
+
+**Supports:** Python (via AST parsing)
+
+### idlergear_graph_schema_info
+Get knowledge graph schema information and statistics.
+
+**Returns:** Node types, relationship types, counts, total nodes/relationships.
+
+**Use cases:**
+- Check if graph is initialized
+- Verify data has been indexed
+- Monitor graph size
 
 ## Task Management (5 tools)
 
@@ -198,6 +269,90 @@ Search references.
 - `idlergear_fs_file_checksum(path, algorithm?)` - File hash
 - `idlergear_fs_allowed_directories()` - Security boundary
 
+## File Registry (4 tools)
+
+**Track file status (current/deprecated/archived/problematic) to prevent AI from accessing outdated files.**
+
+### idlergear_file_register
+Register a file with explicit status.
+
+**Parameters:**
+- `path`: string (required) - File path relative to project root
+- `status`: "current" | "deprecated" | "archived" | "problematic" (required)
+- `reason`: string (optional) - Reason for this status
+
+**Example:**
+```
+idlergear_file_register(path="api_v2.py", status="current")
+```
+
+### idlergear_file_deprecate
+Mark a file as deprecated with optional successor.
+
+**Parameters:**
+- `path`: string (required) - File to deprecate
+- `successor`: string (optional) - Path to current version
+- `reason`: string (optional) - Reason for deprecation
+
+**Example:**
+```
+idlergear_file_deprecate(
+    path="api.py",
+    successor="api_v2.py",
+    reason="Refactored to use async/await"
+)
+```
+
+**Use this when creating new file versions to explicitly mark old ones as deprecated.**
+
+### idlergear_file_status
+Get status of a file.
+
+**Parameters:**
+- `path`: string (required) - File path to check
+
+**Returns:**
+- `registered`: boolean
+- `status`: "current" | "deprecated" | "archived" | "problematic" (if registered)
+- `reason`: string (optional)
+- `current_version`: string (optional) - Path to current version if deprecated
+- `deprecated_at`: timestamp (optional)
+- `replaces`: list of strings (optional)
+- `deprecated_versions`: list of strings (optional)
+
+**Example:**
+```
+result = idlergear_file_status(path="api.py")
+# Returns: {"status": "deprecated", "current_version": "api_v2.py", ...}
+```
+
+**Check this before accessing files to avoid using outdated code.**
+
+### idlergear_file_list
+List all registered files, optionally filtered by status.
+
+**Parameters:**
+- `status`: "current" | "deprecated" | "archived" | "problematic" (optional)
+
+**Returns:**
+- `count`: integer - Number of files
+- `files`: list of file entries with full metadata
+
+**Example:**
+```
+# List all deprecated files
+result = idlergear_file_list(status="deprecated")
+# Returns: {"count": 3, "files": [...]}
+```
+
+**Condensed reference:**
+- `idlergear_file_register(path, status, reason?)` - Register file
+- `idlergear_file_deprecate(path, successor?, reason?)` - Mark as deprecated
+- `idlergear_file_status(path)` - Check file status
+- `idlergear_file_list(status?)` - List registered files
+
+**See also:** `docs/guides/file-registry.md` for full documentation.
+
 ## Git Integration (18 tools)
 
 - `idlergear_git_status(repo_path?)` - Structured status
@@ -230,12 +385,15 @@ Search references.
 - `idlergear_pm_task_runs(task_id)` - Runs for task
 - `idlergear_pm_quick_start(executable, args?)` - Foreground process
 
-## Environment (4 tools)
+## Environment (5 tools)
+
+**Auto-activation**: The MCP server automatically detects and activates project virtualenvs on startup.
 
 - `idlergear_env_info()` - Python/Node/Rust versions, venvs, PATH
 - `idlergear_env_which(command)` - Find all matches in PATH
 - `idlergear_env_detect(path?)` - Detect project type
 - `idlergear_env_find_venv(path?)` - Find virtual environments
+- `idlergear_env_active()` - Show currently active venv (auto-activated)
 
 ## OpenTelemetry (3 tools)
 
@@ -338,6 +496,8 @@ Detect Python project configuration.
 - `idlergear_run_stop(name)` - Stop a running process
 
 ## Project Boards (9 tools)
+
+**Auto-add Configuration:** Tasks can be automatically added to a default project by setting `projects.auto_add = true`, `projects.default_project`, and `projects.default_column` in config.toml. When configured, `idlergear_task_create()` will automatically add new tasks to the project and return `added_to_project: true` in the response.
 
 - `idlergear_project_create(title, columns?, create_on_github?)` - Create Kanban board
 - `idlergear_project_list(include_github?)` - List all project boards

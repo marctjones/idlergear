@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.5.0)
+## Features (v0.5.4)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -38,10 +38,13 @@ IdlerGear works identically across all major AI coding assistants:
 - **Runs** - Background process tracking with logs
 - **Secrets** - Secure encrypted local storage for sensitive data (CLI-only, no MCP tools for security)
 - **Projects** - Kanban boards with GitHub Projects v2 sync (NEW in v0.5.0!)
+- **Data File Versioning** - Detect when code references old data files (CSV, JSON, etc.) ⭐ NEW!
+- **File Registry** - Track file status (current/deprecated/archived/problematic) to prevent using outdated code ⭐ NEW!
 
 ### Python-Native MCP Servers (Zero Node.js!)
 - **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries) ⭐ NEW!
 - **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks) ⭐ NEW!
+- **File Registry** - 4 tools (track file status, prevent deprecated file usage) ⭐ NEW!
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
 - **Git + Task Integration** - 18 tools (commit-task linking, status, diff, branches)
 - **Process Management** - 11 tools (list, monitor, IdlerGear runs integration)
@@ -51,15 +54,16 @@ IdlerGear works identically across all major AI coding assistants:
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
 - **Health Check** - Doctor command for configuration validation
 
-**Total: 132 MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 136 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **132 tools** via Model Context Protocol (universal)
+- **MCP Server** - **136 tools** via Model Context Protocol (universal)
 - **Knowledge Graph** - 95-98% token savings for context retrieval ⭐ NEW!
+- **File Registry** - Track file status to prevent deprecated file usage ⭐ NEW!
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
 - **Goose Integration** - CLI + GUI support with `.goosehints`
 - **Token Efficiency** - Up to 98% context reduction (15K → 200 tokens!)
@@ -85,17 +89,20 @@ Also available as: `idlergear monitor` or `idlergear session monitor`
 
 ## Roadmap
 
-**See [ROADMAP.md](docs/ROADMAP.md) for full release plan.**
+**See [ROADMAP.md](ROADMAP.md) for detailed release plan and dependencies.**
 
-IdlerGear ships **incrementally stable releases** with immediately useful features. Each milestone can be adopted independently.
+IdlerGear ships **quarterly releases** with major features. Each milestone delivers production-ready capabilities.
 
-| Milestone | Theme | Timeline | Key Features |
-|-----------|-------|----------|--------------|
-| **v0.4.0** | Test & Run Awareness | Q1 2026 (2-3 weeks) | Test coverage tracking, run history, hook integration |
-| **v0.5.0** ⭐ | Planning & Foundation | Q1 2026 (2-3 weeks) | Priorities registry, GraphQL API, planning clarity, docs enforcement |
-| **v0.6.0** 🎯 | Structured Information | Q2 2026 (4-5 weeks) | 70-90% token savings, query API docs/priorities, knowledge graphs |
-| **v0.7.0** 🌐 | Multi-Assistant & Collaboration | Q2-Q3 2026 (4-5 weeks) | Universal AI support, GitHub Projects v2, upstream contributions |
-| **v0.8.0** 💎 | Developer Experience & Polish | Q4 2026 - Q1 2027 (2-4 weeks) | Production quality, complete docs, performance optimization |
+| Milestone | Theme | Target | Key Features |
+|-----------|-------|--------|--------------|
+| **v0.5.4** ✅ | Planning & Foundation | CURRENT | Priorities, GraphQL API, planning, docs, knowledge graph |
+| **v0.6.0** 🎯 | File Registry & Quality | March 2026 | File deprecation detection, MCP interception, daemon integration |
+| **v0.7.0** 📊 | GitHub Integration | June 2026 | GitHub Projects v2 sync, custom fields, bidirectional updates |
+| **v0.8.0** 🌿 | Session Management | September 2026 | Session branching, harvesting, analytics, multi-client monitoring |
+| **v0.9.0** 🤖 | Multi-Assistant | December 2026 | Gemini integration, SKILLS.md support, cross-assistant coordination |
+| **v0.10.0** 💎 | Polish & Maturity | March 2027 | Pre-release maturity, 80%+ coverage, production validation |
+
+**[View Project Board](https://github.com/users/marctjones/projects/18)** | **[View Milestones](https://github.com/marctjones/idlergear/milestones)**
 
 **Philosophy:** Ship features users can adopt immediately. No waiting for "v1.0" to get value.
 
@@ -119,16 +126,15 @@ The difference:
 ## Quick Start
 
 ```bash
+# Install from PyPI (recommended)
+pipx install idlergear  # Isolated environment
+# OR
+pip install idlergear   # System/user install
+
 # Install from source (development)
 git clone https://github.com/marctjones/idlergear.git
 cd idlergear
 pip install -e .
-
-# Or install from PyPI (once published)
-# pipx install idlergear
-
-# Or with pip
-# pip install idlergear
 
 # Initialize a project
 cd my-project
@@ -264,13 +270,13 @@ idlergear config set KEY VAL      # Configure settings
 idlergear config get KEY          # Get config value
 ```
 
-### MCP Tools (132 total - use via AI assistants)
+### MCP Tools (136 total - use via AI assistants)
 
 See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
 
 ## MCP Tools Reference
 
-IdlerGear provides **132 MCP tools** across 16 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+IdlerGear provides **136 MCP tools** across 17 categories. All tools are **100% Python** with **zero Node.js dependencies**.
 
 ### Session Management (4 tools) ⚡ **Start here!**
 
@@ -343,6 +349,49 @@ idlergear_project_create(title="Sprint Backlog")
 ```
 
 **Documentation**: [docs/guides/github-projects.md](docs/guides/github-projects.md)
+
+---
+
+### File Registry (4 tools) ⭐ **NEW in v0.5.4!**
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_file_register` | Register file with explicit status (current/deprecated/archived/problematic) |
+| `idlergear_file_deprecate` | Mark file as deprecated with optional successor |
+| `idlergear_file_status` | Get status and metadata for a file |
+| `idlergear_file_list` | List all registered files, optionally filtered by status |
+
+**Use Case**: Prevent AI assistants from using outdated code versions.
+
+**Example workflow:**
+```python
+# When refactoring api.py → api_v2.py
+idlergear_file_deprecate(
+    path="api.py",
+    successor="api_v2.py",
+    reason="Refactored to use async/await"
+)
+
+# Before using a file
+status = idlergear_file_status(path="api.py")
+if status["status"] == "deprecated":
+    # Use successor instead: api_v2.py
+    pass
+
+# List all deprecated files
+result = idlergear_file_list(status="deprecated")
+# Shows: api.py, handler_old.py, etc.
+```
+
+**File Statuses:**
+- `current` - Active version, should be used
+- `deprecated` - Outdated, successor available
+- `archived` - Old version kept for reference only
+- `problematic` - Has known issues, use with caution
+
+**Storage**: `.idlergear/file_registry.json`
+
+**Documentation**: [docs/guides/file-registry.md](docs/guides/file-registry.md)
 
 ---
 

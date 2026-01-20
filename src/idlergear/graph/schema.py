@@ -233,7 +233,8 @@ def _create_relationship_tables(conn):
     conn.execute("""
         CREATE REL TABLE IMPORTS(
             FROM File TO File,
-            import_type STRING
+            import_type STRING,
+            line INT32
         )
     """)
 

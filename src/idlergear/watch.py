@@ -318,6 +318,63 @@ def check_reference_staleness(project_root: Path) -> list[dict[str, Any]]:
     return stale
 
 
+def check_stale_data_references(project_root: Path) -> list[dict[str, Any]]:
+    """Check for Python files referencing stale versions of data files.
+
+    Returns:
+        List of warnings about stale data file references
+    """
+    import ast
+    from idlergear.data_file_detector import (
+        detect_stale_data_references,
+        extract_file_references,
+    )
+    from idlergear.git_version_detector import detect_versioned_files
+
+    warnings = []
+
+    # Detect all versioned files in the repository
+    versioned_files = detect_versioned_files(project_root, include_renames=False)
+
+    if not versioned_files:
+        # No versioned files detected, nothing to check
+        return warnings
+
+    # Find all Python files to scan
+    python_files = list(project_root.glob("**/*.py"))
+
+    # Exclude virtual environments and .idlergear directory
+    python_files = [
+        f
+        for f in python_files
+        if ".idlergear" not in str(f)
+        and "venv" not in str(f)
+        and ".venv" not in str(f)
+        and "virtualenv" not in str(f)
+        and "site-packages" not in str(f)
+    ]
+
+    for py_file in python_files:
+        try:
+            content = py_file.read_text()
+            tree = ast.parse(content)
+
+            rel_path = str(py_file.relative_to(project_root))
+            refs = extract_file_references(tree, rel_path)
+
+            if refs:
+                file_warnings = detect_stale_data_references(
+                    refs, versioned_files, project_root
+                )
+                warnings.extend(file_warnings)
+
+        except (SyntaxError, UnicodeDecodeError, PermissionError):
+            # Skip files we can't parse
+            continue
+
+    return warnings
+
+
 def analyze(project_root: Path | None = None) -> WatchStatus:
     """Analyze the project and return suggestions.
 
@@ -584,6 +641,26 @@ def analyze(project_root: Path | None = None) -> WatchStatus:
                     id=next_id(),
                     category="reference",
                     message=f"Reference '{stale['reference']}' may be stale ({stale['reference_age_days']} days old)",
+                    severity="warning",
+                    context=stale,
+                )
+            )
+
+    # Check for stale data file references
+    check_data_versions_config = get_config_value("watch.check_data_versions")
+    check_data_versions = (
+        str(check_data_versions_config).lower() == "true"
+        if check_data_versions_config
+        else True
+    )
+    if check_data_versions:
+        stale_data_refs = check_stale_data_references(project_root)
+        for stale in stale_data_refs:
+            suggestions.append(
+                Suggestion(
+                    id=next_id(),
+                    category="data_version",
+                    message=f"{stale['source_file']}:{stale['line']} references stale data file",
                     severity="warning",
                     context=stale,
                 )

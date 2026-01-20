@@ -2449,6 +2449,88 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
+        Tool(
+            name="idlergear_watch_versions",
+            description="Check for stale file version references in Python code. Detects when Python scripts reference old versions of data files (CSV, JSON, YAML, etc.) and suggests using the current version instead. Useful for catching when AI creates better datasets but forgets to update scripts.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        # File Registry tools
+        Tool(
+            name="idlergear_file_register",
+            description="Register a file with explicit status (current/deprecated/archived/problematic). Use this to mark files as current when creating new versions, or mark old files as deprecated/archived.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path relative to project root",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["current", "deprecated", "archived", "problematic"],
+                        "description": "File status",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional reason for status",
+                    },
+                },
+                "required": ["path", "status"],
+            },
+        ),
+        Tool(
+            name="idlergear_file_deprecate",
+            description="Mark a file as deprecated with an optional successor. Use this when you create a new version of a file to explicitly deprecate the old version.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to deprecate",
+                    },
+                    "successor": {
+                        "type": "string",
+                        "description": "Path to current version that should be used instead",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for deprecation",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
+        Tool(
+            name="idlergear_file_status",
+            description="Get the status of a file. Returns current/deprecated/archived/problematic status, the current version if deprecated, and the reason for the status.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path to check",
+                    },
+                },
+                "required": ["path"],
+            },
+        ),
+        Tool(
+            name="idlergear_file_list",
+            description="List all registered files. Can filter by status to see only current, deprecated, archived, or problematic files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["current", "deprecated", "archived", "problematic"],
+                        "description": "Filter by status (optional)",
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -4577,6 +4659,128 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "path": path,
                     "detected": False,
                     "message": "No Python, Rust, or .NET project detected",
+                }
+            )
+
+        elif name == "idlergear_watch_versions":
+            from idlergear.watch import check_stale_data_references
+            from pathlib import Path
+
+            project_root = Path.cwd()
+            warnings = check_stale_data_references(project_root)
+
+            return _format_result(
+                {
+                    "warnings_count": len(warnings),
+                    "warnings": warnings,
+                }
+            )
+
+        # File Registry handlers
+        elif name == "idlergear_file_register":
+            from idlergear.file_registry import FileRegistry, FileStatus
+
+            registry = FileRegistry()
+            status = FileStatus(arguments["status"])
+            registry.register_file(
+                arguments["path"],
+                status,
+                reason=arguments.get("reason"),
+            )
+
+            return _format_result(
+                {
+                    "success": True,
+                    "path": arguments["path"],
+                    "status": arguments["status"],
+                    "reason": arguments.get("reason"),
+                }
+            )
+
+        elif name == "idlergear_file_deprecate":
+            from idlergear.file_registry import FileRegistry
+
+            registry = FileRegistry()
+            registry.deprecate_file(
+                arguments["path"],
+                successor=arguments.get("successor"),
+                reason=arguments.get("reason"),
+            )
+
+            return _format_result(
+                {
+                    "success": True,
+                    "path": arguments["path"],
+                    "deprecated": True,
+                    "successor": arguments.get("successor"),
+                    "reason": arguments.get("reason"),
+                }
+            )
+
+        elif name == "idlergear_file_status":
+            from idlergear.file_registry import FileRegistry
+
+            registry = FileRegistry()
+            path = arguments["path"]
+
+            status = registry.get_status(path)
+            entry = registry.get_entry(path)
+
+            if status is None:
+                return _format_result(
+                    {
+                        "path": path,
+                        "registered": False,
+                        "status": None,
+                    }
+                )
+
+            result = {
+                "path": path,
+                "registered": True,
+                "status": status.value,
+            }
+
+            if entry:
+                result["reason"] = entry.reason
+                result["current_version"] = entry.current_version
+                result["deprecated_at"] = entry.deprecated_at
+                result["replaces"] = entry.replaces
+                result["deprecated_versions"] = entry.deprecated_versions
+
+            return _format_result(result)
+
+        elif name == "idlergear_file_list":
+            from idlergear.file_registry import FileRegistry, FileStatus
+
+            registry = FileRegistry()
+
+            # Filter by status if provided
+            status_filter = None
+            if "status" in arguments:
+                status_filter = FileStatus(arguments["status"])
+
+            entries = registry.list_files(status_filter)
+
+            # Convert to dict format
+            files = []
+            for entry in entries:
+                files.append(
+                    {
+                        "path": entry.path,
+                        "status": entry.status.value,
+                        "reason": entry.reason,
+                        "current_version": entry.current_version,
+                        "deprecated_at": entry.deprecated_at,
+                        "replaces": entry.replaces,
+                        "deprecated_versions": entry.deprecated_versions,
+                    }
+                )
+
+            return _format_result(
+                {
+                    "count": len(files),
+                    "files": files,
                 }
             )
 

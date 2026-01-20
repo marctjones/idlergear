@@ -53,6 +53,25 @@ This returns:
 | Show vision | `idlergear_vision_show()` |
 | Project status | `idlergear_status()` |
 
+### File Status Tracking
+
+Track which files are current, deprecated, archived, or problematic to prevent using outdated code:
+
+| Action | MCP Tool |
+|--------|----------|
+| Register file | `idlergear_file_register(path="...", status="current")` |
+| Deprecate file | `idlergear_file_deprecate(path="...", successor="...", reason="...")` |
+| Check file status | `idlergear_file_status(path="...")` |
+| List files by status | `idlergear_file_list(status="deprecated")` |
+
+**File statuses:**
+- `current` - Active, should be used
+- `deprecated` - Outdated, successor available
+- `archived` - Old version kept for reference
+- `problematic` - Has known issues
+
+See `references/mcp-tools.md` for detailed documentation.
+
 ### Task Labels
 
 - `bug` - Something broken

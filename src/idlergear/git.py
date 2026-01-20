@@ -350,6 +350,71 @@ class GitServer:
 
         return commits
 
+    def detect_file_renames(
+        self,
+        repo_path: Optional[str] = None,
+        since: Optional[str] = None,
+        similarity: int = 80,
+    ) -> List[Dict[str, str]]:
+        """
+        Detect file renames using git history.
+
+        Args:
+            repo_path: Repository path
+            since: Only check commits since this ref/date (e.g., "1 month ago", "HEAD~10")
+            similarity: Minimum similarity percentage for rename detection (0-100)
+
+        Returns:
+            List of rename dictionaries with 'old_path', 'new_path', and 'similarity'
+        """
+        repo_path = repo_path or os.getcwd()
+
+        args = [
+            "log",
+            "--diff-filter=R",
+            f"--find-renames={similarity}",
+            "--name-status",
+            "--format=",
+        ]
+
+        if since:
+            args.append(f"--since={since}")
+
+        result = self._run_git(args, cwd=repo_path, check=False)
+
+        if result.returncode != 0:
+            return []
+
+        renames = []
+        lines = result.stdout.strip().split("\n")
+
+        for line in lines:
+            if not line or not line.startswith("R"):
+                continue
+
+            # Format: R<similarity>  old_path  new_path
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                # Extract similarity from R100 or R087
+                similarity_str = parts[0][1:]  # Remove 'R'
+                try:
+                    similarity_pct = int(similarity_str)
+                except ValueError:
+                    similarity_pct = 100
+
+                old_path = parts[1]
+                new_path = parts[2]
+
+                renames.append(
+                    {
+                        "old_path": old_path,
+                        "new_path": new_path,
+                        "similarity": similarity_pct,
+                    }
+                )
+
+        return renames
+
     def add(
         self, files: List[str], repo_path: Optional[str] = None, all: bool = False
     ) -> str:
