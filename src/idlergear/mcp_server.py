@@ -228,6 +228,20 @@ def _get_pm_server() -> ProcessManager:
     return pm_server
 
 
+# Plugin registry singleton
+plugin_registry = None
+
+
+def _get_plugin_registry():
+    """Get or create plugin registry instance."""
+    from idlergear.plugins import PluginRegistry
+
+    global plugin_registry
+    if plugin_registry is None:
+        plugin_registry = PluginRegistry()
+    return plugin_registry
+
+
 # Create the MCP server with enhanced instructions
 server = Server(
     "idlergear",
@@ -2615,6 +2629,118 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {},
             },
         ),
+        # Plugin tools (NEW v0.8.0)
+        Tool(
+            name="idlergear_plugin_list",
+            description="List available and loaded plugins. Shows which integrations (Langfuse, LlamaIndex, Mem0) are registered and enabled.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "loaded_only": {
+                        "type": "boolean",
+                        "description": "Only show loaded plugins (default: false, show all available)",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_plugin_status",
+            description="Get detailed status of plugins including enabled state, loaded state, health check, and capabilities.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "plugin_name": {
+                        "type": "string",
+                        "description": "Optional plugin name to check (omit for all plugins)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_plugin_enable",
+            description="Enable or disable a plugin in config.toml. Requires plugin to be registered first.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "plugin_name": {
+                        "type": "string",
+                        "description": "Plugin name (e.g., 'langfuse', 'llamaindex', 'mem0')",
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Enable (true) or disable (false) the plugin",
+                        "default": True,
+                    },
+                },
+                "required": ["plugin_name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plugin_search",
+            description="Semantic search over IdlerGear knowledge (references, notes) using LlamaIndex. Provides 40% faster retrieval than alternatives with relevance scoring.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query",
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "description": "Number of results to return (default: 5)",
+                        "default": 5,
+                    },
+                    "knowledge_type": {
+                        "type": "string",
+                        "enum": ["reference", "note"],
+                        "description": "Optional filter for knowledge type",
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="idlergear_plugin_index_reference",
+            description="Index a reference document for semantic search using LlamaIndex. Call this after creating or updating references.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "description": "Reference title",
+                    },
+                    "body": {
+                        "type": "string",
+                        "description": "Reference body content",
+                    },
+                },
+                "required": ["title"],
+            },
+        ),
+        Tool(
+            name="idlergear_plugin_index_note",
+            description="Index a note for semantic search using LlamaIndex. Call this after creating notes to make them searchable.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "note_id": {
+                        "type": "integer",
+                        "description": "Note ID",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Note content",
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Note tags",
+                    },
+                },
+                "required": ["note_id", "content"],
+            },
+        ),
     ]
 
 
@@ -4988,6 +5114,226 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 {
                     "count": len(tags),
                     "tags": tags,
+                }
+            )
+
+        # Plugin handlers (NEW v0.8.0)
+        elif name == "idlergear_plugin_list":
+            from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin, PluginRegistry
+
+            registry = _get_plugin_registry()
+
+            # Register available plugins
+            registry.register_plugin_class(LangfusePlugin)
+            registry.register_plugin_class(LlamaIndexPlugin)
+
+            loaded_only = arguments.get("loaded_only", False)
+
+            if loaded_only:
+                plugins = registry.list_loaded_plugins()
+            else:
+                plugins = registry.list_available_plugins()
+
+            return _format_result(
+                {
+                    "plugins": plugins,
+                    "loaded": registry.list_loaded_plugins(),
+                    "count": len(plugins),
+                }
+            )
+
+        elif name == "idlergear_plugin_status":
+            from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin
+
+            registry = _get_plugin_registry()
+
+            # Register available plugins
+            registry.register_plugin_class(LangfusePlugin)
+            registry.register_plugin_class(LlamaIndexPlugin)
+
+            plugin_name = arguments.get("plugin_name")
+
+            if plugin_name:
+                # Get status for specific plugin
+                plugin = registry.get_plugin(plugin_name)
+                if not plugin:
+                    # Try to load it
+                    plugin = registry.load_plugin(plugin_name)
+
+                if plugin:
+                    return _format_result(
+                        {
+                            "plugin": plugin_name,
+                            "loaded": True,
+                            "initialized": plugin.is_initialized(),
+                            "healthy": plugin.health_check(),
+                            "capabilities": [cap.value for cap in plugin.capabilities()],
+                        }
+                    )
+                else:
+                    # Check if enabled in config
+                    enabled = registry.config.is_plugin_enabled(plugin_name)
+                    return _format_result(
+                        {
+                            "plugin": plugin_name,
+                            "loaded": False,
+                            "enabled": enabled,
+                            "available": plugin_name in registry.list_available_plugins(),
+                        }
+                    )
+            else:
+                # Get status for all plugins
+                statuses = []
+                for name in registry.list_available_plugins():
+                    plugin = registry.get_plugin(name)
+                    if plugin:
+                        statuses.append(
+                            {
+                                "plugin": name,
+                                "loaded": True,
+                                "initialized": plugin.is_initialized(),
+                                "healthy": plugin.health_check(),
+                                "capabilities": [
+                                    cap.value for cap in plugin.capabilities()
+                                ],
+                            }
+                        )
+                    else:
+                        enabled = registry.config.is_plugin_enabled(name)
+                        statuses.append(
+                            {
+                                "plugin": name,
+                                "loaded": False,
+                                "enabled": enabled,
+                            }
+                        )
+
+                return _format_result({"plugins": statuses, "count": len(statuses)})
+
+        elif name == "idlergear_plugin_enable":
+            import toml
+
+            plugin_name = arguments["plugin_name"]
+            enabled = arguments.get("enabled", True)
+
+            # Load config.toml
+            config_path = Path.cwd() / ".idlergear" / "config.toml"
+            if config_path.exists():
+                config = toml.load(config_path)
+            else:
+                config = {}
+
+            # Update plugin config
+            if "plugins" not in config:
+                config["plugins"] = {}
+            if plugin_name not in config["plugins"]:
+                config["plugins"][plugin_name] = {}
+
+            config["plugins"][plugin_name]["enabled"] = enabled
+
+            # Write back
+            with open(config_path, "w") as f:
+                toml.dump(config, f)
+
+            return _format_result(
+                {
+                    "plugin": plugin_name,
+                    "enabled": enabled,
+                    "config_path": str(config_path),
+                }
+            )
+
+        elif name == "idlergear_plugin_search":
+            from idlergear.plugins import LlamaIndexPlugin
+
+            registry = _get_plugin_registry()
+
+            # Register and load LlamaIndex plugin
+            registry.register_plugin_class(LlamaIndexPlugin)
+            plugin = registry.load_plugin("llamaindex")
+
+            if not plugin:
+                return _format_result(
+                    {
+                        "error": "LlamaIndex plugin not enabled. Enable it first with: idlergear plugin enable llamaindex"
+                    }
+                )
+
+            # Perform search
+            query = arguments["query"]
+            top_k = arguments.get("top_k", 5)
+            knowledge_type = arguments.get("knowledge_type")
+
+            results = plugin.search(query, top_k=top_k, knowledge_type=knowledge_type)
+
+            return _format_result(
+                {
+                    "query": query,
+                    "results": results,
+                    "count": len(results),
+                }
+            )
+
+        elif name == "idlergear_plugin_index_reference":
+            from idlergear.plugins import LlamaIndexPlugin
+
+            registry = _get_plugin_registry()
+
+            # Register and load LlamaIndex plugin
+            registry.register_plugin_class(LlamaIndexPlugin)
+            plugin = registry.load_plugin("llamaindex")
+
+            if not plugin:
+                return _format_result(
+                    {
+                        "error": "LlamaIndex plugin not enabled. Enable it first with: idlergear plugin enable llamaindex"
+                    }
+                )
+
+            # Index reference
+            reference = {
+                "title": arguments["title"],
+                "body": arguments.get("body", ""),
+            }
+            plugin.index_reference(reference)
+
+            return _format_result(
+                {
+                    "success": True,
+                    "indexed": "reference",
+                    "title": arguments["title"],
+                }
+            )
+
+        elif name == "idlergear_plugin_index_note":
+            from idlergear.plugins import LlamaIndexPlugin
+
+            registry = _get_plugin_registry()
+
+            # Register and load LlamaIndex plugin
+            registry.register_plugin_class(LlamaIndexPlugin)
+            plugin = registry.load_plugin("llamaindex")
+
+            if not plugin:
+                return _format_result(
+                    {
+                        "error": "LlamaIndex plugin not enabled. Enable it first with: idlergear plugin enable llamaindex"
+                    }
+                )
+
+            # Index note
+            note = {
+                "id": arguments["note_id"],
+                "content": arguments["content"],
+                "tags": arguments.get("tags", []),
+            }
+            plugin.index_note(note)
+
+            return _format_result(
+                {
+                    "success": True,
+                    "indexed": "note",
+                    "note_id": arguments["note_id"],
                 }
             )
 
