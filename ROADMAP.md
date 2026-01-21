@@ -1,11 +1,11 @@
 # IdlerGear Release Roadmap & Milestone Reorganization
 
 ## Current State (January 2026)
-- **Current Version**: v0.5.4
-- **Open Issues**: 30
-- **Completed Milestones**: v0.4.0, v0.5.0, v0.6.0, v0.7.0 (all at 0 open issues)
-- **Active Milestones**: v0.8.0 (5 issues), v0.9.0 (7 issues), v0.10.0 (3 issues)
-- **Unassigned Issues**: 15 (including new File Registry epic)
+- **Current Version**: v0.5.19
+- **Open Issues**: 5 (all for future milestones)
+- **Completed Milestones**: v0.4.0, v0.5.0, v0.6.0 (original), v0.7.0 (original)
+- **Active Milestones**: v0.6.0 (in progress), v0.7.0 (planned), v0.8.0 (5 issues), v0.9.0 (planned)
+- **Recent Completions**: File Registry core (#287-289, #294), AI Assistant Integrations (#299, #300)
 
 ## Problem Analysis
 
@@ -41,17 +41,17 @@
 ## v0.6.0 - File Registry & Quality
 **Target**: March 1, 2026 (6 weeks)
 **Theme**: Major new feature + quality improvements
-**Status**: Ready to implement
+**Status**: In Progress - Core features completed, advanced features remain
 
 ### Epic: File Registry & Deprecated File Detection (#286)
 **Problem**: AI assistants access outdated/archived files causing bugs
 **Solution**: Explicit registry with MCP interception
 **Priority**: HIGH - Solves critical user pain point
 
-#### Phase 1: Core Infrastructure (Weeks 1-2)
-- #287: FileRegistry data model and storage (HIGH, Medium effort)
-- #288: CLI commands for registry management (HIGH, Medium effort)
-- #289: MCP tools for AI assistant access (HIGH, Small effort)
+#### Phase 1: Core Infrastructure (Weeks 1-2) ✅ COMPLETED
+- ✅ #287: FileRegistry data model and storage (HIGH, Medium effort) - Implemented in file_registry.py
+- ✅ #288: CLI commands for registry management (HIGH, Medium effort) - 7 commands in cli.py
+- ✅ #289: MCP tools for AI assistant access (HIGH, Small effort) - 8 MCP tools in mcp_server.py
 
 #### Phase 2: MCP Interception (Weeks 2-3)
 - #290: MCP tool interception for file operations (HIGH, Large effort) ⭐ **Critical**
@@ -66,7 +66,15 @@
 
 #### Phase 5: Testing & Documentation (Week 6)
 - #296: End-to-end integration testing (HIGH, Medium effort)
-- #294: User guide and documentation (MEDIUM, Small effort)
+- ✅ #294: User guide and documentation (MEDIUM, Small effort) - Comprehensive docs created
+
+### AI Assistant Integrations ✅ LARGELY COMPLETED
+- ✅ #299: Cursor AI IDE Integration - .mdc rules generation complete
+- ✅ #300: Aider Configuration - .aider.conf.yml generation complete
+- ⚠️ #298: GitHub Copilot CLI Integration - Template complete, MCP testing pending
+- ✅ Gemini CLI - GEMINI.md enhanced with comprehensive guidance
+- ✅ Goose - .goosehints integration complete
+- ✅ AGENTS.md - Enhanced with comprehensive multi-assistant guidance (205 lines)
 
 ### Quality Improvements
 - #285: Fix pipx installation support (HIGH priority)
@@ -400,5 +408,21 @@ Create label: `epic` (color: #5319e7, description: "Large feature spanning multi
 
 ---
 
-**Last Updated**: January 19, 2026
+## Progress Summary (v0.5.19)
+
+### Completed in v0.5.x Series
+- ✅ **File Registry Core** (#287-289, #294): Data model, CLI, MCP tools, documentation
+- ✅ **AI Assistant Integrations** (#298-300): Cursor, Aider, Copilot, Gemini, Goose, AGENTS.md
+- ✅ **Plugin System** (v0.5.11-13): CLI commands, MCP tools, Mem0 integration
+- 🔄 **v0.6.0 Status**: ~60% complete (core done, MCP interception & testing remain)
+
+### Next Priorities
+1. #290: MCP tool interception (CRITICAL for File Registry)
+2. #296: End-to-end integration testing
+3. #285: Fix pipx installation support (HIGH priority bug)
+4. #291: Daemon integration for registry broadcasts
+
+---
+
+**Last Updated**: January 21, 2026
 **Next Review**: February 1, 2026
