@@ -87,9 +87,43 @@ class TestGenerateFiles:
     def test_generate_gemini_md(self, tmp_path):
         """Generate GEMINI.md content."""
         content = generate_gemini_md(tmp_path)
-        assert "# GEMINI.md" in content
-        assert "IdlerGear" in content
+
+        # Check basic structure
+        assert "# Gemini CLI" in content
+        assert "IdlerGear Integration" in content
+
+        # Check key sections exist
+        assert "CRITICAL: Session Start" in content
         assert "idlergear context" in content
+        assert "Core Commands" in content
+        assert "Task Management" in content
+        assert "Notes & Insights" in content
+        assert "File Registry" in content
+
+        # Check forbidden patterns section
+        assert "FORBIDDEN Patterns" in content
+        assert "NEVER create these files" in content
+        assert "TODO.md" in content
+        assert "NEVER write these comments" in content
+        assert "# TODO:" in content
+
+        # Check MCP server section
+        assert "MCP Server (146 Tools)" in content
+        assert "~/.gemini/settings.json" in content
+
+        # Check workflow section
+        assert "Development Workflow" in content
+
+        # Check token efficiency section
+        assert "Token Efficiency" in content
+        assert "97% savings" in content
+
+        # Check best practices
+        assert "Best Practices" in content
+
+        # Check troubleshooting
+        assert "Troubleshooting" in content
+        assert "Command not found" in content
 
     def test_generate_copilot_md(self, tmp_path):
         """Generate COPILOT.md content."""
