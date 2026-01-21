@@ -13,6 +13,7 @@ Plugin Types:
 from .base import IdlerGearPlugin, PluginCapability, PluginRegistry
 from .langfuse import LangfusePlugin
 from .llamaindex import LlamaIndexPlugin
+from .mem0 import Mem0Plugin
 
 __all__ = [
     "IdlerGearPlugin",
@@ -20,4 +21,5 @@ __all__ = [
     "PluginRegistry",
     "LangfusePlugin",
     "LlamaIndexPlugin",
+    "Mem0Plugin",
 ]
