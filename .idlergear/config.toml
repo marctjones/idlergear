@@ -1,0 +1,30 @@
+idlergear_version = "0.5.4"
+
+[project]
+name = ""
+
+[github]
+
+[daemon]
+auto_start = true
+
+[backends]
+task = "github"
+explore = "github"
+note = "github"
+plan = "github"
+
+[watch]
+enabled = "true"
+debounce = "5"
+files_changed_threshold = "5"
+uncommitted_lines_threshold = "100"
+test_failures_threshold = "1"
+detect_todos = "true"
+detect_fixmes = "true"
+detect_hacks = "true"
+poll_interval = "10"
+
+[test]
+block_on_failure = false
+stale_threshold_seconds = 7200

@@ -1,0 +1,15 @@
+{
+  "id": "d0bdf406",
+  "from": "claude-code-39957650",
+  "to": "claude-code-39957650",
+  "message": "Hey! Can you check if you can see your messages now? Try calling idlergear_message_list without any arguments - the v0.3.13 fix should auto-detect your agent_id.",
+  "timestamp": "2026-01-08T23:38:38.270777+00:00",
+  "priority": "normal",
+  "type": "info",
+  "action_requested": false,
+  "context": {},
+  "read": false,
+  "processed": false,
+  "task_id": null,
+  "metadata": {}
+}

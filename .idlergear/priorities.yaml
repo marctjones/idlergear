@@ -1,0 +1,43 @@
+version: 1.0.0
+last_updated: '2026-01-17T22:01:20.048606'
+feature_areas:
+  tier_1: []
+  tier_2: []
+  tier_3: []
+backends:
+  critical:
+  - name: local
+    status: complete
+    priority_level: critical
+    features:
+      tasks: complete
+      notes: complete
+      references: complete
+      plans: complete
+  high: []
+  medium: []
+ai_assistants:
+  tier_1: []
+  tier_2: []
+validation_matrix:
+  backend_features: {}
+  assistant_features: {}
+coverage_requirements:
+  tier_1_feature:
+  - 'implementation: Feature works end-to-end'
+  - 'tests: 85%+ test coverage'
+  - 'documentation: User guide + reference docs'
+  - 'examples: At least 2 working examples'
+  - 'validation: Tested with 2+ backends or assistants'
+  critical_backend:
+  - 'implementation: All CRUD operations work'
+  - 'tests: Backend test suite passes'
+  - 'documentation: Setup guide in README'
+  - 'examples: Example configuration'
+v1_0_requirements:
+  feature_coverage: {}
+  backend_coverage: {}
+  assistant_coverage: {}
+  validation_matrix_minimum: {}
+  bugs_blocking_release: []
+  documentation_required: []

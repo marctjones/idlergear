@@ -1,0 +1,17 @@
+{
+  "id": "b2c6c944",
+  "from": "ci-bot",
+  "to": "test-agent",
+  "message": "URGENT: Build is broken!",
+  "timestamp": "2026-01-08T14:28:05.382617+00:00",
+  "priority": "urgent",
+  "type": "alert",
+  "action_requested": true,
+  "context": {},
+  "read": true,
+  "processed": true,
+  "task_id": null,
+  "metadata": {},
+  "processed_at": "2026-01-08T14:28:05.384661+00:00",
+  "read_at": "2026-01-08T14:28:05.384661+00:00"
+}

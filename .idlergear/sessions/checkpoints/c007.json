@@ -1,0 +1,13 @@
+{
+  "checkpoint_id": "c007",
+  "timestamp": "2026-01-19T09:35:24.694227",
+  "state": {
+    "current_task_id": null,
+    "working_files": [
+      ".claude/skills/idlergear/references/mcp-tools.md",
+      ".claude/hooks/",
+      ".idlergear/"
+    ],
+    "notes": null
+  }
+}

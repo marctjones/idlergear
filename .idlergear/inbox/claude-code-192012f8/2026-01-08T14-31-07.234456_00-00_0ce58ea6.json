@@ -1,0 +1,15 @@
+{
+  "id": "0ce58ea6",
+  "from": "ci-pipeline",
+  "to": "claude-code-192012f8",
+  "message": "URGENT: Database migration failed. Check logs.",
+  "timestamp": "2026-01-08T14:31:07.234456+00:00",
+  "priority": "urgent",
+  "type": "alert",
+  "action_requested": true,
+  "context": {},
+  "read": false,
+  "processed": false,
+  "task_id": null,
+  "metadata": {}
+}

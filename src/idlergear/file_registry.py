@@ -160,6 +160,10 @@ class FileRegistry:
         self.files: Dict[str, FileEntry] = {}
         self.patterns: Dict[str, PatternRule] = {}
         self._status_cache: Dict[str, Optional[FileStatus]] = {}
+        self._event_callbacks: Dict[str, list] = {
+            "file_registered": [],
+            "file_deprecated": [],
+        }
 
         # Load existing registry if it exists
         if self.registry_path.exists():
@@ -168,6 +172,30 @@ class FileRegistry:
     def _clear_cache(self) -> None:
         """Clear the status lookup cache."""
         self._status_cache.clear()
+
+    def on(self, event: str, callback) -> None:
+        """Register a callback for an event.
+
+        Args:
+            event: Event name ("file_registered" or "file_deprecated")
+            callback: Callable that takes event data as parameter
+        """
+        if event in self._event_callbacks:
+            self._event_callbacks[event].append(callback)
+
+    def _emit(self, event: str, data: Dict[str, Any]) -> None:
+        """Emit an event to all registered callbacks.
+
+        Args:
+            event: Event name
+            data: Event data
+        """
+        for callback in self._event_callbacks.get(event, []):
+            try:
+                callback(data)
+            except Exception:
+                # Don't let callback failures break registry operations
+                pass
 
     def load(self) -> None:
         """Load registry from JSON file."""
@@ -235,6 +263,17 @@ class FileRegistry:
         self._clear_cache()
         self.save()
 
+        # Emit event
+        self._emit(
+            "file_registered",
+            {
+                "path": path,
+                "status": status.value,
+                "reason": reason,
+                "timestamp": datetime.now().isoformat(),
+            },
+        )
+
     def deprecate_file(
         self,
         path: str,
@@ -264,6 +303,17 @@ class FileRegistry:
 
         self._clear_cache()
         self.save()
+
+        # Emit event
+        self._emit(
+            "file_deprecated",
+            {
+                "path": path,
+                "successor": successor,
+                "reason": reason,
+                "timestamp": datetime.now().isoformat(),
+            },
+        )
 
     def add_pattern(
         self,

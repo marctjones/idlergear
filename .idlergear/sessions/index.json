@@ -1,0 +1,14 @@
+{
+  "version": "2.0",
+  "current_branch": "main",
+  "current_session": "s001",
+  "branches": {
+    "main": {
+      "created": "2026-01-18T00:42:49.274055",
+      "sessions": [
+        "s001"
+      ],
+      "latest": "s001"
+    }
+  }
+}

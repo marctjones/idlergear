@@ -1,0 +1,5004 @@
+{
+  "framework": "pytest",
+  "timestamp": "2026-01-11T06:07:34.500982Z",
+  "test_files": [
+    "tests/integration/test_fresh_project_workflow.py",
+    "tests/integration/test_mcp_integration.py",
+    "tests/test_backends.py",
+    "tests/test_cli.py",
+    "tests/test_config.py",
+    "tests/test_context.py",
+    "tests/test_daemon.py",
+    "tests/test_daemon_direct.py",
+    "tests/test_daemon_integration.py",
+    "tests/test_doctor.py",
+    "tests/test_explorations.py",
+    "tests/test_fs.py",
+    "tests/test_git.py",
+    "tests/test_github_backend.py",
+    "tests/test_hooks.py",
+    "tests/test_init.py",
+    "tests/test_install.py",
+    "tests/test_mcp_server.py",
+    "tests/test_migration.py",
+    "tests/test_newproject.py",
+    "tests/test_notes.py",
+    "tests/test_otel_collector.py",
+    "tests/test_otel_storage.py",
+    "tests/test_plans.py",
+    "tests/test_pm.py",
+    "tests/test_projects.py",
+    "tests/test_reference.py",
+    "tests/test_runs.py",
+    "tests/test_search.py",
+    "tests/test_selfupdate.py",
+    "tests/test_session.py",
+    "tests/test_shell_backend.py",
+    "tests/test_storage.py",
+    "tests/test_tasks.py",
+    "tests/test_testing.py",
+    "tests/test_upgrade.py",
+    "tests/test_vision.py",
+    "tests/test_watch.py"
+  ],
+  "test_items": [
+    {
+      "name": "TestFreshProjectSetup::test_init_creates_idlergear_directory",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFreshProjectSetup::test_init_creates_config",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFreshProjectSetup::test_install_creates_claude_md",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFreshProjectSetup::test_install_creates_agents_md",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFreshProjectSetup::test_install_creates_rules_file",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFreshProjectSetup::test_install_creates_mcp_json",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskWorkflow::test_create_task",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskWorkflow::test_list_tasks",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskWorkflow::test_show_task",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskWorkflow::test_close_task",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteWorkflow::test_create_note",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteWorkflow::test_list_notes",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestExploreWorkflow::test_create_exploration",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestExploreWorkflow::test_list_explorations",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVisionWorkflow::test_show_vision_empty",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestContextCommand::test_context_shows_overview",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDevelopmentWorkflow::test_full_development_session",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUninstallWorkflow::test_uninstall_removes_install_files",
+      "file": "tests/integration/test_fresh_project_workflow.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpConfiguration::test_mcp_json_has_correct_structure",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpConfiguration::test_mcp_server_executable_exists",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpConfiguration::test_mcp_server_starts_without_error",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpToolDiscovery::test_mcp_server_lists_tools",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpVsCliParity::test_task_create_parity",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpVsCliParity::test_note_create_parity",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMcpVsCliParity::test_context_command_returns_structured_output",
+      "file": "tests/integration/test_mcp_integration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_task_backend",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_note_backend",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_explore_backend",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_reference_backend",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_plan_backend",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_vision_backend",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_backend_caching",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_clear_cache",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_get_configured_backend_name",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_list_available_backends",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestBackendRegistry::test_unknown_backend_type",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolCompliance::test_task_backend_protocol",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolCompliance::test_note_backend_protocol",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolCompliance::test_explore_backend_protocol",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolCompliance::test_reference_backend_protocol",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolCompliance::test_plan_backend_protocol",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolCompliance::test_vision_backend_protocol",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_create_task",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_list_tasks",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_get_task",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_update_task",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_close_task",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_reopen_task",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalTaskBackend::test_task_with_priority_and_due",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalNoteBackend::test_create_note",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalNoteBackend::test_list_notes",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalNoteBackend::test_delete_note",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalExploreBackend::test_create_exploration",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalExploreBackend::test_close_exploration",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalReferenceBackend::test_add_reference",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalReferenceBackend::test_search_references",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalPlanBackend::test_create_plan",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalPlanBackend::test_switch_plan",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLocalVisionBackend::test_set_and_get_vision",
+      "file": "tests/test_backends.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitCommand::test_init",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitCommand::test_init_already_initialized",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_create",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_create_with_body",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_list_empty",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_list",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_show",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_show_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_close",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTaskCommands::test_task_edit",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteCommands::test_note_create",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteCommands::test_note_list",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteCommands::test_note_show",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteCommands::test_note_delete",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNoteCommands::test_note_promote",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestExploreCommands::test_explore_create",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestExploreCommands::test_explore_list",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestExploreCommands::test_explore_show",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestExploreCommands::test_explore_delete",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVisionCommands::test_vision_show",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVisionCommands::test_vision_edit_with_content",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPlanCommands::test_plan_create",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPlanCommands::test_plan_list",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPlanCommands::test_plan_show",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPlanCommands::test_plan_switch",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestReferenceCommands::test_reference_add",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestReferenceCommands::test_reference_list",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestReferenceCommands::test_reference_show",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestReferenceCommands::test_reference_search",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestConfigCommands::test_config_set_and_get",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestConfigCommands::test_config_get_not_set",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallCommands::test_install",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallCommands::test_uninstall",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNewCommand::test_new_project",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestNewCommand::test_new_python_project",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonCommands::test_daemon_status_not_running",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_start",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_list_empty",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_list",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_status",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_status_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_logs",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_logs_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_stop",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommands::test_run_stop_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestErrorHandling::test_task_list_not_initialized",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestErrorHandling::test_note_list_not_initialized",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestErrorHandling::test_explore_list_not_initialized",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalTaskCommands::test_task_list_with_state",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalTaskCommands::test_task_close_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalTaskCommands::test_task_edit_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalTaskCommands::test_task_edit_add_label",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalTaskCommands::test_task_sync",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalNoteCommands::test_note_show_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalNoteCommands::test_note_delete_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalNoteCommands::test_note_promote_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalNoteCommands::test_note_list_empty",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalExploreCommands::test_explore_show_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalExploreCommands::test_explore_delete_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalExploreCommands::test_explore_list_empty",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalPlanCommands::test_plan_show_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalPlanCommands::test_plan_show_current",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalPlanCommands::test_plan_show_no_current",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalPlanCommands::test_plan_switch_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalPlanCommands::test_plan_list_empty",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalPlanCommands::test_plan_sync",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalReferenceCommands::test_reference_show_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalReferenceCommands::test_reference_edit",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalReferenceCommands::test_reference_edit_not_found",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalReferenceCommands::test_reference_search_no_results",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalReferenceCommands::test_reference_list_empty",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAdditionalReferenceCommands::test_reference_sync",
+      "file": "tests/test_cli.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_load_config",
+      "file": "tests/test_config.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_set_and_get_config_value",
+      "file": "tests/test_config.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_nested_config_value",
+      "file": "tests/test_config.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_nonexistent_config_value",
+      "file": "tests/test_config.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_config_env_fallback",
+      "file": "tests/test_config.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_truncate_text",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_truncate_lines",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_context_modes",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_minimal_mode",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_standard_mode",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_full_mode",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_mode_task_body_truncation",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_context_json_serialization",
+      "file": "tests/test_context.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestProtocol::test_request_to_json",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_request_without_params",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_response_success",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_response_error",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_notification_to_json",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_parse_request",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_parse_notification",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_parse_response",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_parse_error_response",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_parse_invalid_json",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocol::test_parse_invalid_version",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonLifecycle::test_not_running_initially",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonLifecycle::test_cleanup_stale_files",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonClient::test_connect_no_socket",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonClient::test_disconnect_when_not_connected",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_start_stop_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_daemon_ping",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_daemon_status",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_daemon_method_not_found",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_task_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_restart_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_note_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_explore_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_vision_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_plan_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_reference_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_config_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_run_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_task_close_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_task_update_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_subscribe_unsubscribe",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_subscribe_missing_event",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonIntegration::test_note_promote_via_daemon",
+      "file": "tests/test_daemon.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestConnection::test_send_when_closed",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestConnection::test_recv_when_closed",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestConnection::test_close",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_register_method",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_handle_ping",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_handle_status",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_handle_subscribe",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_handle_subscribe_missing_event",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_handle_unsubscribe",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_handle_unsubscribe_missing_event",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_dispatch_method",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_dispatch_method_not_found",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDaemonServerMethods::test_broadcast",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersRegistration::test_register_handlers",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_task_create_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_task_list_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_note_create_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_explore_create_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_vision_get_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_vision_set_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_plan_create_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_reference_add_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_config_set_get_handlers",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_run_start_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHandlersExecution::test_task_close_with_broadcast",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolEdgeCases::test_request_with_null_params",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProtocolEdgeCases::test_response_to_json_with_error",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_task_get_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_task_update_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_note_list_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_note_get_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_note_delete_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_note_promote_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_explore_list_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_explore_get_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_explore_close_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_plan_list_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_plan_get_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_plan_current_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_plan_switch_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_reference_list_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_reference_get_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_reference_update_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_reference_search_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_run_list_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_run_status_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_run_logs_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAllHandlers::test_run_stop_handler",
+      "file": "tests/test_daemon_direct.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_agent_registration",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_agent_heartbeat",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_agent_status_update",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_command_queue_basic",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_command_priority",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_command_assignment",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_command_completion",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_lock_acquisition",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_lock_timeout",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_multi_agent_coordination",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_persistence",
+      "file": "tests/test_daemon_integration.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestCheckStatus::test_status_values",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckResult::test_create_simple_result",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckResult::test_create_result_with_fix",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckResult::test_to_dict",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoctorReport::test_healthy_report",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoctorReport::test_report_with_warnings",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoctorReport::test_report_with_errors",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoctorReport::test_to_dict",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckInitialization::test_initialized_project",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckInitialization::test_missing_idlergear_dir",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckInitialization::test_missing_config_file",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckVersion::test_current_version",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckVersion::test_outdated_version",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckVersion::test_no_version_stored",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckMcpConfig::test_valid_mcp_config",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckMcpConfig::test_missing_mcp_config",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckMcpConfig::test_mcp_config_without_idlergear",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckHooksConfig::test_valid_hooks_config",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckHooksConfig::test_missing_hooks_config",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckLegacyFiles::test_no_legacy_files",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckLegacyFiles::test_legacy_explorations_file",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckUnmanagedKnowledgeFiles::test_no_unmanaged_files",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckUnmanagedKnowledgeFiles::test_todo_md_detected",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckUnmanagedKnowledgeFiles::test_multiple_unmanaged_files",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunDoctor::test_run_doctor_initialized_project",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunDoctor::test_run_doctor_outside_project",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunDoctor::test_run_doctor_returns_all_checks",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatReport::test_format_healthy_report",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatReport::test_format_report_with_issues",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatReport::test_format_verbose_shows_ok_checks",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCLIDoctor::test_doctor_command_exists",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCLIDoctor::test_doctor_json_output",
+      "file": "tests/test_doctor.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateExploration::test_create_exploration",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateExploration::test_create_exploration_with_body",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateExploration::test_create_multiple_explorations",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListExplorations::test_list_empty",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListExplorations::test_list_open_explorations",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListExplorations::test_list_closed_explorations",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListExplorations::test_list_all_explorations",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListExplorations::test_list_sorted_by_id",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetExploration::test_get_existing_exploration",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetExploration::test_get_nonexistent_exploration",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateExploration::test_update_title",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateExploration::test_update_body",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateExploration::test_update_state",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateExploration::test_update_nonexistent",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCloseExploration::test_close_exploration",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCloseExploration::test_close_nonexistent",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadExplorationFromFile::test_load_nonexistent_file",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadExplorationFromFile::test_load_exploration_file",
+      "file": "tests/test_explorations.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_read_file",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_write_file",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_create_directory",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_list_directory",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_directory_tree",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_search_files",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_file_info",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_file_checksum",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_move_file",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_read_multiple_files",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_security_outside_allowed_dir",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_security_parent_directory_traversal",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_file_not_found",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_exclude_patterns",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFilesystemServer::test_list_allowed_directories",
+      "file": "tests/test_fs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_git_status_clean",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_status_with_changes",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_add_and_commit",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_commit_with_task_id",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_log",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_diff",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_branches",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_reset",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_show",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_commit_task_integration",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_task_commits",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_sync_tasks",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_security_disallowed_repo",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_git_add_all",
+      "file": "tests/test_git.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestRunGhCommand::test_successful_command",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunGhCommand::test_command_not_found",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunGhCommand::test_not_authenticated",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunGhCommand::test_not_git_repository",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunGhCommand::test_command_timeout",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMapIssueToTask::test_basic_mapping",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMapIssueToTask::test_labels_as_objects",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMapIssueToTask::test_labels_as_strings",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMapIssueToTask::test_priority_extraction",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMapIssueToTask::test_assignees_as_objects",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_create_task",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_create_task_with_labels",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_create_task_with_priority",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_list_tasks",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_list_tasks_closed",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_get_task",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_get_task_not_found",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_close_task",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubTaskBackend::test_reopen_task",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubExploreBackend::test_create_exploration",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGitHubExploreBackend::test_list_explorations",
+      "file": "tests/test_github_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_blocks_todo_md",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_blocks_notes_md",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_blocks_session_md",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_blocks_backlog_md",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_blocks_scratch_md",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_allows_regular_python_file",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_allows_readme",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_allows_non_file_tools",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_blocks_edit_on_forbidden",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPreToolUseHook::test_suggests_alternative",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPostToolUseHook::test_detects_pytest_failure",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPostToolUseHook::test_detects_python_traceback",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPostToolUseHook::test_detects_assertion_error",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPostToolUseHook::test_detects_timeout",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPostToolUseHook::test_no_output_on_success",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPostToolUseHook::test_handles_empty_response",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSessionStartHook::test_exits_gracefully_without_idlergear",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSessionStartHook::test_returns_json_with_context",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStopHook::test_approves_when_no_issues",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStopHook::test_returns_valid_json",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHookPerformance::test_hook_execution_time[ig_pre-tool-use.sh-0.5]",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHookPerformance::test_hook_execution_time[ig_post-tool-use.sh-0.5]",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHookPerformance::test_hook_execution_time[ig_session-start.sh-0.5]",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHookPerformance::test_hook_execution_time[ig_stop.sh-0.5]",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_detects_implement_command",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_detects_add_command",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_detects_create_command",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_detects_fix_command",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_detects_whats_next_pattern",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_detects_bug_mentions",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_no_output_for_regular_prompt",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUserPromptSubmitHook::test_handles_empty_prompt",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestHookIntegration::test_pre_tool_use_error_message_includes_alternative",
+      "file": "tests/test_hooks.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_project",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_already_initialized",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_creates_config_content",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_creates_vision",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_updates_gitignore",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_no_gitignore",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInitProject::test_init_with_path",
+      "file": "tests/test_init.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallMcpServer::test_install_mcp_server",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallMcpServer::test_install_already_installed",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallMcpServer::test_install_adds_to_existing",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUninstallMcpServer::test_uninstall_mcp_server",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUninstallMcpServer::test_uninstall_not_installed",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUninstallMcpServer::test_uninstall_preserves_others",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUninstallMcpServer::test_uninstall_removes_empty_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddAgentsMdSection::test_add_to_new_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddAgentsMdSection::test_add_to_existing_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddAgentsMdSection::test_add_already_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveAgentsMdSection::test_remove_section",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveAgentsMdSection::test_remove_not_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveAgentsMdSection::test_remove_preserves_other_content",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveAgentsMdSection::test_remove_deletes_empty_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetIdlergearMcpConfig::test_get_config",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddClaudeMdSection::test_add_to_new_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddClaudeMdSection::test_add_to_existing_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddClaudeMdSection::test_add_already_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveClaudeMdSection::test_remove_section",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveClaudeMdSection::test_remove_not_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveClaudeMdSection::test_remove_preserves_other_content",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddRulesFile::test_add_rules_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddRulesFile::test_add_already_exists",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddRulesFile::test_add_updates_when_different",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveRulesFile::test_remove_rules_file",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveRulesFile::test_remove_not_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveRulesFile::test_remove_cleans_empty_dirs",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddSkill::test_add_skill",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddSkill::test_add_skill_creates_references",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddSkill::test_add_skill_creates_scripts",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddSkill::test_add_skill_already_exists",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddSkill::test_add_skill_updates_changed_files",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveSkill::test_remove_skill",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveSkill::test_remove_skill_not_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRemoveSkill::test_remove_skill_cleans_empty_dirs",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_install_scripts",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_install_scripts_executable",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_install_scripts_unchanged",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_install_scripts_updated",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_remove_scripts",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_remove_scripts_not_present",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestInstallScripts::test_remove_scripts_cleans_empty_dir",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFullUninstall::test_uninstall_all_components",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFullUninstall::test_uninstall_dry_run",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFullUninstall::test_uninstall_with_remove_data",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFullUninstall::test_uninstall_preserves_data_by_default",
+      "file": "tests/test_install.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatResult::test_format_none",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatResult::test_format_dict",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatResult::test_format_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatResult::test_format_string",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckInitialized::test_not_initialized",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckInitialized::test_initialized",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListTools::test_list_tools",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListTools::test_tools_have_schemas",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolTasks::test_task_create",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolTasks::test_task_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolTasks::test_task_show",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolTasks::test_task_show_not_found",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolTasks::test_task_close",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolTasks::test_task_update",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolNotes::test_note_create",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolNotes::test_note_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolNotes::test_note_delete",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolNotes::test_note_promote",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolExplore::test_explore_create",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolExplore::test_explore_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolExplore::test_explore_delete",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolVision::test_vision_show",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolVision::test_vision_edit",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolPlan::test_plan_create",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolPlan::test_plan_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolPlan::test_plan_switch",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolPlan::test_plan_show_current",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolReference::test_reference_add",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolReference::test_reference_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolReference::test_reference_search",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolConfig::test_config_set_get",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolRuns::test_run_start",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolRuns::test_run_list",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolRuns::test_run_logs",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolWatch::test_watch_check",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolWatch::test_watch_check_with_act",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolWatch::test_watch_act_not_found",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolWatch::test_watch_stats",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolWatch::test_list_tools_includes_watch",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCallToolUnknown::test_unknown_tool",
+      "file": "tests/test_mcp_server.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateTasks::test_migrate_empty",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateTasks::test_migrate_open_tasks",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateTasks::test_migrate_closed_tasks",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateTasks::test_migrate_with_labels_and_priority",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateTasks::test_migrate_with_callback",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateTasks::test_migrate_with_error_callback",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateExplorations::test_migrate_explorations",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateExplorations::test_migrate_closed_exploration",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateReferences::test_migrate_references",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateNotes::test_migrate_notes",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateBackend::test_migrate_backend_invalid_type",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateBackend::test_migrate_backend_invalid_source",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateBackend::test_migrate_backend_invalid_target",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestMigrateBackend::test_migrate_backend_dry_run",
+      "file": "tests/test_migration.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSlugifyPackage::test_lowercase",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSlugifyPackage::test_replace_dash",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSlugifyPackage::test_replace_space",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSlugifyPackage::test_combined",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_base_project",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_with_vision",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_with_description",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_already_exists",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_unknown_template",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_idlergear_structure",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_claude_structure",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateProject::test_create_mcp_config",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePythonProject::test_create_python_project",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePythonProject::test_python_pyproject_content",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePythonProject::test_python_claude_rules",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePythonProject::test_python_with_venv",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateWithGit::test_create_with_git",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateWithGit::test_create_without_git",
+      "file": "tests/test_newproject.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetNotesDir::test_get_notes_dir",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetNotesDir::test_get_notes_dir_with_path",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateNote::test_create_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateNote::test_create_note_strips_whitespace",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateNote::test_create_multiple_notes",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateNote::test_create_note_with_tags",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateNote::test_create_note_with_multiple_tags",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreateNote::test_create_note_without_tags",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListNotes::test_list_empty",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListNotes::test_list_notes",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListNotes::test_list_notes_sorted",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListNotes::test_list_notes_by_tag",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListNotes::test_list_notes_by_tag_empty_result",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListNotes::test_list_notes_all_returns_all_tags",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetNote::test_get_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetNote::test_get_nonexistent_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDeleteNote::test_delete_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDeleteNote::test_delete_nonexistent_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadNoteFromFile::test_load_nonexistent_file",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadNoteFromFile::test_load_note_file",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPromoteNote::test_promote_note_to_task",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPromoteNote::test_promote_note_to_reference",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPromoteNote::test_promote_single_line_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPromoteNote::test_promote_nonexistent_note",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPromoteNote::test_promote_invalid_type",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestPromoteNote::test_promote_explore_not_valid",
+      "file": "tests/test_notes.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_console_exporter",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_file_exporter",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_severity_conversion",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_process_log_record",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_collector_process_logs",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_collector_start_stop",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_default_collector",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_grpc_integration",
+      "file": "tests/test_otel_collector.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_schema",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_insert_log",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_insert_batch",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_query_by_time_range",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_query_by_severity",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_query_by_service",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_full_text_search",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_query_by_trace_id",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_count",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_delete_old_logs",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_stats",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_pagination",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_task_note_linking",
+      "file": "tests/test_otel_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestCreatePlan::test_create_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePlan::test_create_plan_with_title",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePlan::test_create_plan_with_body",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCreatePlan::test_create_duplicate_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListPlans::test_list_empty",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListPlans::test_list_plans",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListPlans::test_list_sorted_by_name",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetPlan::test_get_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetPlan::test_get_plan_case_insensitive",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetPlan::test_get_nonexistent_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetCurrentPlan::test_no_current_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetCurrentPlan::test_get_current_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSwitchPlan::test_switch_plan",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSwitchPlan::test_switch_to_nonexistent",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdatePlan::test_update_title",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdatePlan::test_update_body",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdatePlan::test_update_state",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdatePlan::test_update_nonexistent",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadPlanFromFile::test_load_nonexistent_file",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadPlanFromFile::test_load_plan_file",
+      "file": "tests/test_plans.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_list_processes",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_list_processes_filtered",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_list_processes_sorted",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_process",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_process_not_found",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_system_info",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_start_run",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_start_run_with_task",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_list_runs",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_run_status",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_run_logs",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_run_logs_tail",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_stop_run",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_task_runs",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_quick_start",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_quick_start_not_found",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_kill_process",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_kill_process_force",
+      "file": "tests/test_pm.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_project",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_project_custom_columns",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_project_duplicate",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_list_projects",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_project",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_project_not_found",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_delete_project",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_add_task_to_project",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_add_task_to_specific_column",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_add_task_invalid_column",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_move_task",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_remove_task_from_project",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_task_only_in_one_column",
+      "file": "tests/test_projects.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestAddReference::test_add_reference",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddReference::test_add_reference_with_body",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAddReference::test_add_duplicate_title",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListReferences::test_list_empty",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListReferences::test_list_references",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListReferences::test_list_sorted_by_title",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetReference::test_get_by_title",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetReference::test_get_case_insensitive",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetReference::test_get_nonexistent",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetReference::test_get_by_slug",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetReferenceById::test_get_by_id",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetReferenceById::test_get_nonexistent_id",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateReference::test_update_title",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateReference::test_update_body",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateReference::test_update_updates_timestamp",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestUpdateReference::test_update_nonexistent",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchReferences::test_search_by_title",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchReferences::test_search_by_body",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchReferences::test_search_case_insensitive",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchReferences::test_search_no_results",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadReferenceFromFile::test_load_nonexistent_file",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadReferenceFromFile::test_load_reference_file",
+      "file": "tests/test_reference.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStartRun::test_start_run",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStartRun::test_start_run_with_name",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStartRun::test_start_run_generates_name",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStartRun::test_start_duplicate_running",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListRuns::test_list_empty",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestListRuns::test_list_runs",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunInfo::test_get_run_info",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunInfo::test_get_nonexistent_run",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunInfo::test_get_run_status_running",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunInfo::test_get_run_status_stopped",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunStatus::test_get_run_status",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunStatus::test_get_nonexistent_status",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunLogs::test_get_stdout_logs",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunLogs::test_get_stderr_logs",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunLogs::test_get_logs_with_tail",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetRunLogs::test_get_nonexistent_logs",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStopRun::test_stop_running_process",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStopRun::test_stop_nonexistent_run",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestStopRun::test_stop_already_stopped",
+      "file": "tests/test_runs.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_empty",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_tasks_by_title",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_tasks_by_body",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_notes",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_explorations",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_references",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_plans",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_across_types",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_case_insensitive",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_filter_by_type",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_multiple_types_filter",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_results_include_metadata",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_no_results",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSearchAll::test_search_preview_context",
+      "file": "tests/test_search.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_simple_version",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_version_with_v_prefix",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_version_with_suffix",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_short_version",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_invalid_version",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCompareVersions::test_newer_version",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCompareVersions::test_older_version",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCompareVersions::test_same_version",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCompareVersions::test_major_version_bump",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCompareVersions::test_minor_version_bump",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetLatestVersion::test_get_latest_version_success",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetLatestVersion::test_get_latest_version_network_error",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetLatestVersion::test_get_latest_version_rate_limited",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectInstallMethod::test_detect_returns_install_info",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectInstallMethod::test_detect_editable_install",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectInstallMethod::test_install_info_has_required_fields",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoSelfUpdate::test_dry_run_returns_info",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoSelfUpdate::test_cannot_upgrade_returns_error",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoSelfUpdate::test_already_latest_succeeds",
+      "file": "tests/test_selfupdate.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_session_save_and_load",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_session_load_nonexistent",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_session_clear",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_session_summary_no_state",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_session_summary_with_state",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_session_summary_truncates_long_file_list",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_start_session_without_state",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_start_session_with_state",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_end_session",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_session_state_file_location",
+      "file": "tests/test_session.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestRunCommand::test_simple_command",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_parameter_substitution",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_multiple_parameters",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_list_parameter",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_bool_parameter_true",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_bool_parameter_false",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_none_parameter",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_unmatched_variable_left_alone",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_command_failure_raises_error",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunCommand::test_command_timeout",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseJsonOutput::test_empty_output_returns_none",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseJsonOutput::test_valid_json_object",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseJsonOutput::test_valid_json_array",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseJsonOutput::test_invalid_json_raises_error",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseJsonOutput::test_field_map_applied",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestApplyFieldMap::test_simple_dict",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestApplyFieldMap::test_list_of_dicts",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestApplyFieldMap::test_non_dict_returned_as_is",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestApplyFieldMap::test_unmapped_keys_preserved",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_create_task",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_list_tasks",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_list_with_field_map",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_get_task",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_get_task_not_found",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_close_task",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_close_falls_back_to_update",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_reopen_task",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellTaskBackend::test_missing_command_raises_error",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellExploreBackend::test_create_exploration",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellExploreBackend::test_list_explorations",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellReferenceBackend::test_add_reference",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellReferenceBackend::test_add_falls_back_to_create",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellReferenceBackend::test_search_with_command",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellReferenceBackend::test_search_fallback_to_list",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellReferenceBackend::test_get_by_id_with_command",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestShellReferenceBackend::test_get_by_id_fallback_to_list",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadShellBackendConfig::test_load_from_project",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadShellBackendConfig::test_load_from_user_config",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadShellBackendConfig::test_returns_none_if_not_found",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestLoadShellBackendConfig::test_returns_none_if_type_not_in_config",
+      "file": "tests/test_shell_backend.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "test_parse_frontmatter",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_parse_frontmatter_no_frontmatter",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_render_frontmatter",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_render_frontmatter_empty",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_slugify",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_slugify_max_length",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_next_id",
+      "file": "tests/test_storage.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_task",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_list_tasks",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_list_tasks_by_state",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_task",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_get_nonexistent_task",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_close_task",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_update_task",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_task_with_priority",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_task_with_due",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_create_task_with_priority_and_due",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_update_task_priority",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_update_task_due",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "test_task_priority_levels",
+      "file": "tests/test_tasks.py",
+      "line": 0,
+      "kind": "function"
+    },
+    {
+      "name": "TestTestFramework::test_framework_values",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTestResult::test_to_dict",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTestResult::test_from_dict",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTestResult::test_from_dict_defaults",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTestConfig::test_to_dict",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestTestConfig::test_from_dict",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_pytest_from_pyproject",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_pytest_from_conftest",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_pytest_from_tests_dir",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_cargo",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_dotnet",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_jest",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_vitest",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_go",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_rspec",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDetectFramework::test_detect_unknown",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestResultPersistence::test_save_and_get_result",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestResultPersistence::test_get_history",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_pytest_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_pytest_mixed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_cargo_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_cargo_failed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_dotnet_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_jest_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_go_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_go_failed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_generic_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestOutputParsing::test_parse_generic_infer_from_exit_code",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatStatus::test_format_passed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatStatus::test_format_failed",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatStatus::test_format_verbose_shows_failed_tests",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFormatStatus::test_format_none",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunTests::test_run_tests_success",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunTests::test_run_tests_with_extra_args",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestRunTests::test_run_tests_no_framework",
+      "file": "tests/test_testing.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_parse_simple_version",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_parse_version_with_v_prefix",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_parse_short_version",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_parse_version_with_suffix",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestParseVersion::test_parse_invalid_version",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVersionComparison::test_newer_version_detected",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVersionComparison::test_same_version_no_upgrade",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVersionComparison::test_older_installed_no_upgrade",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestVersionComparison::test_no_version_stored_needs_upgrade",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProjectVersion::test_set_and_get_version",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestProjectVersion::test_get_version_not_set",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetUpgradeInfo::test_upgrade_info_when_needed",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetUpgradeInfo::test_upgrade_info_when_current",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoUpgrade::test_upgrade_updates_version",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestDoUpgrade::test_upgrade_returns_file_results",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckAndPromptUpgrade::test_no_upgrade_when_current",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckAndPromptUpgrade::test_upgrade_when_outdated",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestCheckAndPromptUpgrade::test_returns_false_outside_project",
+      "file": "tests/test_upgrade.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetVisionPath::test_get_vision_path",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetVisionPath::test_get_vision_path_with_project_path",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetVision::test_get_vision",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetVision::test_get_vision_nonexistent",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSetVision::test_set_vision",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSetVision::test_set_vision_overwrites",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSetVision::test_set_vision_preserves_formatting",
+      "file": "tests/test_vision.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestSuggestion::test_to_dict",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestWatchStatus::test_to_dict",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestWatchConfig::test_default_values",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestWatchConfig::test_load_defaults",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestWatchEvent::test_to_dict",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_init",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_add_callback",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_should_ignore",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_notify_callbacks",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_has_changes_first_status",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_has_changes_same_status",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestFileWatcher::test_has_changes_different_files",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAnalyze::test_analyze_no_project",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAnalyze::test_analyze_with_changes",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestGetWatchStats::test_get_watch_stats",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActionResult::test_to_dict",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActionResult::test_to_dict_no_id",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_commit_suggestion",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_reference_suggestion",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_test_suggestion",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_docs_suggestion",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_unknown_category",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_todo_suggestion",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_todo_creates_tech_debt_label",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnSuggestion::test_act_on_todo_no_text",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnAllSuggestions::test_act_on_all_filters_by_category",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestActOnAllSuggestions::test_act_on_all_custom_categories",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAnalyzeAndAct::test_analyze_and_act_no_todos",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAnalyzeAndAct::test_analyze_and_act_with_todos",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    },
+    {
+      "name": "TestAnalyzeAndAct::test_analyze_and_act_disabled",
+      "file": "tests/test_watch.py",
+      "line": 0,
+      "kind": "method"
+    }
+  ],
+  "total_files": 38,
+  "total_tests": 826
+}

@@ -1,0 +1,25 @@
+{
+  "session_id": "s001",
+  "branch": "main",
+  "parent": null,
+  "children": [],
+  "forks": [],
+  "forked_from": null,
+  "timestamp": "2026-01-18T00:42:49.273851",
+  "duration_seconds": 0,
+  "state": {
+    "current_task_id": 51,
+    "working_files": [],
+    "notes": "Implemented session management with 4 new MCP tools and CLI commands",
+    "metadata": {}
+  },
+  "conversation": {},
+  "code_changes": {},
+  "statistics": {},
+  "outcome": {
+    "status": "migrated",
+    "goals_achieved": [
+      "Migrated from old session state"
+    ]
+  }
+}

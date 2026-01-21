@@ -1,0 +1,244 @@
+{
+  "framework": "pytest",
+  "timestamp": "2026-01-11T06:07:41.964075Z",
+  "mappings": {
+    "src/idlergear/backends/github.py": [
+      "tests/test_github_backend.py"
+    ],
+    "src/idlergear/backends/shell.py": [
+      "tests/test_shell_backend.py"
+    ],
+    "src/idlergear/cli.py": [
+      "tests/test_cli.py"
+    ],
+    "src/idlergear/config.py": [
+      "tests/test_config.py"
+    ],
+    "src/idlergear/context.py": [
+      "tests/test_context.py"
+    ],
+    "src/idlergear/daemon/server.py": [
+      "tests/test_mcp_server.py"
+    ],
+    "src/idlergear/doctor.py": [
+      "tests/test_doctor.py"
+    ],
+    "src/idlergear/explorations.py": [
+      "tests/test_explorations.py"
+    ],
+    "src/idlergear/fs.py": [
+      "tests/test_fs.py"
+    ],
+    "src/idlergear/git.py": [
+      "tests/test_github_backend.py",
+      "tests/test_git.py"
+    ],
+    "src/idlergear/hooks.py": [
+      "tests/test_hooks.py"
+    ],
+    "src/idlergear/init.py": [
+      "tests/test_init.py"
+    ],
+    "src/idlergear/install.py": [
+      "tests/test_install.py"
+    ],
+    "src/idlergear/mcp_server.py": [
+      "tests/test_mcp_server.py"
+    ],
+    "src/idlergear/migration.py": [
+      "tests/test_migration.py"
+    ],
+    "src/idlergear/newproject.py": [
+      "tests/test_newproject.py"
+    ],
+    "src/idlergear/notes.py": [
+      "tests/test_notes.py"
+    ],
+    "src/idlergear/otel.py": [
+      "tests/test_otel_storage.py",
+      "tests/test_otel_collector.py"
+    ],
+    "src/idlergear/otel_collector.py": [
+      "tests/test_otel_collector.py"
+    ],
+    "src/idlergear/otel_storage.py": [
+      "tests/test_otel_storage.py"
+    ],
+    "src/idlergear/plans.py": [
+      "tests/test_plans.py"
+    ],
+    "src/idlergear/pm.py": [
+      "tests/test_pm.py"
+    ],
+    "src/idlergear/projects.py": [
+      "tests/test_projects.py"
+    ],
+    "src/idlergear/reference.py": [
+      "tests/test_reference.py"
+    ],
+    "src/idlergear/runs.py": [
+      "tests/test_runs.py"
+    ],
+    "src/idlergear/search.py": [
+      "tests/test_search.py"
+    ],
+    "src/idlergear/selfupdate.py": [
+      "tests/test_selfupdate.py"
+    ],
+    "src/idlergear/session.py": [
+      "tests/test_session.py"
+    ],
+    "src/idlergear/storage.py": [
+      "tests/test_otel_storage.py",
+      "tests/test_storage.py"
+    ],
+    "src/idlergear/tasks.py": [
+      "tests/test_tasks.py"
+    ],
+    "src/idlergear/upgrade.py": [
+      "tests/test_upgrade.py"
+    ],
+    "src/idlergear/vision.py": [
+      "tests/test_vision.py"
+    ],
+    "src/idlergear/watch.py": [
+      "tests/test_watch.py"
+    ]
+  },
+  "reverse_mappings": {
+    "tests/test_github_backend.py": [
+      "src/idlergear/backends/github.py",
+      "src/idlergear/git.py"
+    ],
+    "tests/test_shell_backend.py": [
+      "src/idlergear/backends/shell.py"
+    ],
+    "tests/test_cli.py": [
+      "src/idlergear/cli.py"
+    ],
+    "tests/test_config.py": [
+      "src/idlergear/config.py"
+    ],
+    "tests/test_context.py": [
+      "src/idlergear/context.py"
+    ],
+    "tests/test_mcp_server.py": [
+      "src/idlergear/daemon/server.py",
+      "src/idlergear/mcp_server.py"
+    ],
+    "tests/test_doctor.py": [
+      "src/idlergear/doctor.py"
+    ],
+    "tests/test_explorations.py": [
+      "src/idlergear/explorations.py"
+    ],
+    "tests/test_fs.py": [
+      "src/idlergear/fs.py"
+    ],
+    "tests/test_git.py": [
+      "src/idlergear/git.py"
+    ],
+    "tests/test_hooks.py": [
+      "src/idlergear/hooks.py"
+    ],
+    "tests/test_init.py": [
+      "src/idlergear/init.py"
+    ],
+    "tests/test_install.py": [
+      "src/idlergear/install.py"
+    ],
+    "tests/test_migration.py": [
+      "src/idlergear/migration.py"
+    ],
+    "tests/test_newproject.py": [
+      "src/idlergear/newproject.py"
+    ],
+    "tests/test_notes.py": [
+      "src/idlergear/notes.py"
+    ],
+    "tests/test_otel_storage.py": [
+      "src/idlergear/otel.py",
+      "src/idlergear/otel_storage.py",
+      "src/idlergear/storage.py"
+    ],
+    "tests/test_otel_collector.py": [
+      "src/idlergear/otel.py",
+      "src/idlergear/otel_collector.py"
+    ],
+    "tests/test_plans.py": [
+      "src/idlergear/plans.py"
+    ],
+    "tests/test_pm.py": [
+      "src/idlergear/pm.py"
+    ],
+    "tests/test_projects.py": [
+      "src/idlergear/projects.py"
+    ],
+    "tests/test_reference.py": [
+      "src/idlergear/reference.py"
+    ],
+    "tests/test_runs.py": [
+      "src/idlergear/runs.py"
+    ],
+    "tests/test_search.py": [
+      "src/idlergear/search.py"
+    ],
+    "tests/test_selfupdate.py": [
+      "src/idlergear/selfupdate.py"
+    ],
+    "tests/test_session.py": [
+      "src/idlergear/session.py"
+    ],
+    "tests/test_storage.py": [
+      "src/idlergear/storage.py"
+    ],
+    "tests/test_tasks.py": [
+      "src/idlergear/tasks.py"
+    ],
+    "tests/test_upgrade.py": [
+      "src/idlergear/upgrade.py"
+    ],
+    "tests/test_vision.py": [
+      "src/idlergear/vision.py"
+    ],
+    "tests/test_watch.py": [
+      "src/idlergear/watch.py"
+    ]
+  },
+  "uncovered": [
+    "src/idlergear/__init__.py",
+    "src/idlergear/backends/__init__.py",
+    "src/idlergear/backends/local.py",
+    "src/idlergear/backends/protocols.py",
+    "src/idlergear/backends/registry.py",
+    "src/idlergear/daemon/__init__.py",
+    "src/idlergear/daemon/__main__.py",
+    "src/idlergear/daemon/agents.py",
+    "src/idlergear/daemon/client.py",
+    "src/idlergear/daemon/handlers.py",
+    "src/idlergear/daemon/lifecycle.py",
+    "src/idlergear/daemon/locks.py",
+    "src/idlergear/daemon/mcp_handlers.py",
+    "src/idlergear/daemon/protocol.py",
+    "src/idlergear/daemon/queue.py",
+    "src/idlergear/daemon_mcp_handlers.py",
+    "src/idlergear/daemon_mcp_tools.py",
+    "src/idlergear/display.py",
+    "src/idlergear/env.py",
+    "src/idlergear/formatters.py",
+    "src/idlergear/github_detect.py",
+    "src/idlergear/goose.py",
+    "src/idlergear/messaging.py",
+    "src/idlergear/schema.py",
+    "src/idlergear/script_generator.py",
+    "src/idlergear/script_mcp_handlers.py",
+    "src/idlergear/script_mcp_tools.py",
+    "src/idlergear/sessions.py",
+    "src/idlergear/status.py",
+    "src/idlergear/templates/__init__.py",
+    "src/idlergear/templates/base.py",
+    "src/idlergear/templates/python.py",
+    "src/idlergear/uninstall.py",
+    "src/idlergear/wiki.py"
+  ]
+}

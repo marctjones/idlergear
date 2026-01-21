@@ -1,0 +1,13 @@
+{
+  "framework": "pytest",
+  "timestamp": "2026-01-11T05:47:25.802655Z",
+  "duration_seconds": 0.84,
+  "total": 0,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "errors": 0,
+  "failed_tests": [],
+  "command": "python -m pytest tests/test_testing.py -q",
+  "exit_code": 0
+}

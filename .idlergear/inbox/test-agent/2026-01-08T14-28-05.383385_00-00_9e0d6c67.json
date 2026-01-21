@@ -1,0 +1,17 @@
+{
+  "id": "9e0d6c67",
+  "from": "doc-bot",
+  "to": "test-agent",
+  "message": "FYI: Updated docs",
+  "timestamp": "2026-01-08T14:28:05.383385+00:00",
+  "priority": "low",
+  "type": "info",
+  "action_requested": false,
+  "context": {},
+  "read": true,
+  "processed": true,
+  "task_id": null,
+  "metadata": {},
+  "processed_at": "2026-01-08T14:28:05.384336+00:00",
+  "read_at": "2026-01-08T14:28:05.384336+00:00"
+}

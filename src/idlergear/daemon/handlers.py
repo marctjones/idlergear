@@ -280,6 +280,60 @@ def register_handlers(server: DaemonServer) -> None:
 
         return search_all(params["query"], types=params.get("types"))
 
+    # File Registry handlers
+    async def file_register(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        from idlergear.file_registry import FileRegistry, FileStatus
+
+        registry = FileRegistry()
+        registry.register_file(
+            path=params["path"],
+            status=FileStatus(params["status"]),
+            reason=params.get("reason"),
+            metadata=params.get("metadata"),
+        )
+
+        # Broadcast to all agents
+        await server.broadcast(
+            "file.registered",
+            {
+                "path": params["path"],
+                "status": params["status"],
+                "reason": params.get("reason"),
+            },
+        )
+
+        return {"success": True, "path": params["path"], "status": params["status"]}
+
+    async def file_deprecate(
+        params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        from idlergear.file_registry import FileRegistry
+
+        registry = FileRegistry()
+        registry.deprecate_file(
+            path=params["path"],
+            successor=params.get("successor"),
+            reason=params.get("reason"),
+        )
+
+        # Broadcast to all agents
+        await server.broadcast(
+            "file.deprecated",
+            {
+                "path": params["path"],
+                "successor": params.get("successor"),
+                "reason": params.get("reason"),
+            },
+        )
+
+        return {
+            "success": True,
+            "path": params["path"],
+            "successor": params.get("successor"),
+        }
+
     # Register all handlers
     server.register_method("task.create", task_create)
     server.register_method("task.list", task_list)
@@ -323,3 +377,6 @@ def register_handlers(server: DaemonServer) -> None:
     server.register_method("run.stop", run_stop)
 
     server.register_method("search", search)
+
+    server.register_method("file.register", file_register)
+    server.register_method("file.deprecate", file_deprecate)

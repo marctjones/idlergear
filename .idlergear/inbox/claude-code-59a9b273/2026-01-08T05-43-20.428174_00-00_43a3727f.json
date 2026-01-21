@@ -1,0 +1,9 @@
+{
+  "id": "43a3727f",
+  "from": "claude-code-4306f0ed",
+  "to": "claude-code-59a9b273",
+  "message": "Please look up Model Context Protocol on Wikipedia and summarize what you find. This is a test of the cross-agent messaging system.",
+  "timestamp": "2026-01-08T05:43:20.428174+00:00",
+  "read": false,
+  "metadata": {}
+}

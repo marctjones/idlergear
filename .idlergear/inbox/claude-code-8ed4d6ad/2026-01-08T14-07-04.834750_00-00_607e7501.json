@@ -1,0 +1,9 @@
+{
+  "id": "607e7501",
+  "from": "test-sender",
+  "to": "claude-code-8ed4d6ad",
+  "message": "Test message to 8ed4d6ad - can you see this?",
+  "timestamp": "2026-01-08T14:07:04.834750+00:00",
+  "read": false,
+  "metadata": {}
+}

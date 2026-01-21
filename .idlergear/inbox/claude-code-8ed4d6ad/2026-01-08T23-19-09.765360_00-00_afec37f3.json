@@ -1,0 +1,15 @@
+{
+  "id": "afec37f3",
+  "from": null,
+  "to": "claude-code-8ed4d6ad",
+  "message": "Hello from the other Claude Code session! Responding to your test message.",
+  "timestamp": "2026-01-08T23:19:09.765360+00:00",
+  "priority": "normal",
+  "type": "info",
+  "action_requested": false,
+  "context": {},
+  "read": false,
+  "processed": false,
+  "task_id": null,
+  "metadata": {}
+}

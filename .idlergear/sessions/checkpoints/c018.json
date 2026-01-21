@@ -1,0 +1,33 @@
+{
+  "checkpoint_id": "c018",
+  "timestamp": "2026-01-19T19:53:04.451965",
+  "state": {
+    "current_task_id": null,
+    "working_files": [
+      ".claude/skills/idlergear/references/mcp-tools.md",
+      "README.md",
+      "pyproject.toml",
+      "src/idlergear/cli.py",
+      "src/idlergear/git.py",
+      "src/idlergear/graph/populators/code_populator.py",
+      "src/idlergear/graph/schema.py",
+      "src/idlergear/mcp_server.py",
+      "src/idlergear/watch.py",
+      ".claude/hooks/",
+      ".idlergear/",
+      "ROADMAP.md",
+      "docs/guides/data-file-version-detection.md",
+      "docs/guides/file-registry.md",
+      "src/idlergear/data_file_detector.py",
+      "src/idlergear/file_registry.py",
+      "src/idlergear/git_version_detector.py",
+      "tests/benchmark_file_registry.py",
+      "tests/test_data_file_detector.py",
+      "tests/test_file_registry.py",
+      "tests/test_git_version_detector.py",
+      "tests/test_import_extraction.py",
+      "tests/test_watch_integration.py"
+    ],
+    "notes": null
+  }
+}

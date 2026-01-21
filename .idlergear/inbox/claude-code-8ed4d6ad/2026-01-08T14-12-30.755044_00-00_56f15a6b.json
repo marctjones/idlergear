@@ -1,0 +1,13 @@
+{
+  "id": "56f15a6b",
+  "from": "claude-code-8ed4d6ad",
+  "to": "claude-code-8ed4d6ad",
+  "message": "[TEST] Self-test message sent at 2026-01-08 14:12:30 UTC",
+  "timestamp": "2026-01-08T14:12:30.755044+00:00",
+  "read": true,
+  "metadata": {
+    "test": true,
+    "purpose": "messaging_self_test"
+  },
+  "read_at": "2026-01-08T14:12:30.756617+00:00"
+}

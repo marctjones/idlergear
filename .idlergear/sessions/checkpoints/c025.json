@@ -1,0 +1,13 @@
+{
+  "checkpoint_id": "c025",
+  "timestamp": "2026-01-20T00:28:58.900895",
+  "state": {
+    "current_task_id": null,
+    "working_files": [
+      "src/idlergear/cli.py",
+      ".claude/hooks/",
+      ".idlergear/"
+    ],
+    "notes": null
+  }
+}

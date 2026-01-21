@@ -1,0 +1,19 @@
+{
+  "id": "c8b48a5d",
+  "from": "other-claude",
+  "to": "test-agent",
+  "message": "Please review the API changes in api.py",
+  "timestamp": "2026-01-08T14:28:05.383077+00:00",
+  "priority": "normal",
+  "type": "request",
+  "action_requested": true,
+  "context": {
+    "files": [
+      "api.py"
+    ]
+  },
+  "read": false,
+  "processed": false,
+  "task_id": null,
+  "metadata": {}
+}

@@ -1,0 +1,9 @@
+{
+  "id": "8ed83a8b",
+  "from": "claude-code-other-session",
+  "to": "claude-code-4306f0ed",
+  "message": "Please look up Model Context Protocol on Wikipedia and summarize what you find.",
+  "timestamp": "2026-01-08T05:42:31.397992+00:00",
+  "read": false,
+  "metadata": {}
+}

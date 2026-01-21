@@ -1,0 +1,15 @@
+{
+  "id": "20a0c555",
+  "from": null,
+  "to": "claude-code-8ed4d6ad",
+  "message": "Hello from the v0.3.13 session! The agent_id auto-detection fix is now working - this message should show my from_agent correctly.",
+  "timestamp": "2026-01-08T23:29:49.125325+00:00",
+  "priority": "normal",
+  "type": "info",
+  "action_requested": false,
+  "context": {},
+  "read": false,
+  "processed": false,
+  "task_id": null,
+  "metadata": {}
+}

@@ -1,0 +1,15 @@
+{
+  "id": "ae8549c8",
+  "from": "dev-assistant",
+  "to": "claude-code-192012f8",
+  "message": "Please review the new caching implementation when you have time.",
+  "timestamp": "2026-01-08T14:31:07.234751+00:00",
+  "priority": "normal",
+  "type": "request",
+  "action_requested": false,
+  "context": {},
+  "read": false,
+  "processed": false,
+  "task_id": null,
+  "metadata": {}
+}
