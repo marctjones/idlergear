@@ -26,7 +26,7 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.5.4)
+## Features (v0.5.11)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -37,14 +37,35 @@ IdlerGear works identically across all major AI coding assistants:
 - **Session State** - Perfect continuity across AI sessions
 - **Runs** - Background process tracking with logs
 - **Secrets** - Secure encrypted local storage for sensitive data (CLI-only, no MCP tools for security)
-- **Projects** - Kanban boards with GitHub Projects v2 sync (NEW in v0.5.0!)
-- **Data File Versioning** - Detect when code references old data files (CSV, JSON, etc.) ⭐ NEW!
-- **File Registry** - Track file status (current/deprecated/archived/problematic) + **File Annotations** for token-efficient discovery (93% token savings!) ⭐ NEW!
+- **Projects** - Kanban boards with GitHub Projects v2 sync
+- **Data File Versioning** - Detect when code references old data files (CSV, JSON, etc.)
+- **File Registry** - Track file status (current/deprecated/archived/problematic) + **File Annotations** for token-efficient discovery (93% token savings!)
+
+### Plugin System (v0.8.0) ⭐ NEW!
+IdlerGear acts as the **"data layer"** while integrating with best-in-class intelligence tools:
+
+- **LlamaIndex Plugin** - Semantic search over references/notes (40% faster retrieval)
+  - Local embeddings by default (zero-config)
+  - Optional OpenAI embeddings for better quality
+  - Persistent vector storage
+- **Langfuse Plugin** - Observability export for token tracking and cost monitoring
+  - OpenTelemetry log export
+  - Automatic token tracking
+  - LLM request/response inspection
+- **Mem0 Plugin** (Coming Soon) - Experiential memory with pattern learning
+
+**Configuration**: Enable plugins in `.idlergear/config.toml`
+```toml
+[plugins.llamaindex]
+enabled = true
+embedding_model = "local"  # or "openai"
+```
 
 ### Python-Native MCP Servers (Zero Node.js!)
-- **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries) ⭐ NEW!
-- **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks) ⭐ NEW!
-- **File Registry** - 8 tools (file status, annotations, token-efficient search) ⭐ NEW!
+- **Plugin System** - 6 tools (list, status, enable, search, index) ⭐ NEW v0.8.0!
+- **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries)
+- **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks)
+- **File Registry** - 8 tools (file status, annotations, token-efficient search)
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
 - **Git + Task Integration** - 18 tools (commit-task linking, status, diff, branches)
 - **Process Management** - 11 tools (list, monitor, IdlerGear runs integration)
@@ -54,22 +75,23 @@ IdlerGear works identically across all major AI coding assistants:
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
 - **Health Check** - Doctor command for configuration validation
 
-**Total: 140 MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 146 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **140 tools** via Model Context Protocol (universal)
-- **Knowledge Graph** - 95-98% token savings for context retrieval ⭐ NEW!
-- **File Registry + Annotations** - Track file status + annotate files for 93% token-efficient discovery ⭐ NEW!
+- **MCP Server** - **146 tools** via Model Context Protocol (universal)
+- **Plugin System** - Integrate with Langfuse, LlamaIndex, Mem0 ⭐ NEW v0.8.0!
+- **Knowledge Graph** - 95-98% token savings for context retrieval
+- **File Registry + Annotations** - Track file status + annotate files for 93% token-efficient discovery
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
 - **Goose Integration** - CLI + GUI support with `.goosehints`
 - **Token Efficiency** - Up to 98% context reduction (15K → 200 tokens!)
 - **Session Persistence** - Perfect state restoration across sessions
 - **Auto Error Capture** - OpenTelemetry errors → tasks/notes automatically
-- **Auto-Add Projects** - Tasks automatically assigned to boards ⭐ NEW!
+- **Auto-Add Projects** - Tasks automatically assigned to boards
 
 ### 🔍 Live Session Monitoring
 
@@ -95,10 +117,10 @@ IdlerGear ships **quarterly releases** with major features. Each milestone deliv
 
 | Milestone | Theme | Target | Key Features |
 |-----------|-------|--------|--------------|
-| **v0.5.4** ✅ | Planning & Foundation | CURRENT | Priorities, GraphQL API, planning, docs, knowledge graph |
-| **v0.6.0** 🎯 | File Registry & Quality | March 2026 | File deprecation detection, MCP interception, daemon integration |
+| **v0.5.11** ✅ | Plugin System Foundation | CURRENT | LlamaIndex, Langfuse plugins, semantic search, observability |
+| **v0.6.0** 🎯 | File Registry Complete | March 2026 | MCP interception, daemon integration, data file detection |
 | **v0.7.0** 📊 | GitHub Integration | June 2026 | GitHub Projects v2 sync, custom fields, bidirectional updates |
-| **v0.8.0** 🌿 | Session Management | September 2026 | Session branching, harvesting, analytics, multi-client monitoring |
+| **v0.8.0** 🚀 | Integration Layer | September 2026 | Mem0 plugin, plugin docs, advanced integrations |
 | **v0.9.0** 🤖 | Multi-Assistant | December 2026 | Gemini integration, SKILLS.md support, cross-assistant coordination |
 | **v0.10.0** 💎 | Polish & Maturity | March 2027 | Pre-release maturity, 80%+ coverage, production validation |
 
@@ -159,6 +181,10 @@ idlergear session-end        # End with smart suggestions
 
 # Start collecting logs
 idlergear otel start         # ERROR logs → notes, FATAL → tasks automatically!
+
+# Enable plugins (NEW v0.8.0!)
+idlergear plugin enable llamaindex  # Enable semantic search
+idlergear plugin search "authentication"  # Search with 40% faster retrieval!
 ```
 
 ## Commands
@@ -239,12 +265,22 @@ idlergear goose register          # Show Goose GUI registration instructions
 idlergear agents init             # Generate AGENTS.md
 idlergear agents check            # Validate AGENTS.md
 
-# MCP Configuration (NEW!)
+# MCP Configuration
 idlergear mcp generate            # Generate .mcp.json
 idlergear mcp show                # Show current MCP config
 idlergear mcp add NAME CMD        # Add an MCP server
 idlergear mcp remove NAME         # Remove an MCP server
 idlergear mcp test                # Test MCP server connectivity
+
+# Plugin System (NEW v0.8.0!)
+idlergear plugin list             # List available/loaded plugins
+idlergear plugin list --loaded    # Only show loaded plugins
+idlergear plugin status           # Show all plugin statuses
+idlergear plugin status NAME      # Check specific plugin
+idlergear plugin enable NAME      # Enable plugin in config.toml
+idlergear plugin disable NAME     # Disable plugin
+idlergear plugin search QUERY     # Semantic search with LlamaIndex
+idlergear plugin search QUERY --top-k 10 --type reference
 
 # OpenTelemetry Logging
 idlergear otel start              # Start OTel collector daemon
@@ -270,13 +306,13 @@ idlergear config set KEY VAL      # Configure settings
 idlergear config get KEY          # Get config value
 ```
 
-### MCP Tools (136 total - use via AI assistants)
+### MCP Tools (146 total - use via AI assistants)
 
 See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
 
 ## MCP Tools Reference
 
-IdlerGear provides **136 MCP tools** across 17 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+IdlerGear provides **146 MCP tools** across 18 categories. All tools are **100% Python** with **zero Node.js dependencies**.
 
 ### Session Management (4 tools) ⚡ **Start here!**
 
