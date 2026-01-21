@@ -355,13 +355,156 @@ class TestMultipleFilesAndOperations:
             assert "deprecated" in result[0].text.lower()
 
 
-@pytest.mark.skip(reason="Requires #291 - Daemon integration")
 class TestMultiAgentCoordination:
     """Test Scenario 2: Multi-agent coordination via daemon.
 
-    TODO: Implement when #291 (daemon integration) is complete.
+    Tests:
+    - Agent 1 deprecates file via daemon
+    - Daemon broadcasts to all agents
+    - Agent 2 receives notification and blocks access
     """
-    pass
+
+    @pytest.mark.asyncio
+    async def test_agent_deprecates_file_broadcasts_to_other_agents(
+        self, temp_project, mock_fs_server
+    ):
+        """Test that file deprecation by one agent is broadcast to others."""
+        from idlergear.daemon.client import get_daemon_client
+        from idlergear.daemon.server import DaemonServer
+        from idlergear.file_registry import FileRegistry
+        from idlergear.mcp_server import call_tool
+
+        # Create test files
+        old_file = temp_project / "config_v1.json"
+        old_file.write_text('{"version": 1}')
+        new_file = temp_project / "config_v2.json"
+        new_file.write_text('{"version": 2}')
+
+        # Start daemon server
+        socket_path = temp_project / "daemon.sock"
+        pid_path = temp_project / "daemon.pid"
+        storage_path = temp_project / ".idlergear"
+        server = DaemonServer(socket_path, pid_path, storage_path)
+
+        # Register handlers
+        from idlergear.daemon.handlers import register_handlers
+
+        register_handlers(server)
+
+        # Start server in background
+        import asyncio
+
+        await server.start()
+        server_task = asyncio.create_task(server.serve_forever())
+
+        try:
+            # Wait for server to be ready
+            await asyncio.sleep(0.2)
+
+            # Agent 1: Connect and deprecate file via daemon
+            async with get_daemon_client(temp_project) as client:
+                result = await client.call(
+                    "file.deprecate",
+                    {
+                        "path": str(old_file),
+                        "successor": str(new_file),
+                        "reason": "Updated to v2",
+                    },
+                )
+
+                assert result["success"] is True
+                assert result["path"] == str(old_file)
+
+            # Give time for broadcast to propagate
+            await asyncio.sleep(0.1)
+
+            # Agent 2 (MCP server): Try to read deprecated file
+            with patch(
+                "idlergear.mcp_server.find_idlergear_root", return_value=temp_project
+            ), patch("idlergear.mcp_server._get_fs_server", return_value=mock_fs_server):
+                result = await call_tool(
+                    "idlergear_fs_read_file", {"path": str(old_file)}
+                )
+
+                # Should be blocked
+                assert len(result) == 1
+                assert result[0].type == "text"
+                assert "deprecated" in result[0].text.lower()
+                assert str(new_file) in result[0].text
+
+        finally:
+            # Stop daemon server
+            await server._shutdown()
+            server_task.cancel()
+            try:
+                await server_task
+            except asyncio.CancelledError:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_multiple_agents_can_subscribe_and_deprecate(self, temp_project):
+        """Test that multiple agents can connect, subscribe, and use registry operations."""
+        from idlergear.daemon.client import get_daemon_client
+        from idlergear.daemon.server import DaemonServer
+
+        # Start daemon server
+        socket_path = temp_project / "daemon.sock"
+        pid_path = temp_project / "daemon.pid"
+        storage_path = temp_project / ".idlergear"
+        server = DaemonServer(socket_path, pid_path, storage_path)
+
+        # Register handlers
+        from idlergear.daemon.handlers import register_handlers
+
+        register_handlers(server)
+
+        # Start server
+        import asyncio
+
+        await server.start()
+        server_task = asyncio.create_task(server.serve_forever())
+
+        try:
+            # Wait for server to be ready
+            await asyncio.sleep(0.2)
+
+            # Agent 1: Connect, subscribe, and deprecate a file
+            async with get_daemon_client(temp_project) as agent1:
+                await agent1.subscribe("file.*")
+
+                result = await agent1.call(
+                    "file.deprecate",
+                    {
+                        "path": "version1.py",
+                        "successor": "version2.py",
+                        "reason": "Upgraded",
+                    },
+                )
+
+                assert result["success"] is True
+                assert result["path"] == "version1.py"
+
+            # Agent 2: Connect and verify the file was deprecated
+            async with get_daemon_client(temp_project) as agent2:
+                # Check that the registry shows the file as deprecated
+                from idlergear.file_registry import FileRegistry, FileStatus
+
+                registry_path = storage_path / "file_registry.json"
+                registry = FileRegistry(registry_path=registry_path)
+
+                status = registry.get_status("version1.py")
+                assert status == FileStatus.DEPRECATED
+
+                successor = registry.get_current_version("version1.py")
+                assert successor == "version2.py"
+
+        finally:
+            await server._shutdown()
+            server_task.cancel()
+            try:
+                await server_task
+            except asyncio.CancelledError:
+                pass
 
 
 @pytest.mark.skip(reason="Requires #292 and #293 - Auto-detection and audit")

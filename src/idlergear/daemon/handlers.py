@@ -286,7 +286,8 @@ def register_handlers(server: DaemonServer) -> None:
     ) -> dict[str, Any]:
         from idlergear.file_registry import FileRegistry, FileStatus
 
-        registry = FileRegistry()
+        registry_path = server.storage_path / "file_registry.json"
+        registry = FileRegistry(registry_path=registry_path)
         registry.register_file(
             path=params["path"],
             status=FileStatus(params["status"]),
@@ -311,7 +312,8 @@ def register_handlers(server: DaemonServer) -> None:
     ) -> dict[str, Any]:
         from idlergear.file_registry import FileRegistry
 
-        registry = FileRegistry()
+        registry_path = server.storage_path / "file_registry.json"
+        registry = FileRegistry(registry_path=registry_path)
         registry.deprecate_file(
             path=params["path"],
             successor=params.get("successor"),

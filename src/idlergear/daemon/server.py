@@ -84,6 +84,7 @@ class DaemonServer:
     def __init__(self, socket_path: Path, pid_path: Path, storage_path: Path):
         self.socket_path = socket_path
         self.pid_path = pid_path
+        self.storage_path = storage_path
         self._server: asyncio.Server | None = None
         self._connections: dict[int, Connection] = {}
         self._next_conn_id = 1

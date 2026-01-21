@@ -1,0 +1,31 @@
+{
+  "files": {
+    "/tmp/pytest-of-marc/pytest-50/test_agent_deprecates_file_bro0/config_v1.json": {
+      "status": "deprecated",
+      "reason": "Updated to v2",
+      "deprecated_at": "2026-01-21T09:24:16.330492",
+      "current_version": "/tmp/pytest-of-marc/pytest-50/test_agent_deprecates_file_bro0/config_v2.json",
+      "replaces": [],
+      "deprecated_versions": [],
+      "metadata": {},
+      "description": null,
+      "tags": [],
+      "components": [],
+      "related_files": []
+    },
+    "old.txt": {
+      "status": "deprecated",
+      "reason": "Updated",
+      "deprecated_at": "2026-01-21T09:24:16.796291",
+      "current_version": "new.txt",
+      "replaces": [],
+      "deprecated_versions": [],
+      "metadata": {},
+      "description": null,
+      "tags": [],
+      "components": [],
+      "related_files": []
+    }
+  },
+  "patterns": {}
+}
