@@ -49,7 +49,6 @@ def is_test_file(filepath: str) -> bool:
     Returns:
         True if file appears to be a test file
     """
-    filepath_lower = filepath.lower()
     path_parts = Path(filepath).parts
 
     # Check for test directories
