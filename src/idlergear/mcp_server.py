@@ -308,7 +308,7 @@ def _log_file_access(
         agent_id: Agent ID if available
     """
     try:
-        from datetime import datetime
+        from datetime import datetime, UTC
 
         root = find_idlergear_root()
         if root is None:
@@ -318,7 +318,7 @@ def _log_file_access(
         log_file.parent.mkdir(parents=True, exist_ok=True)
 
         entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(UTC).isoformat(),
             "tool": tool,
             "file_path": str(file_path),
             "status": status,
@@ -366,18 +366,25 @@ def _check_file_access(
         if path_str.startswith("-") or " " in path_str:
             return (True, None)
 
-        registry = FileRegistry()
-        entry = registry.get_file(file_path)
+        # Get registry from idlergear root
+        root = find_idlergear_root()
+        if root is None:
+            # Not in an idlergear project - allow all access
+            return (True, None)
+
+        registry_path = Path(root) / ".idlergear" / "file_registry.json"
+        registry = FileRegistry(registry_path=registry_path)
+        entry = registry.get_entry(file_path)
 
         if entry is None:
             # File not in registry - allow access
             return (True, None)
 
-        status = entry.get("status")
+        status = entry.status.value  # FileStatus enum value
 
         if status == "deprecated":
-            successor = entry.get("successor")
-            reason = entry.get("reason", "")
+            successor = entry.current_version
+            reason = entry.reason or ""
 
             if successor:
                 msg = f"⚠️  File '{file_path}' is deprecated. Use '{successor}' instead."
@@ -398,7 +405,7 @@ def _check_file_access(
             return (False, msg)
 
         elif status == "archived":
-            reason = entry.get("reason", "")
+            reason = entry.reason or ""
             msg = f"⚠️  File '{file_path}' is archived."
             if reason:
                 msg += f"\nReason: {reason}"
@@ -408,7 +415,7 @@ def _check_file_access(
             return (False, msg)
 
         elif status == "problematic":
-            reason = entry.get("reason", "Known issues")
+            reason = entry.reason or "Known issues"
             msg = f"⚠️  File '{file_path}' has known issues: {reason}"
 
             _log_file_access(operation.capitalize(), file_path, status, False)
