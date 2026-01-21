@@ -19,14 +19,15 @@ IdlerGear works identically across all major AI coding assistants:
 |-----------|-------------|--------|
 | Claude Code | MCP + CLAUDE.md | ✅ Full support |
 | Gemini CLI | MCP + GEMINI.md | ✅ Full support |
-| GitHub Copilot CLI | MCP + agents | ✅ Full support |
+| GitHub Copilot CLI | MCP + COPILOT.md | ✅ Full support |
 | OpenAI Codex CLI | MCP + AGENTS.md | ✅ Full support |
+| Cursor AI | .cursor/rules/*.mdc | ✅ Full support |
 | Aider | CLI + .aider.conf.yml | ✅ CLI support |
 | Block's Goose | MCP + .goosehints | ✅ Full support |
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.5.11)
+## Features (v0.5.20)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -41,7 +42,7 @@ IdlerGear works identically across all major AI coding assistants:
 - **Data File Versioning** - Detect when code references old data files (CSV, JSON, etc.)
 - **File Registry** - Track file status (current/deprecated/archived/problematic) + **File Annotations** for token-efficient discovery (93% token savings!)
 
-### Plugin System (v0.8.0) ⭐ NEW!
+### Plugin System ⭐ NEW in v0.5.13!
 IdlerGear acts as the **"data layer"** while integrating with best-in-class intelligence tools:
 
 - **LlamaIndex Plugin** - Semantic search over references/notes (40% faster retrieval)
@@ -62,7 +63,7 @@ embedding_model = "local"  # or "openai"
 ```
 
 ### Python-Native MCP Servers (Zero Node.js!)
-- **Plugin System** - 6 tools (list, status, enable, search, index) ⭐ NEW v0.8.0!
+- **Plugin System** - 6 tools (list, status, enable, search, index) ⭐ NEW in v0.5.13!
 - **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries)
 - **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks)
 - **File Registry** - 8 tools (file status, annotations, token-efficient search)
@@ -83,7 +84,7 @@ embedding_model = "local"  # or "openai"
 
 ### AI Integration
 - **MCP Server** - **146 tools** via Model Context Protocol (universal)
-- **Plugin System** - Integrate with Langfuse, LlamaIndex, Mem0 ⭐ NEW v0.8.0!
+- **Plugin System** - Integrate with Langfuse, LlamaIndex, Mem0 ⭐ NEW in v0.5.13!
 - **Knowledge Graph** - 95-98% token savings for context retrieval
 - **File Registry + Annotations** - Track file status + annotate files for 93% token-efficient discovery
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
