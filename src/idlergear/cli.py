@@ -1263,6 +1263,7 @@ def install(
     Optional:
     - .git/hooks/pre-commit - Auto-increment patch version (--auto-version)
     - .cursor/rules/*.mdc - Cursor AI IDE integration (--cursor)
+    - .aider.conf.yml - Aider configuration (--aider)
     """
     from idlergear.config import find_idlergear_root
     from idlergear.install import (
@@ -1378,6 +1379,24 @@ def install(
             typer.secho("Created .cursorignore", fg=typer.colors.GREEN)
         elif cursorignore_action == "updated":
             typer.secho("Updated .cursorignore", fg=typer.colors.YELLOW)
+
+    # Install Aider configuration
+    if aider:
+        from idlergear.aider import install_aider_config, generate_aiderignore
+
+        config_action = install_aider_config()
+        if config_action == "created":
+            typer.secho("Created .aider.conf.yml", fg=typer.colors.GREEN)
+        elif config_action == "updated":
+            typer.secho("Updated .aider.conf.yml", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(".aider.conf.yml unchanged", fg=typer.colors.BLUE)
+
+        aiderignore_action = generate_aiderignore()
+        if aiderignore_action == "created":
+            typer.secho("Created .aiderignore", fg=typer.colors.GREEN)
+        elif aiderignore_action == "updated":
+            typer.secho("Updated .aiderignore", fg=typer.colors.YELLOW)
 
     # Store IdlerGear version for future upgrade detection
     from idlergear.upgrade import set_project_version
