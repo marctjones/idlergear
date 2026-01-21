@@ -1248,6 +1248,7 @@ def install(
     codex: bool = typer.Option(False, "--codex", help="Install for Codex CLI"),
     aider: bool = typer.Option(False, "--aider", help="Install for Aider"),
     goose: bool = typer.Option(False, "--goose", help="Install for Goose"),
+    cursor: bool = typer.Option(False, "--cursor", help="Install Cursor AI IDE rules"),
 ):
     """Install IdlerGear integration for Claude Code (and other assistants).
 
@@ -1261,6 +1262,7 @@ def install(
 
     Optional:
     - .git/hooks/pre-commit - Auto-increment patch version (--auto-version)
+    - .cursor/rules/*.mdc - Cursor AI IDE integration (--cursor)
     """
     from idlergear.config import find_idlergear_root
     from idlergear.install import (
@@ -1363,6 +1365,19 @@ def install(
             typer.echo(
                 ".git/hooks/pre-commit already has auto-version hook (or not a git repo)"
             )
+
+    # Install Cursor AI IDE rules
+    if cursor:
+        from idlergear.cursor import install_cursor_rules, generate_cursorignore
+
+        cursor_results = install_cursor_rules()
+        report_results(cursor_results, ".cursor/rules/")
+
+        cursorignore_action = generate_cursorignore()
+        if cursorignore_action == "created":
+            typer.secho("Created .cursorignore", fg=typer.colors.GREEN)
+        elif cursorignore_action == "updated":
+            typer.secho("Updated .cursorignore", fg=typer.colors.YELLOW)
 
     # Store IdlerGear version for future upgrade detection
     from idlergear.upgrade import set_project_version
