@@ -5536,6 +5536,59 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
 
 
+async def _subscribe_to_registry_events():
+    """Subscribe to file registry events from daemon.
+
+    This allows the MCP server to be notified when other agents
+    make changes to the file registry (e.g., deprecating files).
+
+    The FileRegistry loads from disk on each access, so the cache
+    is automatically fresh. This subscription is mainly for awareness
+    and future notification support.
+    """
+    import asyncio
+    import sys
+
+    from idlergear.daemon.client import DaemonNotRunning, get_daemon_client
+
+    # Try to find idlergear root
+    try:
+        idlergear_root = find_idlergear_root()
+        if not idlergear_root:
+            return  # No idlergear root, can't subscribe
+    except Exception:
+        return  # Failed to find root
+
+    # Try to connect to daemon (non-blocking, fail gracefully)
+    try:
+        client = get_daemon_client(idlergear_root)
+        await client.connect()
+
+        # Subscribe to file registry events
+        await client.subscribe("file.*")
+
+        print(
+            "[IdlerGear MCP] Subscribed to file registry events from daemon",
+            file=sys.stderr,
+        )
+
+        # Keep connection alive in background
+        # In future, we could handle notifications here to show AI messages
+        # For now, just maintain the subscription
+        while True:
+            await asyncio.sleep(60)  # Keep alive
+
+    except DaemonNotRunning:
+        # Daemon not running - this is OK, subscription is optional
+        pass
+    except Exception as e:
+        # Log but don't crash the server
+        print(
+            f"[IdlerGear MCP] Warning: Failed to subscribe to daemon events: {e}",
+            file=sys.stderr,
+        )
+
+
 async def run_server():
     """Run the MCP server with reload support."""
     # Set up signal handler for reload (SIGUSR1)
@@ -5547,11 +5600,21 @@ async def run_server():
     # Auto-detect and activate project virtual environment
     _activate_project_environment()
 
+    # Start daemon subscription in background (non-blocking)
+    daemon_task = asyncio.create_task(_subscribe_to_registry_events())
+
     try:
         async with stdio_server() as (read_stream, write_stream):
             init_options = server.create_initialization_options()
             await server.run(read_stream, write_stream, init_options)
     finally:
+        # Cancel daemon subscription
+        daemon_task.cancel()
+        try:
+            await daemon_task
+        except asyncio.CancelledError:
+            pass
+
         _cleanup_pid_file()
 
 
