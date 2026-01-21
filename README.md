@@ -282,6 +282,15 @@ idlergear plugin disable NAME     # Disable plugin
 idlergear plugin search QUERY     # Semantic search with LlamaIndex
 idlergear plugin search QUERY --top-k 10 --type reference
 
+# File Registry & Annotations
+idlergear file register PATH --status STATUS  # Register file with status
+idlergear file deprecate PATH --successor NEW # Mark file as deprecated
+idlergear file status PATH        # Check file status
+idlergear file list               # List all registered files
+idlergear file annotate PATH      # Annotate file for token-efficient search
+idlergear file search --query "..." # Search files (93% token savings!)
+idlergear file unregister PATH    # Remove from registry
+
 # OpenTelemetry Logging
 idlergear otel start              # Start OTel collector daemon
 idlergear otel stop               # Stop collector
@@ -605,6 +614,8 @@ vision = "github"    # Sync vision to repo
 - [Knowledge Types](https://github.com/marctjones/idlergear/wiki/Knowledge-Types) - All 6 knowledge types
 - [Commands Reference](https://github.com/marctjones/idlergear/wiki/Commands-Reference) - Full CLI reference
 - [MCP Server](https://github.com/marctjones/idlergear/wiki/MCP-Server) - 126 MCP tools
+- [File Registry Guide](docs/guides/file-registry.md) - Track file status, annotations, and token-efficient search
+- [File Registry Workflows](docs/examples/file-registry-workflow.md) - Real-world usage examples
 - [Roadmap](docs/ROADMAP.md) - Release plan with 5 incremental milestones
 
 ### AI Assistant Guides
