@@ -1,7 +1,7 @@
 # IdlerGear Release Roadmap & Milestone Reorganization
 
 ## Current State (January 2026)
-- **Current Version**: v0.5.19
+- **Current Version**: v0.6.0
 - **Open Issues**: 5 (all for future milestones)
 - **Completed Milestones**: v0.4.0, v0.5.0, v0.6.0 (original), v0.7.0 (original)
 - **Active Milestones**: v0.6.0 (in progress), v0.7.0 (planned), v0.8.0 (5 issues), v0.9.0 (planned)

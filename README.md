@@ -50,7 +50,7 @@ idlergear task create "Set up authentication" --label feature
 idlergear context
 ```
 
-## Features (v0.5.22)
+## Features (v0.6.0)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -141,8 +141,8 @@ IdlerGear ships **quarterly releases** with major features. Each milestone deliv
 
 | Milestone | Theme | Target | Key Features |
 |-----------|-------|--------|--------------|
-| **v0.5.11** ✅ | Plugin System Foundation | CURRENT | LlamaIndex, Langfuse plugins, semantic search, observability |
-| **v0.6.0** 🎯 | File Registry Complete | March 2026 | MCP interception, daemon integration, data file detection |
+| **v0.5.11** ✅ | Plugin System Foundation | Released | LlamaIndex, Langfuse plugins, semantic search, observability |
+| **v0.6.0** ✅ | File Registry Complete | CURRENT | MCP interception, daemon integration, file annotations |
 | **v0.7.0** 📊 | GitHub Integration | June 2026 | GitHub Projects v2 sync, custom fields, bidirectional updates |
 | **v0.8.0** 🚀 | Integration Layer | September 2026 | Mem0 plugin, plugin docs, advanced integrations |
 | **v0.9.0** 🤖 | Multi-Assistant | December 2026 | Gemini integration, SKILLS.md support, cross-assistant coordination |
@@ -421,18 +421,22 @@ idlergear_project_create(title="Sprint Backlog")
 
 ---
 
-### File Registry (4 tools) ⭐ **NEW in v0.5.4!**
+### File Registry (8 tools) ⭐ **NEW in v0.6.0!**
 
 | Tool | Description |
 |------|-------------|
 | `idlergear_file_register` | Register file with explicit status (current/deprecated/archived/problematic) |
 | `idlergear_file_deprecate` | Mark file as deprecated with optional successor |
-| `idlergear_file_status` | Get status and metadata for a file |
+| `idlergear_file_update_status` | Update file status (current/deprecated/archived/problematic) |
 | `idlergear_file_list` | List all registered files, optionally filtered by status |
+| `idlergear_file_search` | Search files by annotations (tags, descriptions, components) |
+| `idlergear_file_annotate` | Add annotations to files for token-efficient discovery |
+| `idlergear_file_get_annotations` | Retrieve file annotations and metadata |
+| `idlergear_file_unregister` | Remove file from registry |
 
 **Use Case**: Prevent AI assistants from using outdated code versions with automatic protection.
 
-**Automatic File Access Interception** ⭐ **NEW in v0.5.28!**
+**Automatic File Access Interception** ⭐ **NEW in v0.6.0!**
 
 IdlerGear's MCP server automatically intercepts file operations and blocks access to problematic files:
 - **Deprecated files**: Reads blocked, writes allowed (with warnings and successor suggestions)

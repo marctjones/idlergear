@@ -1,5 +1,6 @@
 """MCP Server for IdlerGear - exposes knowledge management as AI tools."""
 
+import asyncio
 import json
 import os
 import signal

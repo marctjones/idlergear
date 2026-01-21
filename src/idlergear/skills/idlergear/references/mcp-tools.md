@@ -269,9 +269,9 @@ Search references.
 - `idlergear_fs_file_checksum(path, algorithm?)` - File hash
 - `idlergear_fs_allowed_directories()` - Security boundary
 
-## File Registry (4 tools)
+## File Registry (8 tools) ⭐ NEW v0.6.0
 
-**Track file status (current/deprecated/archived/problematic) to prevent AI from accessing outdated files.**
+**Track file status (current/deprecated/archived/problematic) to prevent AI from accessing outdated files. NEW in v0.6.0: File annotations for 93% token savings.**
 
 ### idlergear_file_register
 Register a file with explicit status.
@@ -345,11 +345,98 @@ result = idlergear_file_list(status="deprecated")
 # Returns: {"count": 3, "files": [...]}
 ```
 
+### idlergear_file_search
+Search files by annotations (tags, descriptions, components) for token-efficient file discovery.
+
+**Parameters:**
+- `query`: string - Search query for descriptions, tags, or components
+- `tags`: list[string] (optional) - Filter by specific tags
+- `limit`: integer (optional) - Maximum results to return
+
+**Returns:**
+- `count`: integer - Number of matching files
+- `files`: list of files with annotations
+
+**Example:**
+```
+# Search for authentication-related files
+result = idlergear_file_search(query="authentication", tags=["api"])
+# Returns: {"count": 2, "files": [{"path": "src/api/auth.py", "description": "...", "tags": ["api", "auth"]}]}
+```
+
+**Token savings:** 93% reduction vs grep (200 tokens vs 15,000)
+
+### idlergear_file_annotate
+Add annotations to files for token-efficient discovery.
+
+**Parameters:**
+- `path`: string - File path to annotate
+- `description`: string - Human-readable description
+- `tags`: list[string] (optional) - Searchable tags
+- `components`: list[string] (optional) - Key classes/functions
+- `related_files`: list[string] (optional) - Related file paths
+
+**Returns:**
+- `success`: boolean
+- `path`: string - Annotated file path
+
+**Example:**
+```
+idlergear_file_annotate(
+    path="src/api/auth.py",
+    description="REST API endpoints for user authentication, JWT generation",
+    tags=["api", "auth", "jwt"],
+    components=["AuthController", "TokenManager", "login"],
+    related_files=["src/models/user.py"]
+)
+```
+
+**Workflow:** Annotate files proactively after creating or understanding them.
+
+### idlergear_file_get_annotation
+Retrieve annotations and metadata for a file.
+
+**Parameters:**
+- `path`: string - File path
+
+**Returns:**
+- `path`: string
+- `description`: string (if annotated)
+- `tags`: list[string]
+- `components`: list[string]
+- `related_files`: list[string]
+- `status`: string - File registry status
+
+**Example:**
+```
+result = idlergear_file_get_annotation(path="src/api/auth.py")
+# Returns: {"path": "...", "description": "...", "tags": ["api", "auth"], ...}
+```
+
+### idlergear_file_list_tags
+List all tags used in file annotations.
+
+**Parameters:** None
+
+**Returns:**
+- `tags`: list[string] - All unique tags across all annotated files
+- `count`: integer - Number of unique tags
+
+**Example:**
+```
+result = idlergear_file_list_tags()
+# Returns: {"tags": ["api", "auth", "database", "jwt"], "count": 4}
+```
+
 **Condensed reference:**
 - `idlergear_file_register(path, status, reason?)` - Register file
 - `idlergear_file_deprecate(path, successor?, reason?)` - Mark as deprecated
 - `idlergear_file_status(path)` - Check file status
 - `idlergear_file_list(status?)` - List registered files
+- `idlergear_file_search(query, tags?, limit?)` - Search by annotations ⭐ NEW v0.6.0
+- `idlergear_file_annotate(path, description, tags?, components?, related_files?)` - Add annotations ⭐ NEW v0.6.0
+- `idlergear_file_get_annotation(path)` - Get file metadata ⭐ NEW v0.6.0
+- `idlergear_file_list_tags()` - List all tags ⭐ NEW v0.6.0
 
 **See also:** `docs/guides/file-registry.md` for full documentation.
 

@@ -2892,7 +2892,7 @@ def task_reopen(task_id: int):
 def task_sync(target: str = typer.Argument("github")):
     """Sync tasks with remote."""
     typer.echo(f"Syncing tasks to {target}...")
-    # TODO: Implement GitHub sync
+    # See task #317
 
 
 # Label commands
@@ -3400,7 +3400,7 @@ def note_promote(
 def note_sync(target: str = typer.Argument("github")):
     """Sync notes with remote."""
     typer.echo(f"Syncing notes to {target}...")
-    # TODO: Implement GitHub sync
+    # See task #318
 
 
 # Vision commands
@@ -3474,7 +3474,7 @@ def vision_edit(
 def vision_sync(target: str = typer.Argument("github")):
     """Sync vision with remote."""
     typer.echo(f"Syncing vision to {target}...")
-    # TODO: Implement GitHub sync (copy to VISION.md in repo root)
+    # See task #319
 
 
 # Plan commands
@@ -3664,7 +3664,7 @@ def plan_complete(name: str):
 def plan_sync(target: str = typer.Argument("github")):
     """Sync plans with remote."""
     typer.echo(f"Syncing plans to {target}...")
-    # TODO: Implement GitHub Projects sync
+    # See task #320
 
 
 # Milestone commands

@@ -37,6 +37,7 @@ class TestRegistryDaemonHandlers:
         # Create mock server
         server = Mock(spec=DaemonServer)
         server.broadcast = AsyncMock()
+        server.storage_path = temp_registry.parent
 
         # Import and register handlers
         from idlergear.daemon.handlers import register_handlers
@@ -104,6 +105,7 @@ class TestRegistryDaemonHandlers:
         # Create mock server
         server = Mock(spec=DaemonServer)
         server.broadcast = AsyncMock()
+        server.storage_path = temp_registry.parent
 
         # Import and register handlers
         from idlergear.daemon.handlers import register_handlers

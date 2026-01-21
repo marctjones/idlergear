@@ -233,7 +233,7 @@ def install_hooks(project_path: Path = None, force: bool = False) -> Dict[str, b
     if hooks_json_path.exists() and not force:
         # Merge with existing
         existing = json.loads(hooks_json_path.read_text())
-        # TODO: Smart merge
+        # See task #322
         results["hooks.json"] = False
     else:
         hooks_json_path.write_text(json.dumps(HOOKS_JSON_TEMPLATE, indent=2))

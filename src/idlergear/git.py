@@ -700,7 +700,7 @@ class GitServer:
         # Get full status
         status = self.status(repo_path=repo_path)
 
-        # TODO: Load task from IdlerGear and filter by task files
+        # See task #321
         # For now, return full status with task_id annotation
         return {
             "task_id": task_id,

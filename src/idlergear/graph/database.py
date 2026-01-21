@@ -65,7 +65,7 @@ class GraphDatabase:
         Example:
             >>> result = db.execute("MATCH (t:Task {id: $id}) RETURN t", {"id": 278})
         """
-        # TODO: Add parameter support when Kuzu supports it
+        # See task #323
         return self.conn.execute(query)
 
     def close(self):
