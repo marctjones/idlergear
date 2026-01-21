@@ -350,7 +350,7 @@ def context(
     else:
         # The session data needs special handling for the text format,
         # as it's appended after the main block.
-        display(context_data, "human", "context", verbose=verbose)
+        display(context_data, "human", "context")
         if include_session and hasattr(context_data, "session"):
             from idlergear.sessions import format_session_state, load_session
 
