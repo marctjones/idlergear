@@ -27,7 +27,30 @@ IdlerGear works identically across all major AI coding assistants:
 
 **Same commands, same knowledge, any assistant.** Switch between assistants without losing context.
 
-## Features (v0.5.20)
+## Quick Start
+
+**New to IdlerGear?** See [QUICKSTART.md](QUICKSTART.md) for a 5-minute guide to get started.
+
+```bash
+# Install
+pipx install idlergear
+
+# Initialize project
+cd your-project
+idlergear init
+idlergear install
+
+# Set project vision
+idlergear vision edit
+
+# Create first task
+idlergear task create "Set up authentication" --label feature
+
+# Get project context (run at every session start)
+idlergear context
+```
+
+## Features (v0.5.22)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
