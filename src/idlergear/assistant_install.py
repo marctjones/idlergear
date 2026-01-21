@@ -625,8 +625,6 @@ def install_for_assistant(
 
     results = {}
 
-    config = ASSISTANT_CONFIGS[assistant]
-
     if assistant == Assistant.CLAUDE:
         # Use existing Claude Code installation
         from idlergear.install import (
