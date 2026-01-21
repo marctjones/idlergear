@@ -291,6 +291,139 @@ def _check_initialized() -> None:
         raise ValueError("IdlerGear not initialized. Run 'idlergear init' first.")
 
 
+def _log_file_access(
+    tool: str,
+    file_path: str,
+    status: str | None,
+    allowed: bool,
+    agent_id: str | None = None,
+) -> None:
+    """Log file access attempts to .idlergear/access_log.jsonl.
+
+    Args:
+        tool: Tool name (Read, Write, Edit, Bash)
+        file_path: Path to file being accessed
+        status: File status from registry (deprecated, archived, problematic, current, None)
+        allowed: Whether access was allowed
+        agent_id: Agent ID if available
+    """
+    try:
+        from datetime import datetime
+
+        root = find_idlergear_root()
+        if root is None:
+            return  # Can't log if not initialized
+
+        log_file = Path(root) / ".idlergear" / "access_log.jsonl"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+
+        entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "tool": tool,
+            "file_path": str(file_path),
+            "status": status,
+            "allowed": allowed,
+            "agent_id": agent_id or _registered_agent_id,
+        }
+
+        with open(log_file, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        # Don't fail tool calls if logging fails
+        pass
+
+
+def _check_file_access(
+    file_path: str, operation: str, allow_override: bool = False
+) -> tuple[bool, str | None]:
+    """Check if file operation should be allowed based on file registry.
+
+    Args:
+        file_path: Path to file being accessed
+        operation: Operation type (read, write, edit, bash)
+        allow_override: If True, allow access even if deprecated
+
+    Returns:
+        Tuple of (allowed, warning_message)
+        - allowed: True if operation should proceed
+        - warning_message: Error message if not allowed, None otherwise
+    """
+    try:
+        from idlergear.file_registry import FileRegistry
+
+        # Allow override for intentional deprecated file access
+        if allow_override:
+            return (True, None)
+
+        # Check if path looks like a file (not a URL, command, etc.)
+        path_str = str(file_path)
+
+        # Skip non-file-like strings
+        if any(path_str.startswith(prefix) for prefix in ["http://", "https://", "ftp://", "git@"]):
+            return (True, None)
+
+        # Skip if it looks like a command or flag
+        if path_str.startswith("-") or " " in path_str:
+            return (True, None)
+
+        registry = FileRegistry()
+        entry = registry.get_file(file_path)
+
+        if entry is None:
+            # File not in registry - allow access
+            return (True, None)
+
+        status = entry.get("status")
+
+        if status == "deprecated":
+            successor = entry.get("successor")
+            reason = entry.get("reason", "")
+
+            if successor:
+                msg = f"⚠️  File '{file_path}' is deprecated. Use '{successor}' instead."
+            else:
+                msg = f"⚠️  File '{file_path}' is deprecated."
+
+            if reason:
+                msg += f"\nReason: {reason}"
+
+            # For write operations, warn but allow (updates the file)
+            if operation == "write":
+                msg += "\n\nNote: Write operation allowed to update deprecated file."
+                _log_file_access("Write", file_path, status, True)
+                return (True, msg)  # Allow with warning
+
+            # For read/edit, block access
+            _log_file_access(operation.capitalize(), file_path, status, False)
+            return (False, msg)
+
+        elif status == "archived":
+            reason = entry.get("reason", "")
+            msg = f"⚠️  File '{file_path}' is archived."
+            if reason:
+                msg += f"\nReason: {reason}"
+            msg += "\n\nVerify you need historical data before accessing."
+
+            _log_file_access(operation.capitalize(), file_path, status, False)
+            return (False, msg)
+
+        elif status == "problematic":
+            reason = entry.get("reason", "Known issues")
+            msg = f"⚠️  File '{file_path}' has known issues: {reason}"
+
+            _log_file_access(operation.capitalize(), file_path, status, False)
+            return (False, msg)
+
+        # File is current or unknown status - allow
+        _log_file_access(operation.capitalize(), file_path, status or "current", True)
+        return (True, None)
+
+    except Exception as e:
+        # Don't block operations if registry check fails
+        # Log the failure but allow the operation
+        return (True, f"Warning: File registry check failed: {e}")
+
+
 # Define all tools
 @server.list_tools()
 async def list_tools() -> list[Tool]:
@@ -3828,18 +3961,58 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Filesystem handlers
         elif name == "idlergear_fs_read_file":
+            # Check file registry before reading
+            file_path = arguments["path"]
+            allow_override = arguments.get("_allow_deprecated", False)
+            allowed, warning = _check_file_access(file_path, "read", allow_override)
+
+            if not allowed:
+                # Block access to deprecated/archived/problematic files
+                raise ValueError(warning)
+
             fs = _get_fs_server()
-            result = fs.read_file(arguments["path"])
+            result = fs.read_file(file_path)
+
+            # If there was a warning (e.g., write to deprecated), include it
+            if warning:
+                result["warning"] = warning
+
             return _format_result(result)
 
         elif name == "idlergear_fs_read_multiple":
+            # Check each file before reading
+            paths = arguments["paths"]
+            allow_override = arguments.get("_allow_deprecated", False)
+            blocked_files = []
+
+            for path in paths:
+                allowed, warning = _check_file_access(path, "read", allow_override)
+                if not allowed:
+                    blocked_files.append({"path": path, "reason": warning})
+
+            if blocked_files:
+                error_msg = "Some files are blocked:\n"
+                for blocked in blocked_files:
+                    error_msg += f"  - {blocked['path']}: {blocked['reason']}\n"
+                raise ValueError(error_msg)
+
             fs = _get_fs_server()
-            result = fs.read_multiple_files(arguments["paths"])
+            result = fs.read_multiple_files(paths)
             return _format_result(result)
 
         elif name == "idlergear_fs_write_file":
+            # Check file registry (warn but allow writes to deprecated files)
+            file_path = arguments["path"]
+            allow_override = arguments.get("_allow_deprecated", False)
+            allowed, warning = _check_file_access(file_path, "write", allow_override)
+
             fs = _get_fs_server()
-            result = fs.write_file(arguments["path"], arguments["content"])
+            result = fs.write_file(file_path, arguments["content"])
+
+            # Include warning if present
+            if warning and isinstance(result, dict):
+                result["warning"] = warning
+
             return _format_result(result)
 
         elif name == "idlergear_fs_create_directory":
@@ -3865,8 +4038,20 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_fs_move_file":
+            # Check source file before moving
+            source = arguments["source"]
+            allow_override = arguments.get("_allow_deprecated", False)
+            allowed, warning = _check_file_access(source, "read", allow_override)
+
+            if not allowed:
+                raise ValueError(f"Cannot move file: {warning}")
+
             fs = _get_fs_server()
-            result = fs.move_file(arguments["source"], arguments["destination"])
+            result = fs.move_file(source, arguments["destination"])
+
+            if warning and isinstance(result, dict):
+                result["warning"] = warning
+
             return _format_result(result)
 
         elif name == "idlergear_fs_search_files":
