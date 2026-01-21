@@ -70,6 +70,13 @@ Track which files are current, deprecated, archived, or problematic to prevent u
 - `archived` - Old version kept for reference
 - `problematic` - Has known issues
 
+**Automatic Protection:**
+When files are registered with non-current statuses, IdlerGear's MCP server automatically intercepts file operations:
+- **Deprecated files**: Reads are blocked with suggestions to use the successor. Writes are allowed with warnings.
+- **Archived/Problematic files**: All access is blocked with explanatory messages.
+- All access attempts are logged to `.idlergear/access_log.jsonl` for audit purposes.
+- Use `_allow_deprecated=True` parameter to bypass checks when intentionally accessing deprecated files.
+
 ### File Annotations (Token-Efficient Discovery) ⭐
 
 **IMPORTANT: Annotate files proactively to enable 93% token savings on file discovery!**

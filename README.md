@@ -430,22 +430,31 @@ idlergear_project_create(title="Sprint Backlog")
 | `idlergear_file_status` | Get status and metadata for a file |
 | `idlergear_file_list` | List all registered files, optionally filtered by status |
 
-**Use Case**: Prevent AI assistants from using outdated code versions.
+**Use Case**: Prevent AI assistants from using outdated code versions with automatic protection.
+
+**Automatic File Access Interception** ⭐ **NEW in v0.5.28!**
+
+IdlerGear's MCP server automatically intercepts file operations and blocks access to problematic files:
+- **Deprecated files**: Reads blocked, writes allowed (with warnings and successor suggestions)
+- **Archived/Problematic files**: All access blocked with explanatory messages
+- All attempts logged to `.idlergear/access_log.jsonl` for audit trails
 
 **Example workflow:**
 ```python
-# When refactoring api.py → api_v2.py
+# Step 1: Mark file as deprecated when refactoring
 idlergear_file_deprecate(
     path="api.py",
     successor="api_v2.py",
     reason="Refactored to use async/await"
 )
 
-# Before using a file
+# Step 2: AI attempts to read the file
+idlergear_fs_read_file(path="api.py")
+# ⚠️ BLOCKED: "File 'api.py' is deprecated. Use 'api_v2.py' instead."
+
+# Step 3: Check file status manually if needed
 status = idlergear_file_status(path="api.py")
-if status["status"] == "deprecated":
-    # Use successor instead: api_v2.py
-    pass
+# Returns: {"status": "deprecated", "current_version": "api_v2.py", ...}
 
 # List all deprecated files
 result = idlergear_file_list(status="deprecated")
