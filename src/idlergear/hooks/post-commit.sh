@@ -22,7 +22,10 @@ fi
 
 # Check if graph auto-update is enabled
 graph_auto_update=$(idlergear config get graph.auto_update 2>/dev/null || echo "false")
-if [ "$graph_auto_update" != "true" ]; then
+# Extract value from "graph.auto_update: True" format
+if echo "$graph_auto_update" | grep -qiE '(true|True)'; then
+    :  # Config is true, continue
+else
     exit 0
 fi
 
