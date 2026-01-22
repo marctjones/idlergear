@@ -104,6 +104,7 @@ secrets_app = typer.Typer(help="Secure local secrets management")
 release_app = typer.Typer(help="Release management (GitHub Releases)")
 file_app = typer.Typer(help="File registry and annotations (track file status)")
 plugin_app = typer.Typer(help="Plugin management and integration (Langfuse, LlamaIndex, Mem0)")
+graph_app = typer.Typer(help="Knowledge graph queries and population")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -127,6 +128,7 @@ app.add_typer(secrets_app, name="secrets")
 app.add_typer(release_app, name="release")
 app.add_typer(file_app, name="file")
 app.add_typer(plugin_app, name="plugin")
+app.add_typer(graph_app, name="graph")
 
 
 # Helper functions
@@ -9878,6 +9880,316 @@ def plugin_search(
         typer.secho(f"   Type: {metadata.get('type', 'unknown')}", fg=typer.colors.WHITE)
         typer.secho(f"   {text}...", fg=typer.colors.WHITE)
         typer.secho("")
+
+
+# ============================================================================
+# Graph Commands (add before if __name__ == "__main__":)
+
+
+
+# ============================================================================
+# Graph Commands
+# ============================================================================
+
+@graph_app.command("populate")
+def graph_populate(
+    ctx: typer.Context,
+    max_commits: int = typer.Option(100, "--max-commits", help="Maximum commits to index"),
+    code_dir: str = typer.Option("src", "--code-dir", help="Directory to scan for code"),
+    incremental: bool = typer.Option(True, "--incremental/--full", help="Skip already-indexed data"),
+    verbose: bool = typer.Option(True, "--verbose/--quiet", help="Print progress messages"),
+):
+    """Populate entire knowledge graph in one command.
+
+    Runs all populators: git history, code symbols, tasks, commit-task links, references, and wiki.
+    Safe to re-run with --incremental (default).
+    """
+    from idlergear.graph import populate_all
+    from pathlib import Path
+
+    project_path = Path.cwd()
+
+    try:
+        results = populate_all(
+            project_path=project_path,
+            max_commits=max_commits,
+            code_directory=code_dir,
+            incremental=incremental,
+            verbose=verbose
+        )
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(results, indent=2))
+        # Human output is handled by populate_all's verbose mode
+
+    except Exception as e:
+        typer.secho(f"Failed to populate knowledge graph: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("schema")
+def graph_schema(ctx: typer.Context):
+    """Show knowledge graph schema (node types, relationship types, counts)."""
+    try:
+        from idlergear.graph.database import get_database
+
+        db = get_database()
+
+        # Query for node types and counts
+        node_query = """
+        MATCH (n)
+        RETURN labels(n)[0] AS type, COUNT(*) AS count
+        ORDER BY count DESC
+        """
+        node_results = db.execute(node_query)
+
+        # Query for relationship types and counts
+        rel_query = """
+        MATCH ()-[r]->()
+        RETURN type(r) AS type, COUNT(*) AS count
+        ORDER BY count DESC
+        """
+        rel_results = db.execute(rel_query)
+
+        if ctx.obj.get("output_mode") == "json":
+            output = {
+                "node_types": [{"type": r[0], "count": r[1]} for r in node_results],
+                "relationship_types": [{"type": r[0], "count": r[1]} for r in rel_results]
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            typer.secho("\n📊 Knowledge Graph Schema\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            typer.secho("Node Types:", fg=typer.colors.GREEN, bold=True)
+            for node_type, count in node_results:
+                typer.echo(f"  {node_type}: {count:,}")
+
+            typer.secho("\nRelationship Types:", fg=typer.colors.GREEN, bold=True)
+            for rel_type, count in rel_results:
+                typer.echo(f"  {rel_type}: {count:,}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to get schema: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("stats")
+def graph_stats(ctx: typer.Context):
+    """Show knowledge graph statistics (total nodes, relationships)."""
+    try:
+        from idlergear.graph.database import get_database
+
+        db = get_database()
+
+        # Count total nodes
+        node_count_query = "MATCH (n) RETURN COUNT(n) AS count"
+        node_count = db.execute(node_count_query)[0][0]
+
+        # Count total relationships
+        rel_count_query = "MATCH ()-[r]->() RETURN COUNT(r) AS count"
+        rel_count = db.execute(rel_count_query)[0][0]
+
+        if ctx.obj.get("output_mode") == "json":
+            output = {
+                "total_nodes": node_count,
+                "total_relationships": rel_count
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            typer.secho("\n📊 Knowledge Graph Statistics\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.echo(f"Total Nodes: {node_count:,}")
+            typer.echo(f"Total Relationships: {rel_count:,}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to get stats: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("query-task")
+def graph_query_task(
+    ctx: typer.Context,
+    task_id: int = typer.Argument(..., help="Task ID to query"),
+):
+    """Query knowledge graph for task context (files, commits, symbols)."""
+    try:
+        from idlergear.graph.database import get_database
+
+        db = get_database()
+
+        # Query for task and related entities
+        query = """
+        MATCH (t:Task {id: $task_id})
+        OPTIONAL MATCH (t)-[:IMPLEMENTED_IN]->(f:File)
+        OPTIONAL MATCH (c:Commit)-[:MODIFIES]->(t)
+        OPTIONAL MATCH (f)-[:CONTAINS]->(s:Symbol)
+        RETURN t, COLLECT(DISTINCT f) AS files, COLLECT(DISTINCT c) AS commits, COLLECT(DISTINCT s) AS symbols
+        """
+
+        result = db.execute(query, {"task_id": task_id})
+
+        if not result:
+            typer.secho(f"Task #{task_id} not found in knowledge graph", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+
+        task, files, commits, symbols = result[0]
+
+        if ctx.obj.get("output_mode") == "json":
+            output = {
+                "task": dict(task),
+                "files": [dict(f) for f in files if f],
+                "commits": [dict(c) for c in commits if c],
+                "symbols": [dict(s) for s in symbols if s]
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            typer.secho(f"\n📋 Task #{task_id} Context\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            if files and any(files):
+                typer.secho(f"Files ({len([f for f in files if f])}):", fg=typer.colors.GREEN)
+                for f in files:
+                    if f:
+                        typer.echo(f"  - {f.get('path', 'unknown')}")
+
+            if commits and any(commits):
+                typer.secho(f"\nCommits ({len([c for c in commits if c])}):", fg=typer.colors.GREEN)
+                for c in commits:
+                    if c:
+                        typer.echo(f"  - {c.get('sha', 'unknown')[:8]}: {c.get('message', '')[:60]}")
+
+            if symbols and any(symbols):
+                typer.secho(f"\nSymbols ({len([s for s in symbols if s])}):", fg=typer.colors.GREEN)
+                for s in symbols:
+                    if s:
+                        typer.echo(f"  - {s.get('name', 'unknown')} ({s.get('type', 'unknown')})")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to query task: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("query-file")
+def graph_query_file(
+    ctx: typer.Context,
+    file_path: str = typer.Argument(..., help="File path to query"),
+):
+    """Query knowledge graph for file context (symbols, tasks, commits)."""
+    try:
+        from idlergear.graph.database import get_database
+
+        db = get_database()
+
+        # Query for file and related entities
+        query = """
+        MATCH (f:File {path: $file_path})
+        OPTIONAL MATCH (f)-[:CONTAINS]->(s:Symbol)
+        OPTIONAL MATCH (f)<-[:IMPLEMENTED_IN]-(t:Task)
+        OPTIONAL MATCH (c:Commit)-[:CHANGES]->(f)
+        RETURN f, COLLECT(DISTINCT s) AS symbols, COLLECT(DISTINCT t) AS tasks, COLLECT(DISTINCT c) AS commits
+        """
+
+        result = db.execute(query, {"file_path": file_path})
+
+        if not result:
+            typer.secho(f"File '{file_path}' not found in knowledge graph", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+
+        file, symbols, tasks, commits = result[0]
+
+        if ctx.obj.get("output_mode") == "json":
+            output = {
+                "file": dict(file),
+                "symbols": [dict(s) for s in symbols if s],
+                "tasks": [dict(t) for t in tasks if t],
+                "commits": [dict(c) for c in commits if c]
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            typer.secho(f"\n📄 File: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            if symbols and any(symbols):
+                typer.secho(f"Symbols ({len([s for s in symbols if s])}):", fg=typer.colors.GREEN)
+                for s in symbols:
+                    if s:
+                        typer.echo(f"  - {s.get('name', 'unknown')} ({s.get('type', 'unknown')}) at line {s.get('line', '?')}")
+
+            if tasks and any(tasks):
+                typer.secho(f"\nRelated Tasks ({len([t for t in tasks if t])}):", fg=typer.colors.GREEN)
+                for t in tasks:
+                    if t:
+                        typer.echo(f"  - #{t.get('id', '?')}: {t.get('title', 'unknown')}")
+
+            if commits and any(commits):
+                typer.secho(f"\nRecent Commits ({len([c for c in commits if c])}):", fg=typer.colors.GREEN)
+                for c in commits:
+                    if c:
+                        typer.echo(f"  - {c.get('sha', 'unknown')[:8]}: {c.get('message', '')[:60]}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to query file: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("query-symbols")
+def graph_query_symbols(
+    ctx: typer.Context,
+    pattern: str = typer.Argument(..., help="Symbol name pattern (case-insensitive substring match)"),
+    limit: int = typer.Option(10, "--limit", help="Maximum number of results"),
+):
+    """Search for code symbols (functions, classes, methods) by name pattern."""
+    try:
+        from idlergear.graph.database import get_database
+
+        db = get_database()
+
+        # Query for symbols matching pattern
+        query = """
+        MATCH (s:Symbol)
+        WHERE toLower(s.name) CONTAINS toLower($pattern)
+        OPTIONAL MATCH (f:File)-[:CONTAINS]->(s)
+        RETURN s, f
+        LIMIT $limit
+        """
+
+        results = db.execute(query, {"pattern": pattern, "limit": limit})
+
+        if not results:
+            typer.secho(f"No symbols found matching '{pattern}'", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+
+        if ctx.obj.get("output_mode") == "json":
+            output = {
+                "pattern": pattern,
+                "count": len(results),
+                "results": [
+                    {
+                        "symbol": dict(symbol),
+                        "file": dict(file) if file else None
+                    }
+                    for symbol, file in results
+                ]
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            typer.secho(f"\n🔍 Symbols matching '{pattern}' ({len(results)} found)\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            for symbol, file in results:
+                name = symbol.get('name', 'unknown')
+                sym_type = symbol.get('type', 'unknown')
+                line = symbol.get('line', '?')
+                file_path = file.get('path', 'unknown') if file else 'unknown'
+
+                typer.secho(f"{name}", fg=typer.colors.GREEN, bold=True)
+                typer.echo(f"  Type: {sym_type}")
+                typer.echo(f"  Location: {file_path}:{line}")
+                typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to search symbols: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

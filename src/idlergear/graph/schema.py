@@ -50,6 +50,9 @@ def _drop_tables(conn):
         "PARENT_OF",
         "DOCUMENTS",
         "DOCUMENTS_FILE",
+        "DOC_DOCUMENTS_FILE",
+        "DOC_DOCUMENTS_SYMBOL",
+        "DOC_REFERENCES_TASK",
         "RELATED_TO",
     ]
 
@@ -63,6 +66,7 @@ def _drop_tables(conn):
         "Symbol",
         "Commit",
         "Branch",
+        "Documentation",
     ]
 
     for table in rel_tables + node_tables:
@@ -176,6 +180,18 @@ def _create_node_tables(conn):
         )
     """)
 
+    # Documentation nodes (wiki, references, README, docstrings)
+    conn.execute("""
+        CREATE NODE TABLE Documentation(
+            path STRING PRIMARY KEY,
+            title STRING,
+            body STRING,
+            source STRING,
+            created_at TIMESTAMP,
+            updated_at TIMESTAMP
+        )
+    """)
+
 
 def _create_relationship_tables(conn):
     """Create all relationship tables."""
@@ -283,6 +299,25 @@ def _create_relationship_tables(conn):
     conn.execute("""
         CREATE REL TABLE DOCUMENTS_FILE(
             FROM Reference TO File
+        )
+    """)
+
+    # Documentation relationships (wiki, references)
+    conn.execute("""
+        CREATE REL TABLE DOC_DOCUMENTS_FILE(
+            FROM Documentation TO File
+        )
+    """)
+
+    conn.execute("""
+        CREATE REL TABLE DOC_DOCUMENTS_SYMBOL(
+            FROM Documentation TO Symbol
+        )
+    """)
+
+    conn.execute("""
+        CREATE REL TABLE DOC_REFERENCES_TASK(
+            FROM Documentation TO Task
         )
     """)
 
