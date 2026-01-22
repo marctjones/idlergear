@@ -1232,15 +1232,13 @@ def install(
     skip_skill: bool = typer.Option(
         False, "--skip-skill", help="Skip .claude/skills/idlergear/ creation"
     ),
+    skip_graph_hooks: bool = typer.Option(
+        False, "--skip-graph-hooks", help="Skip knowledge graph auto-update hooks"
+    ),
     auto_version: bool = typer.Option(
         False,
         "--auto-version",
         help="Install git hook to auto-bump patch version on commit",
-    ),
-    graph_hooks: bool = typer.Option(
-        False,
-        "--graph-hooks",
-        help="Install git hooks to auto-update knowledge graph on commit/merge",
     ),
     # Multi-assistant options
     all_assistants: bool = typer.Option(
@@ -1257,21 +1255,21 @@ def install(
 ):
     """Install IdlerGear integration for Claude Code (and other assistants).
 
-    Creates:
+    Creates by default:
     - .mcp.json - MCP server registration
     - .claude/skills/idlergear/ - Skill with auto-triggering (RECOMMENDED)
     - CLAUDE.md - Usage instructions
     - AGENTS.md - AI agent instructions
     - .claude/rules/idlergear.md - Enforcement rules
     - .claude/hooks.json - Enforcement hooks
+    - .git/hooks/post-commit, post-merge - Auto-update knowledge graph
 
     Optional:
     - .git/hooks/pre-commit - Auto-increment patch version (--auto-version)
-    - .git/hooks/post-commit, post-merge - Auto-update knowledge graph (--graph-hooks)
     - .cursor/rules/*.mdc - Cursor AI IDE integration (--cursor)
     - .aider.conf.yml - Aider configuration (--aider)
 
-    Note: Graph hooks auto-update is enabled by default. Disable with:
+    Note: Graph auto-update is enabled by default. Disable with:
           idlergear config set graph.auto_update false
     """
     from idlergear.config import find_idlergear_root
@@ -1366,6 +1364,18 @@ def install(
     cmd_results = add_commands()
     report_results(cmd_results, "slash commands")
 
+    # Install graph auto-update git hooks (by default)
+    if not skip_graph_hooks:
+        if add_graph_update_hooks():
+            typer.secho(
+                "Installed .git/hooks/post-commit and post-merge (graph auto-update)",
+                fg=typer.colors.GREEN,
+            )
+        else:
+            typer.echo(
+                ".git/hooks already have graph update hooks (or not a git repo)"
+            )
+
     # Install auto-version git hook (optional)
     if auto_version:
         if add_auto_version_hook():
@@ -1375,18 +1385,6 @@ def install(
         else:
             typer.echo(
                 ".git/hooks/pre-commit already has auto-version hook (or not a git repo)"
-            )
-
-    # Install graph auto-update git hooks (optional)
-    if graph_hooks:
-        if add_graph_update_hooks():
-            typer.secho(
-                "Installed .git/hooks/post-commit and post-merge (graph auto-update)",
-                fg=typer.colors.GREEN,
-            )
-        else:
-            typer.echo(
-                ".git/hooks already have graph update hooks (or not a git repo)"
             )
 
     # Install Cursor AI IDE rules
