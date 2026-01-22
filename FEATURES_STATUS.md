@@ -153,9 +153,11 @@ idlergear_graph_schema_info()
 
 **Why not automatic:** Requires running Mem0 server (local or cloud)
 
-**Option 1: Local Deployment (Recommended) ✅**
+**⚠️ RESOURCE WARNING:** Mem0 local deployment may be resource-intensive (requires LLM + vector database). Actual CPU/memory requirements are not well documented. Consider **cloud deployment** or use **Knowledge Graph** instead for local token savings.
 
-**No API key needed! Runs 100% locally.**
+**Option 1: Local Deployment ⚠️**
+
+**No API key needed! Runs 100% locally. (But may be heavy on resources)**
 
 ```bash
 # 1. Install Mem0
@@ -177,10 +179,10 @@ EOF
 # 4. Mem0 automatically learns from your IdlerGear usage
 ```
 
-**Option 2: Cloud API (Alternative)**
+**Option 2: Cloud API (Recommended for Mem0) ✅**
 
 ```bash
-# Only if you prefer cloud deployment
+# Recommended: Offloads resource usage to Mem0's cloud infrastructure
 # 1. Get API key from https://app.mem0.ai
 
 # 2. Add to config.toml
@@ -207,6 +209,8 @@ EOF
 - Learn from past sessions
 - Get smarter suggestions over time
 - Share team knowledge automatically
+
+**💡 Local Alternative:** If you want token savings without running extra services, use **Knowledge Graph** instead (see above). It provides 95-98% token savings with just an embedded database (~50-100MB), no separate server needed.
 
 ### LlamaIndex Plugin 🔍 MANUAL SETUP REQUIRED
 
