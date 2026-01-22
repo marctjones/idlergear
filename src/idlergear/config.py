@@ -58,7 +58,7 @@ GRAPH_CONFIG_SCHEMA = {
     "graph": {
         "auto_update": {
             "type": "boolean",
-            "default": False,
+            "default": True,
             "description": "Automatically update knowledge graph after commits/merges",
         },
     }

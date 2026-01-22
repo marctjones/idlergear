@@ -1,12 +1,13 @@
 #!/bin/bash
 # IdlerGear post-commit hook
-# Auto-updates knowledge graph after each commit
+# Auto-updates knowledge graph after each commit (enabled by default)
 #
 # Skip graph update: SKIP_GRAPH_UPDATE=1 git commit -m "..."
 # Or use: git commit --no-verify -m "..."
+# Or disable permanently: idlergear config set graph.auto_update false
 #
 # Configuration:
-#   graph.auto_update: true/false - Enable automatic graph updates
+#   graph.auto_update: true/false - Enable automatic graph updates (default: true)
 
 set -e
 

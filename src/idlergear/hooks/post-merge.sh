@@ -1,11 +1,12 @@
 #!/bin/bash
 # IdlerGear post-merge hook
-# Auto-updates knowledge graph after git merge/pull
+# Auto-updates knowledge graph after git merge/pull (enabled by default)
 #
 # Skip graph update: SKIP_GRAPH_UPDATE=1 git merge/pull ...
+# Or disable permanently: idlergear config set graph.auto_update false
 #
 # Configuration:
-#   graph.auto_update: true/false - Enable automatic graph updates
+#   graph.auto_update: true/false - Enable automatic graph updates (default: true)
 
 set -e
 

@@ -1271,7 +1271,8 @@ def install(
     - .cursor/rules/*.mdc - Cursor AI IDE integration (--cursor)
     - .aider.conf.yml - Aider configuration (--aider)
 
-    Note: Graph hooks require 'graph.auto_update' config to be true to activate.
+    Note: Graph hooks auto-update is enabled by default. Disable with:
+          idlergear config set graph.auto_update false
     """
     from idlergear.config import find_idlergear_root
     from idlergear.install import (
