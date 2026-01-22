@@ -828,6 +828,85 @@ def remove_auto_version_hook(project_path: Path | None = None) -> bool:
     return True
 
 
+def add_graph_update_hooks(project_path: Path | None = None) -> bool:
+    """Install git post-commit and post-merge hooks for auto-updating knowledge graph.
+
+    The hooks run incremental populate_all after commits and merges when
+    graph.auto_update config is true.
+
+    Returns True if installed, False if already exists or not a git repo.
+    """
+    from importlib.resources import files
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+
+    # Check if this is a git repository
+    git_dir = project_path / ".git"
+    if not git_dir.exists():
+        return False
+
+    hooks_dir = git_dir / "hooks"
+    hooks_dir.mkdir(exist_ok=True)
+
+    installed_any = False
+
+    # Install post-commit hook
+    post_commit = hooks_dir / "post-commit"
+    if not post_commit.exists() or "IdlerGear graph update" not in post_commit.read_text():
+        hook_source = files("idlergear") / "hooks" / "post-commit.sh"
+        post_commit.write_text(hook_source.read_text())
+        post_commit.chmod(0o755)
+        installed_any = True
+
+    # Install post-merge hook
+    post_merge = hooks_dir / "post-merge"
+    if not post_merge.exists() or "IdlerGear graph update" not in post_merge.read_text():
+        hook_source = files("idlergear") / "hooks" / "post-merge.sh"
+        post_merge.write_text(hook_source.read_text())
+        post_merge.chmod(0o755)
+        installed_any = True
+
+    return installed_any
+
+
+def remove_graph_update_hooks(project_path: Path | None = None) -> bool:
+    """Remove the graph update hooks (post-commit and post-merge).
+
+    Returns True if removed, False if not present.
+    """
+    if project_path is None:
+        project_path = find_idlergear_root()
+    if project_path is None:
+        return False
+
+    git_hooks_dir = project_path / ".git" / "hooks"
+    if not git_hooks_dir.exists():
+        return False
+
+    removed_any = False
+
+    # Remove post-commit hook
+    post_commit = git_hooks_dir / "post-commit"
+    if post_commit.exists():
+        content = post_commit.read_text()
+        if "IdlerGear graph update" in content or "IdlerGear post-commit" in content:
+            post_commit.unlink()
+            removed_any = True
+
+    # Remove post-merge hook
+    post_merge = git_hooks_dir / "post-merge"
+    if post_merge.exists():
+        content = post_merge.read_text()
+        if "IdlerGear graph update" in content or "IdlerGear post-merge" in content:
+            post_merge.unlink()
+            removed_any = True
+
+    return removed_any
+
+
 def remove_rules_file(project_path: Path | None = None) -> bool:
     """Remove .claude/rules/idlergear.md.
 

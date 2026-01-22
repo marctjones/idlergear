@@ -1042,6 +1042,58 @@ async def list_tools() -> list[Tool]:
             description="Get knowledge graph schema information. Returns node types, relationship types, and counts.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        Tool(
+            name="idlergear_graph_query_documentation",
+            description="Query knowledge graph for documentation by path. Returns documentation content with related files, symbols, and tasks. Searches wiki pages and reference files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Documentation path (e.g., 'wiki/Feature-Name.md')",
+                    }
+                },
+                "required": ["path"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_search_documentation",
+            description="Search knowledge graph documentation by keyword. Returns matching wiki pages and references with related code elements.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (searches titles and body text)",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum results to return",
+                        "default": 10,
+                    },
+                },
+                "required": ["query"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_populate_all",
+            description="Populate entire knowledge graph in one command. Runs all populators: git history, code symbols, tasks, commit-task links, references, and wiki documentation.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "max_commits": {
+                        "type": "integer",
+                        "description": "Maximum commits to index",
+                        "default": 100,
+                    },
+                    "incremental": {
+                        "type": "boolean",
+                        "description": "Skip unchanged data",
+                        "default": True,
+                    },
+                },
+            },
+        ),
         # Server management tools
         Tool(
             name="idlergear_version",
@@ -3392,6 +3444,128 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     result = get_schema_info(db)
                     return _format_result(result)
                 raise
+
+        elif name == "idlergear_graph_query_documentation":
+            from idlergear.graph import get_database
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            conn = db.get_connection()
+
+            try:
+                # Get documentation node
+                doc_result = conn.execute("""
+                    MATCH (d:Documentation {path: $path})
+                    RETURN d.path, d.title, d.body, d.source, d.created_at, d.updated_at
+                """, {"path": arguments["path"]})
+
+                if not doc_result.has_next():
+                    return _format_result({
+                        "error": f"Documentation not found: {arguments['path']}",
+                        "path": arguments["path"]
+                    })
+
+                doc = doc_result.get_next()
+                result = {
+                    "path": doc[0],
+                    "title": doc[1],
+                    "body": doc[2],
+                    "source": doc[3],
+                    "created_at": str(doc[4]) if doc[4] else None,
+                    "updated_at": str(doc[5]) if doc[5] else None,
+                    "related_files": [],
+                    "related_symbols": [],
+                    "related_tasks": [],
+                }
+
+                # Get related files
+                files_result = conn.execute("""
+                    MATCH (d:Documentation {path: $path})-[:DOC_DOCUMENTS_FILE]->(f:File)
+                    RETURN f.path
+                    LIMIT 20
+                """, {"path": arguments["path"]})
+                result["related_files"] = [r[0] for r in files_result]
+
+                # Get related symbols
+                symbols_result = conn.execute("""
+                    MATCH (d:Documentation {path: $path})-[:DOC_DOCUMENTS_SYMBOL]->(s:Symbol)
+                    RETURN s.name, s.type, s.file_path
+                    LIMIT 20
+                """, {"path": arguments["path"]})
+                result["related_symbols"] = [
+                    {"name": r[0], "type": r[1], "file": r[2]}
+                    for r in symbols_result
+                ]
+
+                # Get related tasks
+                tasks_result = conn.execute("""
+                    MATCH (d:Documentation {path: $path})-[:DOC_REFERENCES_TASK]->(t:Task)
+                    RETURN t.id, t.title, t.state
+                    LIMIT 10
+                """, {"path": arguments["path"]})
+                result["related_tasks"] = [
+                    {"id": r[0], "title": r[1], "state": r[2]}
+                    for r in tasks_result
+                ]
+
+                return _format_result(result)
+            except Exception as e:
+                if "does not exist" in str(e).lower():
+                    return _format_result({
+                        "error": "Knowledge graph not populated. Run idlergear_graph_populate_all() first."
+                    })
+                raise
+
+        elif name == "idlergear_graph_search_documentation":
+            from idlergear.graph import get_database
+            from idlergear.graph.schema import initialize_schema
+
+            db = get_database()
+            conn = db.get_connection()
+            limit = arguments.get("limit", 10)
+
+            try:
+                # Search documentation by title or body
+                result = conn.execute("""
+                    MATCH (d:Documentation)
+                    WHERE d.title CONTAINS $query OR d.body CONTAINS $query
+                    RETURN d.path, d.title, d.source
+                    LIMIT $limit
+                """, {"query": arguments["query"], "limit": limit})
+
+                docs = []
+                for record in result:
+                    docs.append({
+                        "path": record[0],
+                        "title": record[1],
+                        "source": record[2]
+                    })
+
+                return _format_result({
+                    "query": arguments["query"],
+                    "count": len(docs),
+                    "documents": docs
+                })
+            except Exception as e:
+                if "does not exist" in str(e).lower():
+                    return _format_result({
+                        "error": "Knowledge graph not populated. Run idlergear_graph_populate_all() first."
+                    })
+                raise
+
+        elif name == "idlergear_graph_populate_all":
+            from idlergear.graph import populate_all
+
+            max_commits = arguments.get("max_commits", 100)
+            incremental = arguments.get("incremental", True)
+
+            result = populate_all(
+                max_commits=max_commits,
+                incremental=incremental,
+                verbose=False
+            )
+
+            return _format_result(result)
 
         # Server management handlers
         elif name == "idlergear_version":

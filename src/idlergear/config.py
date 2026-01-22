@@ -54,10 +54,21 @@ PROJECTS_CONFIG_SCHEMA = {
     }
 }
 
+GRAPH_CONFIG_SCHEMA = {
+    "graph": {
+        "auto_update": {
+            "type": "boolean",
+            "default": False,
+            "description": "Automatically update knowledge graph after commits/merges",
+        },
+    }
+}
+
 # Combined schema registry
 CONFIG_SCHEMAS = {
     "test": TEST_CONFIG_SCHEMA["test"],
     "projects": PROJECTS_CONFIG_SCHEMA["projects"],
+    "graph": GRAPH_CONFIG_SCHEMA["graph"],
 }
 
 

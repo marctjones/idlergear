@@ -17,6 +17,15 @@ from .queries import (
     query_recent_changes,
     query_related_files,
 )
+from .populate_all import populate_all, populate_all_quick
+from .populators import (
+    GitPopulator,
+    CodePopulator,
+    TaskPopulator,
+    CommitTaskLinker,
+    ReferencePopulator,
+    WikiPopulator,
+)
 
 __all__ = [
     "get_database",
@@ -26,4 +35,12 @@ __all__ = [
     "query_file_context",
     "query_recent_changes",
     "query_related_files",
+    "populate_all",
+    "populate_all_quick",
+    "GitPopulator",
+    "CodePopulator",
+    "TaskPopulator",
+    "CommitTaskLinker",
+    "ReferencePopulator",
+    "WikiPopulator",
 ]
