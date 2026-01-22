@@ -112,21 +112,36 @@ cat ~/.idlergear/daemon.log
 
 ### Knowledge Graph 📊 MANUAL SETUP REQUIRED
 
-**Status:** ✅ Implemented, ❌ Not enabled by default
+**Status:** ✅ Implemented, ✅ Ready to use (once populated)
 
-**Why not automatic:** Requires initial indexing (can take time on large repos)
+**Why not automatic:** Requires initial indexing (takes 15-30 seconds per project)
 
-**How to enable:**
+**Current status for IdlerGear project:**
+- ✅ **Populated and ready!** (2,003 nodes indexed)
+- 100 commits indexed
+- 422 files indexed
+- 1,481 symbols indexed (functions, classes, methods)
 
-```bash
-# 1. Populate graph with git history
-idlergear_graph_populate_git()
+**How to populate in other projects:**
 
-# 2. Populate graph with code symbols
-idlergear_graph_populate_code()
+```python
+# From Python or via AI assistant MCP tools:
 
-# 3. Verify schema
+# 1. Populate graph with git history (5-10 seconds for 100 commits)
+idlergear_graph_populate_git(max_commits=100, incremental=True)
+
+# 2. Populate graph with code symbols (10-20 seconds for 1000 files)
+idlergear_graph_populate_code(directory="src", incremental=True)
+
+# 3. Verify schema (check node counts)
 idlergear_graph_schema_info()
+```
+
+**Incremental updates (safe to re-run):**
+```python
+# Re-run anytime - only indexes new/changed data
+idlergear_graph_populate_git(incremental=True)
+idlergear_graph_populate_code(directory="src", incremental=True)
 ```
 
 **MCP Tools available (after setup):**

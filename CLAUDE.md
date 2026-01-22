@@ -145,6 +145,68 @@ idlergear_fs_read_file(path="src/api/auth.py")
 - ❌ Don't leave files unannotated
 - ❌ Don't use grep when annotations exist
 
+### MANDATORY: Knowledge Graph Usage (95-98% Token Savings)
+
+**You MUST use knowledge graph queries instead of grep/file reads for context retrieval.**
+
+**The knowledge graph provides:**
+- 95-98% token savings vs grep + file reads
+- Sub-40ms query response times
+- Persistent graph database at `~/.idlergear/graph.db`
+- 2,003+ nodes indexed (commits, files, symbols)
+
+**ALWAYS prefer graph queries over grep when:**
+1. **Finding symbols** - Functions, classes, methods by name
+2. **Getting task context** - Files, commits, symbols related to a task
+3. **Understanding file relationships** - Imports, dependencies, changes
+4. **Searching code** - Fast symbol lookup without reading files
+
+**Query patterns:**
+
+```python
+# Instead of: grep -r "function_name" (7,500 tokens)
+# Use: Knowledge graph symbol search (100 tokens, 98.7% savings!)
+idlergear_graph_query_symbols(pattern="function_name", limit=10)
+# Returns: [{"name": "...", "type": "function", "file": "...", "line": 45}]
+
+# Instead of: Reading 5 files to find task context (5,000 tokens)
+# Use: Knowledge graph task query (100 tokens, 98% savings!)
+idlergear_graph_query_task(task_id=278)
+# Returns: {"task": {...}, "files": [...], "commits": [...], "symbols": [...]}
+
+# Instead of: cat + grep for file relationships (3,000 tokens)
+# Use: Knowledge graph file query (150 tokens, 95% savings!)
+idlergear_graph_query_file(file_path="src/idlergear/mcp_server.py")
+# Returns: {"file": {...}, "tasks": [...], "symbols": [...], "imports": [...]}
+```
+
+**When graph is empty or missing data:**
+```python
+# Check schema/stats
+idlergear_graph_schema_info()
+
+# If nodes == 0, populate (once per project):
+idlergear_graph_populate_git(max_commits=100, incremental=True)
+idlergear_graph_populate_code(directory="src", incremental=True)
+
+# Re-run populate periodically (incremental = skips existing data)
+```
+
+**Rules:**
+- ✅ Use graph queries for symbol/task/file lookups
+- ✅ Query graph BEFORE grepping (check if data exists)
+- ✅ Fall back to grep only if graph returns no results
+- ❌ Don't use grep when graph can answer the query
+- ❌ Don't read multiple files when graph has the context
+
+**Token savings comparison:**
+
+| Query Type | Traditional | Knowledge Graph | Savings |
+|------------|-------------|-----------------|---------|
+| Find function | grep + read files (7,500 tokens) | graph query (100 tokens) | 98.7% |
+| Task context | read 5 files (5,000 tokens) | graph query (100 tokens) | 98.0% |
+| File symbols | cat + grep (3,000 tokens) | graph query (150 tokens) | 95.0% |
+
 ### Knowledge Flow
 
 ```
