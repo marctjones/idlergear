@@ -10192,5 +10192,290 @@ def graph_query_symbols(
         raise typer.Exit(1)
 
 
+@graph_app.command("impact")
+def graph_impact_analysis(
+    ctx: typer.Context,
+    symbol_name: str = typer.Argument(..., help="Symbol name to analyze"),
+):
+    """Analyze what would be affected if a symbol breaks or changes."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_impact_analysis
+
+        db = get_database()
+        result = query_impact_analysis(db, symbol_name)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            if not result.get("found"):
+                typer.secho(f"\n❌ Symbol '{symbol_name}' not found in knowledge graph\n", fg=typer.colors.RED)
+                raise typer.Exit(1)
+
+            typer.secho(f"\n💥 Impact Analysis: {symbol_name}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.echo(f"Defined in: {result['defined_in']}")
+            typer.echo(f"Type: {result['type']}")
+
+            if result['callers']:
+                typer.secho(f"\n📞 Callers ({len(result['callers'])}):", fg=typer.colors.YELLOW)
+                for caller in result['callers']:
+                    typer.echo(f"  - {caller}")
+
+            if result['affected_files']:
+                typer.secho(f"\n📄 Affected Files ({len(result['affected_files'])}):", fg=typer.colors.YELLOW)
+                for file in result['affected_files']:
+                    typer.echo(f"  - {file}")
+
+            if result['related_tasks']:
+                typer.secho(f"\n📋 Related Tasks ({len(result['related_tasks'])}):", fg=typer.colors.YELLOW)
+                for task_id in result['related_tasks']:
+                    typer.echo(f"  - Task #{task_id}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to analyze impact: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("test-coverage")
+def graph_test_coverage(
+    ctx: typer.Context,
+    target: str = typer.Argument(..., help="File path or symbol name"),
+    target_type: str = typer.Option("file", "--type", help="Target type: file or symbol"),
+):
+    """Find test files that cover a given file or symbol."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_test_coverage
+
+        db = get_database()
+        result = query_test_coverage(db, target, target_type)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n🧪 Test Coverage: {target} ({target_type})\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            if result['test_files']:
+                typer.secho(f"Test Files ({len(result['test_files'])}):", fg=typer.colors.GREEN)
+                for test_file in result['test_files']:
+                    typer.echo(f"  - {test_file}")
+            else:
+                typer.secho("No test files found", fg=typer.colors.YELLOW)
+
+            if result['test_functions']:
+                typer.secho(f"\nTest Functions ({len(result['test_functions'])}):", fg=typer.colors.GREEN)
+                for test_func in result['test_functions']:
+                    typer.echo(f"  - {test_func}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to check test coverage: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("history")
+def graph_change_history(
+    ctx: typer.Context,
+    symbol_name: str = typer.Argument(..., help="Symbol name to trace"),
+):
+    """Get all commits that touched a specific symbol."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_change_history
+
+        db = get_database()
+        commits = query_change_history(db, symbol_name)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps({"symbol": symbol_name, "commits": commits}, indent=2))
+        else:
+            typer.secho(f"\n📜 Change History: {symbol_name}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            if not commits:
+                typer.secho("No commits found for this symbol", fg=typer.colors.YELLOW)
+            else:
+                for commit in commits:
+                    typer.secho(f"{commit['hash']}", fg=typer.colors.GREEN, bold=True)
+                    typer.echo(f"  Author: {commit['author']}")
+                    typer.echo(f"  Date: {commit['timestamp']}")
+                    typer.echo(f"  File: {commit['file']}")
+                    typer.echo(f"  Message: {commit['message'][:60]}...")
+                    typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to get change history: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("dependencies")
+def graph_dependency_chain(
+    ctx: typer.Context,
+    file_path: str = typer.Argument(..., help="File path to analyze"),
+    max_depth: int = typer.Option(5, "--max-depth", help="Maximum traversal depth"),
+):
+    """Find transitive dependency chain for a file."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_dependency_chain
+
+        db = get_database()
+        result = query_dependency_chain(db, file_path, max_depth)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n🔗 Dependency Chain: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.echo(f"Total dependencies: {result['total_dependencies']}")
+
+            if result['dependencies']:
+                typer.secho("\nDependencies (by distance):", fg=typer.colors.GREEN)
+                for dep in result['dependencies']:
+                    typer.echo(f"  [{dep['distance']} hops] {dep['file']}")
+            else:
+                typer.secho("\nNo dependencies found", fg=typer.colors.YELLOW)
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to get dependency chain: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("orphans")
+def graph_orphan_detection(ctx: typer.Context):
+    """Find orphaned/unused code - functions with no callers, files with no imports."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_orphan_detection
+
+        db = get_database()
+        result = query_orphan_detection(db)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho("\n🗑️  Orphan Detection\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+
+            typer.secho(f"Unused Symbols: {result['unused_symbol_count']}", fg=typer.colors.YELLOW, bold=True)
+            if result['unused_symbols']:
+                for symbol in result['unused_symbols'][:20]:  # Show first 20
+                    typer.echo(f"  - {symbol['name']} ({symbol['type']}) in {symbol['file']}:{symbol['line']}")
+                if result['unused_symbol_count'] > 20:
+                    typer.echo(f"  ... and {result['unused_symbol_count'] - 20} more")
+
+            typer.echo()
+            typer.secho(f"Unreferenced Files: {result['unreferenced_file_count']}", fg=typer.colors.YELLOW, bold=True)
+            if result['unreferenced_files']:
+                for file in result['unreferenced_files'][:20]:  # Show first 20
+                    typer.echo(f"  - {file['file']} ({file['lines']} lines)")
+                if result['unreferenced_file_count'] > 20:
+                    typer.echo(f"  ... and {result['unreferenced_file_count'] - 20} more")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to detect orphans: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("callers")
+def graph_symbol_callers(
+    ctx: typer.Context,
+    symbol_name: str = typer.Argument(..., help="Symbol to find callers for"),
+):
+    """Find all symbols that call a given symbol (reverse lookup)."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_symbol_callers
+
+        db = get_database()
+        result = query_symbol_callers(db, symbol_name)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n📞 Callers of: {symbol_name}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.echo(f"Total callers: {result['caller_count']}")
+
+            if result['callers']:
+                typer.secho("\nCaller Functions:", fg=typer.colors.GREEN)
+                for caller in result['callers']:
+                    typer.echo(f"  - {caller['name']} ({caller['type']}) in {caller['file']}:{caller['line']}")
+            else:
+                typer.secho("\nNo callers found", fg=typer.colors.YELLOW)
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to find callers: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("timeline")
+def graph_file_timeline(
+    ctx: typer.Context,
+    file_path: str = typer.Argument(..., help="File to trace"),
+    limit: int = typer.Option(20, "--limit", help="Max commits to return"),
+):
+    """Get evolution of a file over time via commits."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_file_timeline
+
+        db = get_database()
+        result = query_file_timeline(db, file_path, limit)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n📅 Timeline: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.echo(f"Total commits: {result['commit_count']}")
+
+            if result['commits']:
+                typer.secho("\nRecent Commits:", fg=typer.colors.GREEN)
+                for commit in result['commits']:
+                    typer.secho(f"{commit['hash']}", fg=typer.colors.CYAN, bold=True)
+                    typer.echo(f"  Author: {commit['author']}")
+                    typer.echo(f"  Date: {commit['timestamp']}")
+                    typer.echo(f"  Message: {commit['message'][:60]}...")
+                    typer.echo()
+            else:
+                typer.secho("\nNo commits found for this file", fg=typer.colors.YELLOW)
+
+    except Exception as e:
+        typer.secho(f"Failed to get file timeline: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("task-coverage")
+def graph_task_coverage(ctx: typer.Context):
+    """Find tasks with no associated commits (not yet implemented)."""
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.queries import query_task_coverage
+
+        db = get_database()
+        result = query_task_coverage(db)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho("\n📊 Task Coverage Analysis\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.echo(f"Tasks with commits: {result['tasks_with_commits_count']}")
+            typer.echo(f"Tasks without commits: {result['tasks_without_commits_count']}")
+            typer.echo(f"Coverage: {result['coverage_percentage']:.1f}%")
+
+            if result['tasks_without_commits']:
+                typer.secho(f"\nTasks Without Commits ({len(result['tasks_without_commits'])}):", fg=typer.colors.YELLOW)
+                for task in result['tasks_without_commits'][:20]:  # Show first 20
+                    priority = task['priority'] or 'none'
+                    typer.echo(f"  - #{task['id']}: {task['title']} (priority: {priority}, state: {task['state']})")
+                if result['tasks_without_commits_count'] > 20:
+                    typer.echo(f"  ... and {result['tasks_without_commits_count'] - 20} more")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to check task coverage: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
