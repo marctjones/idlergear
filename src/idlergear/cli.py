@@ -9649,6 +9649,88 @@ def file_search(
         typer.echo()
 
 
+@file_app.command("audit")
+def file_audit(
+    ctx: typer.Context,
+    since: int = typer.Option(24, "--since", help="Audit access log for last N hours (default: 24)"),
+    include_code: bool = typer.Option(False, "--include-code", help="Include static code analysis"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: json or text (default: text)"),
+):
+    """Audit project for deprecated file usage.
+
+    Scans:
+    - Access log for recent deprecated file access
+    - (Optional) Code for string references to deprecated files
+
+    Examples:
+      idlergear file audit
+      idlergear file audit --since 48 --include-code
+      idlergear file audit --output json
+    """
+    from idlergear.file_registry import FileRegistry
+
+    registry = FileRegistry()
+    report = registry.audit_project(since_hours=since, include_code_scan=include_code)
+
+    # JSON output
+    if output == "json" or ctx.obj.get("output_mode") == "json":
+        typer.echo(json.dumps(report, indent=2))
+        return
+
+    # Text output
+    typer.secho("\n📋 File Registry Audit Report", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho("=" * 60, fg=typer.colors.BRIGHT_BLUE)
+
+    # Accessed files section
+    accessed = report["accessed"]
+    if accessed:
+        typer.secho(f"\n⚠️  Deprecated Files Recently Accessed ({len(accessed)}):", fg=typer.colors.YELLOW, bold=True)
+        for item in accessed:
+            typer.secho(f"\n  ✗ {item['file']}", fg=typer.colors.RED, bold=True)
+            if item.get("current_version"):
+                typer.secho(f"    Current version: {item['current_version']}", fg=typer.colors.GREEN)
+            typer.secho(f"    Access count: {item['access_count']}")
+            typer.secho(f"    Last accessed: {item['last_accessed']}")
+            if item.get("accessed_by"):
+                agents = ", ".join(item["accessed_by"])
+                typer.secho(f"    Accessed by: {agents}")
+            if item.get("tools_used"):
+                tools = ", ".join(item["tools_used"])
+                typer.secho(f"    Tools used: {tools}")
+    else:
+        typer.secho(f"\n✅ No deprecated files accessed in last {since} hours", fg=typer.colors.GREEN)
+
+    # Code references section
+    if include_code:
+        code_refs = report["code_references"]
+        if code_refs:
+            typer.secho(f"\n⚠️  Deprecated Files Referenced in Code ({len(code_refs)}):", fg=typer.colors.YELLOW, bold=True)
+            for ref in code_refs:
+                typer.secho(f"\n  ⚠️  {ref['file']}:{ref['line']}", fg=typer.colors.YELLOW, bold=True)
+                typer.secho(f"    References: {ref['deprecated_file']}", fg=typer.colors.RED)
+                if ref.get("current_version"):
+                    typer.secho(f"    Suggestion: Update to {ref['current_version']}", fg=typer.colors.GREEN)
+                typer.secho(f"    Code: {ref['code'][:80]}{'...' if len(ref['code']) > 80 else ''}")
+        else:
+            typer.secho("\n✅ No deprecated file references found in code", fg=typer.colors.GREEN)
+
+    # Summary
+    typer.secho("\n" + "=" * 60, fg=typer.colors.BRIGHT_BLUE)
+    typer.secho("Summary:", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.echo(f"  Audit period: Last {report['summary']['audit_period_hours']} hours")
+    typer.echo(f"  Deprecated files accessed: {report['summary']['deprecated_files_accessed']}")
+    if include_code:
+        typer.echo(f"  Code references found: {report['summary']['code_references_found']}")
+
+    if report['summary']['deprecated_files_accessed'] > 0 or report['summary']['code_references_found'] > 0:
+        typer.secho("\n💡 Action Required:", fg=typer.colors.CYAN, bold=True)
+        typer.echo("  - Review and update references to deprecated files")
+        typer.echo("  - Use 'idlergear file status <path>' to find current versions")
+        typer.echo("  - Consider adding to pre-commit hook for automated checks")
+
+    typer.echo()
+
+
 @file_app.command("unregister")
 def file_unregister(
     path: str = typer.Argument(..., help="File path to unregister"),

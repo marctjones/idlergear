@@ -584,3 +584,191 @@ class FileRegistry:
                 tag_map[tag]["files"].append(entry.path)
 
         return tag_map
+
+    def audit_project(
+        self,
+        since_hours: int = 24,
+        include_code_scan: bool = False,
+    ) -> Dict[str, Any]:
+        """Audit project for deprecated file usage.
+
+        Scans:
+        1. Access log for recent deprecated file access
+        2. (Optional) Code for string references to deprecated files
+
+        Args:
+            since_hours: Audit access log for last N hours (default: 24)
+            include_code_scan: Include static code analysis (default: False)
+
+        Returns:
+            Audit report with accessed files and code references
+        """
+        from datetime import datetime, timedelta, timezone
+
+        report = {
+            "accessed": [],
+            "code_references": [],
+            "summary": {
+                "deprecated_files_accessed": 0,
+                "code_references_found": 0,
+                "audit_period_hours": since_hours,
+                "audit_timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+        # 1. Check access log
+        access_log_path = self.registry_path.parent / "access_log.jsonl"
+        if access_log_path.exists():
+            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=since_hours)
+            accessed_files = self._parse_access_log(access_log_path, cutoff_time)
+
+            # Filter for deprecated files only
+            for file_path, access_data in accessed_files.items():
+                entry = self.files.get(file_path)
+                if entry and entry.status == FileStatus.DEPRECATED:
+                    report["accessed"].append({
+                        "file": file_path,
+                        "current_version": entry.current_version,
+                        "access_count": access_data["count"],
+                        "last_accessed": access_data["last_accessed"],
+                        "accessed_by": access_data["agents"],
+                        "tools_used": list(access_data["tools"]),
+                    })
+
+            report["summary"]["deprecated_files_accessed"] = len(report["accessed"])
+
+        # 2. (Optional) Static code analysis
+        if include_code_scan:
+            code_refs = self._scan_code_for_deprecated_files()
+            report["code_references"] = code_refs
+            report["summary"]["code_references_found"] = len(code_refs)
+
+        return report
+
+    def _parse_access_log(
+        self,
+        log_path: Path,
+        cutoff_time: datetime,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Parse access log and aggregate by file.
+
+        Args:
+            log_path: Path to access_log.jsonl
+            cutoff_time: Only include entries after this time
+
+        Returns:
+            Dictionary mapping file paths to access statistics
+        """
+        from datetime import datetime
+
+        accessed = {}
+
+        try:
+            with open(log_path) as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+
+                    try:
+                        entry = json.loads(line)
+
+                        # Parse timestamp
+                        timestamp_str = entry.get("timestamp")
+                        if not timestamp_str:
+                            continue
+
+                        try:
+                            # Handle ISO format with timezone
+                            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                        except ValueError:
+                            continue
+
+                        # Skip if before cutoff
+                        if timestamp < cutoff_time:
+                            continue
+
+                        file_path = entry.get("file_path")
+                        if not file_path:
+                            continue
+
+                        # Initialize or update statistics
+                        if file_path not in accessed:
+                            accessed[file_path] = {
+                                "count": 0,
+                                "last_accessed": timestamp.isoformat(),
+                                "agents": set(),
+                                "tools": set(),
+                            }
+
+                        accessed[file_path]["count"] += 1
+
+                        # Update last accessed time if more recent
+                        if timestamp.isoformat() > accessed[file_path]["last_accessed"]:
+                            accessed[file_path]["last_accessed"] = timestamp.isoformat()
+
+                        # Track agents and tools
+                        agent_id = entry.get("agent_id", "unknown")
+                        accessed[file_path]["agents"].add(agent_id)
+
+                        tool = entry.get("tool", "unknown")
+                        accessed[file_path]["tools"].add(tool)
+
+                    except json.JSONDecodeError:
+                        continue  # Skip malformed lines
+
+        except FileNotFoundError:
+            pass  # Log doesn't exist yet
+
+        # Convert sets to lists for JSON serialization
+        for file_data in accessed.values():
+            file_data["agents"] = list(file_data["agents"])
+            file_data["tools"] = list(file_data["tools"])
+
+        return accessed
+
+    def _scan_code_for_deprecated_files(self) -> List[Dict[str, Any]]:
+        """Scan Python files for references to deprecated files.
+
+        Returns:
+            List of code references found
+        """
+        references = []
+
+        # Get list of deprecated files
+        deprecated_files = [
+            entry.path for entry in self.files.values()
+            if entry.status == FileStatus.DEPRECATED
+        ]
+
+        if not deprecated_files:
+            return references
+
+        # Scan Python files
+        project_root = self.registry_path.parent.parent
+        for py_file in project_root.glob("**/*.py"):
+            # Skip virtual environments, test files, .git
+            if any(part in py_file.parts for part in ["venv", ".venv", "env", ".git", ".tox", "__pycache__"]):
+                continue
+
+            try:
+                content = py_file.read_text()
+                lines = content.split("\n")
+
+                for line_num, line in enumerate(lines, 1):
+                    # Check if line contains any deprecated file path
+                    for dep_file in deprecated_files:
+                        # Look for path in string literals (quoted)
+                        if dep_file in line and (f'"{dep_file}"' in line or f"'{dep_file}'" in line):
+                            entry = self.files[dep_file]
+                            references.append({
+                                "file": str(py_file.relative_to(project_root)),
+                                "line": line_num,
+                                "code": line.strip(),
+                                "deprecated_file": dep_file,
+                                "current_version": entry.current_version,
+                            })
+
+            except (UnicodeDecodeError, PermissionError):
+                continue  # Skip files we can't read
+
+        return references

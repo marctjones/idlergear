@@ -3114,6 +3114,25 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {},
             },
         ),
+        Tool(
+            name="idlergear_file_audit",
+            description="Audit project for deprecated file usage. Scans access log for recent deprecated file access and optionally scans code for string references. Use this to detect when AI assistants or developers are using outdated files.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "since_hours": {
+                        "type": "integer",
+                        "description": "Audit access log for last N hours (default: 24)",
+                        "default": 24,
+                    },
+                    "include_code_scan": {
+                        "type": "boolean",
+                        "description": "Include static code analysis for deprecated file references (default: false)",
+                        "default": False,
+                    },
+                },
+            },
+        ),
         # Plugin tools (NEW v0.8.0)
         Tool(
             name="idlergear_plugin_list",
@@ -5946,6 +5965,20 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "tags": tags,
                 }
             )
+
+        elif name == "idlergear_file_audit":
+            from idlergear.file_registry import FileRegistry
+
+            registry = _get_cached_registry()
+            since_hours = arguments.get("since_hours", 24)
+            include_code_scan = arguments.get("include_code_scan", False)
+
+            report = registry.audit_project(
+                since_hours=since_hours,
+                include_code_scan=include_code_scan,
+            )
+
+            return _format_result(report)
 
         # Plugin handlers (NEW v0.8.0)
         elif name == "idlergear_plugin_list":
