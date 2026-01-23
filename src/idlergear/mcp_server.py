@@ -1313,6 +1313,79 @@ async def list_tools() -> list[Tool]:
             description="Find tasks with no associated commits (not yet implemented). Returns tasks that have no work done on them yet, with coverage percentage.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        # Graph visualization tools
+        Tool(
+            name="idlergear_graph_visualize_export",
+            description="Export knowledge graph to visualization format (GraphML for Gephi/Cytoscape, DOT for Graphviz, JSON for custom viz). Use this to create visual diagrams of your codebase structure.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "output_path": {"type": "string", "description": "Output file path (.graphml, .dot, or .json)"},
+                    "format": {
+                        "type": "string",
+                        "description": "Format: graphml, dot, or json (auto-detected from extension)",
+                        "enum": ["graphml", "dot", "json"],
+                    },
+                    "node_types": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by node types (e.g., ['Task', 'File', 'Symbol'])",
+                    },
+                    "relationship_types": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Filter by relationship types (e.g., ['MODIFIES', 'CONTAINS'])",
+                    },
+                    "max_nodes": {"type": "integer", "description": "Maximum nodes to export (default: 1000)", "default": 1000},
+                    "d3_format": {"type": "boolean", "description": "Use D3.js format for JSON (default: false)", "default": False},
+                    "layout": {
+                        "type": "string",
+                        "description": "Graphviz layout for DOT format (dot, neato, fdp, circo, twopi)",
+                        "enum": ["dot", "neato", "fdp", "circo", "twopi"],
+                        "default": "dot",
+                    },
+                },
+                "required": ["output_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_visualize_task",
+            description="Visualize task and its connected nodes (commits, files, symbols). Shows the task's implementation network to understand what was changed.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {"type": "integer", "description": "Task ID to visualize"},
+                    "output_path": {"type": "string", "description": "Output file path"},
+                    "depth": {"type": "integer", "description": "Relationship depth (1=direct, 2=2nd degree, default: 2)", "default": 2},
+                    "format": {
+                        "type": "string",
+                        "description": "Output format (default: dot)",
+                        "enum": ["graphml", "dot", "json"],
+                        "default": "dot",
+                    },
+                },
+                "required": ["task_id", "output_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_visualize_deps",
+            description="Visualize file dependencies (imports, calls). Shows the dependency network to understand module relationships and potential circular dependencies.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "File path to analyze"},
+                    "output_path": {"type": "string", "description": "Output file path"},
+                    "depth": {"type": "integer", "description": "Import depth (how many hops to follow, default: 2)", "default": 2},
+                    "format": {
+                        "type": "string",
+                        "description": "Output format (default: dot)",
+                        "enum": ["graphml", "dot", "json"],
+                        "default": "dot",
+                    },
+                },
+                "required": ["file_path", "output_path"],
+            },
+        ),
         # Server management tools
         Tool(
             name="idlergear_version",
@@ -3861,6 +3934,80 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             db = get_database()
             result = query_task_coverage(db)
+            return _format_result(result)
+
+        # Graph visualization handlers
+        elif name == "idlergear_graph_visualize_export":
+            from idlergear.graph import get_database
+            from idlergear.graph.visualize import GraphVisualizer
+            from pathlib import Path
+
+            output_path = Path(arguments.get("output_path"))
+            format = arguments.get("format")
+            node_types = arguments.get("node_types")
+            relationship_types = arguments.get("relationship_types")
+            max_nodes = arguments.get("max_nodes", 1000)
+            d3_format = arguments.get("d3_format", False)
+            layout = arguments.get("layout", "dot")
+
+            # Auto-detect format from extension if not specified
+            if format is None:
+                suffix = output_path.suffix.lower()
+                if suffix == ".graphml":
+                    format = "graphml"
+                elif suffix == ".dot":
+                    format = "dot"
+                elif suffix == ".json":
+                    format = "json"
+                else:
+                    raise ValueError(f"Unknown file extension: {suffix}. Please specify format parameter.")
+
+            db = get_database()
+            viz = GraphVisualizer(db)
+
+            # Export based on format
+            if format == "graphml":
+                result = viz.export_graphml(output_path, node_types, relationship_types, max_nodes)
+            elif format == "dot":
+                result = viz.export_dot(output_path, node_types, relationship_types, max_nodes, layout)
+            elif format == "json":
+                json_format = "d3" if d3_format else "raw"
+                result = viz.export_json(output_path, node_types, relationship_types, max_nodes, json_format)
+            else:
+                raise ValueError(f"Unknown format: {format}")
+
+            return _format_result(result)
+
+        elif name == "idlergear_graph_visualize_task":
+            from idlergear.graph import get_database
+            from idlergear.graph.visualize import GraphVisualizer
+            from pathlib import Path
+
+            task_id = arguments.get("task_id")
+            output_path = Path(arguments.get("output_path"))
+            depth = arguments.get("depth", 2)
+            format = arguments.get("format", "dot")
+
+            db = get_database()
+            viz = GraphVisualizer(db)
+
+            result = viz.visualize_task_network(task_id, output_path, depth, format)
+            return _format_result(result)
+
+        elif name == "idlergear_graph_visualize_deps":
+            from idlergear.graph import get_database
+            from idlergear.graph.visualize import GraphVisualizer
+            from pathlib import Path
+
+            file_path = arguments.get("file_path")
+            output_path = Path(arguments.get("output_path"))
+            depth = arguments.get("depth", 2)
+            format = arguments.get("format", "dot")
+
+            db = get_database()
+            viz = GraphVisualizer(db)
+
+            result = viz.visualize_dependency_graph(file_path, output_path, depth, format)
             return _format_result(result)
 
         # Server management handlers

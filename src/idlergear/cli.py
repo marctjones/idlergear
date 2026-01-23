@@ -10477,5 +10477,169 @@ def graph_task_coverage(ctx: typer.Context):
         raise typer.Exit(1)
 
 
+@graph_app.command("visualize")
+def graph_visualize_export(
+    ctx: typer.Context,
+    output: Path = typer.Argument(..., help="Output file path (.graphml, .dot, or .json)"),
+    node_types: Optional[str] = typer.Option(None, help="Comma-separated node types (e.g., 'Task,File,Symbol')"),
+    relationship_types: Optional[str] = typer.Option(None, help="Comma-separated relationship types"),
+    max_nodes: int = typer.Option(1000, help="Maximum nodes to export"),
+    format: str = typer.Option(None, help="Format: graphml, dot, json (auto-detected from extension)"),
+    d3: bool = typer.Option(False, help="Export in D3.js format (for JSON only)"),
+    layout: str = typer.Option("dot", help="Graphviz layout: dot, neato, fdp, circo, twopi"),
+):
+    """Export knowledge graph to visualization format.
+
+    Formats:
+    - GraphML (.graphml): For Gephi, Cytoscape, yEd
+    - DOT (.dot): For Graphviz (render with: dot -Tpng output.dot -o output.png)
+    - JSON (.json): For custom visualization or D3.js
+
+    Examples:
+      idlergear graph visualize graph.graphml --node-types "Task,File"
+      idlergear graph visualize graph.dot --max-nodes 100 --layout neato
+      idlergear graph visualize graph.json --d3
+    """
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.visualize import GraphVisualizer
+
+        # Parse node/relationship types
+        node_list = node_types.split(",") if node_types else None
+        rel_list = relationship_types.split(",") if relationship_types else None
+
+        # Auto-detect format from extension
+        if format is None:
+            suffix = output.suffix.lower()
+            if suffix == ".graphml":
+                format = "graphml"
+            elif suffix == ".dot":
+                format = "dot"
+            elif suffix == ".json":
+                format = "json"
+            else:
+                typer.secho("Unknown file extension. Please specify --format", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1)
+
+        db = get_database()
+        viz = GraphVisualizer(db)
+
+        # Export based on format
+        if format == "graphml":
+            result = viz.export_graphml(output, node_list, rel_list, max_nodes)
+        elif format == "dot":
+            result = viz.export_dot(output, node_list, rel_list, max_nodes, layout)
+        elif format == "json":
+            json_format = "d3" if d3 else "raw"
+            result = viz.export_json(output, node_list, rel_list, max_nodes, json_format)
+        else:
+            typer.secho(f"Unknown format: {format}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n✅ Graph exported successfully!", fg=typer.colors.GREEN)
+            typer.echo(f"Format: {format}")
+            typer.echo(f"Nodes: {result['nodes']}")
+            typer.echo(f"Edges: {result['edges']}")
+            typer.echo(f"Output: {result['output']}")
+
+            if 'render_command' in result:
+                typer.secho(f"\n💡 Render with:", fg=typer.colors.CYAN)
+                typer.echo(f"  {result['render_command']}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to export graph: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("visualize-task")
+def graph_visualize_task(
+    ctx: typer.Context,
+    task_id: int = typer.Argument(..., help="Task ID to visualize"),
+    output: Path = typer.Argument(..., help="Output file path"),
+    depth: int = typer.Option(2, help="Relationship depth (1=direct, 2=2nd degree)"),
+    format: str = typer.Option("dot", help="Format: graphml, dot, json"),
+):
+    """Visualize task and its connected nodes (commits, files, symbols).
+
+    Shows the task's implementation network:
+    - Files modified by the task
+    - Commits implementing the task
+    - Symbols changed
+
+    Example:
+      idlergear graph visualize-task 337 task_337.dot --depth 2
+      dot -Tpng task_337.dot -o task_337.png
+    """
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.visualize import GraphVisualizer
+
+        db = get_database()
+        viz = GraphVisualizer(db)
+
+        result = viz.visualize_task_network(task_id, output, depth, format)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n✅ Task network exported!", fg=typer.colors.GREEN)
+            typer.echo(f"Task: #{task_id}")
+            typer.echo(f"Nodes: {result['nodes']}")
+            typer.echo(f"Edges: {result['edges']}")
+            typer.echo(f"Output: {result['output']}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to visualize task: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@graph_app.command("visualize-deps")
+def graph_visualize_deps(
+    ctx: typer.Context,
+    file_path: str = typer.Argument(..., help="File path to analyze"),
+    output: Path = typer.Argument(..., help="Output file path"),
+    depth: int = typer.Option(2, help="Import depth (how many hops to follow)"),
+    format: str = typer.Option("dot", help="Format: graphml, dot, json"),
+):
+    """Visualize file dependencies (imports, calls).
+
+    Shows the dependency network:
+    - Files imported by this file
+    - Files that import this file
+    - Transitive dependencies
+
+    Example:
+      idlergear graph visualize-deps src/main.py deps.dot --depth 3
+      dot -Tpng deps.dot -o deps.png
+    """
+    try:
+        from idlergear.graph.database import get_database
+        from idlergear.graph.visualize import GraphVisualizer
+
+        db = get_database()
+        viz = GraphVisualizer(db)
+
+        result = viz.visualize_dependency_graph(file_path, output, depth, format)
+
+        if ctx.obj.get("output_mode") == "json":
+            typer.echo(json.dumps(result, indent=2))
+        else:
+            typer.secho(f"\n✅ Dependency graph exported!", fg=typer.colors.GREEN)
+            typer.echo(f"File: {file_path}")
+            typer.echo(f"Nodes: {result['nodes']}")
+            typer.echo(f"Edges: {result['edges']}")
+            typer.echo(f"Output: {result['output']}")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to visualize dependencies: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

@@ -25,7 +25,11 @@ from .populators import (
     CommitTaskLinker,
     ReferencePopulator,
     WikiPopulator,
+    PersonPopulator,
+    DependencyPopulator,
+    TestPopulator,
 )
+from .visualize import GraphVisualizer
 
 __all__ = [
     "get_database",
@@ -43,4 +47,8 @@ __all__ = [
     "CommitTaskLinker",
     "ReferencePopulator",
     "WikiPopulator",
+    "PersonPopulator",
+    "DependencyPopulator",
+    "TestPopulator",
+    "GraphVisualizer",
 ]
