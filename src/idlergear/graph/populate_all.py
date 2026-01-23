@@ -12,6 +12,9 @@ from .populators import (
     CommitTaskLinker,
     ReferencePopulator,
     WikiPopulator,
+    PersonPopulator,
+    DependencyPopulator,
+    TestPopulator,
 )
 
 
@@ -32,6 +35,9 @@ def populate_all(
     4. Commit-task linking (parse commit messages)
     5. References (.idlergear/reference/)
     6. Wiki (GitHub wiki)
+    7. Person (git authors, contributors)
+    8. Dependencies (requirements.txt, package.json, etc.)
+    9. Tests (test files and test cases)
 
     Args:
         project_path: Path to project (defaults to current directory)
@@ -164,6 +170,55 @@ def populate_all(
             print(f"  ✗ Error: {e}")
         results['wiki'] = {"error": str(e)}
 
+    # 7. Populate persons (contributors)
+    if verbose:
+        print("\n📊 Populating persons (contributors)...")
+    try:
+        person_pop = PersonPopulator(db, project_path)
+        results['persons'] = person_pop.populate(
+            incremental=incremental,
+            calculate_ownership=True
+        )
+        if verbose:
+            print(f"  ✓ {results['persons']['persons']} contributors indexed")
+            print(f"  ✓ {results['persons']['authored']} commit authorships linked")
+            print(f"  ✓ {results['persons']['owns']} file ownerships calculated")
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ Error: {e}")
+        results['persons'] = {"error": str(e)}
+
+    # 8. Populate dependencies
+    if verbose:
+        print("\n📊 Populating dependencies...")
+    try:
+        dep_pop = DependencyPopulator(db, project_path)
+        results['dependencies'] = dep_pop.populate(incremental=incremental)
+        if verbose:
+            print(f"  ✓ {results['dependencies']['dependencies']} dependencies indexed")
+            print(f"  ✓ {results['dependencies']['relationships']} file-dependency links created")
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ Error: {e}")
+        results['dependencies'] = {"error": str(e)}
+
+    # 9. Populate tests
+    if verbose:
+        print("\n📊 Populating tests...")
+    try:
+        test_pop = TestPopulator(db, project_path)
+        results['tests'] = test_pop.populate(
+            incremental=incremental,
+            link_coverage=True
+        )
+        if verbose:
+            print(f"  ✓ {results['tests']['tests']} tests indexed")
+            print(f"  ✓ {results['tests']['covers']} coverage links created")
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ Error: {e}")
+        results['tests'] = {"error": str(e)}
+
     # Summary
     if verbose:
         print("\n" + "="*60)
@@ -177,6 +232,9 @@ def populate_all(
             results.get('tasks', {}).get('tasks', 0),
             results.get('references', {}).get('references', 0),
             results.get('wiki', {}).get('documents', 0),
+            results.get('persons', {}).get('persons', 0),
+            results.get('dependencies', {}).get('dependencies', 0),
+            results.get('tests', {}).get('tests', 0),
         ])
 
         total_relationships = sum([
@@ -185,6 +243,10 @@ def populate_all(
             results.get('links', {}).get('links_created', 0),
             results.get('references', {}).get('relationships', 0),
             results.get('wiki', {}).get('relationships', 0),
+            results.get('persons', {}).get('authored', 0),
+            results.get('persons', {}).get('owns', 0),
+            results.get('dependencies', {}).get('relationships', 0),
+            results.get('tests', {}).get('covers', 0),
         ])
 
         print(f"\nTotal nodes indexed: ~{total_nodes:,}")

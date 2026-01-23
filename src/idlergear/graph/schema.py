@@ -54,6 +54,13 @@ def _drop_tables(conn):
         "DOC_DOCUMENTS_SYMBOL",
         "DOC_REFERENCES_TASK",
         "RELATED_TO",
+        "COVERS",
+        "DEPENDS_ON_DEPENDENCY",
+        "CONFIGURES",
+        "OCCURS_IN",
+        "FIXES",
+        "AUTHORED",
+        "OWNS",
     ]
 
     # Then drop nodes
@@ -67,6 +74,13 @@ def _drop_tables(conn):
         "Commit",
         "Branch",
         "Documentation",
+        "Test",
+        "Dependency",
+        "Config",
+        "Error",
+        "PR",
+        "Metric",
+        "Person",
     ]
 
     for table in rel_tables + node_tables:
@@ -189,6 +203,97 @@ def _create_node_tables(conn):
             source STRING,
             created_at TIMESTAMP,
             updated_at TIMESTAMP
+        )
+    """)
+
+    # Test nodes (unit tests, integration tests, test coverage)
+    conn.execute("""
+        CREATE NODE TABLE Test(
+            id STRING PRIMARY KEY,
+            name STRING,
+            type STRING,
+            file_path STRING,
+            line_start INT32,
+            line_end INT32,
+            status STRING,
+            last_run TIMESTAMP,
+            duration_ms INT64
+        )
+    """)
+
+    # Dependency nodes (external libraries, imports, package requirements)
+    conn.execute("""
+        CREATE NODE TABLE Dependency(
+            name STRING PRIMARY KEY,
+            version STRING,
+            type STRING,
+            source STRING,
+            required_by STRING[]
+        )
+    """)
+
+    # Config nodes (configuration files, environment variables, settings)
+    conn.execute("""
+        CREATE NODE TABLE Config(
+            id STRING PRIMARY KEY,
+            key STRING,
+            value STRING,
+            file_path STRING,
+            env_var BOOLEAN,
+            description STRING
+        )
+    """)
+
+    # Error nodes (known bugs, exceptions, stack traces, error logs)
+    conn.execute("""
+        CREATE NODE TABLE Error(
+            id STRING PRIMARY KEY,
+            message STRING,
+            type STRING,
+            stack_trace STRING,
+            file_path STRING,
+            line INT32,
+            timestamp TIMESTAMP,
+            resolved BOOLEAN
+        )
+    """)
+
+    # PR nodes (pull requests, code reviews, review comments)
+    conn.execute("""
+        CREATE NODE TABLE PR(
+            number INT64 PRIMARY KEY,
+            title STRING,
+            body STRING,
+            state STRING,
+            author STRING,
+            created_at TIMESTAMP,
+            merged_at TIMESTAMP,
+            base_branch STRING,
+            head_branch STRING
+        )
+    """)
+
+    # Metric nodes (code metrics: complexity, LOC, test coverage %)
+    conn.execute("""
+        CREATE NODE TABLE Metric(
+            id STRING PRIMARY KEY,
+            metric_type STRING,
+            value DOUBLE,
+            target STRING,
+            target_type STRING,
+            timestamp TIMESTAMP
+        )
+    """)
+
+    # Person nodes (contributors, authors, code ownership)
+    conn.execute("""
+        CREATE NODE TABLE Person(
+            email STRING PRIMARY KEY,
+            name STRING,
+            username STRING,
+            commit_count INT32,
+            first_commit TIMESTAMP,
+            last_commit TIMESTAMP
         )
     """)
 
@@ -331,6 +436,73 @@ def _create_relationship_tables(conn):
         )
     """)
 
+    # Test relationships
+    conn.execute("""
+        CREATE REL TABLE COVERS(
+            FROM Test TO Symbol,
+            FROM Test TO File,
+            coverage_percent DOUBLE
+        )
+    """)
+
+    # Dependency relationships
+    conn.execute("""
+        CREATE REL TABLE DEPENDS_ON_DEPENDENCY(
+            FROM File TO Dependency,
+            import_line INT32,
+            required BOOLEAN
+        )
+    """)
+
+    # Config relationships
+    conn.execute("""
+        CREATE REL TABLE CONFIGURES(
+            FROM Config TO Symbol,
+            FROM Config TO File,
+            config_scope STRING
+        )
+    """)
+
+    # Error relationships
+    conn.execute("""
+        CREATE REL TABLE OCCURS_IN(
+            FROM Error TO Symbol,
+            FROM Error TO File,
+            frequency INT32
+        )
+    """)
+
+    # PR relationships
+    conn.execute("""
+        CREATE REL TABLE FIXES(
+            FROM PR TO Task,
+            closes_issue BOOLEAN
+        )
+    """)
+
+    # Note: PR MODIFIES File uses the existing MODIFIES table
+    # which already supports FROM Task TO File
+    # We extend it to support FROM PR TO File as well
+    conn.execute("""
+        ALTER TABLE MODIFIES ADD (FROM PR TO File)
+    """)
+
+    # Person relationships
+    conn.execute("""
+        CREATE REL TABLE AUTHORED(
+            FROM Person TO Commit,
+            commit_timestamp TIMESTAMP
+        )
+    """)
+
+    conn.execute("""
+        CREATE REL TABLE OWNS(
+            FROM Person TO File,
+            ownership_percent DOUBLE,
+            lines_contributed INT32
+        )
+    """)
+
 
 def get_schema_info(db: GraphDatabase) -> dict:
     """Get information about current schema.
@@ -346,7 +518,24 @@ def get_schema_info(db: GraphDatabase) -> dict:
 
     # Get node counts
     node_counts = {}
-    for table in ["Task", "File", "Commit", "Symbol", "Note", "Reference", "Plan", "Branch"]:
+    for table in [
+        "Task",
+        "File",
+        "Commit",
+        "Symbol",
+        "Note",
+        "Reference",
+        "Plan",
+        "Branch",
+        "Documentation",
+        "Test",
+        "Dependency",
+        "Config",
+        "Error",
+        "PR",
+        "Metric",
+        "Person",
+    ]:
         try:
             result = conn.execute(f"MATCH (n:{table}) RETURN COUNT(n) AS count")
             count = result.get_next()[0] if result.has_next() else 0
@@ -356,7 +545,20 @@ def get_schema_info(db: GraphDatabase) -> dict:
 
     # Get relationship counts
     rel_counts = {}
-    for table in ["MODIFIES", "IMPORTS", "CHANGES", "IMPLEMENTED_IN", "CONTAINS"]:
+    for table in [
+        "MODIFIES",
+        "IMPORTS",
+        "CHANGES",
+        "IMPLEMENTED_IN",
+        "CONTAINS",
+        "COVERS",
+        "DEPENDS_ON_DEPENDENCY",
+        "CONFIGURES",
+        "OCCURS_IN",
+        "FIXES",
+        "AUTHORED",
+        "OWNS",
+    ]:
         try:
             result = conn.execute(f"MATCH ()-[r:{table}]->() RETURN COUNT(r) AS count")
             count = result.get_next()[0] if result.has_next() else 0
