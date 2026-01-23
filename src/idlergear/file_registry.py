@@ -6,6 +6,7 @@ It prevents AI assistants from accessing outdated files during development sessi
 
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -148,30 +149,50 @@ class PatternRule:
 
 
 class FileRegistry:
-    """Registry for tracking file status and deprecation."""
+    """Registry for tracking file status and deprecation.
 
-    def __init__(self, registry_path: Optional[Path] = None):
+    Performance optimizations:
+    - Lazy loading: Registry loaded on first access, not __init__
+    - TTL-based caching: Status cache expires after 60 seconds
+    - Pattern compilation: Regex patterns compiled once and cached
+    - Batch operations: Check multiple files in single call
+    """
+
+    # Cache TTL in seconds (60s = 1 minute)
+    CACHE_TTL = 60
+
+    def __init__(self, registry_path: Optional[Path] = None, lazy_load: bool = True):
         """Initialize file registry.
 
         Args:
             registry_path: Path to registry JSON file. Defaults to .idlergear/file_registry.json
+            lazy_load: If True, delay loading until first access (default: True)
         """
         self.registry_path = registry_path or Path.cwd() / ".idlergear" / "file_registry.json"
         self.files: Dict[str, FileEntry] = {}
         self.patterns: Dict[str, PatternRule] = {}
-        self._status_cache: Dict[str, Optional[FileStatus]] = {}
+        self._status_cache: Dict[str, tuple[Optional[FileStatus], float]] = {}  # (status, timestamp)
         self._event_callbacks: Dict[str, list] = {
             "file_registered": [],
             "file_deprecated": [],
         }
+        self._loaded: bool = False
+        self._last_load_time: Optional[float] = None
 
-        # Load existing registry if it exists
-        if self.registry_path.exists():
+        # Optionally load immediately (for backward compatibility)
+        if not lazy_load and self.registry_path.exists():
             self.load()
 
     def _clear_cache(self) -> None:
         """Clear the status lookup cache."""
         self._status_cache.clear()
+
+    def _ensure_loaded(self) -> None:
+        """Ensure registry is loaded (lazy loading)."""
+        if not self._loaded:
+            if self.registry_path.exists():
+                self.load()
+            self._loaded = True
 
     def on(self, event: str, callback) -> None:
         """Register a callback for an event.
@@ -200,6 +221,8 @@ class FileRegistry:
     def load(self) -> None:
         """Load registry from JSON file."""
         if not self.registry_path.exists():
+            self._loaded = True
+            self._last_load_time = time.time()
             return
 
         try:
@@ -220,6 +243,8 @@ class FileRegistry:
 
             # Clear cache after loading new data
             self._clear_cache()
+            self._loaded = True
+            self._last_load_time = time.time()
         except (json.JSONDecodeError, KeyError, ValueError) as e:
             raise ValueError(f"Failed to load file registry: {e}")
 
@@ -342,26 +367,87 @@ class FileRegistry:
         Returns:
             FileStatus if file is registered or matches pattern, None otherwise
         """
-        # Check cache first
+        # Ensure registry is loaded
+        self._ensure_loaded()
+
+        # Check cache first (with TTL)
         if path in self._status_cache:
-            return self._status_cache[path]
+            cached_status, timestamp = self._status_cache[path]
+            if time.time() - timestamp < self.CACHE_TTL:
+                return cached_status
 
         # Check exact match first
         if path in self.files:
             status = self.files[path].status
-            self._status_cache[path] = status
+            self._status_cache[path] = (status, time.time())
             return status
 
         # Check pattern rules
         for rule in self.patterns.values():
             if rule.matches(path):
                 status = rule.status
-                self._status_cache[path] = status
+                self._status_cache[path] = (status, time.time())
                 return status
 
         # Cache negative result
-        self._status_cache[path] = None
+        self._status_cache[path] = (None, time.time())
         return None
+
+    def get_status_batch(self, paths: List[str]) -> Dict[str, Optional[FileStatus]]:
+        """Get status for multiple files in a single call (batch operation).
+
+        This is more efficient than calling get_status() multiple times as it:
+        - Loads registry only once
+        - Processes cache checks in batch
+        - Minimizes pattern matching overhead
+
+        Args:
+            paths: List of file paths to check
+
+        Returns:
+            Dictionary mapping file paths to their status (or None if not registered)
+
+        Example:
+            >>> registry = FileRegistry()
+            >>> statuses = registry.get_status_batch(["file1.csv", "file2.py", "file3.md"])
+            >>> print(statuses["file1.csv"])  # FileStatus.DEPRECATED or None
+        """
+        self._ensure_loaded()
+
+        results = {}
+        current_time = time.time()
+
+        for path in paths:
+            # Check cache first (with TTL)
+            if path in self._status_cache:
+                cached_status, timestamp = self._status_cache[path]
+                if current_time - timestamp < self.CACHE_TTL:
+                    results[path] = cached_status
+                    continue
+
+            # Check exact match
+            if path in self.files:
+                status = self.files[path].status
+                self._status_cache[path] = (status, current_time)
+                results[path] = status
+                continue
+
+            # Check pattern rules
+            matched = False
+            for rule in self.patterns.values():
+                if rule.matches(path):
+                    status = rule.status
+                    self._status_cache[path] = (status, current_time)
+                    results[path] = status
+                    matched = True
+                    break
+
+            if not matched:
+                # Cache negative result
+                self._status_cache[path] = (None, current_time)
+                results[path] = None
+
+        return results
 
     def get_entry(self, path: str) -> Optional[FileEntry]:
         """Get full entry for a file.
@@ -372,6 +458,7 @@ class FileRegistry:
         Returns:
             FileEntry if file is registered, None otherwise
         """
+        self._ensure_loaded()
         return self.files.get(path)
 
     def get_current_version(self, path: str) -> Optional[str]:
@@ -383,6 +470,7 @@ class FileRegistry:
         Returns:
             Path to current version, or None
         """
+        self._ensure_loaded()
         entry = self.files.get(path)
         if entry:
             return entry.current_version
@@ -397,6 +485,7 @@ class FileRegistry:
         Returns:
             Reason string, or None
         """
+        self._ensure_loaded()
         # Check exact match
         entry = self.files.get(path)
         if entry:
@@ -420,6 +509,7 @@ class FileRegistry:
         Returns:
             List of file entries
         """
+        self._ensure_loaded()
         entries = list(self.files.values())
 
         if status_filter:
