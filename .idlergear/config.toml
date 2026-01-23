@@ -28,3 +28,6 @@ poll_interval = "10"
 [test]
 block_on_failure = false
 stale_threshold_seconds = 7200
+
+[graph]
+auto_update = true

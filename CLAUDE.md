@@ -185,11 +185,27 @@ idlergear_graph_query_file(file_path="src/idlergear/mcp_server.py")
 # Check schema/stats
 idlergear_graph_schema_info()
 
-# If nodes == 0, populate (once per project):
+# RECOMMENDED: Populate everything in one command (once per project)
+idlergear_graph_populate_all(max_commits=100, incremental=True)
+# Populates: git history, code symbols, GitHub tasks, commit-task links,
+# references, and wiki documentation (2,000+ nodes in ~60 seconds)
+
+# OR: Populate individually if needed
 idlergear_graph_populate_git(max_commits=100, incremental=True)
 idlergear_graph_populate_code(directory="src", incremental=True)
 
-# Re-run populate periodically (incremental = skips existing data)
+# Re-run populate_all periodically (incremental = skips existing data)
+```
+
+**New documentation query tools:**
+```python
+# Query wiki pages or reference docs by path
+idlergear_graph_query_documentation(path="wiki/Feature-Name.md")
+# Returns: doc content + related files/symbols/tasks
+
+# Search documentation by keyword
+idlergear_graph_search_documentation(query="authentication", limit=10)
+# Returns: matching wiki pages and references
 ```
 
 **Rules:**
