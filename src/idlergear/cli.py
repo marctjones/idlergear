@@ -9747,6 +9747,156 @@ def file_unregister(
     typer.secho(f"✅ Unregistered {path}", fg=typer.colors.GREEN)
 
 
+@file_app.command("scan")
+def file_scan(
+    ctx: typer.Context,
+    auto: bool = typer.Option(False, "--auto", help="Automatically apply high-confidence suggestions"),
+    confidence: str = typer.Option("low", "--confidence", "-c", help="Minimum confidence: high, medium, low"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show suggestions without applying"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: json or text"),
+):
+    """Auto-detect versioned files and suggest registry entries.
+
+    Scans project for:
+    - Git rename history (high confidence)
+    - Filename patterns (_old, _v1, .bak, timestamps)
+    - Archive directories (archive/, old/, backup/)
+
+    Examples:
+        idlergear file scan                    # Interactive mode
+        idlergear file scan --auto             # Auto-apply high confidence
+        idlergear file scan --confidence high  # Only show high confidence
+        idlergear file scan --dry-run          # Preview without applying
+    """
+    from idlergear.file_registry import FileRegistry
+    from idlergear.file_registry_scanner import FileRegistryScanner
+
+    scanner = FileRegistryScanner()
+    suggestions = scanner.scan(min_confidence=confidence)
+
+    if not suggestions:
+        typer.secho("✅ No versioned files detected", fg=typer.colors.GREEN)
+        return
+
+    # JSON output
+    if output == "json" or (hasattr(ctx.obj, "output_mode") and ctx.obj.output_mode == "json"):
+        result = {
+            "suggestions": [
+                {
+                    "file_path": s.file_path,
+                    "suggested_status": s.suggested_status.value,
+                    "confidence": s.confidence,
+                    "reason": s.reason,
+                    "current_version": s.current_version,
+                    "evidence": s.evidence,
+                }
+                for s in suggestions
+            ],
+            "total": len(suggestions),
+        }
+        typer.echo(json.dumps(result, indent=2))
+        return
+
+    # Text output
+    typer.secho(f"\n🔍 File Registry Auto-Detection Report", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho(f"Found {len(suggestions)} suggestions\n", fg=typer.colors.CYAN)
+
+    # Group by confidence
+    grouped = scanner.group_suggestions_by_confidence(suggestions)
+
+    registry = FileRegistry()
+    applied = 0
+    skipped = 0
+
+    for conf_level in ["high", "medium", "low"]:
+        conf_suggestions = grouped.get(conf_level, [])
+        if not conf_suggestions:
+            continue
+
+        # Confidence color
+        conf_color = {
+            "high": typer.colors.GREEN,
+            "medium": typer.colors.YELLOW,
+            "low": typer.colors.WHITE,
+        }[conf_level]
+
+        typer.secho(f"\n{conf_level.upper()} CONFIDENCE ({len(conf_suggestions)}):", fg=conf_color, bold=True)
+        typer.secho("=" * 60, fg=conf_color)
+
+        for suggestion in conf_suggestions:
+            typer.echo()
+            typer.secho(f"  📄 {suggestion.file_path}", fg=typer.colors.CYAN, bold=True)
+            typer.echo(f"     Status: {suggestion.suggested_status.value}")
+            typer.echo(f"     Reason: {suggestion.reason}")
+
+            if suggestion.current_version:
+                typer.secho(f"     Current: {suggestion.current_version}", fg=typer.colors.GREEN)
+
+            if suggestion.evidence:
+                typer.echo(f"     Evidence:")
+                for ev in suggestion.evidence:
+                    typer.echo(f"       - {ev}")
+
+            # Auto-apply logic
+            should_apply = False
+
+            if dry_run:
+                typer.secho("     [DRY RUN - Would register]", fg=typer.colors.MAGENTA)
+                continue
+
+            if auto and conf_level == "high":
+                should_apply = True
+                typer.secho("     [AUTO-APPLYING]", fg=typer.colors.GREEN)
+            elif not auto:
+                # Interactive mode
+                response = typer.prompt(
+                    "     Apply this suggestion? [Y/n/skip]",
+                    default="y",
+                    show_default=False,
+                )
+                should_apply = response.lower() in ["y", "yes", ""]
+                if response.lower() in ["skip", "s"]:
+                    skipped += 1
+                    continue
+
+            # Apply suggestion
+            if should_apply:
+                try:
+                    if suggestion.suggested_status.value == "deprecated":
+                        registry.deprecate(
+                            suggestion.file_path,
+                            successor=suggestion.current_version,
+                            reason=suggestion.reason,
+                        )
+                    else:
+                        registry.register(
+                            suggestion.file_path,
+                            status=suggestion.suggested_status,
+                            reason=suggestion.reason,
+                        )
+
+                    typer.secho(f"     ✅ Registered as {suggestion.suggested_status.value}", fg=typer.colors.GREEN)
+                    applied += 1
+
+                except Exception as e:
+                    typer.secho(f"     ❌ Failed to register: {e}", fg=typer.colors.RED)
+            else:
+                skipped += 1
+
+    # Summary
+    if not dry_run:
+        typer.secho("\n" + "=" * 60, fg=typer.colors.BRIGHT_BLUE)
+        typer.secho("Summary:", fg=typer.colors.BRIGHT_BLUE, bold=True)
+        typer.echo(f"  Total suggestions: {len(suggestions)}")
+        typer.echo(f"  Applied: {applied}")
+        typer.echo(f"  Skipped: {skipped}")
+
+        if applied > 0:
+            typer.secho("\n✅ Registry updated successfully", fg=typer.colors.GREEN)
+    else:
+        typer.secho("\n💡 Run without --dry-run to apply changes", fg=typer.colors.CYAN)
+
+
 # Plugin commands
 @plugin_app.command("list")
 def plugin_list(

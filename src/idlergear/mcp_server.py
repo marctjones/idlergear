@@ -3133,6 +3133,36 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
+        Tool(
+            name="idlergear_file_scan",
+            description="Auto-detect versioned files and suggest registry entries. Scans project for git rename history, filename patterns (_old, _v1, .bak, timestamps), and archive directories. Returns suggestions with confidence levels (high/medium/low).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "min_confidence": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                        "description": "Minimum confidence level to include (default: low)",
+                        "default": "low",
+                    },
+                    "include_git_renames": {
+                        "type": "boolean",
+                        "description": "Use git rename history detection (default: true)",
+                        "default": True,
+                    },
+                    "include_patterns": {
+                        "type": "boolean",
+                        "description": "Use filename pattern matching (default: true)",
+                        "default": True,
+                    },
+                    "include_directories": {
+                        "type": "boolean",
+                        "description": "Use directory structure detection (default: true)",
+                        "default": True,
+                    },
+                },
+            },
+        ),
         # Plugin tools (NEW v0.8.0)
         Tool(
             name="idlergear_plugin_list",
@@ -5979,6 +6009,46 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             )
 
             return _format_result(report)
+
+        elif name == "idlergear_file_scan":
+            from idlergear.file_registry_scanner import FileRegistryScanner
+
+            scanner = FileRegistryScanner()
+            min_confidence = arguments.get("min_confidence", "low")
+            include_git_renames = arguments.get("include_git_renames", True)
+            include_patterns = arguments.get("include_patterns", True)
+            include_directories = arguments.get("include_directories", True)
+
+            suggestions = scanner.scan(
+                min_confidence=min_confidence,
+                include_git_renames=include_git_renames,
+                include_patterns=include_patterns,
+                include_directories=include_directories,
+            )
+
+            # Convert suggestions to serializable format
+            result = {
+                "suggestions": [
+                    {
+                        "file_path": s.file_path,
+                        "suggested_status": s.suggested_status.value,
+                        "confidence": s.confidence,
+                        "reason": s.reason,
+                        "current_version": s.current_version,
+                        "evidence": s.evidence,
+                    }
+                    for s in suggestions
+                ],
+                "total": len(suggestions),
+            }
+
+            # Group by confidence
+            grouped = scanner.group_suggestions_by_confidence(suggestions)
+            result["by_confidence"] = {
+                level: len(sug_list) for level, sug_list in grouped.items()
+            }
+
+            return _format_result(result)
 
         # Plugin handlers (NEW v0.8.0)
         elif name == "idlergear_plugin_list":
