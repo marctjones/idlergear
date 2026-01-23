@@ -24,6 +24,114 @@ _reload_requested = False
 # Set when idlergear_daemon_register_agent is called successfully
 _registered_agent_id: str | None = None
 
+# FileRegistry cache for performance (invalidated by daemon events)
+# Key: registry_path (str), Value: FileRegistry instance
+_registry_cache: dict[str, Any] = {}
+_registry_cache_lock = asyncio.Lock()
+
+
+def _get_cached_registry(registry_path: Path | None = None) -> Any:
+    """Get cached FileRegistry instance or create new one.
+
+    Args:
+        registry_path: Path to registry file (defaults to .idlergear/file_registry.json)
+
+    Returns:
+        FileRegistry instance
+    """
+    from idlergear.file_registry import FileRegistry
+
+    # Determine path
+    if registry_path is None:
+        try:
+            root = find_idlergear_root()
+            if root:
+                registry_path = Path(root) / ".idlergear" / "file_registry.json"
+            else:
+                registry_path = Path.cwd() / ".idlergear" / "file_registry.json"
+        except Exception:
+            registry_path = Path.cwd() / ".idlergear" / "file_registry.json"
+
+    path_str = str(registry_path)
+
+    # Return cached instance if available
+    if path_str in _registry_cache:
+        return _registry_cache[path_str]
+
+    # Create new instance and cache it
+    registry = FileRegistry(registry_path=registry_path)
+    _registry_cache[path_str] = registry
+    return registry
+
+
+def _invalidate_registry_cache(registry_path: Path | None = None) -> None:
+    """Invalidate FileRegistry cache.
+
+    Called when daemon broadcasts registry change events to ensure
+    all agents see the latest registry state.
+
+    Args:
+        registry_path: Specific registry to invalidate, or None for all
+    """
+    if registry_path is None:
+        # Invalidate all caches
+        _registry_cache.clear()
+    else:
+        # Invalidate specific cache
+        path_str = str(registry_path)
+        _registry_cache.pop(path_str, None)
+
+
+async def _broadcast_registry_change(
+    action: str, file_path: str, data: dict[str, Any] | None = None
+) -> None:
+    """Broadcast file registry change to daemon.
+
+    This notifies all connected agents when the registry changes,
+    allowing them to invalidate their caches and stay synchronized.
+
+    Args:
+        action: Action type (registered, deprecated, etc.)
+        file_path: File path that was modified
+        data: Additional data to include in broadcast
+    """
+    try:
+        from idlergear.daemon.client import DaemonNotRunning, get_daemon_client
+
+        # Try to find idlergear root
+        try:
+            idlergear_root = find_idlergear_root()
+            if not idlergear_root:
+                return  # No daemon to broadcast to
+        except Exception:
+            return
+
+        # Try to connect and broadcast (non-blocking, fail gracefully)
+        try:
+            client = get_daemon_client(idlergear_root)
+            await client.connect()
+
+            # Construct broadcast message
+            message = {
+                "type": "registry_changed",
+                "action": action,
+                "file_path": file_path,
+                **(data or {}),
+            }
+
+            # Broadcast via daemon
+            await client.notify(
+                "event", {"event": f"file.{action}", "data": message}
+            )
+
+            await client.disconnect()
+        except DaemonNotRunning:
+            # Daemon not running - this is OK, broadcast is optional
+            pass
+    except Exception:
+        # Don't let broadcast failures break registry operations
+        pass
+
 
 # PID file for external reload triggers
 def _get_pid_file() -> Path:
@@ -374,7 +482,7 @@ def _check_file_access(
             return (True, None)
 
         registry_path = Path(root) / ".idlergear" / "file_registry.json"
-        registry = FileRegistry(registry_path=registry_path)
+        registry = _get_cached_registry(registry_path)
         entry = registry.get_entry(file_path)
 
         if entry is None:
@@ -5257,12 +5365,22 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_register":
             from idlergear.file_registry import FileRegistry, FileStatus
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
             status = FileStatus(arguments["status"])
             registry.register_file(
                 arguments["path"],
                 status,
                 reason=arguments.get("reason"),
+            )
+
+            # Broadcast change to daemon for multi-agent coordination
+            await _broadcast_registry_change(
+                action="registered",
+                file_path=arguments["path"],
+                data={
+                    "status": arguments["status"],
+                    "reason": arguments.get("reason"),
+                },
             )
 
             return _format_result(
@@ -5277,11 +5395,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_deprecate":
             from idlergear.file_registry import FileRegistry
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
             registry.deprecate_file(
                 arguments["path"],
                 successor=arguments.get("successor"),
                 reason=arguments.get("reason"),
+            )
+
+            # Broadcast change to daemon for multi-agent coordination
+            await _broadcast_registry_change(
+                action="deprecated",
+                file_path=arguments["path"],
+                data={
+                    "successor": arguments.get("successor"),
+                    "reason": arguments.get("reason"),
+                },
             )
 
             return _format_result(
@@ -5297,7 +5425,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_status":
             from idlergear.file_registry import FileRegistry
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
             path = arguments["path"]
 
             status = registry.get_status(path)
@@ -5330,7 +5458,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_list":
             from idlergear.file_registry import FileRegistry, FileStatus
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
 
             # Filter by status if provided
             status_filter = None
@@ -5365,7 +5493,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_annotate":
             from idlergear.file_registry import FileRegistry
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
             entry = registry.annotate_file(
                 arguments["path"],
                 description=arguments.get("description"),
@@ -5389,7 +5517,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_search":
             from idlergear.file_registry import FileRegistry, FileStatus
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
 
             # Convert status string to enum if provided
             status_filter = None
@@ -5429,7 +5557,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_get_annotation":
             from idlergear.file_registry import FileRegistry
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
             entry = registry.get_annotation(arguments["path"])
 
             if not entry:
@@ -5460,7 +5588,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_file_list_tags":
             from idlergear.file_registry import FileRegistry
 
-            registry = FileRegistry()
+            registry = _get_cached_registry()
             tag_map = registry.list_tags()
 
             # Convert to list format for better display
@@ -5717,14 +5845,14 @@ async def _subscribe_to_registry_events():
     This allows the MCP server to be notified when other agents
     make changes to the file registry (e.g., deprecating files).
 
-    The FileRegistry loads from disk on each access, so the cache
-    is automatically fresh. This subscription is mainly for awareness
-    and future notification support.
+    When registry change events are received, the cache is invalidated
+    to ensure all agents see the latest registry state.
     """
     import asyncio
     import sys
 
     from idlergear.daemon.client import DaemonNotRunning, get_daemon_client
+    from idlergear.daemon.protocol import Notification
 
     # Try to find idlergear root
     try:
@@ -5739,6 +5867,40 @@ async def _subscribe_to_registry_events():
         client = get_daemon_client(idlergear_root)
         await client.connect()
 
+        # Define event handler
+        async def handle_registry_event(notification: Notification) -> None:
+            """Handle file registry change events from daemon."""
+            try:
+                # Check if this is a registry event
+                method = notification.method
+                params = notification.params or {}
+
+                if method == "event":
+                    event = params.get("event", "")
+                    data = params.get("data", {})
+
+                    if event.startswith("file."):
+                        # Registry changed - invalidate cache
+                        _invalidate_registry_cache()
+
+                        # Log the change
+                        action = data.get("action", "unknown")
+                        file_path = data.get("file_path", "unknown")
+                        print(
+                            f"[IdlerGear MCP] Registry changed: {action} {file_path} (cache invalidated)",
+                            file=sys.stderr,
+                        )
+            except Exception as e:
+                # Don't let handler failures break the subscription
+                print(
+                    f"[IdlerGear MCP] Warning: Error handling registry event: {e}",
+                    file=sys.stderr,
+                )
+
+        # Override the client's notification handler
+        # This is safe because we control the client lifecycle
+        client._handle_notification = handle_registry_event  # type: ignore
+
         # Subscribe to file registry events
         await client.subscribe("file.*")
 
@@ -5748,8 +5910,7 @@ async def _subscribe_to_registry_events():
         )
 
         # Keep connection alive in background
-        # In future, we could handle notifications here to show AI messages
-        # For now, just maintain the subscription
+        # The _receive_loop is already running and will call our handler
         while True:
             await asyncio.sleep(60)  # Keep alive
 
