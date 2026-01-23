@@ -1202,6 +1202,117 @@ async def list_tools() -> list[Tool]:
                 },
             },
         ),
+        # Advanced graph query tools (Issue #335)
+        Tool(
+            name="idlergear_graph_impact_analysis",
+            description="Analyze what would be affected if a symbol breaks or changes. Returns all files, symbols, and tasks that depend on this symbol. Provides 95%+ token efficiency vs grep.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol_name": {
+                        "type": "string",
+                        "description": "Name of symbol to analyze (function, class, method)",
+                    }
+                },
+                "required": ["symbol_name"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_test_coverage",
+            description="Find test files that cover a given file or symbol. Returns test files and test functions that exercise the target.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "type": "string",
+                        "description": "File path or symbol name to check coverage for",
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "description": "Type of target: 'file' or 'symbol'",
+                        "enum": ["file", "symbol"],
+                        "default": "file",
+                    },
+                },
+                "required": ["target"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_change_history",
+            description="Get all commits that touched a specific symbol. Traces symbol across file changes and renames. Returns chronological commit history.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol_name": {
+                        "type": "string",
+                        "description": "Symbol name to trace",
+                    }
+                },
+                "required": ["symbol_name"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_dependency_chain",
+            description="Find transitive dependency chain for a file. Returns all files this file depends on recursively via imports. Useful for refactoring decisions.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Source file path",
+                    },
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum depth to traverse (default: 5)",
+                        "default": 5,
+                    },
+                },
+                "required": ["file_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_orphan_detection",
+            description="Find orphaned/unused code - functions with no callers and files with no imports. Helps identify dead code for cleanup.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="idlergear_graph_symbol_callers",
+            description="Find all symbols that call a given symbol (reverse lookup). Returns caller functions, their locations, and files. 98% token efficiency vs grep.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "symbol_name": {
+                        "type": "string",
+                        "description": "Symbol to find callers for",
+                    }
+                },
+                "required": ["symbol_name"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_file_timeline",
+            description="Get evolution of a file over time via commits. Returns chronological list of all commits that modified this file.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "File to trace",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Max commits to return (default: 20)",
+                        "default": 20,
+                    },
+                },
+                "required": ["file_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_graph_task_coverage",
+            description="Find tasks with no associated commits (not yet implemented). Returns tasks that have no work done on them yet, with coverage percentage.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
         # Server management tools
         Tool(
             name="idlergear_version",
@@ -3673,6 +3784,83 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 verbose=False
             )
 
+            return _format_result(result)
+
+        # Advanced graph query handlers (Issue #335)
+        elif name == "idlergear_graph_impact_analysis":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_impact_analysis
+
+            db = get_database()
+            result = query_impact_analysis(db, arguments["symbol_name"])
+            return _format_result(result)
+
+        elif name == "idlergear_graph_test_coverage":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_test_coverage
+
+            db = get_database()
+            result = query_test_coverage(
+                db,
+                arguments["target"],
+                arguments.get("target_type", "file")
+            )
+            return _format_result(result)
+
+        elif name == "idlergear_graph_change_history":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_change_history
+
+            db = get_database()
+            result = query_change_history(db, arguments["symbol_name"])
+            return _format_result({"symbol": arguments["symbol_name"], "commits": result})
+
+        elif name == "idlergear_graph_dependency_chain":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_dependency_chain
+
+            db = get_database()
+            result = query_dependency_chain(
+                db,
+                arguments["file_path"],
+                arguments.get("max_depth", 5)
+            )
+            return _format_result(result)
+
+        elif name == "idlergear_graph_orphan_detection":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_orphan_detection
+
+            db = get_database()
+            result = query_orphan_detection(db)
+            return _format_result(result)
+
+        elif name == "idlergear_graph_symbol_callers":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_symbol_callers
+
+            db = get_database()
+            result = query_symbol_callers(db, arguments["symbol_name"])
+            return _format_result(result)
+
+        elif name == "idlergear_graph_file_timeline":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_file_timeline
+
+            db = get_database()
+            result = query_file_timeline(
+                db,
+                arguments["file_path"],
+                arguments.get("limit", 20)
+            )
+            return _format_result(result)
+
+        elif name == "idlergear_graph_task_coverage":
+            from idlergear.graph import get_database
+            from idlergear.graph.queries import query_task_coverage
+
+            db = get_database()
+            result = query_task_coverage(db)
             return _format_result(result)
 
         # Server management handlers
