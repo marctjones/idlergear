@@ -105,6 +105,56 @@ This provides the project vision, current plan, and open tasks. Do NOT skip this
 | Start background process | `idlergear run start "command" --name <name>` |
 | Check background runs | `idlergear run list` |
 
+### Tmux Session Integration
+
+**IdlerGear supports running processes in persistent tmux sessions for interactive access.**
+
+**Start run in tmux:**
+```bash
+# Run in tmux session (allows attaching later)
+idlergear run start "python server.py" --tmux --name backend
+
+# Shows:
+#   Tmux session: idlergear-backend
+#   Attach: tmux attach-session -t idlergear-backend
+#   Or use: idlergear run attach backend
+```
+
+**Attach to running tmux session:**
+```bash
+# Get attach instructions for a run
+idlergear run attach backend
+
+# Shows the tmux attach command you can copy/paste
+```
+
+**When to use --tmux:**
+- Long-running servers that need interactive input
+- Processes where you want to see live output
+- Development servers you might need to restart/control
+- Any process requiring persistent terminal access
+
+**MCP Tools:**
+```python
+# Create standalone tmux session
+idlergear_tmux_create_session(name="dev", command="bash")
+
+# List all tmux sessions
+idlergear_tmux_list_sessions()
+
+# Get session details
+idlergear_tmux_get_session(name="dev")
+
+# Send commands to session
+idlergear_tmux_send_keys(session_name="dev", keys="ls -la")
+
+# Kill session
+idlergear_tmux_kill_session(name="dev")
+
+# Get attach command for a run
+idlergear_run_attach(name="backend")
+```
+
 ### MANDATORY: File Annotations (Proactive)
 
 **You MUST annotate files proactively to enable token-efficient discovery.**
