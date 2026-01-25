@@ -2502,6 +2502,107 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "required": ["executable"],
             },
         ),
+        # Tmux session management tools
+        Tool(
+            name="idlergear_tmux_create_session",
+            description="Create a new tmux session for persistent terminal management. Useful for long-running processes that need interactive access.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Session name (must be unique)",
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "Optional command to run in the session",
+                    },
+                    "window_name": {
+                        "type": "string",
+                        "description": "Optional window name (defaults to session name)",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_tmux_list_sessions",
+            description="List all tmux sessions. Shows session names, window counts, and attachment status.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="idlergear_tmux_get_session",
+            description="Get detailed information about a specific tmux session including all windows and panes.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Session name",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_tmux_kill_session",
+            description="Kill a tmux session. All processes running in the session will be terminated.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Session name",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_tmux_send_keys",
+            description="Send keys/commands to a specific pane in a tmux session. Useful for controlling running processes.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_name": {
+                        "type": "string",
+                        "description": "Session name",
+                    },
+                    "keys": {
+                        "type": "string",
+                        "description": "Keys/command to send",
+                    },
+                    "window_index": {
+                        "type": "integer",
+                        "description": "Window index (default: 0)",
+                        "default": 0,
+                    },
+                    "pane_index": {
+                        "type": "integer",
+                        "description": "Pane index (default: 0)",
+                        "default": 0,
+                    },
+                },
+                "required": ["session_name", "keys"],
+            },
+        ),
+        Tool(
+            name="idlergear_run_attach",
+            description="Get tmux attach command for a run. Returns the command to attach to the run's tmux session for interactive access.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Run name",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
         # === OpenTelemetry Log Tools ===
         Tool(
             name="idlergear_otel_query_logs",
@@ -5077,6 +5178,58 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 args=arguments.get("args"),
             )
             return _format_result(process)
+
+        # === Tmux Session Management Tools ===
+        elif name == "idlergear_tmux_create_session":
+            pm = _get_pm_server()
+            try:
+                session_info = pm.create_tmux_session(
+                    name=arguments["name"],
+                    command=arguments.get("command"),
+                    window_name=arguments.get("window_name"),
+                )
+                return _format_result(session_info)
+            except (RuntimeError, ValueError) as e:
+                return [TextContent(type="text", text=f"Error creating tmux session: {e}")]
+
+        elif name == "idlergear_tmux_list_sessions":
+            pm = _get_pm_server()
+            sessions = pm.list_tmux_sessions()
+            return _format_result(sessions)
+
+        elif name == "idlergear_tmux_get_session":
+            pm = _get_pm_server()
+            session = pm.get_tmux_session(arguments["name"])
+            if session is None:
+                return [
+                    TextContent(
+                        type="text", text=f"Tmux session not found: {arguments['name']}"
+                    )
+                ]
+            return _format_result(session)
+
+        elif name == "idlergear_tmux_kill_session":
+            pm = _get_pm_server()
+            success = pm.kill_tmux_session(arguments["name"])
+            return _format_result({"success": success, "name": arguments["name"]})
+
+        elif name == "idlergear_tmux_send_keys":
+            pm = _get_pm_server()
+            success = pm.send_keys_to_tmux(
+                session_name=arguments["session_name"],
+                keys=arguments["keys"],
+                window_index=arguments.get("window_index", 0),
+                pane_index=arguments.get("pane_index", 0),
+            )
+            return _format_result({"success": success, "session": arguments["session_name"]})
+
+        elif name == "idlergear_run_attach":
+            from idlergear.runs import attach_to_run
+            try:
+                result = attach_to_run(arguments["name"])
+                return _format_result(result)
+            except RuntimeError as e:
+                return [TextContent(type="text", text=f"Error: {e}")]
 
         # OpenTelemetry log query handlers
         elif name == "idlergear_otel_query_logs":
