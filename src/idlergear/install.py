@@ -450,12 +450,20 @@ HOOK_SCRIPTS = [
 
 
 def install_hook_scripts(project_path: Path | None = None) -> dict[str, str]:
-    """Install Claude Code hook scripts from the idlergear package.
+    """Install Claude Code hook scripts from the idlergear package with smart merge.
 
     Copies hook scripts from src/idlergear/hooks/ to .claude/hooks/.
-    Returns dict of {script_name: action} where action is 'created', 'updated', or 'unchanged'.
+    If a hook has been modified by the user, creates a backup before updating.
+
+    Returns dict of {script_name: action} where action is:
+    - 'created': New hook created
+    - 'updated': Hook updated (backup created if user-modified)
+    - 'unchanged': Hook already up-to-date
+    - 'backed_up': User-modified hook backed up and updated
     """
     from importlib.resources import files
+    import hashlib
+    from datetime import datetime
 
     if project_path is None:
         project_path = find_idlergear_root()
@@ -465,8 +473,16 @@ def install_hook_scripts(project_path: Path | None = None) -> dict[str, str]:
     hooks_dir = project_path / ".claude" / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
 
+    # Store checksums of installed hooks for future comparison
+    checksums_file = hooks_dir / ".idlergear_checksums.json"
+    old_checksums = {}
+    if checksums_file.exists():
+        with open(checksums_file) as f:
+            old_checksums = json.load(f)
+
     package_hooks_dir = files("idlergear") / "hooks"
     results = {}
+    new_checksums = {}
 
     for script_name in HOOK_SCRIPTS:
         src_file = package_hooks_dir / script_name
@@ -476,18 +492,43 @@ def install_hook_scripts(project_path: Path | None = None) -> dict[str, str]:
             continue
 
         src_content = src_file.read_text()
+        src_checksum = hashlib.sha256(src_content.encode()).hexdigest()
+        new_checksums[script_name] = src_checksum
 
         if dst_file.exists():
-            if dst_file.read_text() == src_content:
+            dst_content = dst_file.read_text()
+            dst_checksum = hashlib.sha256(dst_content.encode()).hexdigest()
+
+            if dst_checksum == src_checksum:
+                # Already up-to-date
                 results[script_name] = "unchanged"
             else:
+                # Check if user has modified the hook
+                old_checksum = old_checksums.get(script_name)
+                user_modified = old_checksum is not None and dst_checksum != old_checksum
+
+                if user_modified:
+                    # Create timestamped backup of user modifications
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_file = hooks_dir / f"{script_name}.backup_{timestamp}"
+                    backup_file.write_text(dst_content)
+                    backup_file.chmod(0o755)
+                    results[script_name] = "backed_up"
+                else:
+                    results[script_name] = "updated"
+
+                # Write new version
                 dst_file.write_text(src_content)
                 dst_file.chmod(0o755)
-                results[script_name] = "updated"
         else:
+            # New hook
             dst_file.write_text(src_content)
             dst_file.chmod(0o755)
             results[script_name] = "created"
+
+    # Save new checksums for next install
+    with open(checksums_file, "w") as f:
+        json.dump(new_checksums, f, indent=2)
 
     return results
 

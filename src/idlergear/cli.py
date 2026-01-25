@@ -1308,6 +1308,7 @@ def install(
         """Report created/updated/unchanged files."""
         created = [k for k, v in results.items() if v == "created"]
         updated = [k for k, v in results.items() if v == "updated"]
+        backed_up = [k for k, v in results.items() if v == "backed_up"]
         unchanged = [k for k, v in results.items() if v == "unchanged"]
         if created:
             typer.secho(
@@ -1317,7 +1318,12 @@ def install(
             typer.secho(
                 f"Updated {component}: {', '.join(updated)}", fg=typer.colors.YELLOW
             )
-        if unchanged and not created and not updated:
+        if backed_up:
+            typer.secho(
+                f"Updated {component} (backed up user modifications): {', '.join(backed_up)}",
+                fg=typer.colors.CYAN,
+            )
+        if unchanged and not created and not updated and not backed_up:
             typer.echo(f"{component} unchanged")
 
     # Create/update skill

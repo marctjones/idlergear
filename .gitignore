@@ -156,3 +156,4 @@ docs/api/
 .claude/rules/idlergear.md
 .claude/settings.local.json
 .wiki/
+.claude/hooks/.idlergear_checksums.json
