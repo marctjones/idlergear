@@ -236,7 +236,15 @@ def update_task(
     new_content = render_frontmatter(frontmatter, new_body.strip() + "\n")
     filepath.write_text(new_content)
 
-    return load_task_from_file(filepath)
+    updated_task = load_task_from_file(filepath)
+
+    # Auto-move task in project board if state changed
+    if state is not None:
+        from idlergear.projects import auto_move_task_on_state_change
+
+        auto_move_task_on_state_change(task_id, state, project_path)
+
+    return updated_task
 
 
 def close_task(task_id: int, project_path: Path | None = None) -> dict[str, Any] | None:

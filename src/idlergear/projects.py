@@ -481,3 +481,81 @@ def auto_add_task_if_configured(
     except Exception:
         # Silently fail - don't break task creation if project add fails
         return False
+
+
+def auto_move_task_on_state_change(
+    task_id: str | int,
+    new_state: str,
+    project_path: Path | None = None,
+) -> bool:
+    """Automatically move task to appropriate column when state changes.
+
+    Uses projects.column_mapping configuration to map task states to project columns.
+
+    Args:
+        task_id: Task ID
+        new_state: New task state (e.g., "open", "in_progress", "completed")
+        project_path: Override project path
+
+    Returns:
+        True if task was moved, False otherwise
+
+    Configuration example:
+        [projects.column_mapping]
+        open = "Backlog"
+        in_progress = "In Progress"
+        completed = "Done"
+
+    Example:
+        >>> auto_move_task_on_state_change(278, "in_progress")
+        True  # Task moved to "In Progress" column
+    """
+    from idlergear.config import get_config_value
+
+    # Check if column mapping is enabled
+    auto_move = get_config_value("projects.auto_move", project_path)
+    if auto_move is False:  # Explicitly disabled
+        return False
+
+    # Get default project
+    default_project = get_config_value("projects.default_project", project_path)
+    if not default_project:
+        return False
+
+    # Get column mapping for the state
+    column_mapping_key = f"projects.column_mapping.{new_state}"
+    target_column = get_config_value(column_mapping_key, project_path)
+
+    if not target_column:
+        # No mapping for this state, don't move
+        return False
+
+    # Check if task is in the project
+    project = get_project(default_project, project_path)
+    if not project:
+        return False
+
+    # Check if task exists in any column
+    task_id_str = str(task_id)
+    task_in_project = False
+    for col_tasks in project["tasks"].values():
+        if task_id_str in col_tasks:
+            task_in_project = True
+            break
+
+    if not task_in_project:
+        # Task not in project, don't try to move it
+        return False
+
+    # Move task to target column
+    try:
+        result = move_task(
+            project_name=default_project,
+            task_id=task_id_str,
+            column=target_column,
+            project_path=project_path,
+        )
+        return result is not None
+    except Exception:
+        # Silently fail - don't break task updates if project move fails
+        return False

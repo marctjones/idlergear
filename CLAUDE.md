@@ -434,6 +434,68 @@ idlergear task list --preview
 idlergear task list --preview --limit 10
 ```
 
+## Project Board Automation
+
+**IdlerGear can automatically move tasks between project board columns when their state changes.**
+
+### Configuration
+
+Enable automatic task movement based on state changes:
+
+```toml
+# .idlergear/config.toml
+[projects]
+auto_add = true              # Auto-add new tasks to default project
+auto_move = true             # Auto-move tasks when state changes (default: true)
+default_project = "main"     # Default project name
+default_column = "Backlog"   # Column for new tasks
+
+[projects.column_mapping]
+open = "Backlog"             # Tasks with state="open" → "Backlog" column
+in_progress = "In Progress"  # Tasks with state="in_progress" → "In Progress" column
+completed = "Done"           # Tasks with state="completed" → "Done" column
+closed = "Done"              # Tasks with state="closed" → "Done" column
+```
+
+### How It Works
+
+1. **Task Creation**: New tasks automatically added to default project's default column
+2. **State Changes**: When task state changes, automatically moves to mapped column
+3. **Manual Updates**: Use `idlergear task update` or MCP tools - movement is automatic
+
+### Examples
+
+```bash
+# Create project with custom columns
+idlergear project create "Sprint Q1" --columns "Backlog,Ready,Doing,Review,Done"
+
+# Configure as default
+idlergear config set projects.default_project "Sprint Q1"
+idlergear config set projects.auto_add true
+idlergear config set projects.auto_move true
+
+# Set column mapping
+idlergear config set projects.column_mapping.open "Backlog"
+idlergear config set projects.column_mapping.in_progress "Doing"
+idlergear config set projects.column_mapping.completed "Done"
+
+# Create task - automatically added to "Backlog"
+idlergear task create "Implement login" --label enhancement
+
+# Update state - automatically moves to "Doing"
+idlergear task update 123 --state in_progress
+
+# Close task - automatically moves to "Done"
+idlergear task close 123
+```
+
+### Benefits
+
+- **Automatic Kanban Flow**: Tasks move through board as work progresses
+- **GitHub Sync**: Project boards can sync to GitHub Projects v2
+- **No Manual Dragging**: State changes in IdlerGear update board position
+- **Consistent Workflow**: Same behavior for CLI, MCP tools, and API
+
 ## IdlerGear Usage Quick Reference
 
 **ALWAYS run at session start:**
