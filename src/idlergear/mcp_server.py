@@ -24,6 +24,9 @@ _reload_requested = False
 # Set when idlergear_daemon_register_agent is called successfully
 _registered_agent_id: str | None = None
 
+# Current session ID (set when session starts, cleared when it ends)
+_current_session_id: str | None = None
+
 # FileRegistry cache for performance (invalidated by daemon events)
 # Key: registry_path (str), Value: FileRegistry instance
 _registry_cache: dict[str, Any] = {}
@@ -1633,6 +1636,75 @@ async def list_tools() -> list[Tool]:
                     },
                 },
                 "required": ["message"],
+            },
+        ),
+        # Session monitoring tools (for multi-client coordination)
+        Tool(
+            name="idlergear_session_notify_start",
+            description="Notify the daemon that a session has started. Enables multi-client coordination by tracking active sessions across all AI assistants. Call this when starting work to let other agents know what you're working on.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Agent ID (from registration)",
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID (unique identifier)",
+                    },
+                    "session_name": {
+                        "type": "string",
+                        "description": "Human-readable session name",
+                    },
+                    "working_files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of files being worked on",
+                    },
+                    "current_task_id": {
+                        "type": "integer",
+                        "description": "Current task ID",
+                    },
+                },
+                "required": ["agent_id", "session_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_session_notify_end",
+            description="Notify the daemon that a session has ended. Call this when finishing work to clear your session state.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Agent ID (from registration)",
+                    },
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID that is ending",
+                    },
+                },
+                "required": ["agent_id", "session_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_session_list_active",
+            description="List all active sessions across all AI assistants. Use this to see what other agents are currently working on.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
+        Tool(
+            name="idlergear_session_get_agent_status",
+            description="Get the current session status for a specific agent. Returns what they're working on (files, task, session name).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "string",
+                        "description": "Agent ID to query",
+                    },
+                },
+                "required": ["agent_id"],
             },
         ),
         Tool(
@@ -4362,6 +4434,31 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             result = handle_list_queue()
             return _format_result(result)
 
+        # Session monitoring handlers (for multi-client coordination)
+        elif name == "idlergear_session_notify_start":
+            from idlergear.daemon.mcp_handlers import handle_session_notify_start
+
+            result = handle_session_notify_start(arguments)
+            return _format_result(result)
+
+        elif name == "idlergear_session_notify_end":
+            from idlergear.daemon.mcp_handlers import handle_session_notify_end
+
+            result = handle_session_notify_end(arguments)
+            return _format_result(result)
+
+        elif name == "idlergear_session_list_active":
+            from idlergear.daemon.mcp_handlers import handle_session_list_active
+
+            result = handle_session_list_active()
+            return _format_result(result)
+
+        elif name == "idlergear_session_get_agent_status":
+            from idlergear.daemon.mcp_handlers import handle_session_get_agent_status
+
+            result = handle_session_get_agent_status(arguments)
+            return _format_result(result)
+
         # Cross-agent messaging handlers (inbox-based)
         elif name == "idlergear_message_send":
             from idlergear.messaging import send_message
@@ -5335,11 +5432,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         # === Session Management Handlers ===
         elif name == "idlergear_session_start":
             from idlergear.session import start_session
+            global _registered_agent_id, _current_session_id
 
             result = start_session(
                 context_mode=arguments.get("context_mode", "minimal"),
                 load_state=arguments.get("load_state", True),
+                agent_id=_registered_agent_id,
+                session_name=arguments.get("session_name"),
             )
+
+            # Store session ID for use in session_end
+            if "session_id" in result:
+                _current_session_id = result["session_id"]
+
             return _format_result(result)
 
         elif name == "idlergear_session_save":
@@ -5355,12 +5460,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_session_end":
             from idlergear.session import end_session
+            global _registered_agent_id, _current_session_id
 
             result = end_session(
                 current_task_id=arguments.get("current_task_id"),
                 working_files=arguments.get("working_files"),
                 notes=arguments.get("notes"),
+                agent_id=_registered_agent_id,
+                session_id=_current_session_id,
             )
+
+            # Clear session ID after ending
+            _current_session_id = None
+
             return _format_result(result)
 
         elif name == "idlergear_session_status":

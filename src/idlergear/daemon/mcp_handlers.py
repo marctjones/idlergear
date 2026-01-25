@@ -401,3 +401,128 @@ def handle_list_queue() -> dict[str, Any]:
         return result
     except Exception as e:
         return {"commands": [], "error": str(e)}
+
+
+# ============================================================================
+# Session Monitoring Handlers (for multi-client coordination)
+# ============================================================================
+
+
+def handle_session_notify_start(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Notify daemon that a session has started.
+
+    This enables multi-client coordination by tracking which sessions
+    are active across all AI assistants.
+    """
+    agent_id = arguments.get("agent_id")
+    session_id = arguments.get("session_id")
+    session_name = arguments.get("session_name")
+    working_files = arguments.get("working_files", [])
+    current_task_id = arguments.get("current_task_id")
+
+    if not agent_id:
+        raise ValueError("agent_id is required")
+    if not session_id:
+        raise ValueError("session_id is required")
+
+    # Ensure daemon is running
+    _ensure_daemon()
+
+    result = _run_async(
+        _call_daemon(
+            "session.start",
+            {
+                "agent_id": agent_id,
+                "session_id": session_id,
+                "session_name": session_name,
+                "working_files": working_files,
+                "current_task_id": current_task_id,
+            },
+        )
+    )
+
+    return {
+        "notified": result.get("success", False),
+        "session_id": session_id,
+        "agent_id": agent_id,
+    }
+
+
+def handle_session_notify_end(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Notify daemon that a session has ended."""
+    agent_id = arguments.get("agent_id")
+    session_id = arguments.get("session_id")
+
+    if not agent_id:
+        raise ValueError("agent_id is required")
+    if not session_id:
+        raise ValueError("session_id is required")
+
+    # Ensure daemon is running
+    _ensure_daemon()
+
+    result = _run_async(
+        _call_daemon(
+            "session.end",
+            {
+                "agent_id": agent_id,
+                "session_id": session_id,
+            },
+        )
+    )
+
+    return {
+        "notified": result.get("success", False),
+        "session_id": session_id,
+        "agent_id": agent_id,
+    }
+
+
+def handle_session_list_active() -> dict[str, Any]:
+    """List all active sessions across all AI assistants.
+
+    Returns session information for multi-client coordination.
+    """
+    try:
+        idlergear_root = _get_idlergear_root()
+        lifecycle = DaemonLifecycle(idlergear_root)
+
+        if not lifecycle.is_running():
+            return {"sessions": [], "daemon_running": False}
+
+        result = _run_async(_call_daemon("session.list", {}))
+        result["daemon_running"] = True
+        return result
+    except Exception as e:
+        return {"sessions": [], "error": str(e)}
+
+
+def handle_session_get_agent_status(arguments: dict[str, Any]) -> dict[str, Any]:
+    """Get session status for a specific agent (what are they working on?)."""
+    agent_id = arguments.get("agent_id")
+
+    if not agent_id:
+        raise ValueError("agent_id is required")
+
+    try:
+        idlergear_root = _get_idlergear_root()
+        lifecycle = DaemonLifecycle(idlergear_root)
+
+        if not lifecycle.is_running():
+            return {"found": False, "daemon_running": False}
+
+        result = _run_async(
+            _call_daemon(
+                "session.get",
+                {"agent_id": agent_id},
+            )
+        )
+
+        result["found"] = True
+        result["daemon_running"] = True
+        return result
+    except ValueError as e:
+        # Agent not found
+        return {"found": False, "error": str(e)}
+    except Exception as e:
+        return {"found": False, "error": str(e)}

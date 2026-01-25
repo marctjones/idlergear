@@ -114,6 +114,13 @@ class DaemonServer:
         self.register_method("agent.update_status", self._handle_agent_update_status)
         self.register_method("agent.list", self._handle_agent_list)
 
+        # Session monitoring methods
+        self.register_method("session.start", self._handle_session_start)
+        self.register_method("session.end", self._handle_session_end)
+        self.register_method("session.update", self._handle_session_update)
+        self.register_method("session.list", self._handle_session_list)
+        self.register_method("session.get", self._handle_session_get)
+
         # Queue methods
         self.register_method("queue.add", self._handle_queue_add)
         self.register_method("queue.get", self._handle_queue_get)
@@ -262,6 +269,140 @@ class DaemonServer:
             agent_type=params.get("agent_type"), status=params.get("status")
         )
         return {"agents": [a.to_dict() for a in agents]}
+
+    # Session monitoring handlers
+    async def _handle_session_start(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle session start notification."""
+        agent_id = params.get("agent_id")
+        session_id = params.get("session_id")
+        session_name = params.get("session_name")
+
+        if not agent_id or not session_id:
+            raise ValueError("Missing agent_id or session_id")
+
+        # Update agent's session information
+        success = await self.agents.update_session(
+            agent_id=agent_id,
+            session_id=session_id,
+            session_name=session_name,
+            working_files=params.get("working_files"),
+            current_task_id=params.get("current_task_id"),
+        )
+
+        if success:
+            agent = await self.agents.get(agent_id)
+            if agent:
+                await self.broadcast("session.started", agent.to_dict())
+
+        return {"success": success}
+
+    async def _handle_session_end(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle session end notification."""
+        agent_id = params.get("agent_id")
+        session_id = params.get("session_id")
+
+        if not agent_id or not session_id:
+            raise ValueError("Missing agent_id or session_id")
+
+        # Clear session information
+        success = await self.agents.update_session(
+            agent_id=agent_id,
+            session_id=None,
+            session_name=None,
+            working_files=[],
+            current_task_id=None,
+        )
+
+        if success:
+            await self.broadcast(
+                "session.ended",
+                {"agent_id": agent_id, "session_id": session_id},
+            )
+
+        return {"success": success}
+
+    async def _handle_session_update(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle session state update."""
+        agent_id = params.get("agent_id")
+        if not agent_id:
+            raise ValueError("Missing agent_id")
+
+        # Update session fields (only those provided)
+        success = await self.agents.update_session(
+            agent_id=agent_id,
+            session_id=params.get("session_id"),
+            session_name=params.get("session_name"),
+            working_files=params.get("working_files"),
+            current_task_id=params.get("current_task_id"),
+        )
+
+        if success:
+            agent = await self.agents.get(agent_id)
+            if agent:
+                # Determine what changed and broadcast appropriate event
+                event_data = agent.to_dict()
+
+                if params.get("current_task_id") is not None:
+                    await self.broadcast("session.task_changed", event_data)
+                elif params.get("working_files") is not None:
+                    await self.broadcast("session.files_changed", event_data)
+                else:
+                    await self.broadcast("session.updated", event_data)
+
+        return {"success": success}
+
+    async def _handle_session_list(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle session list request - returns all active sessions."""
+        agents = await self.agents.list()
+
+        # Filter to only agents with active sessions
+        sessions = [
+            {
+                "agent_id": a.agent_id,
+                "agent_type": a.agent_type,
+                "session_id": a.session_id,
+                "session_name": a.session_name,
+                "working_files": a.working_files,
+                "current_task_id": a.current_task_id,
+                "status": a.status,
+                "last_heartbeat": a.last_heartbeat,
+            }
+            for a in agents
+            if a.session_id is not None
+        ]
+
+        return {"sessions": sessions}
+
+    async def _handle_session_get(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle getting session details for a specific agent."""
+        agent_id = params.get("agent_id")
+        if not agent_id:
+            raise ValueError("Missing agent_id")
+
+        agent = await self.agents.get(agent_id)
+        if not agent:
+            raise ValueError(f"Agent not found: {agent_id}")
+
+        return {
+            "agent_id": agent.agent_id,
+            "agent_type": agent.agent_type,
+            "session_id": agent.session_id,
+            "session_name": agent.session_name,
+            "working_files": agent.working_files,
+            "current_task_id": agent.current_task_id,
+            "status": agent.status,
+            "last_heartbeat": agent.last_heartbeat,
+        }
 
     # Queue handlers
     async def _handle_queue_add(

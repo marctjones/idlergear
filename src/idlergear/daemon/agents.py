@@ -23,6 +23,11 @@ class AgentSession:
     current_task: Optional[str] = None  # Current command ID
     capabilities: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Session tracking fields (for multi-client coordination)
+    session_id: Optional[str] = None  # IdlerGear session ID
+    session_name: Optional[str] = None  # Human-readable session name
+    working_files: list[str] = field(default_factory=list)  # Files being worked on
+    current_task_id: Optional[int] = None  # IdlerGear task ID
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -75,6 +80,10 @@ class AgentRegistry:
         connection_id: int,
         capabilities: Optional[list[str]] = None,
         metadata: Optional[dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+        session_name: Optional[str] = None,
+        working_files: Optional[list[str]] = None,
+        current_task_id: Optional[int] = None,
     ) -> AgentSession:
         """Register a new agent session."""
         async with self._lock:
@@ -87,6 +96,10 @@ class AgentRegistry:
                 connection_id=connection_id,
                 capabilities=capabilities or [],
                 metadata=metadata or {},
+                session_id=session_id,
+                session_name=session_name,
+                working_files=working_files or [],
+                current_task_id=current_task_id,
             )
             self._agents[agent_id] = session
             await self._save()
@@ -144,6 +157,33 @@ class AgentRegistry:
 
             agent.status = status
             agent.current_task = current_task
+            agent.last_heartbeat = datetime.now(timezone.utc).isoformat()
+            await self._save()
+            return True
+
+    async def update_session(
+        self,
+        agent_id: str,
+        session_id: Optional[str] = None,
+        session_name: Optional[str] = None,
+        working_files: Optional[list[str]] = None,
+        current_task_id: Optional[int] = None,
+    ) -> bool:
+        """Update agent's session information."""
+        async with self._lock:
+            agent = self._agents.get(agent_id)
+            if not agent:
+                return False
+
+            if session_id is not None:
+                agent.session_id = session_id
+            if session_name is not None:
+                agent.session_name = session_name
+            if working_files is not None:
+                agent.working_files = working_files
+            if current_task_id is not None:
+                agent.current_task_id = current_task_id
+
             agent.last_heartbeat = datetime.now(timezone.utc).isoformat()
             await self._save()
             return True

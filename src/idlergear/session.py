@@ -127,6 +127,8 @@ class SessionState:
 def start_session(
     context_mode: str = "minimal",
     load_state: bool = True,
+    agent_id: Optional[str] = None,
+    session_name: Optional[str] = None,
 ) -> dict[str, Any]:
     """Start a new session, optionally loading previous state.
 
@@ -135,6 +137,8 @@ def start_session(
     Args:
         context_mode: Context mode to use (minimal, standard, detailed, full)
         load_state: Whether to load previous session state
+        agent_id: Agent ID (for daemon notification)
+        session_name: Human-readable session name
 
     Returns:
         Dict containing:
@@ -143,8 +147,13 @@ def start_session(
             - recommendations: What to work on based on state
     """
     from idlergear.context import gather_context
+    import uuid
 
     result: dict[str, Any] = {}
+
+    # Generate session ID
+    session_id = f"s{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+    result["session_id"] = session_id
 
     # Load project context
     result["context"] = gather_context(mode=context_mode)
@@ -173,6 +182,23 @@ def start_session(
 
         result["recommendations"] = recommendations
 
+        # Notify daemon of session start (if agent_id provided)
+        if agent_id:
+            try:
+                from idlergear.daemon.mcp_handlers import handle_session_notify_start
+
+                notify_result = handle_session_notify_start({
+                    "agent_id": agent_id,
+                    "session_id": session_id,
+                    "session_name": session_name or f"Session {session_id}",
+                    "working_files": state.get("working_files", []) if state else [],
+                    "current_task_id": state.get("current_task_id") if state else None,
+                })
+                result["daemon_notified"] = notify_result.get("notified", False)
+            except Exception:
+                # Graceful degradation - daemon not running or error
+                result["daemon_notified"] = False
+
     return result
 
 
@@ -181,6 +207,8 @@ def end_session(
     working_files: Optional[list[str]] = None,
     notes: Optional[str] = None,
     auto_suggest: bool = True,
+    agent_id: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """End current session and save state.
 
@@ -189,6 +217,8 @@ def end_session(
         working_files: Files being worked on
         notes: Session notes
         auto_suggest: Whether to generate suggestions for next session
+        agent_id: Agent ID (for daemon notification)
+        session_id: Session ID to end (for daemon notification)
 
     Returns:
         Dict containing saved state and suggestions
@@ -215,5 +245,19 @@ def end_session(
             )
 
         result["suggestions"] = suggestions
+
+    # Notify daemon of session end (if agent_id and session_id provided)
+    if agent_id and session_id:
+        try:
+            from idlergear.daemon.mcp_handlers import handle_session_notify_end
+
+            notify_result = handle_session_notify_end({
+                "agent_id": agent_id,
+                "session_id": session_id,
+            })
+            result["daemon_notified"] = notify_result.get("notified", False)
+        except Exception:
+            # Graceful degradation - daemon not running or error
+            result["daemon_notified"] = False
 
     return result
