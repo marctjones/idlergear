@@ -5835,6 +5835,179 @@ def session_abandon(
         raise typer.Exit(1)
 
 
+@session_app.command("harvest")
+def session_harvest(
+    session_id: str = typer.Option(None, "--session", "-s", help="Session ID to harvest (default: latest)"),
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
+    days: int = typer.Option(None, "--days", "-d", help="Harvest recent sessions from last N days"),
+    save_note: bool = typer.Option(False, "--save", help="Save insights as note"),
+    patterns: bool = typer.Option(False, "--patterns", help="Identify patterns across sessions"),
+):
+    """Extract knowledge and insights from completed sessions.
+
+    Analyzes sessions to identify lessons learned, patterns, and achievements.
+
+    Examples:
+        idlergear session harvest --session s003
+        idlergear session harvest --days 7 --patterns
+        idlergear session harvest --session s005 --save
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_knowledge import KnowledgeHarvester
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        harvester = KnowledgeHarvester()
+
+        if patterns:
+            # Show patterns across multiple sessions
+            pattern_days = days or 30
+            result = harvester.identify_patterns(days=pattern_days, branch=branch)
+
+            typer.echo(f"\n📊 Patterns (last {pattern_days} days, {result['total_sessions']} sessions):\n")
+
+            for pattern in result["patterns"]:
+                typer.secho(f"  • {pattern['description']}", fg=typer.colors.CYAN)
+
+        elif days:
+            # Harvest recent sessions
+            harvested = harvester.harvest_recent_sessions(days=days, branch=branch)
+
+            typer.echo(f"\n💡 Knowledge from last {days} days ({len(harvested)} sessions):\n")
+
+            for knowledge in harvested:
+                session_id = knowledge["session_id"]
+                typer.secho(f"Session {session_id}:", fg=typer.colors.BRIGHT_BLUE)
+
+                for insight in knowledge.get("insights", []):
+                    typer.echo(f"  • {insight.get('content', '')}")
+
+                typer.echo("")
+
+        else:
+            # Harvest single session
+            if not session_id:
+                # Get latest session
+                from idlergear.session_history import SessionHistory
+                history = SessionHistory()
+                latest = history.get_latest_snapshot(branch)
+                if not latest:
+                    typer.secho("No sessions found", fg=typer.colors.RED)
+                    raise typer.Exit(1)
+                session_id = latest.session_id
+
+            knowledge = harvester.harvest_session(session_id, branch)
+
+            typer.echo(f"\n💡 Session {session_id} Knowledge:\n")
+            typer.echo(f"  Duration: {knowledge['duration_minutes']} minutes")
+            typer.echo(f"  Insights:\n")
+
+            for insight in knowledge.get("insights", []):
+                typer.echo(f"    • {insight.get('content', '')}")
+
+            # Save as note if requested
+            if save_note:
+                note = harvester.save_as_note(knowledge)
+                typer.echo(f"\n✓ Saved as note #{note['id']}: {note['title']}")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("analyze")
+def session_analyze(
+    session_id: str,
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
+):
+    """Analyze a specific session for efficiency and insights.
+
+    Provides detailed breakdown of session time, tool usage, and patterns.
+
+    Examples:
+        idlergear session analyze s003
+        idlergear session analyze s005 --branch experiment
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_history import SessionHistory
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        history = SessionHistory()
+        snapshot = history.load_snapshot(session_id, branch)
+
+        if not snapshot:
+            typer.secho(
+                f"Session '{session_id}' not found in branch '{branch}'",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+        # Display analysis
+        typer.echo(f"\n📊 Session {session_id} Analysis\n")
+
+        duration_min = snapshot.duration_seconds // 60
+        duration_sec = snapshot.duration_seconds % 60
+        typer.echo(f"⏱️  Duration: {duration_min}m {duration_sec}s")
+
+        outcome = snapshot.outcome
+        status = outcome.get("status", "unknown")
+        status_icon = "✅" if status == "success" else "❌"
+        typer.echo(f"{status_icon} Outcome: {status}")
+
+        # Task info
+        state = snapshot.state
+        current_task = state.get("current_task_id")
+        if current_task:
+            typer.echo(f"🎯 Task: #{current_task}")
+
+        # Working files
+        working_files = state.get("working_files", [])
+        if working_files:
+            typer.echo(f"\n📁 Files Modified: {len(working_files)}")
+            for file in working_files[:5]:  # Show first 5
+                typer.echo(f"  • {file}")
+            if len(working_files) > 5:
+                typer.echo(f"  ... and {len(working_files) - 5} more")
+
+        # Tool usage
+        tool_usage = outcome.get("tool_usage", {})
+        if tool_usage:
+            typer.echo(f"\n🔧 Tool Usage:")
+            total_calls = sum(tool_usage.values())
+
+            for tool, count in sorted(tool_usage.items(), key=lambda x: x[1], reverse=True)[:5]:
+                percentage = (count / total_calls * 100) if total_calls > 0 else 0
+                typer.echo(f"  {tool}: {count} calls ({percentage:.1f}%)")
+
+        # Tasks created/completed
+        tasks_created = outcome.get("tasks_created", [])
+        tasks_completed = outcome.get("tasks_completed", [])
+
+        if tasks_created or tasks_completed:
+            typer.echo(f"\n✅ Tasks:")
+            if tasks_created:
+                typer.echo(f"  Created: {len(tasks_created)}")
+            if tasks_completed:
+                typer.echo(f"  Completed: {len(tasks_completed)}")
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 @session_app.command("monitor")
 def session_monitor(
     session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
