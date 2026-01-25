@@ -147,6 +147,7 @@ def start_run(
     project_path: Path | None = None,
     register_with_daemon: bool = True,
     stream_logs: bool = False,
+    use_tmux: bool = False,
 ) -> dict[str, Any]:
     """Start a new run (execute a command in the background).
 
@@ -156,8 +157,9 @@ def start_run(
         project_path: Project root path
         register_with_daemon: Whether to register as an agent with the daemon
         stream_logs: Whether to stream logs to daemon (requires registration)
+        use_tmux: Whether to run in a tmux session (allows attaching later)
 
-    Returns the run data including name and PID.
+    Returns the run data including name and PID, plus tmux_session if use_tmux=True.
     """
     runs_dir = get_runs_dir(project_path)
     if runs_dir is None:
@@ -209,30 +211,68 @@ def start_run(
     if project_path is None:
         project_path = find_idlergear_root()
 
-    # Start process
-    process = subprocess.Popen(
-        command,
-        shell=True,
-        stdout=stdout_handle,
-        stderr=stderr_handle,
-        cwd=project_path,
-        start_new_session=True,  # Detach from parent
-    )
+    # Start process (either in tmux or as background process)
+    tmux_session_name = None
+    pid = None
+
+    if use_tmux:
+        # Start in tmux session
+        from idlergear.pm import ProcessManager
+
+        pm = ProcessManager(project_path)
+        try:
+            tmux_session_name = f"idlergear-{name}"
+            # Redirect tmux output to log files
+            log_command = f"{command} > {stdout_file} 2> {stderr_file}"
+            session_info = pm.create_tmux_session(
+                name=tmux_session_name,
+                command=log_command,
+                start_directory=str(project_path),
+            )
+            # Get PID of the shell in tmux (approximate)
+            # We'll use a sentinel file to track the actual command PID
+            pid_sentinel = run_dir / "tmux_command_pid"
+            wrapped_command = f"({command}) & echo $! > {pid_sentinel}"
+            pm.send_keys_to_tmux(tmux_session_name, wrapped_command)
+
+            # Wait briefly for PID file to be created
+            time.sleep(0.1)
+            if pid_sentinel.exists():
+                pid = int(pid_sentinel.read_text().strip())
+            else:
+                # Fallback: use a placeholder PID
+                pid = -1
+        except Exception as e:
+            stdout_handle.close()
+            stderr_handle.close()
+            raise RuntimeError(f"Failed to create tmux session: {e}")
+    else:
+        # Start as background process
+        process = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            cwd=project_path,
+            start_new_session=True,  # Detach from parent
+        )
+        pid = process.pid
 
     # Write PID
-    pid_file.write_text(str(process.pid))
+    pid_file.write_text(str(pid))
 
     # Write metadata.json for rich run information
     metadata = {
         "name": name,
         "command": command,
         "script_hash": script_hash,
-        "pid": process.pid,
+        "pid": pid,
         "started_at": start_time,
         "ended_at": None,
         "exit_code": None,
         "status": "running",
-        "terminal_type": "background",
+        "terminal_type": "tmux" if use_tmux else "background",
+        "tmux_session": tmux_session_name if use_tmux else None,
     }
     metadata_file = run_dir / "metadata.json"
     metadata_file.write_text(json.dumps(metadata, indent=2) + "\n")
@@ -263,7 +303,7 @@ def start_run(
         "name": name,
         "command": command,
         "script_hash": script_hash,
-        "pid": process.pid,
+        "pid": pid,
         "status": "running",
         "started_at": start_time,
         "path": str(run_dir),
@@ -271,6 +311,10 @@ def start_run(
 
     if agent_id:
         result["agent_id"] = agent_id
+
+    if tmux_session_name:
+        result["tmux_session"] = tmux_session_name
+        result["terminal_type"] = "tmux"
 
     return result
 
@@ -473,8 +517,53 @@ def get_run_logs(
     return content
 
 
+def attach_to_run(name: str, project_path: Path | None = None) -> dict[str, Any]:
+    """Attach to a tmux session for a run.
+
+    Args:
+        name: Run name
+        project_path: Project root path
+
+    Returns:
+        Dict with tmux_session name and attach_command
+
+    Raises:
+        RuntimeError: If run not found, not running, or not in tmux
+    """
+    run = get_run_info(name, project_path)
+    if run is None:
+        raise RuntimeError(f"Run '{name}' not found")
+
+    if run["status"] != "running":
+        raise RuntimeError(f"Run '{name}' is not running (status: {run['status']})")
+
+    # Check if run is in tmux
+    runs_dir = get_runs_dir(project_path)
+    run_dir = runs_dir / name
+    metadata_file = run_dir / "metadata.json"
+
+    if metadata_file.exists():
+        metadata = json.loads(metadata_file.read_text())
+        tmux_session = metadata.get("tmux_session")
+        if not tmux_session:
+            raise RuntimeError(
+                f"Run '{name}' is not running in tmux. "
+                "Start with --tmux flag to enable attaching."
+            )
+
+        return {
+            "tmux_session": tmux_session,
+            "attach_command": f"tmux attach-session -t {tmux_session}",
+            "message": f"Attach to session with: tmux attach-session -t {tmux_session}",
+        }
+
+    raise RuntimeError(f"Run '{name}' metadata not found")
+
+
 def stop_run(name: str, project_path: Path | None = None) -> bool:
     """Stop a running process.
+
+    If running in tmux, kills the tmux session. Otherwise, kills the process.
 
     Returns True if stopped, False if not running or not found.
     """
@@ -482,12 +571,30 @@ def stop_run(name: str, project_path: Path | None = None) -> bool:
     if run is None or run["status"] != "running":
         return False
 
+    runs_dir = get_runs_dir(project_path)
+    run_dir = runs_dir / name
+
+    # Check if running in tmux
+    metadata_file = run_dir / "metadata.json"
+    tmux_session = None
+    if metadata_file.exists():
+        try:
+            metadata = json.loads(metadata_file.read_text())
+            tmux_session = metadata.get("tmux_session")
+        except (json.JSONDecodeError, KeyError):
+            pass
+
     try:
-        os.kill(run["pid"], signal.SIGTERM)
+        if tmux_session:
+            # Kill tmux session
+            from idlergear.pm import ProcessManager
+            pm = ProcessManager(project_path)
+            pm.kill_tmux_session(tmux_session)
+        else:
+            # Kill process directly
+            os.kill(run["pid"], signal.SIGTERM)
 
         # Update status file
-        runs_dir = get_runs_dir(project_path)
-        run_dir = runs_dir / name
         status_file = run_dir / "status.txt"
         status_file.write_text(f"stopped\nstopped: {now_iso()}\n")
 
