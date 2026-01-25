@@ -690,25 +690,54 @@ class GitServer:
         """
         Get git status filtered by task files (IdlerGear-specific).
 
+        Filters git status to only show files related to the given task.
+        Uses knowledge graph to find task-file relationships.
+
         Args:
             task_id: Task ID
             repo_path: Repository path
 
         Returns:
-            Filtered status
+            Filtered status with only task-related files
+
+        Example:
+            >>> git = GitOperations()
+            >>> status = git.status_for_task(278)
+            >>> print(status['staged'])  # Only files for task 278
         """
+        from idlergear.graph import get_database, query_task_context
+
         # Get full status
         status = self.status(repo_path=repo_path)
 
-        # See task #321
-        # For now, return full status with task_id annotation
+        # Get task files from knowledge graph
+        try:
+            db = get_database()
+            task_context = query_task_context(db, task_id)
+            task_files = set(task_context.get("files", []))
+        except Exception:
+            # If knowledge graph unavailable, return full status with warning
+            return {
+                "task_id": task_id,
+                "branch": status.branch,
+                "staged": status.staged,
+                "modified": status.modified,
+                "untracked": status.untracked,
+                "warning": "Knowledge graph unavailable - showing all files",
+            }
+
+        # Filter status by task files
+        def filter_files(files):
+            return [f for f in files if f in task_files]
+
         return {
             "task_id": task_id,
+            "task_title": task_context.get("title", "Unknown"),
+            "task_file_count": len(task_files),
             "branch": status.branch,
-            "staged": status.staged,
-            "modified": status.modified,
-            "untracked": status.untracked,
-            "note": "Full task file filtering requires task backend integration",
+            "staged": filter_files(status.staged),
+            "modified": filter_files(status.modified),
+            "untracked": filter_files(status.untracked),
         }
 
     def task_commits(

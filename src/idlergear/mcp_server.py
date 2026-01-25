@@ -2277,7 +2277,7 @@ This ensures messages don't derail your work - only context ones are shown immed
         ),
         Tool(
             name="idlergear_git_status_for_task",
-            description="Get git status filtered by task files (IdlerGear-specific). Shows only files relevant to a specific task.",
+            description="Get git status filtered by task files (IdlerGear-specific). Uses knowledge graph to find files associated with a task and filters git status to show only those files. Returns staged, modified, and untracked files relevant to the task.",
             inputSchema={
                 "type": "object",
                 "properties": {
