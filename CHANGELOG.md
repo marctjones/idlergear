@@ -5,6 +5,140 @@ All notable changes to IdlerGear will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-01-25
+
+### Added - Session Management Advanced
+- **Session Branching** - Git-like branching for experimental work (#273)
+  - Create branches from any session with purpose/reason tracking
+  - Switch between branches with `checkout`
+  - Compare branches with detailed diff (files, tasks, duration)
+  - Merge successful experiments back to main
+  - Abandon failed experiments with documentation
+  - Delete merged/abandoned branches
+  - Full session lineage tracking with parent pointers
+  - Branch metadata: status (active/merged/abandoned), created, forked_from
+- **Knowledge Harvesting** - Extract insights from completed sessions (#274)
+  - Harvest single session: tasks completed, focus areas, tool usage
+  - Identify patterns across multiple sessions (days/weeks)
+  - Save harvested insights as notes with tags
+  - Insight types: achievement, focus_area, tool_pattern, success_pattern, learning
+  - Pattern analysis: success rates, common directories, tool preferences, avg duration
+  - Integration with session branching for experiment comparison
+- **Session Analytics** - Deep session efficiency analysis (#275)
+  - Productivity metrics and efficiency scoring
+  - Tool usage analysis and recommendations
+  - Task completion rate tracking
+  - File change pattern identification
+  - Session duration statistics
+- **Container Support** - Isolated process execution (#325)
+  - Podman and Docker support with unified API
+  - Resource limits: memory and CPU constraints
+  - Environment variable injection
+  - Volume mounting for workspace access
+  - Container lifecycle management (start, stop, remove, logs, stats)
+  - Integration with run system for task-aware containers
+  - Containerized testing infrastructure (Containerfiles for install/build)
+  - Test matrix script: Python 3.10, 3.11, 3.12
+
+### Added - CLI Commands
+Session management commands:
+- `idlergear session branch` - Create experimental branch
+- `idlergear session checkout` - Switch to branch
+- `idlergear session branches` - List all branches
+- `idlergear session diff` - Compare two branches
+- `idlergear session merge` - Merge branch into target
+- `idlergear session abandon` - Mark branch as abandoned
+- `idlergear session delete-branch` - Delete branch
+- `idlergear session harvest` - Extract insights from session(s)
+- `idlergear session analyze` - Deep efficiency analysis
+
+Container run enhancements:
+- `idlergear run start --container` - Run in container
+- `--image`, `--memory`, `--cpus` - Container resource options
+- `--env` - Environment variable injection
+
+### Added - Infrastructure
+- **Tmux Integration** - Terminal multiplexer support for persistent sessions (#327)
+- **Test Infrastructure** - Containerized testing
+  - `containers/test-install.Containerfile` - Clean environment install testing
+  - `containers/test-build.Containerfile` - Build process validation
+  - `scripts/podman-test.sh` - Test runner (install/build/matrix)
+
+### Added - Documentation
+- Wiki pages for v0.8.0 features
+  - Session Branching guide with use cases and best practices
+  - Knowledge Harvesting guide with insight types and workflows
+  - Container Support guide with resource limits and examples
+- Updated README.md, AGENTS.md, SKILL.md for v0.8.0
+- Updated wiki Home.md with v0.8.0 release notes
+
+### Fixed
+- Session history snapshot loading edge cases
+- Container runtime detection priority (Podman first, Docker fallback)
+
+### Improved
+- Session metadata tracking with parent/child relationships
+- ProcessManager abstraction for containers
+- Run system integration with container lifecycle
+
+## [0.7.0] - 2026-01-24
+
+### Added - GitHub Projects Integration
+- **GitHub Projects v2 Sync** - Bidirectional project board integration (#320, #257)
+  - Create and manage Kanban boards locally
+  - Sync to/from GitHub Projects v2
+  - Link existing GitHub Projects to IdlerGear projects
+  - Automatic task addition to default project (configurable)
+  - Token-efficient project queries
+- **Custom Field Sync** - Rich GitHub Projects metadata (#283)
+  - Map IdlerGear task properties to GitHub custom fields
+  - Supported field types: single-select (priority), date (due), text (labels)
+  - Automatic sync on task create/update
+  - Field validation and graceful failure handling
+  - Configuration via `projects.field_mapping` in config.toml
+- **Status Column Mapping** - Automatic task movement (#282)
+  - Configure column mapping for task states (open → Backlog, in_progress → Doing, etc.)
+  - Auto-move tasks when state changes
+  - Configurable via `projects.column_mapping` in config.toml
+- **Bidirectional Sync** - GitHub as source of truth (#284)
+  - Pull changes from GitHub Projects to IdlerGear
+  - Sync priority, due dates, labels, and issue status
+  - Automatic task closure when GitHub issue closed
+  - Conflict resolution: GitHub wins by default
+
+### Added - GitHub Backend Enhancements
+- **Vision Sync** - Copy vision to `VISION.md` in repo root (#319)
+- **Reference Sync** - Sync references to GitHub Wiki (#318)
+- **Plan Sync** - Sync plans to GitHub (#317)
+
+### Added - CLI Commands
+GitHub Projects commands:
+- `idlergear project sync` - Sync project to GitHub Projects v2
+- `idlergear project link` - Link to existing GitHub Project
+- `idlergear project pull` - Pull changes from GitHub (bidirectional)
+
+### Added - MCP Tools
+- `idlergear_project_sync` - Sync project to GitHub
+- `idlergear_project_link` - Link existing project
+- `idlergear_project_pull` - Pull GitHub changes
+- `idlergear_project_sync_fields` - Sync custom fields
+
+### Added - Documentation
+- GitHub Projects integration guide
+- Custom field sync documentation
+- Bidirectional sync workflow examples
+- Project board automation guide
+
+### Fixed
+- GitHub Projects GraphQL query optimization
+- Field type validation for custom fields
+- Project board column detection
+
+### Improved
+- Token efficiency for project queries
+- GitHub API error handling
+- Project configuration schema
+
 ## [0.6.0] - 2026-01-21
 
 ### Added - File Registry System
