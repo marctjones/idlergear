@@ -723,3 +723,163 @@ def sync_task_fields_to_github(
     except Exception:
         # Silently fail - don't break task operations if sync fails
         return False
+
+
+def pull_project_from_github(
+    name: str,
+    project_path: Path | None = None,
+) -> dict[str, Any]:
+    """Pull changes from GitHub Projects and update local IdlerGear tasks.
+
+    Syncs changes made in GitHub Projects UI back to IdlerGear (bidirectional sync).
+    GitHub is treated as source of truth for conflicts.
+
+    Args:
+        name: Project name or slug
+        project_path: Override project path
+
+    Returns:
+        Summary dict with updated task counts and details
+
+    Operations:
+        - Issue marked CLOSED in GitHub → close IdlerGear task
+        - Priority changed in GitHub → update IdlerGear task priority
+        - Due date changed in GitHub → update IdlerGear task due date
+        - Labels changed in GitHub → update IdlerGear task labels
+
+    Example:
+        >>> result = pull_project_from_github("main")
+        >>> result
+        {
+            "updated": 3,
+            "closed": 1,
+            "tasks": [{"id": 278, "changes": ["priority", "due"]}, ...]
+        }
+    """
+    from idlergear.config import get_config_value
+    from idlergear.github_graphql import GitHubGraphQL, GitHubGraphQLError
+    from idlergear.tasks import get_task, update_task, close_task
+
+    # Get project
+    project = get_project(name, project_path)
+    if not project:
+        raise ValueError(f"Project '{name}' not found")
+
+    # Must be linked to GitHub
+    github_project_id = project.get("github_project_id")
+    github_project_number = project.get("github_project_number")
+    if not github_project_id or not github_project_number:
+        raise ValueError(f"Project '{name}' is not linked to GitHub Projects")
+
+    # Get repo info
+    root = project_path or find_idlergear_root()
+    owner = get_github_owner(root)
+    if not owner:
+        raise RuntimeError("Could not determine GitHub owner")
+
+    # Get field mapping configuration
+    priority_field_name = get_config_value("projects.field_mapping.priority", project_path)
+    due_field_name = get_config_value("projects.field_mapping.due", project_path)
+    labels_field_name = get_config_value("projects.field_mapping.labels", project_path)
+
+    try:
+        graphql = GitHubGraphQL()
+
+        # Fetch all project items with field values
+        items = graphql.get_project_items_with_fields(
+            github_project_id, owner, owner
+        )
+
+        summary = {
+            "updated": 0,
+            "closed": 0,
+            "tasks": []
+        }
+
+        for item in items:
+            content = item.get("content", {})
+            if not content:
+                continue
+
+            issue_number = content.get("number")
+            issue_state = content.get("state")
+            if not issue_number:
+                continue
+
+            # Get local task
+            task = get_task(issue_number, project_path)
+            if not task:
+                # Task doesn't exist locally, skip
+                continue
+
+            changes = []
+            update_params = {}
+
+            # Check if issue is closed in GitHub
+            if issue_state == "CLOSED" and task.get("state") != "closed":
+                close_task(issue_number, project_path)
+                summary["closed"] += 1
+                changes.append("closed")
+
+            # Parse field values from GitHub
+            field_values = item.get("fieldValues", {}).get("nodes", [])
+            github_fields = {}
+
+            for field_value in field_values:
+                field_info = field_value.get("field", {})
+                field_name = field_info.get("name")
+                if not field_name:
+                    continue
+
+                # Extract value based on type
+                if "text" in field_value:
+                    github_fields[field_name] = field_value["text"]
+                elif "date" in field_value:
+                    github_fields[field_name] = field_value["date"]
+                elif "name" in field_value:
+                    # Single-select field
+                    github_fields[field_name] = field_value["name"]
+
+            # Compare and update priority
+            if priority_field_name and priority_field_name in github_fields:
+                gh_priority = github_fields[priority_field_name].lower()
+                local_priority = task.get("priority", "").lower() if task.get("priority") else ""
+                if gh_priority != local_priority:
+                    update_params["priority"] = gh_priority
+                    changes.append("priority")
+
+            # Compare and update due date
+            if due_field_name and due_field_name in github_fields:
+                gh_due = github_fields[due_field_name]
+                local_due = task.get("due", "")
+                if gh_due != local_due:
+                    update_params["due"] = gh_due
+                    changes.append("due")
+
+            # Compare and update labels
+            if labels_field_name and labels_field_name in github_fields:
+                gh_labels_text = github_fields[labels_field_name]
+                gh_labels = [label.strip() for label in gh_labels_text.split(",") if label.strip()]
+                local_labels = task.get("labels", [])
+                if set(gh_labels) != set(local_labels):
+                    update_params["labels"] = gh_labels
+                    changes.append("labels")
+
+            # Apply updates if any changes detected
+            if update_params and issue_state != "CLOSED":
+                update_task(issue_number, **update_params, project_path=project_path)
+                summary["updated"] += 1
+
+            if changes:
+                summary["tasks"].append({
+                    "id": issue_number,
+                    "title": task.get("title"),
+                    "changes": changes
+                })
+
+        return summary
+
+    except GitHubGraphQLError as e:
+        raise RuntimeError(f"Failed to fetch project data from GitHub: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to pull project from GitHub: {e}")

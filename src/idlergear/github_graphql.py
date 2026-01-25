@@ -595,3 +595,111 @@ class GitHubGraphQL:
                 return item
 
         return None
+
+    def get_project_items_with_fields(
+        self, project_id: str, owner: str, repo_owner: str
+    ) -> list[dict[str, Any]]:
+        """Get all project items with their field values.
+
+        Args:
+            project_id: Project node ID
+            owner: Project owner (user or org)
+            repo_owner: Repository owner for filtering
+
+        Returns:
+            List of project items with issue details and field values
+        """
+        query = """
+        query($projectId: ID!, $first: Int!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              items(first: $first) {
+                nodes {
+                  id
+                  fieldValues(first: 20) {
+                    nodes {
+                      ... on ProjectV2ItemFieldTextValue {
+                        text
+                        field {
+                          ... on ProjectV2Field {
+                            id
+                            name
+                          }
+                        }
+                      }
+                      ... on ProjectV2ItemFieldDateValue {
+                        date
+                        field {
+                          ... on ProjectV2Field {
+                            id
+                            name
+                          }
+                        }
+                      }
+                      ... on ProjectV2ItemFieldSingleSelectValue {
+                        name
+                        field {
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                  content {
+                    ... on Issue {
+                      id
+                      number
+                      title
+                      state
+                      repository {
+                        owner {
+                          login
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        data = self.query(query, {"projectId": project_id, "first": 100})
+        items = data.get("node", {}).get("items", {}).get("nodes", [])
+
+        # Filter to only items from the specified repo owner
+        filtered_items = []
+        for item in items:
+            content = item.get("content", {})
+            if content:
+                repo = content.get("repository", {})
+                owner_login = repo.get("owner", {}).get("login", "")
+                if owner_login == repo_owner:
+                    filtered_items.append(item)
+
+        return filtered_items
+
+    def get_project_field_by_name(
+        self, owner: str, project_number: int, field_name: str
+    ) -> dict[str, Any] | None:
+        """Get a project field by name.
+
+        Args:
+            owner: User or organization login
+            project_number: Project number
+            field_name: Field name to find
+
+        Returns:
+            Field data or None if not found
+        """
+        project = self.get_project_v2(owner, project_number)
+        fields = project.get("fields", {}).get("nodes", [])
+
+        for field in fields:
+            if field.get("name") == field_name:
+                return field
+
+        return None

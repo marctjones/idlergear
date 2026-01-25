@@ -1553,6 +1553,20 @@ async def list_tools() -> list[Tool]:
                 "required": ["task_id"],
             },
         ),
+        Tool(
+            name="idlergear_project_pull",
+            description="Pull changes from GitHub Projects and update local IdlerGear tasks (bidirectional sync). Syncs issue state (closed), priority, due dates, and labels from GitHub Projects to IdlerGear. GitHub is treated as source of truth for conflicts.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Project name or slug",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
         # Daemon coordination tools
         Tool(
             name="idlergear_daemon_register_agent",
@@ -4199,6 +4213,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "success": False,
                     "message": f"Could not sync fields for task {task_id}. Check configuration and project setup."
                 })
+
+        elif name == "idlergear_project_pull":
+            from idlergear.projects import pull_project_from_github
+
+            result = pull_project_from_github(arguments["name"])
+            return _format_result(result)
 
         # Daemon coordination handlers
         elif name == "idlergear_daemon_register_agent":

@@ -595,6 +595,124 @@ idlergear_project_sync_fields(task_id=123)
 - GitHub single-select options must match IdlerGear priority values exactly
 - Options: "high", "medium", "low" (case-insensitive)
 
+## Bidirectional GitHub Projects Sync
+
+**IdlerGear can sync changes from GitHub Projects back to local tasks (two-way sync).**
+
+This enables a true bidirectional workflow where changes made in either IdlerGear or GitHub Projects are reflected in both systems.
+
+### Pull Changes from GitHub
+
+Use the `idlergear_project_pull` MCP tool to fetch changes from GitHub Projects:
+
+```python
+# Pull all changes from GitHub Projects to IdlerGear
+result = idlergear_project_pull(name="main")
+
+# Returns:
+{
+    "updated": 3,           # Number of tasks updated
+    "closed": 1,            # Number of tasks closed
+    "tasks": [              # Details of changed tasks
+        {
+            "id": 278,
+            "title": "Add auth",
+            "changes": ["priority", "due"]
+        },
+        ...
+    ]
+}
+```
+
+### What Gets Synced
+
+| GitHub Projects Change | IdlerGear Update |
+|------------------------|------------------|
+| Issue marked as CLOSED | Task closed (`state="closed"`) |
+| Priority field changed | Task priority updated |
+| Due Date field changed | Task due date updated |
+| Labels field changed | Task labels updated |
+
+### Conflict Resolution
+
+**GitHub is treated as source of truth** - local changes are overwritten by GitHub values when pulling.
+
+Future versions may add:
+- Conflict detection (warn before overwriting)
+- Three-way merge (detect simultaneous changes)
+- User-selected conflict resolution strategy
+
+### Workflow Examples
+
+**Example 1: Team member updates priority in GitHub Projects**
+```bash
+# Team member changes priority from "medium" to "high" in GitHub Projects UI
+
+# AI assistant pulls changes
+idlergear_project_pull(name="main")
+# → Updates local task priority to "high"
+
+# Now local task matches GitHub
+```
+
+**Example 2: Issue closed in GitHub**
+```bash
+# GitHub issue #283 marked as closed
+
+# Pull changes
+idlergear_project_pull(name="main")
+# → Closes local task #283, moves to "Done" column (if column mapping configured)
+```
+
+**Example 3: Automated sync workflow**
+```bash
+# 1. Make changes in IdlerGear
+idlergear task update 278 --priority high --due 2026-02-15
+# → Automatically syncs TO GitHub (if field_sync enabled)
+
+# 2. Team member edits in GitHub Projects UI
+# (Changes priority to "low", adds due date 2026-02-20)
+
+# 3. Pull changes FROM GitHub
+idlergear_project_pull(name="main")
+# → Local task updated: priority="low", due="2026-02-20"
+# (GitHub wins in conflicts)
+```
+
+### Requirements
+
+1. **GitHub Project linked**: Project must have `github_project_id` and `github_project_number`
+2. **Field mapping configured**: Must have `projects.field_mapping` in config
+3. **Tasks in project**: Only tasks that are in the project board get synced
+4. **Local tasks exist**: Pull only updates existing tasks, doesn't create new ones
+
+### Manual Sync Command
+
+For manual control, use the MCP tool:
+
+```python
+# Pull changes for specific project
+idlergear_project_pull(name="main")
+
+# Check what changed
+# → Returns summary with updated/closed counts
+```
+
+### Future Enhancements
+
+- **Polling mode**: Automatically pull changes every N minutes
+- **Webhook mode**: Real-time updates via GitHub webhooks
+- **Conflict detection**: Warn before overwriting local changes
+- **Selective sync**: Pull only specific fields or tasks
+- **Audit log**: Track all sync operations
+
+### Benefits
+
+- **True bidirectional workflow**: Update from either IdlerGear or GitHub
+- **Team collaboration**: Multiple people/tools can update same data
+- **GitHub as backup**: Project data persists in GitHub
+- **Cross-tool editing**: AI assistants and humans use preferred interface
+
 ## IdlerGear Usage Quick Reference
 
 **ALWAYS run at session start:**
