@@ -65,6 +65,24 @@ idlergear run logs <name>                    # View output
 idlergear run stop <name>                    # Stop process
 ```
 
+### Session Management (⭐ NEW in v0.8.0)
+```bash
+# Session branching - experiment without losing main work
+idlergear session branch experiment-feature  # Create branch
+idlergear session checkout experiment-feature  # Switch branches
+idlergear session merge experiment-feature main  # Merge success
+idlergear session abandon experiment-feature  # Discard failure
+
+# Knowledge harvesting - extract insights from completed sessions
+idlergear session harvest s042              # Extract from specific session
+idlergear session harvest --days 7 --patterns  # Identify patterns
+idlergear session analyze s042              # Deep efficiency analysis
+
+# Container support - isolated execution
+idlergear run start "pytest" --container --image python:3.11
+idlergear run start "npm test" --container --image node:20 --memory 2G
+```
+
 ## FORBIDDEN Patterns
 
 ### NEVER Create These Files

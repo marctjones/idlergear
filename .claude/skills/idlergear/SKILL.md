@@ -167,6 +167,71 @@ idlergear_session_end(notes="what was accomplished")
 
 This saves state for the next session.
 
+## Advanced Session Management ⭐ NEW in v0.8.0!
+
+### Session Branching
+
+Create experimental branches for trying different approaches without losing main work:
+
+| Action | CLI Command |
+|--------|-------------|
+| Create branch | `idlergear session branch experiment-auth --purpose "Try OAuth2"` |
+| Switch branch | `idlergear session checkout experiment-auth` |
+| List branches | `idlergear session branches` |
+| Compare branches | `idlergear session diff experiment-auth main` |
+| Merge success | `idlergear session merge experiment-auth main` |
+| Abandon failure | `idlergear session abandon experiment-auth --reason "Approach failed"` |
+| Delete branch | `idlergear session delete-branch experiment-auth` |
+
+**Use cases:**
+- Try different implementation approaches
+- Experiment without risk to main work
+- Compare solutions before committing
+- Learn from failed experiments
+
+### Knowledge Harvesting
+
+Extract insights and patterns from completed sessions:
+
+| Action | CLI Command |
+|--------|-------------|
+| Harvest session | `idlergear session harvest s042` |
+| Recent insights | `idlergear session harvest --days 7` |
+| Save as note | `idlergear session harvest s042 --save-note` |
+| Identify patterns | `idlergear session harvest --days 30 --patterns` |
+| Analyze session | `idlergear session analyze s042` |
+
+**What gets harvested:**
+- Tasks completed
+- Focus areas (directories with most work)
+- Tool usage patterns
+- Success/failure status
+- Session duration
+
+**Pattern identification:**
+- Success rates over time
+- Common focus areas
+- Tool preferences
+- Average session duration
+
+### Container Support
+
+Run processes in isolated containers (Podman/Docker):
+
+| Action | CLI Command |
+|--------|-------------|
+| Start in container | `idlergear run start "pytest" --container --image python:3.11` |
+| Resource limits | `idlergear run start "npm test" --container --image node:20 --memory 2G --cpus 1.5` |
+| Environment vars | `idlergear run start "python app.py" --container --image python:3.11 --env DEBUG=1` |
+| Check logs | `idlergear run logs container-name` |
+| Stop container | `idlergear run stop container-name` |
+
+**Benefits:**
+- Isolated execution environment
+- Reproducible builds
+- Resource constraints (memory, CPU)
+- Clean testing environment
+
 ## Python Documentation (API Exploration)
 
 Quickly explore Python APIs with token-efficient summaries:

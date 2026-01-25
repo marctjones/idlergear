@@ -50,7 +50,7 @@ idlergear task create "Set up authentication" --label feature
 idlergear context
 ```
 
-## Features (v0.6.0)
+## Features (v0.8.0)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -142,11 +142,11 @@ IdlerGear ships **quarterly releases** with major features. Each milestone deliv
 | Milestone | Theme | Target | Key Features |
 |-----------|-------|--------|--------------|
 | **v0.5.11** ✅ | Plugin System Foundation | Released | LlamaIndex, Langfuse plugins, semantic search, observability |
-| **v0.6.0** ✅ | File Registry Complete | CURRENT | MCP interception, daemon integration, file annotations |
-| **v0.7.0** 📊 | GitHub Integration | June 2026 | GitHub Projects v2 sync, custom fields, bidirectional updates |
-| **v0.8.0** 🚀 | Integration Layer | September 2026 | Mem0 plugin, plugin docs, advanced integrations |
-| **v0.9.0** 🤖 | Multi-Assistant | December 2026 | Gemini integration, SKILLS.md support, cross-assistant coordination |
-| **v0.10.0** 💎 | Polish & Maturity | March 2027 | Pre-release maturity, 80%+ coverage, production validation |
+| **v0.6.0** ✅ | File Registry Complete | Released | MCP interception, daemon integration, file annotations |
+| **v0.7.0** ✅ | GitHub Integration | Released | GitHub Projects v2 sync, custom fields, bidirectional updates |
+| **v0.8.0** ✅ | Session Management Advanced | CURRENT | Session branching, knowledge harvesting, container support |
+| **v0.9.0** 🤖 | Multi-Assistant | June 2026 | Multi-agent coordination, memory decay, cross-session knowledge |
+| **v0.10.0** 💎 | Polish & Maturity | September 2026 | Pre-release maturity, 80%+ coverage, production validation |
 
 **[View Project Board](https://github.com/users/marctjones/projects/18)** | **[View Milestones](https://github.com/marctjones/idlergear/milestones)**
 
@@ -356,6 +356,29 @@ IdlerGear provides **146 MCP tools** across 18 categories. All tools are **100% 
 | `idlergear_session_end` | End session with smart suggestions for next time |
 | `idlergear_session_status` | View current session state |
 
+**⭐ NEW in v0.8.0: Advanced Session Features**
+
+**Session Branching** - Git-like branching for experimental work:
+```bash
+idlergear session branch experiment-auth  # Create branch
+idlergear session checkout experiment-auth  # Switch to branch
+idlergear session merge experiment-auth main  # Merge successful work
+idlergear session abandon experiment-auth  # Discard failed experiment
+```
+
+**Knowledge Harvesting** - Extract insights from completed sessions:
+```bash
+idlergear session harvest s042  # Extract from specific session
+idlergear session harvest --days 7 --patterns  # Identify patterns
+idlergear session analyze s042  # Deep efficiency analysis
+```
+
+**Container Support** - Isolated process execution:
+```bash
+idlergear run start "pytest" --container --image python:3.11
+idlergear run start "npm test" --container --image node:20 --memory 2G
+```
+
 **Example:**
 ```python
 # Start of EVERY AI session
@@ -535,7 +558,7 @@ idlergear_git_commit_task(
 
 ---
 
-### Process Management (11 tools)
+### Process Management (11 tools) + Container Support ⭐ NEW in v0.8.0!
 
 | Tool | Description |
 |------|-------------|
@@ -551,8 +574,17 @@ idlergear_git_commit_task(
 | `idlergear_pm_cpu_percent` | Current CPU usage |
 | `idlergear_pm_memory_info` | Memory usage breakdown |
 
+**⭐ NEW: Container Management** (Podman/Docker)
+- `start_container()` - Launch containers with resource limits
+- `list_containers()` - View running containers
+- `stop_container()` - Stop containers
+- `remove_container()` - Clean up containers
+- `get_container_logs()` - Stream container output
+- `get_container_stats()` - Monitor resource usage
+
 **Replaces**: `pm-mcp` (Node.js)
 **Integrates**: IdlerGear's existing `runs` system for task-aware process management
+**Supports**: Podman (preferred) and Docker with unified API
 
 ---
 

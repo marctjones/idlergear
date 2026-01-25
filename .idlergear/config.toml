@@ -13,6 +13,7 @@ task = "github"
 explore = "github"
 note = "github"
 plan = "github"
+reference = "wiki"
 
 [watch]
 enabled = "true"
@@ -31,3 +32,6 @@ stale_threshold_seconds = 7200
 
 [graph]
 auto_update = true
+
+[wiki]
+enabled = "true"
