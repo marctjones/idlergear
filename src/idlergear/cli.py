@@ -5535,6 +5535,66 @@ def session_recover(
         raise typer.Exit(1)
 
 
+@session_app.command("stats")
+def session_stats(
+    days: int = typer.Option(7, "--days", "-d", help="Number of days to analyze"),
+    branch: str = typer.Option("main", "--branch", "-b", help="Branch to analyze"),
+):
+    """Show session statistics and analytics.
+
+    Display productivity metrics, session overview, and tool usage
+    statistics for recent sessions.
+
+    Examples:
+        idlergear session stats              # Last 7 days
+        idlergear session stats --days 30    # Last 30 days
+        idlergear session stats --branch experiment  # Specific branch
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_analytics import SessionStats, format_stats_output
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        stats = SessionStats()
+
+        # Get and display overview stats
+        overview = stats.get_overview_stats(days=days, branch=branch)
+        typer.echo(format_stats_output(overview))
+
+        # Get and display tool usage if we have sessions
+        if overview["total_sessions"] > 0:
+            tool_stats = stats.get_tool_usage_stats(days=days, branch=branch)
+            if tool_stats["total_calls"] > 0:
+                typer.echo("\n🔧 Tool Usage:")
+                for tool_stat in tool_stats["tools"][:5]:  # Top 5 tools
+                    typer.echo(
+                        f"  {tool_stat['tool']}: {tool_stat['calls']} calls "
+                        f"({tool_stat['percentage']})"
+                    )
+
+            # Get and display success rate
+            success = stats.get_success_rate(days=days, branch=branch)
+            if success["total_sessions"] > 0:
+                typer.echo("\n✅ Success Rate:")
+                typer.echo(
+                    f"  {success['success_rate']} "
+                    f"({success['successful']}/{success['total_sessions']} sessions)"
+                )
+
+    except RuntimeError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error calculating stats: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 @session_app.command("monitor")
 def session_monitor(
     session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
