@@ -87,6 +87,9 @@ def create_task(
         "title": title,
         "state": "open",
         "created": now_iso(),
+        "accessed": None,
+        "access_count": 0,
+        "relevance_score": 1.0,
     }
 
     if labels:
@@ -113,11 +116,15 @@ def create_task(
         "priority": priority,
         "due": due,
         "created": frontmatter["created"],
+        "accessed": frontmatter["accessed"],
+        "access_count": frontmatter["access_count"],
+        "relevance_score": frontmatter["relevance_score"],
         "path": str(filepath),
     }
 
     # Sync fields to GitHub Projects if configured
     from idlergear.projects import sync_task_fields_to_github
+
     sync_task_fields_to_github(task_id, task_data, project_path)
 
     return task_data
@@ -163,13 +170,28 @@ def load_task_from_file(filepath: Path) -> dict[str, Any] | None:
         "priority": frontmatter.get("priority"),
         "due": frontmatter.get("due"),
         "created": frontmatter.get("created"),
+        "accessed": frontmatter.get("accessed"),
+        "access_count": frontmatter.get("access_count", 0),
+        "relevance_score": frontmatter.get("relevance_score", 1.0),
         "github_issue": frontmatter.get("github_issue"),
         "path": str(filepath),
     }
 
 
-def get_task(task_id: int, project_path: Path | None = None) -> dict[str, Any] | None:
-    """Get a task by ID."""
+def get_task(
+    task_id: int,
+    project_path: Path | None = None,
+    update_access: bool = True,
+) -> dict[str, Any] | None:
+    """Get a task by ID.
+
+    Args:
+        task_id: ID of the task to retrieve
+        project_path: Optional project path override
+        update_access: If True, updates access timestamp and relevance score
+
+    Returns the task data, or None if not found.
+    """
     tasks_dir = get_tasks_dir(project_path)
     if tasks_dir is None:
         return None
@@ -178,6 +200,35 @@ def get_task(task_id: int, project_path: Path | None = None) -> dict[str, Any] |
     for filepath in tasks_dir.glob("*.md"):
         task = load_task_from_file(filepath)
         if task and task.get("id") == task_id:
+            # Update access tracking if requested
+            if update_access:
+                from datetime import datetime, timezone
+                from idlergear.relevance import calculate_relevance
+                from idlergear.storage import parse_iso
+
+                # Update access metadata
+                content = filepath.read_text()
+                frontmatter, body = parse_frontmatter(content)
+
+                frontmatter["accessed"] = now_iso()
+                frontmatter["access_count"] = frontmatter.get("access_count", 0) + 1
+
+                # Recalculate relevance score
+                created = parse_iso(frontmatter.get("created", ""))
+                if created:
+                    frontmatter["relevance_score"] = calculate_relevance(
+                        created=created,
+                        accessed=datetime.now(timezone.utc),
+                        access_count=frontmatter["access_count"],
+                    )
+
+                # Save updated task
+                new_content = render_frontmatter(frontmatter, body.strip() + "\n")
+                filepath.write_text(new_content)
+
+                # Reload to get updated data
+                task = load_task_from_file(filepath)
+
             return task
 
     return None
@@ -209,13 +260,30 @@ def update_task(
 
     Returns the updated task data, or None if not found.
     """
-    task = get_task(task_id, project_path)
+    task = get_task(task_id, project_path, update_access=False)
     if task is None:
         return None
 
     filepath = Path(task["path"])
     content = filepath.read_text()
     frontmatter, old_body = parse_frontmatter(content)
+
+    # Update access metadata
+    from datetime import datetime, timezone
+    from idlergear.relevance import calculate_relevance
+    from idlergear.storage import parse_iso
+
+    frontmatter["accessed"] = now_iso()
+    frontmatter["access_count"] = frontmatter.get("access_count", 0) + 1
+
+    # Recalculate relevance score
+    created = parse_iso(frontmatter.get("created", ""))
+    if created:
+        frontmatter["relevance_score"] = calculate_relevance(
+            created=created,
+            accessed=datetime.now(timezone.utc),
+            access_count=frontmatter["access_count"],
+        )
 
     # Update fields if provided
     if title is not None:
@@ -252,6 +320,7 @@ def update_task(
 
     # Sync fields to GitHub Projects if configured
     from idlergear.projects import sync_task_fields_to_github
+
     sync_task_fields_to_github(task_id, updated_task, project_path)
 
     return updated_task

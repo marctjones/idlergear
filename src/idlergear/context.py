@@ -73,6 +73,8 @@ def gather_context(
     max_notes: int = 5,
     max_explorations: int = 5,
     mode: str = "minimal",
+    min_relevance: float | None = None,
+    include_stale: bool = False,
 ) -> ProjectContext:
     """Gather all relevant project context.
 
@@ -87,6 +89,9 @@ def gather_context(
               - standard: ~2500 tokens (general dev work)
               - detailed: ~7000 tokens (deep planning)
               - full: ~17000+ tokens (no limits, rare use)
+        min_relevance: Minimum relevance score (0.0-1.0) for filtering
+                      Items below this threshold are filtered out (default: 0.3)
+        include_stale: If True, include items below relevance threshold
 
     Returns:
         ProjectContext with all gathered knowledge
@@ -188,9 +193,22 @@ def gather_context(
     try:
         task_backend = get_backend("task", project_path=project_path)
         tasks = task_backend.list(state="open")
-        # Sort by priority if available
-        priority_order = {"high": 0, "medium": 1, "low": 2, None: 3}
-        tasks.sort(key=lambda t: priority_order.get(t.get("priority"), 3))
+
+        # Apply relevance filtering
+        relevance_threshold = min_relevance if min_relevance is not None else 0.3
+        if not include_stale:
+            from idlergear.relevance import filter_by_relevance, sort_by_relevance
+
+            # Filter out low-relevance tasks
+            tasks = filter_by_relevance(tasks, min_relevance=relevance_threshold)
+
+            # Sort by relevance (highest first), then by priority
+            tasks = sort_by_relevance(tasks, reverse=True)
+        else:
+            # Just sort by priority if including stale items
+            priority_order = {"high": 0, "medium": 1, "low": 2, None: 3}
+            tasks.sort(key=lambda t: priority_order.get(t.get("priority"), 3))
+
         ctx.open_tasks = tasks[:max_tasks]
 
         # Truncate task bodies based on mode
@@ -218,7 +236,17 @@ def gather_context(
     try:
         note_backend = get_backend("note", project_path=project_path)
         notes = note_backend.list()
-        # Notes are typically sorted by recency already
+
+        # Apply relevance filtering
+        if not include_stale:
+            from idlergear.relevance import filter_by_relevance, sort_by_relevance
+
+            # Filter out low-relevance notes
+            notes = filter_by_relevance(notes, min_relevance=relevance_threshold)
+
+            # Sort by relevance (highest first)
+            notes = sort_by_relevance(notes, reverse=True)
+
         ctx.recent_notes = notes[:max_notes]
     except Exception as e:
         ctx.errors.append(f"Notes: {e}")
@@ -288,7 +316,13 @@ def format_context(ctx: ProjectContext, verbose: bool = False) -> str:
             priority_str = f" [{priority}]" if priority else ""
             labels = task.get("labels", [])
             label_str = f" ({', '.join(labels)})" if labels else ""
-            lines.append(f"- #{task_id}{priority_str}: {title}{label_str}")
+            relevance = task.get("relevance_score")
+            relevance_str = (
+                f" [relevance: {relevance:.2f}]" if verbose and relevance else ""
+            )
+            lines.append(
+                f"- #{task_id}{priority_str}: {title}{label_str}{relevance_str}"
+            )
     else:
         lines.append("*No open tasks*")
     lines.append("")

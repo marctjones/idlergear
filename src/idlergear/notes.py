@@ -48,6 +48,9 @@ def create_note(
     frontmatter: dict[str, Any] = {
         "id": note_id,
         "created": now_iso(),
+        "accessed": None,
+        "access_count": 0,
+        "relevance_score": 1.0,
     }
     if tags:
         frontmatter["tags"] = tags
@@ -60,6 +63,9 @@ def create_note(
         "content": content.strip(),
         "tags": tags or [],
         "created": frontmatter["created"],
+        "accessed": frontmatter["accessed"],
+        "access_count": frontmatter["access_count"],
+        "relevance_score": frontmatter["relevance_score"],
         "path": str(filepath),
     }
 
@@ -103,12 +109,27 @@ def load_note_from_file(filepath: Path) -> dict[str, Any] | None:
         "content": body.strip(),
         "tags": frontmatter.get("tags", []),
         "created": frontmatter.get("created"),
+        "accessed": frontmatter.get("accessed"),
+        "access_count": frontmatter.get("access_count", 0),
+        "relevance_score": frontmatter.get("relevance_score", 1.0),
         "path": str(filepath),
     }
 
 
-def get_note(note_id: int, project_path: Path | None = None) -> dict[str, Any] | None:
-    """Get a note by ID."""
+def get_note(
+    note_id: int,
+    project_path: Path | None = None,
+    update_access: bool = True,
+) -> dict[str, Any] | None:
+    """Get a note by ID.
+
+    Args:
+        note_id: ID of the note to retrieve
+        project_path: Optional project path override
+        update_access: If True, updates access timestamp and relevance score
+
+    Returns the note data, or None if not found.
+    """
     notes_dir = get_notes_dir(project_path)
     if notes_dir is None:
         return None
@@ -116,15 +137,48 @@ def get_note(note_id: int, project_path: Path | None = None) -> dict[str, Any] |
     # Try direct filename match first
     filepath = notes_dir / f"{note_id:03d}.md"
     if filepath.exists():
-        return load_note_from_file(filepath)
+        note = load_note_from_file(filepath)
+        if note and update_access:
+            _update_note_access(filepath, note)
+            note = load_note_from_file(filepath)
+        return note
 
     # Fallback: scan directory for matching ID in frontmatter
     for filepath in notes_dir.glob("*.md"):
         note = load_note_from_file(filepath)
         if note and note.get("id") == note_id:
+            if update_access:
+                _update_note_access(filepath, note)
+                note = load_note_from_file(filepath)
             return note
 
     return None
+
+
+def _update_note_access(filepath: Path, note: dict[str, Any]) -> None:
+    """Update note access timestamp and relevance score."""
+    from datetime import datetime, timezone
+    from idlergear.relevance import calculate_relevance
+    from idlergear.storage import parse_iso
+
+    content = filepath.read_text()
+    frontmatter, body = parse_frontmatter(content)
+
+    frontmatter["accessed"] = now_iso()
+    frontmatter["access_count"] = frontmatter.get("access_count", 0) + 1
+
+    # Recalculate relevance score
+    created = parse_iso(frontmatter.get("created", ""))
+    if created:
+        frontmatter["relevance_score"] = calculate_relevance(
+            created=created,
+            accessed=datetime.now(timezone.utc),
+            access_count=frontmatter["access_count"],
+        )
+
+    # Save updated note
+    new_content = render_frontmatter(frontmatter, body.strip() + "\n")
+    filepath.write_text(new_content)
 
 
 def update_note(
@@ -143,13 +197,30 @@ def update_note(
 
     Returns the updated note data, or None if not found.
     """
-    note = get_note(note_id, project_path)
+    note = get_note(note_id, project_path, update_access=False)
     if note is None:
         return None
 
     filepath = Path(note["path"])
     file_content = filepath.read_text()
     frontmatter, old_content = parse_frontmatter(file_content)
+
+    # Update access metadata
+    from datetime import datetime, timezone
+    from idlergear.relevance import calculate_relevance
+    from idlergear.storage import parse_iso
+
+    frontmatter["accessed"] = now_iso()
+    frontmatter["access_count"] = frontmatter.get("access_count", 0) + 1
+
+    # Recalculate relevance score
+    created = parse_iso(frontmatter.get("created", ""))
+    if created:
+        frontmatter["relevance_score"] = calculate_relevance(
+            created=created,
+            accessed=datetime.now(timezone.utc),
+            access_count=frontmatter["access_count"],
+        )
 
     # Update tags if provided
     if tags is not None:

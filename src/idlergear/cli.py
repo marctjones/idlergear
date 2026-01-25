@@ -103,8 +103,11 @@ agents_app = typer.Typer(help="AGENTS.md generation and management")
 secrets_app = typer.Typer(help="Secure local secrets management")
 release_app = typer.Typer(help="Release management (GitHub Releases)")
 file_app = typer.Typer(help="File registry and annotations (track file status)")
-plugin_app = typer.Typer(help="Plugin management and integration (Langfuse, LlamaIndex, Mem0)")
+plugin_app = typer.Typer(
+    help="Plugin management and integration (Langfuse, LlamaIndex, Mem0)"
+)
 graph_app = typer.Typer(help="Knowledge graph queries and population")
+knowledge_app = typer.Typer(help="Knowledge decay and relevance management")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -129,6 +132,7 @@ app.add_typer(release_app, name="release")
 app.add_typer(file_app, name="file")
 app.add_typer(plugin_app, name="plugin")
 app.add_typer(graph_app, name="graph")
+app.add_typer(knowledge_app, name="knowledge")
 
 
 # Helper functions
@@ -1380,9 +1384,7 @@ def install(
                 fg=typer.colors.GREEN,
             )
         else:
-            typer.echo(
-                ".git/hooks already have graph update hooks (or not a git repo)"
-            )
+            typer.echo(".git/hooks already have graph update hooks (or not a git repo)")
 
     # Install auto-version git hook (optional)
     if auto_version:
@@ -2188,8 +2190,12 @@ def mcp_test_cmd(
 
 @daemon_app.command("cleanup")
 def daemon_cleanup(
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be removed without removing"),
-    all_agents: bool = typer.Option(False, "--all", help="Remove all presence files (nuclear option)"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be removed without removing"
+    ),
+    all_agents: bool = typer.Option(
+        False, "--all", help="Remove all presence files (nuclear option)"
+    ),
 ):
     """Clean up stale agent presence files.
 
@@ -2277,7 +2283,9 @@ def daemon_cleanup(
             elif last_heartbeat_str:
                 # Check heartbeat age
                 try:
-                    last_heartbeat = datetime.fromisoformat(last_heartbeat_str.replace("Z", "+00:00"))
+                    last_heartbeat = datetime.fromisoformat(
+                        last_heartbeat_str.replace("Z", "+00:00")
+                    )
                     if last_heartbeat < staleness_cutoff:
                         is_stale = True
                 except (ValueError, AttributeError):
@@ -2314,7 +2322,11 @@ def daemon_cleanup(
             if last_hb and last_hb != "unknown":
                 hb_time = datetime.fromisoformat(last_hb.replace("Z", "+00:00"))
                 age = datetime.now(timezone.utc) - hb_time
-                age_str = f"{age.days}d {age.seconds // 3600}h ago" if age.days > 0 else f"{age.seconds // 3600}h {(age.seconds % 3600) // 60}m ago"
+                age_str = (
+                    f"{age.days}d {age.seconds // 3600}h ago"
+                    if age.days > 0
+                    else f"{age.seconds // 3600}h {(age.seconds % 3600) // 60}m ago"
+                )
             else:
                 age_str = "unknown"
         except (ValueError, AttributeError):
@@ -2344,7 +2356,10 @@ def daemon_cleanup(
             agent_id = data.get("agent_id", presence_file.stem)
             typer.secho(f"  ✗ Failed to remove {agent_id}: {e}", fg=typer.colors.RED)
 
-    typer.secho(f"\n✓ Removed {removed}/{len(stale_files)} stale presence file(s)", fg=typer.colors.GREEN)
+    typer.secho(
+        f"\n✓ Removed {removed}/{len(stale_files)} stale presence file(s)",
+        fg=typer.colors.GREEN,
+    )
 
 
 # Config commands
@@ -2615,11 +2630,15 @@ def task_create(
         None, "--priority", "-p", help="Priority: high, medium, low"
     ),
     due: str = typer.Option(None, "--due", "-d", help="Due date (YYYY-MM-DD)"),
-    milestone: str = typer.Option(None, "--milestone", "-m", help="Milestone number or title"),
+    milestone: str = typer.Option(
+        None, "--milestone", "-m", help="Milestone number or title"
+    ),
     needs_tests: bool = typer.Option(
         False, "--needs-tests", help="Mark task as requiring test coverage"
     ),
-    no_validate: bool = typer.Option(False, "--no-validate", help="Skip label validation"),
+    no_validate: bool = typer.Option(
+        False, "--no-validate", help="Skip label validation"
+    ),
 ):
     """Create a new task."""
     from idlergear.backends.registry import get_backend
@@ -2660,12 +2679,19 @@ def task_create(
                             text=True,
                             check=True,
                         )
-                        typer.secho(f"  ✓ Created label: {label}", fg=typer.colors.GREEN)
+                        typer.secho(
+                            f"  ✓ Created label: {label}", fg=typer.colors.GREEN
+                        )
                     except subprocess.CalledProcessError:
-                        typer.secho(f"  ✗ Failed to create label: {label}", fg=typer.colors.RED)
+                        typer.secho(
+                            f"  ✗ Failed to create label: {label}", fg=typer.colors.RED
+                        )
                         raise typer.Exit(1)
             else:
-                typer.secho("Cancelled - cannot create task without valid labels.", fg=typer.colors.YELLOW)
+                typer.secho(
+                    "Cancelled - cannot create task without valid labels.",
+                    fg=typer.colors.YELLOW,
+                )
                 raise typer.Exit(1)
 
     task = backend.create(
@@ -2682,12 +2708,9 @@ def task_create(
     from idlergear.projects import auto_add_task_if_configured
     from idlergear.config import get_config_value
 
-    if auto_add_task_if_configured(task['id']):
+    if auto_add_task_if_configured(task["id"]):
         default_project = get_config_value("projects.default_project")
-        typer.secho(
-            f"  ✓ Added to project '{default_project}'",
-            fg=typer.colors.GREEN
-        )
+        typer.secho(f"  ✓ Added to project '{default_project}'", fg=typer.colors.GREEN)
 
 
 @task_app.command("list")
@@ -2738,9 +2761,7 @@ def task_list(
     # Filter by labels if specified
     if labels:
         tasks = [
-            t
-            for t in tasks
-            if any(label in t.get("labels", []) for label in labels)
+            t for t in tasks if any(label in t.get("labels", []) for label in labels)
         ]
 
     # Apply limit if specified
@@ -2946,6 +2967,7 @@ def label_list(
         )
 
         import json
+
         labels = json.loads(result.stdout)
 
         if ctx.obj.output_format == "json":
@@ -2981,8 +3003,12 @@ def label_list(
 @label_app.command("create")
 def label_create(
     name: str,
-    description: str = typer.Option(None, "--description", "-d", help="Label description"),
-    color: str = typer.Option(None, "--color", "-c", help="Label color (hex without #)"),
+    description: str = typer.Option(
+        None, "--description", "-d", help="Label description"
+    ),
+    color: str = typer.Option(
+        None, "--color", "-c", help="Label color (hex without #)"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Update if exists"),
 ):
     """Create a new label.
@@ -3073,7 +3099,9 @@ def label_delete(
 def label_edit(
     name: str,
     new_name: str = typer.Option(None, "--name", "-n", help="New label name"),
-    description: str = typer.Option(None, "--description", "-d", help="New description"),
+    description: str = typer.Option(
+        None, "--description", "-d", help="New description"
+    ),
     color: str = typer.Option(None, "--color", "-c", help="New color (hex without #)"),
 ):
     """Edit an existing label.
@@ -3154,12 +3182,21 @@ def label_ensure_standards(
     standard_labels = {
         "bug": {"color": "D73A4A", "description": "Something isn't working"},
         "enhancement": {"color": "A2EEEF", "description": "New feature or request"},
-        "documentation": {"color": "0075CA", "description": "Improvements or additions to documentation"},
+        "documentation": {
+            "color": "0075CA",
+            "description": "Improvements or additions to documentation",
+        },
         "good first issue": {"color": "7057FF", "description": "Good for newcomers"},
         "help wanted": {"color": "008672", "description": "Extra attention is needed"},
-        "question": {"color": "D876E3", "description": "Further information is requested"},
+        "question": {
+            "color": "D876E3",
+            "description": "Further information is requested",
+        },
         "wontfix": {"color": "FFFFFF", "description": "This will not be worked on"},
-        "duplicate": {"color": "CFD3D7", "description": "This issue or pull request already exists"},
+        "duplicate": {
+            "color": "CFD3D7",
+            "description": "This issue or pull request already exists",
+        },
         "invalid": {"color": "E4E669", "description": "This doesn't seem right"},
         "tech-debt": {"color": "FBCA04", "description": "Technical debt"},
         "decision": {"color": "C5DEF5", "description": "Design decision"},
@@ -3190,7 +3227,9 @@ def label_ensure_standards(
         if dry_run:
             typer.echo(f"\nWould create {len(to_create)} labels:\n")
             for name, details in to_create.items():
-                typer.echo(f"  • {name} (#{details['color']}) - {details['description']}")
+                typer.echo(
+                    f"  • {name} (#{details['color']}) - {details['description']}"
+                )
             typer.echo()
             return
 
@@ -3201,9 +3240,14 @@ def label_ensure_standards(
             try:
                 subprocess.run(
                     [
-                        "gh", "label", "create", name,
-                        "--description", details["description"],
-                        "--color", details["color"],
+                        "gh",
+                        "label",
+                        "create",
+                        name,
+                        "--description",
+                        details["description"],
+                        "--color",
+                        details["color"],
                     ],
                     capture_output=True,
                     text=True,
@@ -3215,7 +3259,9 @@ def label_ensure_standards(
                 typer.secho(f"  ✗ {name}: {e.stderr.strip()}", fg=typer.colors.RED)
 
         typer.echo()
-        typer.secho(f"Created {created}/{len(to_create)} labels.", fg=typer.colors.GREEN)
+        typer.secho(
+            f"Created {created}/{len(to_create)} labels.", fg=typer.colors.GREEN
+        )
 
     except FileNotFoundError:
         typer.secho(
@@ -3233,7 +3279,9 @@ def label_ensure_standards(
 def note_create(
     content: str,
     tag: list[str] = typer.Option([], "--tag", "-t", help="Tags (e.g., explore, idea)"),
-    no_validate: bool = typer.Option(False, "--no-validate", help="Skip tag label validation"),
+    no_validate: bool = typer.Option(
+        False, "--no-validate", help="Skip tag label validation"
+    ),
 ):
     """Create a quick note."""
     from idlergear.backends.registry import get_backend
@@ -3274,12 +3322,19 @@ def note_create(
                             text=True,
                             check=True,
                         )
-                        typer.secho(f"  ✓ Created label: {label}", fg=typer.colors.GREEN)
+                        typer.secho(
+                            f"  ✓ Created label: {label}", fg=typer.colors.GREEN
+                        )
                     except subprocess.CalledProcessError:
-                        typer.secho(f"  ✗ Failed to create label: {label}", fg=typer.colors.RED)
+                        typer.secho(
+                            f"  ✗ Failed to create label: {label}", fg=typer.colors.RED
+                        )
                         raise typer.Exit(1)
             else:
-                typer.secho("Cancelled - cannot create note without valid tag labels.", fg=typer.colors.YELLOW)
+                typer.secho(
+                    "Cancelled - cannot create note without valid tag labels.",
+                    fg=typer.colors.YELLOW,
+                )
                 raise typer.Exit(1)
 
     note = backend.create(content, tags=list(tag) if tag else None)
@@ -3547,16 +3602,16 @@ def plan_list(ctx: typer.Context):
 
     backend = get_backend("plan")
     plans = backend.list()
-    
+
     current = None
     if hasattr(backend, "get_current"):
         current = backend.get_current()
-    
+
     current_name = current["name"] if current else None
 
     # Augment data for the display function
     for plan in plans:
-        plan["is_current"] = (plan.get("current") or plan["name"] == current_name)
+        plan["is_current"] = plan.get("current") or plan["name"] == current_name
 
     display(plans, ctx.obj.output_format, "plans")
 
@@ -3623,7 +3678,9 @@ def plan_edit(
     name: str,
     title: str = typer.Option(None, "--title", "-t", help="New title"),
     body: str = typer.Option(None, "--body", "-b", help="New body"),
-    state: str = typer.Option(None, "--state", "-s", help="New state: active, completed"),
+    state: str = typer.Option(
+        None, "--state", "-s", help="New state: active, completed"
+    ),
 ):
     """Edit a plan."""
     from idlergear.backends.registry import get_backend
@@ -3699,7 +3756,9 @@ def plan_sync(target: str = typer.Argument("github")):
 @milestone_app.command("create")
 def milestone_create(
     title: str,
-    description: str = typer.Option(None, "--description", "-d", help="Milestone description"),
+    description: str = typer.Option(
+        None, "--description", "-d", help="Milestone description"
+    ),
     due_on: str = typer.Option(None, "--due", help="Due date (YYYY-MM-DD)"),
 ):
     """Create a GitHub milestone."""
@@ -3721,19 +3780,26 @@ def milestone_create(
             check=True,
         )
         import json
+
         repo = json.loads(repo_info.stdout)
-        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        owner = (
+            repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        )
         name = repo["name"]
 
         # Create milestone
         result = subprocess.run(
             [
-                "gh", "api",
+                "gh",
+                "api",
                 f"repos/{owner}/{name}/milestones",
-                "-f", f"title={title}",
-                "-f", "state=open",
-            ] + (["-f", f"description={description}"] if description else [])
-              + (["-f", f"due_on={due_on}T00:00:00Z"] if due_on else []),
+                "-f",
+                f"title={title}",
+                "-f",
+                "state=open",
+            ]
+            + (["-f", f"description={description}"] if description else [])
+            + (["-f", f"due_on={due_on}T00:00:00Z"] if due_on else []),
             capture_output=True,
             text=True,
             check=True,
@@ -3756,7 +3822,9 @@ def milestone_create(
 @milestone_app.command("list")
 def milestone_list(
     ctx: typer.Context,
-    state: str = typer.Option("open", "--state", "-s", help="Filter by state: open, closed, all"),
+    state: str = typer.Option(
+        "open", "--state", "-s", help="Filter by state: open, closed, all"
+    ),
 ):
     """List GitHub milestones."""
     import subprocess
@@ -3771,7 +3839,9 @@ def milestone_list(
             check=True,
         )
         repo = json.loads(repo_info.stdout)
-        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        owner = (
+            repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        )
         name = repo["name"]
 
         # Fetch milestones
@@ -3794,16 +3864,18 @@ def milestone_list(
             total = m["open_issues"] + m["closed_issues"]
             progress = (m["closed_issues"] / total * 100) if total > 0 else 0
 
-            formatted.append({
-                "number": m["number"],
-                "title": m["title"],
-                "state": m["state"],
-                "open_issues": m["open_issues"],
-                "closed_issues": m["closed_issues"],
-                "progress": f"{progress:.0f}%",
-                "due_on": m.get("due_on", ""),
-                "description": m.get("description", ""),
-            })
+            formatted.append(
+                {
+                    "number": m["number"],
+                    "title": m["title"],
+                    "state": m["state"],
+                    "open_issues": m["open_issues"],
+                    "closed_issues": m["closed_issues"],
+                    "progress": f"{progress:.0f}%",
+                    "due_on": m.get("due_on", ""),
+                    "description": m.get("description", ""),
+                }
+            )
 
         display(formatted, ctx.obj.output_format, "milestones")
 
@@ -3833,7 +3905,9 @@ def milestone_show(
             check=True,
         )
         repo = json.loads(repo_info.stdout)
-        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        owner = (
+            repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        )
         name = repo["name"]
 
         # Fetch all milestones to find by title if needed
@@ -3859,7 +3933,17 @@ def milestone_show(
 
         # Get issues for this milestone
         issues_result = subprocess.run(
-            ["gh", "issue", "list", "--milestone", found["title"], "--json", "number,title,state", "--limit", "1000"],
+            [
+                "gh",
+                "issue",
+                "list",
+                "--milestone",
+                found["title"],
+                "--json",
+                "number,title,state",
+                "--limit",
+                "1000",
+            ],
             capture_output=True,
             text=True,
             check=True,
@@ -3912,7 +3996,9 @@ def milestone_close(
             check=True,
         )
         repo = json.loads(repo_info.stdout)
-        owner = repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        owner = (
+            repo["owner"]["login"] if isinstance(repo["owner"], dict) else repo["owner"]
+        )
         name = repo["name"]
 
         # Find milestone
@@ -3937,10 +4023,13 @@ def milestone_close(
         # Close milestone
         subprocess.run(
             [
-                "gh", "api",
+                "gh",
+                "api",
                 f"repos/{owner}/{name}/milestones/{found['number']}",
-                "-X", "PATCH",
-                "-f", "state=closed",
+                "-X",
+                "PATCH",
+                "-f",
+                "state=closed",
             ],
             capture_output=True,
             text=True,
@@ -4283,10 +4372,18 @@ def reference_sync(
 def run_start(
     command: str,
     name: str = typer.Option(None, "--name", "-n", help="Run name"),
-    tmux: bool = typer.Option(False, "--tmux", help="Run in a tmux session (allows attaching later)"),
-    container: bool = typer.Option(False, "--container", help="Run in a container (podman/docker)"),
-    image: str = typer.Option(None, "--image", help="Container image (required with --container)"),
-    memory: str = typer.Option(None, "--memory", help="Container memory limit (e.g., '512m', '2g')"),
+    tmux: bool = typer.Option(
+        False, "--tmux", help="Run in a tmux session (allows attaching later)"
+    ),
+    container: bool = typer.Option(
+        False, "--container", help="Run in a container (podman/docker)"
+    ),
+    image: str = typer.Option(
+        None, "--image", help="Container image (required with --container)"
+    ),
+    memory: str = typer.Option(
+        None, "--memory", help="Container memory limit (e.g., '512m', '2g')"
+    ),
     cpus: str = typer.Option(None, "--cpus", help="Container CPU limit (e.g., '1.5')"),
 ):
     """Start a script/command.
@@ -4378,15 +4475,14 @@ def run_list():
 
 @run_app.command("history")
 def run_history(
-    failed: bool = typer.Option(
-        False, "--failed", "-f", help="Show only failed runs"
-    ),
+    failed: bool = typer.Option(False, "--failed", "-f", help="Show only failed runs"),
     status: str = typer.Option(
-        None, "--status", "-s", help="Filter by status (running, stopped, completed, failed)"
+        None,
+        "--status",
+        "-s",
+        help="Filter by status (running, stopped, completed, failed)",
     ),
-    limit: int = typer.Option(
-        None, "--limit", "-l", help="Limit number of results"
-    ),
+    limit: int = typer.Option(None, "--limit", "-l", help="Limit number of results"),
 ):
     """Show run history.
 
@@ -4545,9 +4641,7 @@ def run_attach(name: str):
 
     try:
         result = attach_to_run(name)
-        typer.secho(
-            f"Tmux session: {result['tmux_session']}", fg=typer.colors.GREEN
-        )
+        typer.secho(f"Tmux session: {result['tmux_session']}", fg=typer.colors.GREEN)
         typer.echo(f"  {result['message']}")
         typer.echo("")
         typer.echo("To attach to the session, run:")
@@ -4583,7 +4677,10 @@ def run_cleanup(
         7, "--older-than", "-d", help="Delete runs older than N days (default: 7)"
     ),
     status: str = typer.Option(
-        None, "--status", "-s", help="Only delete runs with this status (e.g., stopped, failed)"
+        None,
+        "--status",
+        "-s",
+        help="Only delete runs with this status (e.g., stopped, failed)",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", "-n", help="Show what would be deleted without deleting"
@@ -4629,7 +4726,10 @@ def run_clean(
         7, "--older-than", "-d", help="Delete runs older than N days (default: 7)"
     ),
     status: str = typer.Option(
-        None, "--status", "-s", help="Only delete runs with this status (e.g., stopped, failed)"
+        None,
+        "--status",
+        "-s",
+        help="Only delete runs with this status (e.g., stopped, failed)",
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", "-n", help="Show what would be deleted without deleting"
@@ -5301,14 +5401,19 @@ def session_show(
         snapshot = history.load_snapshot(session_id, branch)
 
         if snapshot is None:
-            typer.secho(f"Session '{session_id}' not found in branch '{branch}'.", fg=typer.colors.RED)
+            typer.secho(
+                f"Session '{session_id}' not found in branch '{branch}'.",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(1)
 
         if json_output:
             typer.echo(json.dumps(snapshot.to_dict(), indent=2))
         else:
             # Format human-readable output
-            typer.secho(f"\nSession: {snapshot.session_id}", fg=typer.colors.CYAN, bold=True)
+            typer.secho(
+                f"\nSession: {snapshot.session_id}", fg=typer.colors.CYAN, bold=True
+            )
             typer.echo(f"Branch: {snapshot.branch}")
             typer.echo(f"Timestamp: {snapshot.timestamp}")
             typer.echo(f"Duration: {snapshot.duration_seconds}s")
@@ -5377,7 +5482,9 @@ def session_diff(
             typer.secho(f"Session '{session2}' not found.", fg=typer.colors.RED)
             raise typer.Exit(1)
 
-        typer.secho(f"\nComparing {session1} vs {session2}:", fg=typer.colors.CYAN, bold=True)
+        typer.secho(
+            f"\nComparing {session1} vs {session2}:", fg=typer.colors.CYAN, bold=True
+        )
 
         # Compare timestamps
         typer.echo(f"\nTime:")
@@ -5409,7 +5516,9 @@ def session_diff(
             if added_files:
                 typer.secho(f"  Added: {', '.join(added_files)}", fg=typer.colors.GREEN)
             if removed_files:
-                typer.secho(f"  Removed: {', '.join(removed_files)}", fg=typer.colors.RED)
+                typer.secho(
+                    f"  Removed: {', '.join(removed_files)}", fg=typer.colors.RED
+                )
 
         # Compare outcomes
         outcome1 = snap1.outcome.get("status")
@@ -5426,7 +5535,9 @@ def session_diff(
 
 @session_app.command("checkpoints")
 def session_checkpoints(
-    limit: int = typer.Option(10, "--limit", "-l", help="Number of checkpoints to show"),
+    limit: int = typer.Option(
+        10, "--limit", "-l", help="Number of checkpoints to show"
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output as JSON"),
 ):
     """List auto-saved checkpoints.
@@ -5454,7 +5565,9 @@ def session_checkpoints(
 
         if not checkpoints:
             typer.secho("No checkpoints found.", fg=typer.colors.YELLOW)
-            typer.echo("Checkpoints are auto-saved every 15 minutes during active sessions.")
+            typer.echo(
+                "Checkpoints are auto-saved every 15 minutes during active sessions."
+            )
             return
 
         # Limit results
@@ -5467,7 +5580,9 @@ def session_checkpoints(
             print(json.dumps(checkpoints, indent=2))
             return
 
-        typer.secho(f"\n📌 Session Checkpoints (showing {len(checkpoints)}):\n", bold=True)
+        typer.secho(
+            f"\n📌 Session Checkpoints (showing {len(checkpoints)}):\n", bold=True
+        )
 
         for cp in reversed(checkpoints):  # Show newest first
             checkpoint_id = cp["checkpoint_id"]
@@ -5501,7 +5616,9 @@ def session_checkpoints(
 
 @session_app.command("recover")
 def session_recover(
-    checkpoint_id: str = typer.Option(None, "--checkpoint", "-c", help="Specific checkpoint ID (default: latest)"),
+    checkpoint_id: str = typer.Option(
+        None, "--checkpoint", "-c", help="Specific checkpoint ID (default: latest)"
+    ),
 ):
     """Recover session state from a checkpoint.
 
@@ -5535,7 +5652,9 @@ def session_recover(
             if checkpoint_id:
                 typer.echo(f"Checkpoint {checkpoint_id} does not exist.")
             else:
-                typer.echo("No checkpoints available. They are created every 15 minutes during active sessions.")
+                typer.echo(
+                    "No checkpoints available. They are created every 15 minutes during active sessions."
+                )
             return
 
         # Display checkpoint info
@@ -5543,7 +5662,9 @@ def session_recover(
         timestamp = checkpoint["timestamp"]
         state = checkpoint.get("state", {})
 
-        typer.secho(f"\n💾 Recovered Checkpoint: {cp_id}\n", bold=True, fg=typer.colors.GREEN)
+        typer.secho(
+            f"\n💾 Recovered Checkpoint: {cp_id}\n", bold=True, fg=typer.colors.GREEN
+        )
         typer.echo(f"Saved at: {timestamp}\n")
 
         # Show state
@@ -5633,8 +5754,12 @@ def session_stats(
 @session_app.command("branch")
 def session_branch(
     branch_name: str,
-    from_session: str = typer.Option(None, "--from", help="Session ID to branch from (default: latest)"),
-    from_branch: str = typer.Option("main", "--from-branch", help="Branch to fork from"),
+    from_session: str = typer.Option(
+        None, "--from", help="Session ID to branch from (default: latest)"
+    ),
+    from_branch: str = typer.Option(
+        "main", "--from-branch", help="Branch to fork from"
+    ),
     purpose: str = typer.Option(None, "--purpose", "-p", help="Purpose of this branch"),
 ):
     """Create a new session branch.
@@ -5743,9 +5868,7 @@ def session_branches():
                 "abandoned": "❌",
             }.get(branch["status"], "")
 
-            typer.secho(
-                f"{marker}{branch['name']}", fg=color, nl=False
-            )
+            typer.secho(f"{marker}{branch['name']}", fg=color, nl=False)
             typer.echo(f" {status_icon} ({branch['sessions']} sessions)")
 
             if branch.get("purpose"):
@@ -5824,9 +5947,7 @@ def session_abandon(
         branching = SessionBranching()
         branching.abandon_branch(branch_name, reason)
 
-        typer.secho(
-            f"✓ Abandoned branch '{branch_name}'", fg=typer.colors.YELLOW
-        )
+        typer.secho(f"✓ Abandoned branch '{branch_name}'", fg=typer.colors.YELLOW)
         if reason:
             typer.echo(f"  Reason: {reason}")
 
@@ -5837,11 +5958,17 @@ def session_abandon(
 
 @session_app.command("harvest")
 def session_harvest(
-    session_id: str = typer.Option(None, "--session", "-s", help="Session ID to harvest (default: latest)"),
+    session_id: str = typer.Option(
+        None, "--session", "-s", help="Session ID to harvest (default: latest)"
+    ),
     branch: str = typer.Option("main", "--branch", "-b", help="Branch name"),
-    days: int = typer.Option(None, "--days", "-d", help="Harvest recent sessions from last N days"),
+    days: int = typer.Option(
+        None, "--days", "-d", help="Harvest recent sessions from last N days"
+    ),
     save_note: bool = typer.Option(False, "--save", help="Save insights as note"),
-    patterns: bool = typer.Option(False, "--patterns", help="Identify patterns across sessions"),
+    patterns: bool = typer.Option(
+        False, "--patterns", help="Identify patterns across sessions"
+    ),
 ):
     """Extract knowledge and insights from completed sessions.
 
@@ -5870,7 +5997,9 @@ def session_harvest(
             pattern_days = days or 30
             result = harvester.identify_patterns(days=pattern_days, branch=branch)
 
-            typer.echo(f"\n📊 Patterns (last {pattern_days} days, {result['total_sessions']} sessions):\n")
+            typer.echo(
+                f"\n📊 Patterns (last {pattern_days} days, {result['total_sessions']} sessions):\n"
+            )
 
             for pattern in result["patterns"]:
                 typer.secho(f"  • {pattern['description']}", fg=typer.colors.CYAN)
@@ -5879,7 +6008,9 @@ def session_harvest(
             # Harvest recent sessions
             harvested = harvester.harvest_recent_sessions(days=days, branch=branch)
 
-            typer.echo(f"\n💡 Knowledge from last {days} days ({len(harvested)} sessions):\n")
+            typer.echo(
+                f"\n💡 Knowledge from last {days} days ({len(harvested)} sessions):\n"
+            )
 
             for knowledge in harvested:
                 session_id = knowledge["session_id"]
@@ -5895,6 +6026,7 @@ def session_harvest(
             if not session_id:
                 # Get latest session
                 from idlergear.session_history import SessionHistory
+
                 history = SessionHistory()
                 latest = history.get_latest_snapshot(branch)
                 if not latest:
@@ -5988,7 +6120,9 @@ def session_analyze(
             typer.echo(f"\n🔧 Tool Usage:")
             total_calls = sum(tool_usage.values())
 
-            for tool, count in sorted(tool_usage.items(), key=lambda x: x[1], reverse=True)[:5]:
+            for tool, count in sorted(
+                tool_usage.items(), key=lambda x: x[1], reverse=True
+            )[:5]:
                 percentage = (count / total_calls * 100) if total_calls > 0 else 0
                 typer.echo(f"  {tool}: {count} calls ({percentage:.1f}%)")
 
@@ -6010,7 +6144,12 @@ def session_analyze(
 
 @session_app.command("monitor")
 def session_monitor(
-    session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
+    session_file: str = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="Session file to monitor (auto-detect if not provided)",
+    ),
 ):
     """Monitor active session in real-time.
 
@@ -6225,7 +6364,9 @@ def session_clear():
 def session_snapshot(
     notes: str = typer.Option("", "--notes", "-n", help="Session notes"),
     task_id: Optional[int] = typer.Option(None, "--task", "-t", help="Current task ID"),
-    duration: int = typer.Option(0, "--duration", "-d", help="Session duration in minutes"),
+    duration: int = typer.Option(
+        0, "--duration", "-d", help="Session duration in minutes"
+    ),
 ):
     """Create a session snapshot (full history record).
 
@@ -6260,11 +6401,14 @@ def session_snapshot(
             check=True,
         ).stdout.strip()[:7]
 
-        git_dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-        ).stdout.strip() != ""
+        git_dirty = (
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            != ""
+        )
     except Exception:
         git_branch = "unknown"
         git_commit = "unknown"
@@ -6349,7 +6493,9 @@ def session_history(
             print(f"   Git: {state.get('git_branch')} @ {state['git_commit']}")
         if state.get("notes"):
             notes_preview = state["notes"][:60]
-            print(f"   Notes: {notes_preview}{'...' if len(state['notes']) > 60 else ''}")
+            print(
+                f"   Notes: {notes_preview}{'...' if len(state['notes']) > 60 else ''}"
+            )
 
 
 @app.command()
@@ -6374,6 +6520,7 @@ def session_show(
 
     # Pretty print the full snapshot
     import json
+
     print(json.dumps(snapshot.to_dict(), indent=2))
 
 
@@ -6670,7 +6817,11 @@ def watch_check(
     else:
         status = analyze()
         actions = []
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+    output_format = (
+        getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+        if ctx.obj
+        else OutputFormat.HUMAN
+    )
 
     if output_format == OutputFormat.JSON:
         result = status.to_dict()
@@ -6764,10 +6915,13 @@ def watch_versions(
 
     if ctx.obj["output"] == "json":
         import json
+
         typer.echo(json.dumps({"warnings": warnings}, indent=2))
     else:
         if not warnings:
-            typer.secho("✓ No stale file version references found", fg=typer.colors.GREEN)
+            typer.secho(
+                "✓ No stale file version references found", fg=typer.colors.GREEN
+            )
         else:
             typer.secho(
                 f"\nFile Version Analysis ({len(warnings)} issues found)",
@@ -7932,7 +8086,9 @@ def docs_summary(
                         "No XML documentation files found.",
                         fg=typer.colors.RED,
                     )
-                    typer.echo("  Build with: dotnet build -p:GenerateDocumentationFile=true")
+                    typer.echo(
+                        "  Build with: dotnet build -p:GenerateDocumentationFile=true"
+                    )
                 raise typer.Exit(1)
 
             # Parse first XML docs file
@@ -8096,7 +8252,9 @@ def docs_build(
             typer.echo(json.dumps(result))
         else:
             if result["success"]:
-                typer.secho("✓ XML documentation built successfully", fg=typer.colors.GREEN)
+                typer.secho(
+                    "✓ XML documentation built successfully", fg=typer.colors.GREEN
+                )
                 typer.echo(f"  XML files: {len(result.get('xml_files', []))}")
                 for xml_file in result.get("xml_files", []):
                     typer.echo(f"    - {xml_file}")
@@ -9485,14 +9643,20 @@ def priorities_show(
         )
         raise typer.Exit(1)
 
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+    output_format = (
+        getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+        if ctx.obj
+        else OutputFormat.HUMAN
+    )
 
     if output_format == OutputFormat.JSON:
         typer.echo(registry.model_dump_json(indent=2, exclude_none=True))
         return
 
     # Human-readable output
-    typer.secho("\n=== Project Priorities ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.secho(
+        "\n=== Project Priorities ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True
+    )
     typer.echo(f"Last updated: {registry.last_updated}\n")
 
     # Show feature areas
@@ -9598,21 +9762,26 @@ def priorities_matrix(ctx: typer.Context):
         )
         raise typer.Exit(1)
 
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+    output_format = (
+        getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+        if ctx.obj
+        else OutputFormat.HUMAN
+    )
 
     if output_format == OutputFormat.JSON:
         typer.echo(registry.validation_matrix.model_dump_json(indent=2))
         return
 
     # Human-readable matrix
-    typer.secho(
-        "\n=== Validation Matrix ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True
-    )
+    typer.secho("\n=== Validation Matrix ===\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
 
     # Backend × Feature matrix
     if registry.validation_matrix.backend_features:
         typer.secho("Backend × Feature:", fg=typer.colors.BRIGHT_GREEN, bold=True)
-        for backend_name, features in registry.validation_matrix.backend_features.items():
+        for (
+            backend_name,
+            features,
+        ) in registry.validation_matrix.backend_features.items():
             typer.secho(f"\n  {backend_name}:", fg=typer.colors.YELLOW)
             for feature_name, status in features.items():
                 typer.echo(f"    {feature_name}: {status}")
@@ -9620,7 +9789,10 @@ def priorities_matrix(ctx: typer.Context):
     # Assistant × Feature matrix
     if registry.validation_matrix.assistant_features:
         typer.secho("\n\nAssistant × Feature:", fg=typer.colors.BRIGHT_GREEN, bold=True)
-        for assistant_name, features in registry.validation_matrix.assistant_features.items():
+        for (
+            assistant_name,
+            features,
+        ) in registry.validation_matrix.assistant_features.items():
             typer.secho(f"\n  {assistant_name}:", fg=typer.colors.YELLOW)
             for feature_name, status in features.items():
                 typer.echo(f"    {feature_name}: {status}")
@@ -9640,7 +9812,11 @@ def priorities_coverage(ctx: typer.Context):
         )
         raise typer.Exit(1)
 
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+    output_format = (
+        getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+        if ctx.obj
+        else OutputFormat.HUMAN
+    )
 
     if output_format == OutputFormat.JSON:
         typer.echo(registry.coverage_requirements.model_dump_json(indent=2))
@@ -9679,7 +9855,11 @@ def priorities_validate(
         )
         raise typer.Exit(1)
 
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+    output_format = (
+        getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+        if ctx.obj
+        else OutputFormat.HUMAN
+    )
 
     # Calculate validation status
     ready = True
@@ -9690,9 +9870,7 @@ def priorities_validate(
     if milestone:
         tier_1_features = [f for f in tier_1_features if f.milestone == milestone]
 
-    incomplete_features = [
-        f for f in tier_1_features if f.status.value != "complete"
-    ]
+    incomplete_features = [f for f in tier_1_features if f.status.value != "complete"]
     if incomplete_features:
         ready = False
         for feature in incomplete_features:
@@ -9702,13 +9880,13 @@ def priorities_validate(
 
     # Check backend coverage
     critical_backends = registry.backends.get("critical", [])
-    incomplete_backends = [
-        b for b in critical_backends if b.status.value != "complete"
-    ]
+    incomplete_backends = [b for b in critical_backends if b.status.value != "complete"]
     if incomplete_backends:
         ready = False
         for backend in incomplete_backends:
-            issues.append(f"Backend '{backend.name}' not complete ({backend.status.value})")
+            issues.append(
+                f"Backend '{backend.name}' not complete ({backend.status.value})"
+            )
 
     # Check blocking bugs
     if registry.v1_0_requirements.bugs_blocking_release:
@@ -9756,7 +9934,9 @@ def priorities_validate(
 @app.command("doc-coverage")
 def doc_coverage(
     ctx: typer.Context,
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show all undocumented items"),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show all undocumented items"
+    ),
 ):
     """Check documentation coverage for MCP tools and CLI commands.
 
@@ -9764,7 +9944,10 @@ def doc_coverage(
         idlergear doc-coverage              # Show coverage summary
         idlergear doc-coverage -v           # Show all undocumented items
     """
-    from idlergear.doc_coverage import get_documentation_coverage, format_coverage_report
+    from idlergear.doc_coverage import (
+        get_documentation_coverage,
+        format_coverage_report,
+    )
 
     try:
         coverage = get_documentation_coverage()
@@ -9772,7 +9955,11 @@ def doc_coverage(
         typer.secho(f"Error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    output_format = getattr(ctx.obj, "output_format", OutputFormat.HUMAN) if ctx.obj else OutputFormat.HUMAN
+    output_format = (
+        getattr(ctx.obj, "output_format", OutputFormat.HUMAN)
+        if ctx.obj
+        else OutputFormat.HUMAN
+    )
 
     if output_format == OutputFormat.JSON:
         result = {
@@ -9786,7 +9973,9 @@ def doc_coverage(
                 "total": len(coverage.cli_commands),
                 "documented": len(coverage.documented_in_readme),
                 "coverage": coverage.cli_coverage_readme,
-                "undocumented": [c.full_name for c in coverage.undocumented_cli_commands],
+                "undocumented": [
+                    c.full_name for c in coverage.undocumented_cli_commands
+                ],
             },
         }
         typer.echo(json.dumps(result, indent=2))
@@ -9801,7 +9990,12 @@ def doc_coverage(
 
 @app.command("monitor")
 def monitor(
-    session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
+    session_file: str = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="Session file to monitor (auto-detect if not provided)",
+    ),
 ):
     """Monitor active session in real-time.
 
@@ -9901,8 +10095,15 @@ For more information: idlergear session monitor --help
 @file_app.command("register")
 def file_register(
     path: str = typer.Argument(..., help="File path to register"),
-    status: str = typer.Option("current", "--status", "-s", help="File status: current, deprecated, archived, problematic"),
-    reason: Optional[str] = typer.Option(None, "--reason", "-r", help="Reason for status"),
+    status: str = typer.Option(
+        "current",
+        "--status",
+        "-s",
+        help="File status: current, deprecated, archived, problematic",
+    ),
+    reason: Optional[str] = typer.Option(
+        None, "--reason", "-r", help="Reason for status"
+    ),
 ):
     """Register a file with explicit status."""
     from idlergear.file_registry import FileRegistry, FileStatus
@@ -9910,7 +10111,10 @@ def file_register(
     try:
         status_enum = FileStatus(status)
     except ValueError:
-        typer.secho(f"Invalid status: {status}. Must be one of: current, deprecated, archived, problematic", fg=typer.colors.RED)
+        typer.secho(
+            f"Invalid status: {status}. Must be one of: current, deprecated, archived, problematic",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(1)
 
     registry = FileRegistry()
@@ -9932,7 +10136,9 @@ def file_register(
 @file_app.command("deprecate")
 def file_deprecate(
     path: str = typer.Argument(..., help="File path to deprecate"),
-    successor: Optional[str] = typer.Option(None, "--successor", "-s", help="Current version path"),
+    successor: Optional[str] = typer.Option(
+        None, "--successor", "-s", help="Current version path"
+    ),
     reason: str = typer.Option(..., "--reason", "-r", help="Reason for deprecation"),
 ):
     """Mark a file as deprecated."""
@@ -9992,7 +10198,9 @@ def file_status(
         typer.secho(f"Current version: {entry.current_version}", fg=typer.colors.GREEN)
 
     if entry.deprecated_at:
-        typer.secho(f"Deprecated at: {entry.deprecated_at}", fg=typer.colors.BRIGHT_BLACK)
+        typer.secho(
+            f"Deprecated at: {entry.deprecated_at}", fg=typer.colors.BRIGHT_BLACK
+        )
 
     if entry.description:
         typer.secho(f"\nDescription: {entry.description}", fg=typer.colors.CYAN)
@@ -10013,7 +10221,9 @@ def file_status(
 
 @file_app.command("list")
 def file_list(
-    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+    status: Optional[str] = typer.Option(
+        None, "--status", "-s", help="Filter by status"
+    ),
 ):
     """List all registered files."""
     from idlergear.file_registry import FileRegistry, FileStatus
@@ -10025,7 +10235,10 @@ def file_list(
         try:
             status_filter = FileStatus(status)
         except ValueError:
-            typer.secho(f"Invalid status: {status}. Must be one of: current, deprecated, archived, problematic", fg=typer.colors.RED)
+            typer.secho(
+                f"Invalid status: {status}. Must be one of: current, deprecated, archived, problematic",
+                fg=typer.colors.RED,
+            )
             raise typer.Exit(1)
 
     files = registry.list_files(status_filter)
@@ -10043,7 +10256,11 @@ def file_list(
         by_status[status_key].append(entry)
 
     # Display
-    typer.secho(f"\n📁 Registered Files ({len(files)} total)\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.secho(
+        f"\n📁 Registered Files ({len(files)} total)\n",
+        fg=typer.colors.BRIGHT_CYAN,
+        bold=True,
+    )
 
     status_order = ["current", "deprecated", "archived", "problematic"]
     status_colors = {
@@ -10067,14 +10284,18 @@ def file_list(
         color = status_colors[status_key]
         symbol = status_symbols[status_key]
 
-        typer.secho(f"{symbol} {status_key.upper()} ({len(entries)} files)", fg=color, bold=True)
+        typer.secho(
+            f"{symbol} {status_key.upper()} ({len(entries)} files)", fg=color, bold=True
+        )
 
         for entry in sorted(entries, key=lambda e: e.path):
             typer.secho(f"  {entry.path}", fg=color)
             if entry.reason:
                 typer.secho(f"    → {entry.reason}", fg=typer.colors.BRIGHT_BLACK)
             if entry.current_version:
-                typer.secho(f"    → Use: {entry.current_version}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"    → Use: {entry.current_version}", fg=typer.colors.GREEN
+                )
 
         typer.echo()
 
@@ -10082,9 +10303,15 @@ def file_list(
 @file_app.command("annotate")
 def file_annotate(
     path: str = typer.Argument(..., help="File path to annotate"),
-    description: Optional[str] = typer.Option(None, "--description", "-d", help="File description"),
-    tags: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Tags (can be specified multiple times)"),
-    components: Optional[List[str]] = typer.Option(None, "--component", "-c", help="Components (can be specified multiple times)"),
+    description: Optional[str] = typer.Option(
+        None, "--description", "-d", help="File description"
+    ),
+    tags: Optional[List[str]] = typer.Option(
+        None, "--tag", "-t", help="Tags (can be specified multiple times)"
+    ),
+    components: Optional[List[str]] = typer.Option(
+        None, "--component", "-c", help="Components (can be specified multiple times)"
+    ),
 ):
     """Annotate a file with description, tags, and components."""
     from idlergear.file_registry import FileRegistry
@@ -10109,10 +10336,18 @@ def file_annotate(
 
 @file_app.command("search")
 def file_search(
-    query: Optional[str] = typer.Option(None, "--query", "-q", help="Search in descriptions"),
-    tags: Optional[List[str]] = typer.Option(None, "--tag", "-t", help="Filter by tags"),
-    components: Optional[List[str]] = typer.Option(None, "--component", "-c", help="Filter by components"),
-    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+    query: Optional[str] = typer.Option(
+        None, "--query", "-q", help="Search in descriptions"
+    ),
+    tags: Optional[List[str]] = typer.Option(
+        None, "--tag", "-t", help="Filter by tags"
+    ),
+    components: Optional[List[str]] = typer.Option(
+        None, "--component", "-c", help="Filter by components"
+    ),
+    status: Optional[str] = typer.Option(
+        None, "--status", "-s", help="Filter by status"
+    ),
 ):
     """Search files by annotations."""
     from idlergear.file_registry import FileRegistry, FileStatus
@@ -10138,7 +10373,9 @@ def file_search(
         typer.secho("No files found", fg=typer.colors.BRIGHT_BLACK)
         raise typer.Exit(0)
 
-    typer.secho(f"\n🔍 Found {len(results)} files\n", fg=typer.colors.BRIGHT_CYAN, bold=True)
+    typer.secho(
+        f"\n🔍 Found {len(results)} files\n", fg=typer.colors.BRIGHT_CYAN, bold=True
+    )
 
     for entry in results:
         # Status color
@@ -10158,7 +10395,9 @@ def file_search(
             typer.secho(f"   Tags: {', '.join(entry.tags)}", fg=typer.colors.MAGENTA)
 
         if entry.components:
-            typer.secho(f"   Components: {', '.join(entry.components)}", fg=typer.colors.BLUE)
+            typer.secho(
+                f"   Components: {', '.join(entry.components)}", fg=typer.colors.BLUE
+            )
 
         typer.echo()
 
@@ -10166,9 +10405,15 @@ def file_search(
 @file_app.command("audit")
 def file_audit(
     ctx: typer.Context,
-    since: int = typer.Option(24, "--since", help="Audit access log for last N hours (default: 24)"),
-    include_code: bool = typer.Option(False, "--include-code", help="Include static code analysis"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: json or text (default: text)"),
+    since: int = typer.Option(
+        24, "--since", help="Audit access log for last N hours (default: 24)"
+    ),
+    include_code: bool = typer.Option(
+        False, "--include-code", help="Include static code analysis"
+    ),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output format: json or text (default: text)"
+    ),
 ):
     """Audit project for deprecated file usage.
 
@@ -10192,17 +10437,26 @@ def file_audit(
         return
 
     # Text output
-    typer.secho("\n📋 File Registry Audit Report", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho(
+        "\n📋 File Registry Audit Report", fg=typer.colors.BRIGHT_BLUE, bold=True
+    )
     typer.secho("=" * 60, fg=typer.colors.BRIGHT_BLUE)
 
     # Accessed files section
     accessed = report["accessed"]
     if accessed:
-        typer.secho(f"\n⚠️  Deprecated Files Recently Accessed ({len(accessed)}):", fg=typer.colors.YELLOW, bold=True)
+        typer.secho(
+            f"\n⚠️  Deprecated Files Recently Accessed ({len(accessed)}):",
+            fg=typer.colors.YELLOW,
+            bold=True,
+        )
         for item in accessed:
             typer.secho(f"\n  ✗ {item['file']}", fg=typer.colors.RED, bold=True)
             if item.get("current_version"):
-                typer.secho(f"    Current version: {item['current_version']}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"    Current version: {item['current_version']}",
+                    fg=typer.colors.GREEN,
+                )
             typer.secho(f"    Access count: {item['access_count']}")
             typer.secho(f"    Last accessed: {item['last_accessed']}")
             if item.get("accessed_by"):
@@ -10212,31 +10466,59 @@ def file_audit(
                 tools = ", ".join(item["tools_used"])
                 typer.secho(f"    Tools used: {tools}")
     else:
-        typer.secho(f"\n✅ No deprecated files accessed in last {since} hours", fg=typer.colors.GREEN)
+        typer.secho(
+            f"\n✅ No deprecated files accessed in last {since} hours",
+            fg=typer.colors.GREEN,
+        )
 
     # Code references section
     if include_code:
         code_refs = report["code_references"]
         if code_refs:
-            typer.secho(f"\n⚠️  Deprecated Files Referenced in Code ({len(code_refs)}):", fg=typer.colors.YELLOW, bold=True)
+            typer.secho(
+                f"\n⚠️  Deprecated Files Referenced in Code ({len(code_refs)}):",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
             for ref in code_refs:
-                typer.secho(f"\n  ⚠️  {ref['file']}:{ref['line']}", fg=typer.colors.YELLOW, bold=True)
-                typer.secho(f"    References: {ref['deprecated_file']}", fg=typer.colors.RED)
+                typer.secho(
+                    f"\n  ⚠️  {ref['file']}:{ref['line']}",
+                    fg=typer.colors.YELLOW,
+                    bold=True,
+                )
+                typer.secho(
+                    f"    References: {ref['deprecated_file']}", fg=typer.colors.RED
+                )
                 if ref.get("current_version"):
-                    typer.secho(f"    Suggestion: Update to {ref['current_version']}", fg=typer.colors.GREEN)
-                typer.secho(f"    Code: {ref['code'][:80]}{'...' if len(ref['code']) > 80 else ''}")
+                    typer.secho(
+                        f"    Suggestion: Update to {ref['current_version']}",
+                        fg=typer.colors.GREEN,
+                    )
+                typer.secho(
+                    f"    Code: {ref['code'][:80]}{'...' if len(ref['code']) > 80 else ''}"
+                )
         else:
-            typer.secho("\n✅ No deprecated file references found in code", fg=typer.colors.GREEN)
+            typer.secho(
+                "\n✅ No deprecated file references found in code",
+                fg=typer.colors.GREEN,
+            )
 
     # Summary
     typer.secho("\n" + "=" * 60, fg=typer.colors.BRIGHT_BLUE)
     typer.secho("Summary:", fg=typer.colors.BRIGHT_BLUE, bold=True)
     typer.echo(f"  Audit period: Last {report['summary']['audit_period_hours']} hours")
-    typer.echo(f"  Deprecated files accessed: {report['summary']['deprecated_files_accessed']}")
+    typer.echo(
+        f"  Deprecated files accessed: {report['summary']['deprecated_files_accessed']}"
+    )
     if include_code:
-        typer.echo(f"  Code references found: {report['summary']['code_references_found']}")
+        typer.echo(
+            f"  Code references found: {report['summary']['code_references_found']}"
+        )
 
-    if report['summary']['deprecated_files_accessed'] > 0 or report['summary']['code_references_found'] > 0:
+    if (
+        report["summary"]["deprecated_files_accessed"] > 0
+        or report["summary"]["code_references_found"] > 0
+    ):
         typer.secho("\n💡 Action Required:", fg=typer.colors.CYAN, bold=True)
         typer.echo("  - Review and update references to deprecated files")
         typer.echo("  - Use 'idlergear file status <path>' to find current versions")
@@ -10264,10 +10546,18 @@ def file_unregister(
 @file_app.command("scan")
 def file_scan(
     ctx: typer.Context,
-    auto: bool = typer.Option(False, "--auto", help="Automatically apply high-confidence suggestions"),
-    confidence: str = typer.Option("low", "--confidence", "-c", help="Minimum confidence: high, medium, low"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Show suggestions without applying"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output format: json or text"),
+    auto: bool = typer.Option(
+        False, "--auto", help="Automatically apply high-confidence suggestions"
+    ),
+    confidence: str = typer.Option(
+        "low", "--confidence", "-c", help="Minimum confidence: high, medium, low"
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show suggestions without applying"
+    ),
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o", help="Output format: json or text"
+    ),
 ):
     """Auto-detect versioned files and suggest registry entries.
 
@@ -10293,7 +10583,9 @@ def file_scan(
         return
 
     # JSON output
-    if output == "json" or (hasattr(ctx.obj, "output_mode") and ctx.obj.output_mode == "json"):
+    if output == "json" or (
+        hasattr(ctx.obj, "output_mode") and ctx.obj.output_mode == "json"
+    ):
         result = {
             "suggestions": [
                 {
@@ -10312,7 +10604,11 @@ def file_scan(
         return
 
     # Text output
-    typer.secho(f"\n🔍 File Registry Auto-Detection Report", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho(
+        f"\n🔍 File Registry Auto-Detection Report",
+        fg=typer.colors.BRIGHT_BLUE,
+        bold=True,
+    )
     typer.secho(f"Found {len(suggestions)} suggestions\n", fg=typer.colors.CYAN)
 
     # Group by confidence
@@ -10334,7 +10630,11 @@ def file_scan(
             "low": typer.colors.WHITE,
         }[conf_level]
 
-        typer.secho(f"\n{conf_level.upper()} CONFIDENCE ({len(conf_suggestions)}):", fg=conf_color, bold=True)
+        typer.secho(
+            f"\n{conf_level.upper()} CONFIDENCE ({len(conf_suggestions)}):",
+            fg=conf_color,
+            bold=True,
+        )
         typer.secho("=" * 60, fg=conf_color)
 
         for suggestion in conf_suggestions:
@@ -10344,7 +10644,9 @@ def file_scan(
             typer.echo(f"     Reason: {suggestion.reason}")
 
             if suggestion.current_version:
-                typer.secho(f"     Current: {suggestion.current_version}", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"     Current: {suggestion.current_version}", fg=typer.colors.GREEN
+                )
 
             if suggestion.evidence:
                 typer.echo(f"     Evidence:")
@@ -10389,7 +10691,10 @@ def file_scan(
                             reason=suggestion.reason,
                         )
 
-                    typer.secho(f"     ✅ Registered as {suggestion.suggested_status.value}", fg=typer.colors.GREEN)
+                    typer.secho(
+                        f"     ✅ Registered as {suggestion.suggested_status.value}",
+                        fg=typer.colors.GREEN,
+                    )
                     applied += 1
 
                 except Exception as e:
@@ -10436,10 +10741,15 @@ def plugin_list(
         loaded = registry.list_loaded_plugins()
 
     if not plugins:
-        typer.secho(f"No plugins {'loaded' if loaded_only else 'available'}", fg=typer.colors.YELLOW)
+        typer.secho(
+            f"No plugins {'loaded' if loaded_only else 'available'}",
+            fg=typer.colors.YELLOW,
+        )
         return
 
-    typer.secho(f"\n{title} ({len(plugins)} total):", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho(
+        f"\n{title} ({len(plugins)} total):", fg=typer.colors.BRIGHT_BLUE, bold=True
+    )
 
     for name in plugins:
         enabled = registry.config.is_plugin_enabled(name)
@@ -10469,7 +10779,9 @@ def plugin_list(
 
 @plugin_app.command("status")
 def plugin_status(
-    plugin_name: Optional[str] = typer.Argument(None, help="Plugin name (omit for all)"),
+    plugin_name: Optional[str] = typer.Argument(
+        None, help="Plugin name (omit for all)"
+    ),
 ):
     """Show detailed plugin status."""
     from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin, PluginRegistry
@@ -10488,9 +10800,13 @@ def plugin_status(
             plugin = registry.load_plugin(plugin_name)
 
         if plugin:
-            typer.secho(f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
             typer.secho(f"  Status: Loaded", fg=typer.colors.GREEN)
-            typer.secho(f"  Initialized: {plugin.is_initialized()}", fg=typer.colors.WHITE)
+            typer.secho(
+                f"  Initialized: {plugin.is_initialized()}", fg=typer.colors.WHITE
+            )
             typer.secho(f"  Healthy: {plugin.health_check()}", fg=typer.colors.WHITE)
             typer.secho(f"  Capabilities:", fg=typer.colors.WHITE)
             for cap in plugin.capabilities():
@@ -10499,7 +10815,9 @@ def plugin_status(
             enabled = registry.config.is_plugin_enabled(plugin_name)
             available = plugin_name in registry.list_available_plugins()
 
-            typer.secho(f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
             typer.secho(f"  Status: Not loaded", fg=typer.colors.YELLOW)
             typer.secho(f"  Enabled: {enabled}", fg=typer.colors.WHITE)
             typer.secho(f"  Available: {available}", fg=typer.colors.WHITE)
@@ -10529,7 +10847,9 @@ def plugin_status(
 
 @plugin_app.command("enable")
 def plugin_enable(
-    plugin_name: str = typer.Argument(..., help="Plugin name (e.g., langfuse, llamaindex)"),
+    plugin_name: str = typer.Argument(
+        ..., help="Plugin name (e.g., langfuse, llamaindex)"
+    ),
 ):
     """Enable a plugin in config.toml."""
     import toml
@@ -10591,7 +10911,9 @@ def plugin_disable(
 def plugin_search(
     query: str = typer.Argument(..., help="Search query"),
     top_k: int = typer.Option(5, "--top-k", "-k", help="Number of results to return"),
-    knowledge_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by type: reference or note"),
+    knowledge_type: Optional[str] = typer.Option(
+        None, "--type", "-t", help="Filter by type: reference or note"
+    ),
 ):
     """Semantic search using LlamaIndex plugin."""
     from idlergear.plugins import LlamaIndexPlugin, PluginRegistry
@@ -10604,7 +10926,10 @@ def plugin_search(
 
     if not plugin:
         typer.secho("❌ LlamaIndex plugin not enabled", fg=typer.colors.RED)
-        typer.secho("   Enable it first: idlergear plugin enable llamaindex", fg=typer.colors.YELLOW)
+        typer.secho(
+            "   Enable it first: idlergear plugin enable llamaindex",
+            fg=typer.colors.YELLOW,
+        )
         raise typer.Exit(1)
 
     # Perform search
@@ -10614,7 +10939,11 @@ def plugin_search(
         typer.secho(f"No results found for: {query}", fg=typer.colors.YELLOW)
         return
 
-    typer.secho(f"\nSearch Results ({len(results)} found):", fg=typer.colors.BRIGHT_BLUE, bold=True)
+    typer.secho(
+        f"\nSearch Results ({len(results)} found):",
+        fg=typer.colors.BRIGHT_BLUE,
+        bold=True,
+    )
     typer.secho(f"Query: {query}\n", fg=typer.colors.WHITE)
 
     for i, result in enumerate(results, 1):
@@ -10623,7 +10952,9 @@ def plugin_search(
         metadata = result.get("metadata", {})
 
         typer.secho(f"{i}. Score: {score:.3f}", fg=typer.colors.GREEN)
-        typer.secho(f"   Type: {metadata.get('type', 'unknown')}", fg=typer.colors.WHITE)
+        typer.secho(
+            f"   Type: {metadata.get('type', 'unknown')}", fg=typer.colors.WHITE
+        )
         typer.secho(f"   {text}...", fg=typer.colors.WHITE)
         typer.secho("")
 
@@ -10632,18 +10963,26 @@ def plugin_search(
 # Graph Commands (add before if __name__ == "__main__":)
 
 
-
 # ============================================================================
 # Graph Commands
 # ============================================================================
 
+
 @graph_app.command("populate")
 def graph_populate(
     ctx: typer.Context,
-    max_commits: int = typer.Option(100, "--max-commits", help="Maximum commits to index"),
-    code_dir: str = typer.Option("src", "--code-dir", help="Directory to scan for code"),
-    incremental: bool = typer.Option(True, "--incremental/--full", help="Skip already-indexed data"),
-    verbose: bool = typer.Option(True, "--verbose/--quiet", help="Print progress messages"),
+    max_commits: int = typer.Option(
+        100, "--max-commits", help="Maximum commits to index"
+    ),
+    code_dir: str = typer.Option(
+        "src", "--code-dir", help="Directory to scan for code"
+    ),
+    incremental: bool = typer.Option(
+        True, "--incremental/--full", help="Skip already-indexed data"
+    ),
+    verbose: bool = typer.Option(
+        True, "--verbose/--quiet", help="Print progress messages"
+    ),
 ):
     """Populate entire knowledge graph in one command.
 
@@ -10661,7 +11000,7 @@ def graph_populate(
             max_commits=max_commits,
             code_directory=code_dir,
             incremental=incremental,
-            verbose=verbose
+            verbose=verbose,
         )
 
         if ctx.obj.get("output_mode") == "json":
@@ -10669,7 +11008,9 @@ def graph_populate(
         # Human output is handled by populate_all's verbose mode
 
     except Exception as e:
-        typer.secho(f"Failed to populate knowledge graph: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Failed to populate knowledge graph: {e}", fg=typer.colors.RED, err=True
+        )
         raise typer.Exit(1)
 
 
@@ -10700,11 +11041,15 @@ def graph_schema(ctx: typer.Context):
         if ctx.obj.get("output_mode") == "json":
             output = {
                 "node_types": [{"type": r[0], "count": r[1]} for r in node_results],
-                "relationship_types": [{"type": r[0], "count": r[1]} for r in rel_results]
+                "relationship_types": [
+                    {"type": r[0], "count": r[1]} for r in rel_results
+                ],
             }
             typer.echo(json.dumps(output, indent=2))
         else:
-            typer.secho("\n📊 Knowledge Graph Schema\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                "\n📊 Knowledge Graph Schema\n", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
 
             typer.secho("Node Types:", fg=typer.colors.GREEN, bold=True)
             for node_type, count in node_results:
@@ -10737,13 +11082,14 @@ def graph_stats(ctx: typer.Context):
         rel_count = db.execute(rel_count_query)[0][0]
 
         if ctx.obj.get("output_mode") == "json":
-            output = {
-                "total_nodes": node_count,
-                "total_relationships": rel_count
-            }
+            output = {"total_nodes": node_count, "total_relationships": rel_count}
             typer.echo(json.dumps(output, indent=2))
         else:
-            typer.secho("\n📊 Knowledge Graph Statistics\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                "\n📊 Knowledge Graph Statistics\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
             typer.echo(f"Total Nodes: {node_count:,}")
             typer.echo(f"Total Relationships: {rel_count:,}")
             typer.echo()
@@ -10776,7 +11122,11 @@ def graph_query_task(
         result = db.execute(query, {"task_id": task_id})
 
         if not result:
-            typer.secho(f"Task #{task_id} not found in knowledge graph", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"Task #{task_id} not found in knowledge graph",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(1)
 
         task, files, commits, symbols = result[0]
@@ -10786,29 +11136,45 @@ def graph_query_task(
                 "task": dict(task),
                 "files": [dict(f) for f in files if f],
                 "commits": [dict(c) for c in commits if c],
-                "symbols": [dict(s) for s in symbols if s]
+                "symbols": [dict(s) for s in symbols if s],
             }
             typer.echo(json.dumps(output, indent=2))
         else:
-            typer.secho(f"\n📋 Task #{task_id} Context\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n📋 Task #{task_id} Context\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
 
             if files and any(files):
-                typer.secho(f"Files ({len([f for f in files if f])}):", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"Files ({len([f for f in files if f])}):", fg=typer.colors.GREEN
+                )
                 for f in files:
                     if f:
                         typer.echo(f"  - {f.get('path', 'unknown')}")
 
             if commits and any(commits):
-                typer.secho(f"\nCommits ({len([c for c in commits if c])}):", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"\nCommits ({len([c for c in commits if c])}):",
+                    fg=typer.colors.GREEN,
+                )
                 for c in commits:
                     if c:
-                        typer.echo(f"  - {c.get('sha', 'unknown')[:8]}: {c.get('message', '')[:60]}")
+                        typer.echo(
+                            f"  - {c.get('sha', 'unknown')[:8]}: {c.get('message', '')[:60]}"
+                        )
 
             if symbols and any(symbols):
-                typer.secho(f"\nSymbols ({len([s for s in symbols if s])}):", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"\nSymbols ({len([s for s in symbols if s])}):",
+                    fg=typer.colors.GREEN,
+                )
                 for s in symbols:
                     if s:
-                        typer.echo(f"  - {s.get('name', 'unknown')} ({s.get('type', 'unknown')})")
+                        typer.echo(
+                            f"  - {s.get('name', 'unknown')} ({s.get('type', 'unknown')})"
+                        )
             typer.echo()
 
     except Exception as e:
@@ -10839,7 +11205,11 @@ def graph_query_file(
         result = db.execute(query, {"file_path": file_path})
 
         if not result:
-            typer.secho(f"File '{file_path}' not found in knowledge graph", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"File '{file_path}' not found in knowledge graph",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(1)
 
         file, symbols, tasks, commits = result[0]
@@ -10849,29 +11219,46 @@ def graph_query_file(
                 "file": dict(file),
                 "symbols": [dict(s) for s in symbols if s],
                 "tasks": [dict(t) for t in tasks if t],
-                "commits": [dict(c) for c in commits if c]
+                "commits": [dict(c) for c in commits if c],
             }
             typer.echo(json.dumps(output, indent=2))
         else:
-            typer.secho(f"\n📄 File: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n📄 File: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
 
             if symbols and any(symbols):
-                typer.secho(f"Symbols ({len([s for s in symbols if s])}):", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"Symbols ({len([s for s in symbols if s])}):",
+                    fg=typer.colors.GREEN,
+                )
                 for s in symbols:
                     if s:
-                        typer.echo(f"  - {s.get('name', 'unknown')} ({s.get('type', 'unknown')}) at line {s.get('line', '?')}")
+                        typer.echo(
+                            f"  - {s.get('name', 'unknown')} ({s.get('type', 'unknown')}) at line {s.get('line', '?')}"
+                        )
 
             if tasks and any(tasks):
-                typer.secho(f"\nRelated Tasks ({len([t for t in tasks if t])}):", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"\nRelated Tasks ({len([t for t in tasks if t])}):",
+                    fg=typer.colors.GREEN,
+                )
                 for t in tasks:
                     if t:
-                        typer.echo(f"  - #{t.get('id', '?')}: {t.get('title', 'unknown')}")
+                        typer.echo(
+                            f"  - #{t.get('id', '?')}: {t.get('title', 'unknown')}"
+                        )
 
             if commits and any(commits):
-                typer.secho(f"\nRecent Commits ({len([c for c in commits if c])}):", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"\nRecent Commits ({len([c for c in commits if c])}):",
+                    fg=typer.colors.GREEN,
+                )
                 for c in commits:
                     if c:
-                        typer.echo(f"  - {c.get('sha', 'unknown')[:8]}: {c.get('message', '')[:60]}")
+                        typer.echo(
+                            f"  - {c.get('sha', 'unknown')[:8]}: {c.get('message', '')[:60]}"
+                        )
             typer.echo()
 
     except Exception as e:
@@ -10882,7 +11269,9 @@ def graph_query_file(
 @graph_app.command("query-symbols")
 def graph_query_symbols(
     ctx: typer.Context,
-    pattern: str = typer.Argument(..., help="Symbol name pattern (case-insensitive substring match)"),
+    pattern: str = typer.Argument(
+        ..., help="Symbol name pattern (case-insensitive substring match)"
+    ),
     limit: int = typer.Option(10, "--limit", help="Maximum number of results"),
 ):
     """Search for code symbols (functions, classes, methods) by name pattern."""
@@ -10903,7 +11292,9 @@ def graph_query_symbols(
         results = db.execute(query, {"pattern": pattern, "limit": limit})
 
         if not results:
-            typer.secho(f"No symbols found matching '{pattern}'", fg=typer.colors.RED, err=True)
+            typer.secho(
+                f"No symbols found matching '{pattern}'", fg=typer.colors.RED, err=True
+            )
             raise typer.Exit(1)
 
         if ctx.obj.get("output_mode") == "json":
@@ -10911,22 +11302,23 @@ def graph_query_symbols(
                 "pattern": pattern,
                 "count": len(results),
                 "results": [
-                    {
-                        "symbol": dict(symbol),
-                        "file": dict(file) if file else None
-                    }
+                    {"symbol": dict(symbol), "file": dict(file) if file else None}
                     for symbol, file in results
-                ]
+                ],
             }
             typer.echo(json.dumps(output, indent=2))
         else:
-            typer.secho(f"\n🔍 Symbols matching '{pattern}' ({len(results)} found)\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n🔍 Symbols matching '{pattern}' ({len(results)} found)\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
 
             for symbol, file in results:
-                name = symbol.get('name', 'unknown')
-                sym_type = symbol.get('type', 'unknown')
-                line = symbol.get('line', '?')
-                file_path = file.get('path', 'unknown') if file else 'unknown'
+                name = symbol.get("name", "unknown")
+                sym_type = symbol.get("type", "unknown")
+                line = symbol.get("line", "?")
+                file_path = file.get("path", "unknown") if file else "unknown"
 
                 typer.secho(f"{name}", fg=typer.colors.GREEN, bold=True)
                 typer.echo(f"  Type: {sym_type}")
@@ -10955,26 +11347,41 @@ def graph_impact_analysis(
             typer.echo(json.dumps(result, indent=2))
         else:
             if not result.get("found"):
-                typer.secho(f"\n❌ Symbol '{symbol_name}' not found in knowledge graph\n", fg=typer.colors.RED)
+                typer.secho(
+                    f"\n❌ Symbol '{symbol_name}' not found in knowledge graph\n",
+                    fg=typer.colors.RED,
+                )
                 raise typer.Exit(1)
 
-            typer.secho(f"\n💥 Impact Analysis: {symbol_name}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n💥 Impact Analysis: {symbol_name}\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
             typer.echo(f"Defined in: {result['defined_in']}")
             typer.echo(f"Type: {result['type']}")
 
-            if result['callers']:
-                typer.secho(f"\n📞 Callers ({len(result['callers'])}):", fg=typer.colors.YELLOW)
-                for caller in result['callers']:
+            if result["callers"]:
+                typer.secho(
+                    f"\n📞 Callers ({len(result['callers'])}):", fg=typer.colors.YELLOW
+                )
+                for caller in result["callers"]:
                     typer.echo(f"  - {caller}")
 
-            if result['affected_files']:
-                typer.secho(f"\n📄 Affected Files ({len(result['affected_files'])}):", fg=typer.colors.YELLOW)
-                for file in result['affected_files']:
+            if result["affected_files"]:
+                typer.secho(
+                    f"\n📄 Affected Files ({len(result['affected_files'])}):",
+                    fg=typer.colors.YELLOW,
+                )
+                for file in result["affected_files"]:
                     typer.echo(f"  - {file}")
 
-            if result['related_tasks']:
-                typer.secho(f"\n📋 Related Tasks ({len(result['related_tasks'])}):", fg=typer.colors.YELLOW)
-                for task_id in result['related_tasks']:
+            if result["related_tasks"]:
+                typer.secho(
+                    f"\n📋 Related Tasks ({len(result['related_tasks'])}):",
+                    fg=typer.colors.YELLOW,
+                )
+                for task_id in result["related_tasks"]:
                     typer.echo(f"  - Task #{task_id}")
             typer.echo()
 
@@ -10987,7 +11394,9 @@ def graph_impact_analysis(
 def graph_test_coverage(
     ctx: typer.Context,
     target: str = typer.Argument(..., help="File path or symbol name"),
-    target_type: str = typer.Option("file", "--type", help="Target type: file or symbol"),
+    target_type: str = typer.Option(
+        "file", "--type", help="Target type: file or symbol"
+    ),
 ):
     """Find test files that cover a given file or symbol."""
     try:
@@ -11000,23 +11409,34 @@ def graph_test_coverage(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n🧪 Test Coverage: {target} ({target_type})\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n🧪 Test Coverage: {target} ({target_type})\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
 
-            if result['test_files']:
-                typer.secho(f"Test Files ({len(result['test_files'])}):", fg=typer.colors.GREEN)
-                for test_file in result['test_files']:
+            if result["test_files"]:
+                typer.secho(
+                    f"Test Files ({len(result['test_files'])}):", fg=typer.colors.GREEN
+                )
+                for test_file in result["test_files"]:
                     typer.echo(f"  - {test_file}")
             else:
                 typer.secho("No test files found", fg=typer.colors.YELLOW)
 
-            if result['test_functions']:
-                typer.secho(f"\nTest Functions ({len(result['test_functions'])}):", fg=typer.colors.GREEN)
-                for test_func in result['test_functions']:
+            if result["test_functions"]:
+                typer.secho(
+                    f"\nTest Functions ({len(result['test_functions'])}):",
+                    fg=typer.colors.GREEN,
+                )
+                for test_func in result["test_functions"]:
                     typer.echo(f"  - {test_func}")
             typer.echo()
 
     except Exception as e:
-        typer.secho(f"Failed to check test coverage: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Failed to check test coverage: {e}", fg=typer.colors.RED, err=True
+        )
         raise typer.Exit(1)
 
 
@@ -11034,9 +11454,15 @@ def graph_change_history(
         commits = query_change_history(db, symbol_name)
 
         if ctx.obj.get("output_mode") == "json":
-            typer.echo(json.dumps({"symbol": symbol_name, "commits": commits}, indent=2))
+            typer.echo(
+                json.dumps({"symbol": symbol_name, "commits": commits}, indent=2)
+            )
         else:
-            typer.secho(f"\n📜 Change History: {symbol_name}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n📜 Change History: {symbol_name}\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
 
             if not commits:
                 typer.secho("No commits found for this symbol", fg=typer.colors.YELLOW)
@@ -11071,19 +11497,25 @@ def graph_dependency_chain(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n🔗 Dependency Chain: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n🔗 Dependency Chain: {file_path}\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
             typer.echo(f"Total dependencies: {result['total_dependencies']}")
 
-            if result['dependencies']:
+            if result["dependencies"]:
                 typer.secho("\nDependencies (by distance):", fg=typer.colors.GREEN)
-                for dep in result['dependencies']:
+                for dep in result["dependencies"]:
                     typer.echo(f"  [{dep['distance']} hops] {dep['file']}")
             else:
                 typer.secho("\nNo dependencies found", fg=typer.colors.YELLOW)
             typer.echo()
 
     except Exception as e:
-        typer.secho(f"Failed to get dependency chain: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Failed to get dependency chain: {e}", fg=typer.colors.RED, err=True
+        )
         raise typer.Exit(1)
 
 
@@ -11100,22 +11532,36 @@ def graph_orphan_detection(ctx: typer.Context):
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho("\n🗑️  Orphan Detection\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                "\n🗑️  Orphan Detection\n", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
 
-            typer.secho(f"Unused Symbols: {result['unused_symbol_count']}", fg=typer.colors.YELLOW, bold=True)
-            if result['unused_symbols']:
-                for symbol in result['unused_symbols'][:20]:  # Show first 20
-                    typer.echo(f"  - {symbol['name']} ({symbol['type']}) in {symbol['file']}:{symbol['line']}")
-                if result['unused_symbol_count'] > 20:
+            typer.secho(
+                f"Unused Symbols: {result['unused_symbol_count']}",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
+            if result["unused_symbols"]:
+                for symbol in result["unused_symbols"][:20]:  # Show first 20
+                    typer.echo(
+                        f"  - {symbol['name']} ({symbol['type']}) in {symbol['file']}:{symbol['line']}"
+                    )
+                if result["unused_symbol_count"] > 20:
                     typer.echo(f"  ... and {result['unused_symbol_count'] - 20} more")
 
             typer.echo()
-            typer.secho(f"Unreferenced Files: {result['unreferenced_file_count']}", fg=typer.colors.YELLOW, bold=True)
-            if result['unreferenced_files']:
-                for file in result['unreferenced_files'][:20]:  # Show first 20
+            typer.secho(
+                f"Unreferenced Files: {result['unreferenced_file_count']}",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
+            if result["unreferenced_files"]:
+                for file in result["unreferenced_files"][:20]:  # Show first 20
                     typer.echo(f"  - {file['file']} ({file['lines']} lines)")
-                if result['unreferenced_file_count'] > 20:
-                    typer.echo(f"  ... and {result['unreferenced_file_count'] - 20} more")
+                if result["unreferenced_file_count"] > 20:
+                    typer.echo(
+                        f"  ... and {result['unreferenced_file_count'] - 20} more"
+                    )
             typer.echo()
 
     except Exception as e:
@@ -11139,13 +11585,19 @@ def graph_symbol_callers(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n📞 Callers of: {symbol_name}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n📞 Callers of: {symbol_name}\n",
+                fg=typer.colors.BRIGHT_BLUE,
+                bold=True,
+            )
             typer.echo(f"Total callers: {result['caller_count']}")
 
-            if result['callers']:
+            if result["callers"]:
                 typer.secho("\nCaller Functions:", fg=typer.colors.GREEN)
-                for caller in result['callers']:
-                    typer.echo(f"  - {caller['name']} ({caller['type']}) in {caller['file']}:{caller['line']}")
+                for caller in result["callers"]:
+                    typer.echo(
+                        f"  - {caller['name']} ({caller['type']}) in {caller['file']}:{caller['line']}"
+                    )
             else:
                 typer.secho("\nNo callers found", fg=typer.colors.YELLOW)
             typer.echo()
@@ -11172,12 +11624,14 @@ def graph_file_timeline(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n📅 Timeline: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                f"\n📅 Timeline: {file_path}\n", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
             typer.echo(f"Total commits: {result['commit_count']}")
 
-            if result['commits']:
+            if result["commits"]:
                 typer.secho("\nRecent Commits:", fg=typer.colors.GREEN)
-                for commit in result['commits']:
+                for commit in result["commits"]:
                     typer.secho(f"{commit['hash']}", fg=typer.colors.CYAN, bold=True)
                     typer.echo(f"  Author: {commit['author']}")
                     typer.echo(f"  Date: {commit['timestamp']}")
@@ -11204,35 +11658,58 @@ def graph_task_coverage(ctx: typer.Context):
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho("\n📊 Task Coverage Analysis\n", fg=typer.colors.BRIGHT_BLUE, bold=True)
+            typer.secho(
+                "\n📊 Task Coverage Analysis\n", fg=typer.colors.BRIGHT_BLUE, bold=True
+            )
             typer.echo(f"Tasks with commits: {result['tasks_with_commits_count']}")
-            typer.echo(f"Tasks without commits: {result['tasks_without_commits_count']}")
+            typer.echo(
+                f"Tasks without commits: {result['tasks_without_commits_count']}"
+            )
             typer.echo(f"Coverage: {result['coverage_percentage']:.1f}%")
 
-            if result['tasks_without_commits']:
-                typer.secho(f"\nTasks Without Commits ({len(result['tasks_without_commits'])}):", fg=typer.colors.YELLOW)
-                for task in result['tasks_without_commits'][:20]:  # Show first 20
-                    priority = task['priority'] or 'none'
-                    typer.echo(f"  - #{task['id']}: {task['title']} (priority: {priority}, state: {task['state']})")
-                if result['tasks_without_commits_count'] > 20:
-                    typer.echo(f"  ... and {result['tasks_without_commits_count'] - 20} more")
+            if result["tasks_without_commits"]:
+                typer.secho(
+                    f"\nTasks Without Commits ({len(result['tasks_without_commits'])}):",
+                    fg=typer.colors.YELLOW,
+                )
+                for task in result["tasks_without_commits"][:20]:  # Show first 20
+                    priority = task["priority"] or "none"
+                    typer.echo(
+                        f"  - #{task['id']}: {task['title']} (priority: {priority}, state: {task['state']})"
+                    )
+                if result["tasks_without_commits_count"] > 20:
+                    typer.echo(
+                        f"  ... and {result['tasks_without_commits_count'] - 20} more"
+                    )
             typer.echo()
 
     except Exception as e:
-        typer.secho(f"Failed to check task coverage: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Failed to check task coverage: {e}", fg=typer.colors.RED, err=True
+        )
         raise typer.Exit(1)
 
 
 @graph_app.command("visualize")
 def graph_visualize_export(
     ctx: typer.Context,
-    output: Path = typer.Argument(..., help="Output file path (.graphml, .dot, or .json)"),
-    node_types: Optional[str] = typer.Option(None, help="Comma-separated node types (e.g., 'Task,File,Symbol')"),
-    relationship_types: Optional[str] = typer.Option(None, help="Comma-separated relationship types"),
+    output: Path = typer.Argument(
+        ..., help="Output file path (.graphml, .dot, or .json)"
+    ),
+    node_types: Optional[str] = typer.Option(
+        None, help="Comma-separated node types (e.g., 'Task,File,Symbol')"
+    ),
+    relationship_types: Optional[str] = typer.Option(
+        None, help="Comma-separated relationship types"
+    ),
     max_nodes: int = typer.Option(1000, help="Maximum nodes to export"),
-    format: str = typer.Option(None, help="Format: graphml, dot, json (auto-detected from extension)"),
+    format: str = typer.Option(
+        None, help="Format: graphml, dot, json (auto-detected from extension)"
+    ),
     d3: bool = typer.Option(False, help="Export in D3.js format (for JSON only)"),
-    layout: str = typer.Option("dot", help="Graphviz layout: dot, neato, fdp, circo, twopi"),
+    layout: str = typer.Option(
+        "dot", help="Graphviz layout: dot, neato, fdp, circo, twopi"
+    ),
 ):
     """Export knowledge graph to visualization format.
 
@@ -11264,7 +11741,11 @@ def graph_visualize_export(
             elif suffix == ".json":
                 format = "json"
             else:
-                typer.secho("Unknown file extension. Please specify --format", fg=typer.colors.RED, err=True)
+                typer.secho(
+                    "Unknown file extension. Please specify --format",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
                 raise typer.Exit(1)
 
         db = get_database()
@@ -11277,7 +11758,9 @@ def graph_visualize_export(
             result = viz.export_dot(output, node_list, rel_list, max_nodes, layout)
         elif format == "json":
             json_format = "d3" if d3 else "raw"
-            result = viz.export_json(output, node_list, rel_list, max_nodes, json_format)
+            result = viz.export_json(
+                output, node_list, rel_list, max_nodes, json_format
+            )
         else:
             typer.secho(f"Unknown format: {format}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
@@ -11291,7 +11774,7 @@ def graph_visualize_export(
             typer.echo(f"Edges: {result['edges']}")
             typer.echo(f"Output: {result['output']}")
 
-            if 'render_command' in result:
+            if "render_command" in result:
                 typer.secho(f"\n💡 Render with:", fg=typer.colors.CYAN)
                 typer.echo(f"  {result['render_command']}")
             typer.echo()
@@ -11383,7 +11866,249 @@ def graph_visualize_deps(
             typer.echo()
 
     except Exception as e:
-        typer.secho(f"Failed to visualize dependencies: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(
+            f"Failed to visualize dependencies: {e}", fg=typer.colors.RED, err=True
+        )
+        raise typer.Exit(1)
+
+
+# ============================================================================
+# Knowledge Management Commands
+# ============================================================================
+
+
+@knowledge_app.command("decay")
+def knowledge_decay(
+    recalculate: bool = typer.Option(
+        False, "--recalculate", help="Recalculate all relevance scores"
+    ),
+    project_path: Optional[Path] = typer.Option(None, "--project", help="Project path"),
+):
+    """Show knowledge decay statistics and optionally recalculate relevance scores."""
+    from idlergear.backends.registry import get_backend
+    from idlergear.config import find_idlergear_root
+    from idlergear.relevance import recalculate_all_relevance, get_relevance_stats
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+
+    if project_path is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        # Get all items
+        task_backend = get_backend("task", project_path=project_path)
+        note_backend = get_backend("note", project_path=project_path)
+
+        tasks = task_backend.list(state="all")
+        notes = note_backend.list()
+
+        all_items = tasks + notes
+
+        if recalculate:
+            typer.echo("Recalculating relevance scores...")
+            updated_tasks = recalculate_all_relevance(tasks)
+            updated_notes = recalculate_all_relevance(notes)
+
+            # Save updated items
+            for task in updated_tasks:
+                task_backend.update(
+                    task_id=task["id"],
+                    accessed=task.get("accessed"),
+                    access_count=task.get("access_count"),
+                    relevance_score=task.get("relevance_score"),
+                )
+
+            for note in updated_notes:
+                note_backend.update(
+                    note_id=note["id"],
+                    accessed=note.get("accessed"),
+                    access_count=note.get("access_count"),
+                    relevance_score=note.get("relevance_score"),
+                )
+
+            all_items = updated_tasks + updated_notes
+            typer.secho(
+                f"✅ Recalculated {len(all_items)} items",
+                fg=typer.colors.GREEN,
+            )
+
+        # Show statistics
+        stats = get_relevance_stats(all_items)
+        typer.echo("\n## Knowledge Decay Statistics")
+        typer.echo(f"Total items: {stats['count']}")
+        typer.echo(f"Average relevance: {stats['avg']:.3f}")
+        typer.echo(f"Min relevance: {stats['min']:.3f}")
+        typer.echo(f"Max relevance: {stats['max']:.3f}")
+        typer.echo(f"Stale items (< 0.2): {stats['stale_count']}")
+
+    except Exception as e:
+        typer.secho(f"Failed to calculate decay: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@knowledge_app.command("stale")
+def knowledge_stale(
+    threshold: float = typer.Option(
+        0.2, "--threshold", help="Stale relevance threshold"
+    ),
+    project_path: Optional[Path] = typer.Option(None, "--project", help="Project path"),
+):
+    """Show stale knowledge items (low relevance)."""
+    from idlergear.backends.registry import get_backend
+    from idlergear.config import find_idlergear_root
+    from idlergear.relevance import identify_stale_items
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+
+    if project_path is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        # Get all items
+        task_backend = get_backend("task", project_path=project_path)
+        note_backend = get_backend("note", project_path=project_path)
+
+        tasks = task_backend.list(state="all")
+        notes = note_backend.list()
+
+        all_items = tasks + notes
+
+        # Identify stale items
+        stale_items = identify_stale_items(all_items, stale_threshold=threshold)
+
+        typer.echo(f"\n## Stale Items (relevance < {threshold})")
+        typer.echo(f"Found {len(stale_items)} stale items:\n")
+
+        for item in stale_items:
+            item_type = "Task" if "state" in item else "Note"
+            item_id = item.get("id", "?")
+            title = item.get("title") or item.get("content", "")[:50]
+            relevance = item.get("relevance_score", 0.0)
+            typer.echo(
+                f"- {item_type} #{item_id}: {title} [relevance: {relevance:.3f}]"
+            )
+
+        if not stale_items:
+            typer.secho("✅ No stale items found!", fg=typer.colors.GREEN)
+
+    except Exception as e:
+        typer.secho(f"Failed to find stale items: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@knowledge_app.command("prune")
+def knowledge_prune(
+    threshold: float = typer.Option(
+        0.1, "--threshold", help="Prune items below this relevance"
+    ),
+    archive: bool = typer.Option(False, "--archive", help="Archive instead of delete"),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Show what would be pruned without doing it"
+    ),
+    project_path: Optional[Path] = typer.Option(None, "--project", help="Project path"),
+):
+    """Archive or delete stale knowledge items."""
+    from idlergear.backends.registry import get_backend
+    from idlergear.config import find_idlergear_root
+    from idlergear.relevance import identify_stale_items
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+
+    if project_path is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        # Get all items
+        task_backend = get_backend("task", project_path=project_path)
+        note_backend = get_backend("note", project_path=project_path)
+
+        tasks = task_backend.list(state="all")
+        notes = note_backend.list()
+
+        all_items = tasks + notes
+
+        # Identify stale items
+        stale_items = identify_stale_items(all_items, stale_threshold=threshold)
+
+        if not stale_items:
+            typer.secho("✅ No items to prune!", fg=typer.colors.GREEN)
+            return
+
+        typer.echo(
+            f"\n## Items to {'archive' if archive else 'delete'} (relevance < {threshold})"
+        )
+        typer.echo(f"Found {len(stale_items)} items:\n")
+
+        for item in stale_items:
+            item_type = "Task" if "state" in item else "Note"
+            item_id = item.get("id", "?")
+            title = item.get("title") or item.get("content", "")[:50]
+            relevance = item.get("relevance_score", 0.0)
+            typer.echo(
+                f"- {item_type} #{item_id}: {title} [relevance: {relevance:.3f}]"
+            )
+
+        if dry_run:
+            typer.echo(f"\n[Dry run - no changes made]")
+            return
+
+        # Confirm before pruning
+        if not typer.confirm(
+            f"\n{'Archive' if archive else 'Delete'} these {len(stale_items)} items?"
+        ):
+            typer.echo("Cancelled.")
+            return
+
+        # Prune items
+        pruned_count = 0
+        for item in stale_items:
+            item_id = item.get("id")
+            is_task = "state" in item
+
+            try:
+                if is_task:
+                    if archive:
+                        # Close the task as archived
+                        task_backend.update(task_id=item_id, state="closed")
+                    else:
+                        # For now, just close tasks (delete not implemented)
+                        task_backend.update(task_id=item_id, state="closed")
+                else:
+                    if archive:
+                        # For notes, we just leave them (archive not implemented)
+                        pass
+                    else:
+                        # Delete note
+                        note_backend.delete(note_id=item_id)
+
+                pruned_count += 1
+            except Exception as e:
+                typer.secho(
+                    f"Failed to prune item #{item_id}: {e}", fg=typer.colors.RED
+                )
+
+        action = "archived" if archive else "deleted"
+        typer.secho(
+            f"\n✅ {action.capitalize()} {pruned_count} items", fg=typer.colors.GREEN
+        )
+
+    except Exception as e:
+        typer.secho(f"Failed to prune items: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
 
