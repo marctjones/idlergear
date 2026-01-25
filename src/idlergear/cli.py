@@ -4283,6 +4283,7 @@ def reference_sync(
 def run_start(
     command: str,
     name: str = typer.Option(None, "--name", "-n", help="Run name"),
+    tmux: bool = typer.Option(False, "--tmux", help="Run in a tmux session (allows attaching later)"),
 ):
     """Start a script/command."""
     from idlergear.config import find_idlergear_root
@@ -4296,11 +4297,15 @@ def run_start(
         raise typer.Exit(1)
 
     try:
-        run = start_run(command, name=name)
+        run = start_run(command, name=name, use_tmux=tmux)
         typer.secho(
             f"Started run '{run['name']}' (PID {run['pid']})", fg=typer.colors.GREEN
         )
         typer.echo(f"  Command: {run['command']}")
+        if tmux and run.get("tmux_session"):
+            typer.echo(f"  Tmux session: {run['tmux_session']}")
+            typer.echo(f"  Attach: tmux attach-session -t {run['tmux_session']}")
+            typer.echo(f"  Or use: idlergear run attach {run['name']}")
         typer.echo(f"  Logs: idlergear run logs {run['name']}")
     except RuntimeError as e:
         typer.secho(str(e), fg=typer.colors.RED)
@@ -4484,6 +4489,36 @@ def run_stop(name: str):
         typer.secho(f"Stopped run '{name}'", fg=typer.colors.GREEN)
     else:
         typer.secho(f"Run '{name}' is not running or not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@run_app.command("attach")
+def run_attach(name: str):
+    """Attach to a tmux session for a run.
+
+    Only works for runs started with --tmux flag.
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.runs import attach_to_run
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        result = attach_to_run(name)
+        typer.secho(
+            f"Tmux session: {result['tmux_session']}", fg=typer.colors.GREEN
+        )
+        typer.echo(f"  {result['message']}")
+        typer.echo("")
+        typer.echo("To attach to the session, run:")
+        typer.secho(f"  {result['attach_command']}", fg=typer.colors.BRIGHT_CYAN)
+    except RuntimeError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
