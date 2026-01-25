@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idlergear"
-version = "0.7.1"
+version = "0.7.2"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,6 +24,7 @@ dependencies = [
     "textual>=0.47.0",
     "watchdog>=3.0.0",
     "kuzu>=0.11.3",
+    "libtmux>=0.37.0",
 ]
 
 [project.optional-dependencies]

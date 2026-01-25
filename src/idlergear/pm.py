@@ -312,3 +312,231 @@ class ProcessManager:
             "command": " ".join(cmd),
             "status": "running",
         }
+
+    # ==== Tmux Session Management ====
+
+    def _tmux_available(self) -> bool:
+        """Check if tmux is installed."""
+        return shutil.which("tmux") is not None
+
+    def _get_tmux_server(self):
+        """Get tmux server instance.
+
+        Returns None if tmux not available or import fails.
+        """
+        if not self._tmux_available():
+            return None
+
+        try:
+            import libtmux
+            return libtmux.Server()
+        except ImportError:
+            return None
+
+    def create_tmux_session(
+        self,
+        name: str,
+        command: str | None = None,
+        window_name: str | None = None,
+        start_directory: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new tmux session.
+
+        Args:
+            name: Session name
+            command: Optional command to run in the session
+            window_name: Optional window name (defaults to session name)
+            start_directory: Optional starting directory
+
+        Returns:
+            Session info dict
+
+        Raises:
+            RuntimeError: If tmux not available
+        """
+        server = self._get_tmux_server()
+        if server is None:
+            raise RuntimeError(
+                "tmux not available. Install tmux and libtmux: "
+                "apt install tmux && pip install libtmux"
+            )
+
+        # Check if session already exists
+        existing = server.find_where({"session_name": name})
+        if existing:
+            raise ValueError(f"Tmux session '{name}' already exists")
+
+        # Create session
+        session = server.new_session(
+            session_name=name,
+            window_name=window_name or name,
+            start_directory=start_directory or str(self.project_path),
+        )
+
+        # Run command if provided
+        if command:
+            window = session.attached_window
+            pane = window.attached_pane
+            pane.send_keys(command)
+
+        return {
+            "name": session.name,
+            "id": session.id,
+            "windows": len(session.windows),
+            "attached": session.attached,
+        }
+
+    def list_tmux_sessions(self) -> list[dict[str, Any]]:
+        """List all tmux sessions.
+
+        Returns:
+            List of session info dicts
+        """
+        server = self._get_tmux_server()
+        if server is None:
+            return []
+
+        sessions = []
+        for session in server.sessions:
+            sessions.append({
+                "name": session.name,
+                "id": session.id,
+                "windows": len(session.windows),
+                "attached": session.attached,
+                "created": session.created,
+            })
+
+        return sessions
+
+    def get_tmux_session(self, name: str) -> dict[str, Any] | None:
+        """Get information about a specific tmux session.
+
+        Args:
+            name: Session name
+
+        Returns:
+            Session info dict or None if not found
+        """
+        server = self._get_tmux_server()
+        if server is None:
+            return None
+
+        session = server.find_where({"session_name": name})
+        if not session:
+            return None
+
+        windows = []
+        for window in session.windows:
+            panes = []
+            for pane in window.panes:
+                panes.append({
+                    "id": pane.id,
+                    "width": pane.width,
+                    "height": pane.height,
+                    "active": pane.pane_active,
+                })
+            windows.append({
+                "id": window.id,
+                "name": window.name,
+                "panes": panes,
+            })
+
+        return {
+            "name": session.name,
+            "id": session.id,
+            "windows": windows,
+            "attached": session.attached,
+            "created": session.created,
+        }
+
+    def kill_tmux_session(self, name: str) -> bool:
+        """Kill a tmux session.
+
+        Args:
+            name: Session name
+
+        Returns:
+            True if session was killed, False if not found
+        """
+        server = self._get_tmux_server()
+        if server is None:
+            return False
+
+        session = server.find_where({"session_name": name})
+        if not session:
+            return False
+
+        session.kill_session()
+        return True
+
+    def send_keys_to_tmux(
+        self, session_name: str, keys: str, window_index: int = 0, pane_index: int = 0
+    ) -> bool:
+        """Send keys to a specific pane in a tmux session.
+
+        Args:
+            session_name: Session name
+            keys: Keys to send
+            window_index: Window index (default: 0)
+            pane_index: Pane index within window (default: 0)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        server = self._get_tmux_server()
+        if server is None:
+            return False
+
+        session = server.find_where({"session_name": session_name})
+        if not session:
+            return False
+
+        if window_index >= len(session.windows):
+            return False
+
+        window = session.windows[window_index]
+        if pane_index >= len(window.panes):
+            return False
+
+        pane = window.panes[pane_index]
+        pane.send_keys(keys)
+        return True
+
+    def split_tmux_window(
+        self,
+        session_name: str,
+        command: str | None = None,
+        vertical: bool = True,
+        window_index: int = 0,
+    ) -> dict[str, Any] | None:
+        """Split a window in a tmux session.
+
+        Args:
+            session_name: Session name
+            command: Optional command to run in the new pane
+            vertical: If True, split vertically; if False, split horizontally
+            window_index: Window index to split (default: 0)
+
+        Returns:
+            New pane info dict or None if failed
+        """
+        server = self._get_tmux_server()
+        if server is None:
+            return None
+
+        session = server.find_where({"session_name": session_name})
+        if not session or window_index >= len(session.windows):
+            return None
+
+        window = session.windows[window_index]
+        new_pane = window.split_window(vertical=vertical)
+
+        if command:
+            new_pane.send_keys(command)
+
+        return {
+            "id": new_pane.id,
+            "width": new_pane.width,
+            "height": new_pane.height,
+            "active": new_pane.pane_active,
+        }
