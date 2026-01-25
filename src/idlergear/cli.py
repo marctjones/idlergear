@@ -5630,6 +5630,211 @@ def session_stats(
         raise typer.Exit(1)
 
 
+@session_app.command("branch")
+def session_branch(
+    branch_name: str,
+    from_session: str = typer.Option(None, "--from", help="Session ID to branch from (default: latest)"),
+    from_branch: str = typer.Option("main", "--from-branch", help="Branch to fork from"),
+    purpose: str = typer.Option(None, "--purpose", "-p", help="Purpose of this branch"),
+):
+    """Create a new session branch.
+
+    Enables git-like branching to try different approaches without losing main work.
+
+    Examples:
+        idlergear session branch experiment-graphql
+        idlergear session branch try-alternative --from main/s002
+        idlergear session branch risky-refactor --purpose "Try new architecture"
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_branching import SessionBranching
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        branching = SessionBranching()
+        branch_info = branching.create_branch(
+            branch_name=branch_name,
+            from_session=from_session,
+            from_branch=from_branch,
+            purpose=purpose,
+        )
+
+        typer.secho(f"✓ Created branch '{branch_name}'", fg=typer.colors.GREEN)
+        typer.echo(f"  Forked from: {branch_info['forked_from']}")
+        if purpose:
+            typer.echo(f"  Purpose: {purpose}")
+        typer.echo(f"\nSwitch to it with: idlergear session checkout {branch_name}")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("checkout")
+def session_checkout(branch_name: str):
+    """Switch to a different session branch.
+
+    Examples:
+        idlergear session checkout experiment-graphql
+        idlergear session checkout main
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_branching import SessionBranching
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        branching = SessionBranching()
+        result = branching.checkout_branch(branch_name)
+
+        typer.secho(f"✓ Switched to branch '{branch_name}'", fg=typer.colors.GREEN)
+        if result["latest_session"]:
+            typer.echo(f"  Latest session: {result['latest_session']}")
+        typer.echo(f"  Total sessions: {result['session_count']}")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("branches")
+def session_branches():
+    """List all session branches.
+
+    Shows all branches with their status, session count, and creation time.
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_branching import SessionBranching
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        branching = SessionBranching()
+        branches = branching.list_branches()
+
+        if not branches:
+            typer.echo("No branches found.")
+            return
+
+        typer.echo("\nSession Branches:\n")
+        for branch in branches:
+            marker = "* " if branch["current"] else "  "
+            color = typer.colors.GREEN if branch["current"] else None
+
+            status_icon = {
+                "active": "🟢",
+                "merged": "✅",
+                "abandoned": "❌",
+            }.get(branch["status"], "")
+
+            typer.secho(
+                f"{marker}{branch['name']}", fg=color, nl=False
+            )
+            typer.echo(f" {status_icon} ({branch['sessions']} sessions)")
+
+            if branch.get("purpose"):
+                typer.echo(f"    Purpose: {branch['purpose']}")
+            if branch.get("forked_from"):
+                typer.echo(f"    Forked from: {branch['forked_from']}")
+
+    except Exception as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("merge")
+def session_merge(
+    source_branch: str,
+    target_branch: str = typer.Option("main", "--to", help="Target branch"),
+):
+    """Merge a branch into target branch.
+
+    Creates a new session in the target branch with the state from
+    the source branch's latest session.
+
+    Examples:
+        idlergear session merge experiment-graphql
+        idlergear session merge feature-a --to develop
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_branching import SessionBranching
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        branching = SessionBranching()
+        result = branching.merge_branch(source_branch, target_branch)
+
+        typer.secho(
+            f"✓ Merged '{source_branch}' into '{target_branch}'",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"  New session: {result['new_session']}")
+        typer.echo(f"  Branch '{source_branch}' marked as merged")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@session_app.command("abandon")
+def session_abandon(
+    branch_name: str,
+    reason: str = typer.Option(None, "--reason", "-r", help="Reason for abandoning"),
+):
+    """Mark a branch as abandoned.
+
+    Use this when an experimental branch didn't work out.
+
+    Examples:
+        idlergear session abandon experiment-graphql --reason "Performance issues"
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.session_branching import SessionBranching
+
+    if find_idlergear_root() is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        branching = SessionBranching()
+        branching.abandon_branch(branch_name, reason)
+
+        typer.secho(
+            f"✓ Abandoned branch '{branch_name}'", fg=typer.colors.YELLOW
+        )
+        if reason:
+            typer.echo(f"  Reason: {reason}")
+
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 @session_app.command("monitor")
 def session_monitor(
     session_file: str = typer.Option(None, "--file", "-f", help="Session file to monitor (auto-detect if not provided)"),
