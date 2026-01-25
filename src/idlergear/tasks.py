@@ -103,7 +103,7 @@ def create_task(
     content = render_frontmatter(frontmatter, (body or "").strip() + "\n")
     filepath.write_text(content)
 
-    return {
+    task_data = {
         "id": task_id,
         "title": title,
         "body": body,
@@ -115,6 +115,12 @@ def create_task(
         "created": frontmatter["created"],
         "path": str(filepath),
     }
+
+    # Sync fields to GitHub Projects if configured
+    from idlergear.projects import sync_task_fields_to_github
+    sync_task_fields_to_github(task_id, task_data, project_path)
+
+    return task_data
 
 
 def list_tasks(
@@ -243,6 +249,10 @@ def update_task(
         from idlergear.projects import auto_move_task_on_state_change
 
         auto_move_task_on_state_change(task_id, state, project_path)
+
+    # Sync fields to GitHub Projects if configured
+    from idlergear.projects import sync_task_fields_to_github
+    sync_task_fields_to_github(task_id, updated_task, project_path)
 
     return updated_task
 

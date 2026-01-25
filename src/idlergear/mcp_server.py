@@ -1539,6 +1539,20 @@ async def list_tools() -> list[Tool]:
                 "required": ["name", "github_project_number"],
             },
         ),
+        Tool(
+            name="idlergear_project_sync_fields",
+            description="Manually sync task metadata to GitHub Projects custom fields. Syncs priority, labels, and due date based on projects.field_mapping configuration. Automatically called on task create/update if configured.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Task ID to sync",
+                    },
+                },
+                "required": ["task_id"],
+            },
+        ),
         # Daemon coordination tools
         Tool(
             name="idlergear_daemon_register_agent",
@@ -4164,6 +4178,27 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             if result is None:
                 raise ValueError(f"Project '{arguments['name']}' not found")
             return _format_result(result)
+
+        elif name == "idlergear_project_sync_fields":
+            from idlergear.projects import sync_task_fields_to_github
+            from idlergear.tasks import get_task
+
+            task_id = arguments["task_id"]
+            task = get_task(task_id)
+            if task is None:
+                raise ValueError(f"Task {task_id} not found")
+
+            success = sync_task_fields_to_github(task_id, task)
+            if success:
+                return _format_result({
+                    "success": True,
+                    "message": f"Synced fields for task {task_id} to GitHub Projects"
+                })
+            else:
+                return _format_result({
+                    "success": False,
+                    "message": f"Could not sync fields for task {task_id}. Check configuration and project setup."
+                })
 
         # Daemon coordination handlers
         elif name == "idlergear_daemon_register_agent":

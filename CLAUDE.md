@@ -496,6 +496,105 @@ idlergear task close 123
 - **No Manual Dragging**: State changes in IdlerGear update board position
 - **Consistent Workflow**: Same behavior for CLI, MCP tools, and API
 
+## GitHub Projects Custom Field Sync
+
+**IdlerGear can automatically sync task metadata to GitHub Projects v2 custom fields.**
+
+This enables rich project board data including priority, labels, and due dates to be visible in GitHub Projects UI.
+
+### Configuration
+
+Enable custom field sync and map IdlerGear properties to GitHub Projects fields:
+
+```toml
+# .idlergear/config.toml
+[projects]
+field_sync = true            # Enable custom field sync (default: true if field_mapping configured)
+
+[projects.field_mapping]
+priority = "Priority"        # Map task priority to "Priority" field in GitHub Projects
+due = "Due Date"            # Map task due date to "Due Date" field
+labels = "Labels"           # Map task labels to "Labels" field (comma-separated text)
+```
+
+### Field Types
+
+IdlerGear supports these field type mappings:
+
+| IdlerGear Property | GitHub Field Type | Example |
+|--------------------|-------------------|---------|
+| `priority` | Single Select | "high", "medium", "low" |
+| `due` | Date | "2026-02-01" (YYYY-MM-DD) |
+| `labels` | Text | "enhancement, api, urgent" (comma-separated) |
+
+### How It Works
+
+1. **Automatic Sync**: Fields are synced automatically on task create/update
+2. **Field Detection**: IdlerGear finds GitHub Projects custom fields by name
+3. **Type Validation**: Only syncs fields with matching types (e.g., priority → single-select)
+4. **Graceful Failure**: Sync errors don't break task operations
+
+### Setup Requirements
+
+1. **GitHub Project**: Must be linked to IdlerGear project
+2. **Custom Fields**: Must be created in GitHub Projects UI with exact names from config
+3. **Field Options**: For single-select fields (priority), options must match IdlerGear values
+4. **Task in Project**: Task must be added to project for sync to work
+
+### Examples
+
+```bash
+# 1. Create GitHub Project fields (via GitHub UI)
+#    - Add "Priority" field (single-select) with options: high, medium, low
+#    - Add "Due Date" field (date)
+#    - Add "Labels" field (text)
+
+# 2. Configure field mapping
+idlergear config set projects.field_sync true
+idlergear config set projects.field_mapping.priority "Priority"
+idlergear config set projects.field_mapping.due "Due Date"
+idlergear config set projects.field_mapping.labels "Labels"
+
+# 3. Link project to GitHub
+idlergear project sync "main"
+
+# 4. Create/update tasks - fields sync automatically
+idlergear task create "Add auth" --priority high --due 2026-02-01 --label enhancement
+# → Priority, Due Date, and Labels fields updated in GitHub Projects
+
+idlergear task update 123 --priority low
+# → Priority field updated in GitHub Projects
+
+# 5. Manual sync (if needed)
+idlergear_project_sync_fields(task_id=123)  # MCP tool
+```
+
+### MCP Tool
+
+```python
+# Manually sync task fields to GitHub Projects
+idlergear_project_sync_fields(task_id=123)
+```
+
+### Benefits
+
+- **Rich Project Data**: See priority, labels, and due dates in GitHub Projects UI
+- **Automatic Updates**: Changes in IdlerGear immediately reflected in GitHub
+- **Cross-Tool Workflow**: AI assistants and humans see same data
+- **Custom Fields**: Extend with any field types GitHub Projects supports
+
+### Troubleshooting
+
+**Fields not syncing?**
+- Check that GitHub Project is linked (`github_project_id` in project JSON)
+- Verify custom field names match exactly (case-sensitive)
+- Ensure task is in the project (use `idlergear project add-task`)
+- Check field types match (priority → single-select, due → date, etc.)
+
+**Priority values not mapping?**
+- GitHub single-select options must match IdlerGear priority values exactly
+- Options: "high", "medium", "low" (case-insensitive)
+
 ## IdlerGear Usage Quick Reference
 
 **ALWAYS run at session start:**

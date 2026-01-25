@@ -369,3 +369,229 @@ class GitHubGraphQL:
         """
         data = self.query(query, {"owner": owner, "name": name})
         return data["repository"]
+
+    def add_issue_to_project(
+        self, project_id: str, issue_id: str
+    ) -> dict[str, Any]:
+        """Add an issue to a GitHub Project v2.
+
+        Args:
+            project_id: Project node ID (from get_project_v2)
+            issue_id: Issue node ID (not issue number!)
+
+        Returns:
+            Project item data including item ID
+
+        Raises:
+            GitHubGraphQLError: If mutation fails
+        """
+        mutation = """
+        mutation($projectId: ID!, $contentId: ID!) {
+          addProjectV2ItemById(input: {
+            projectId: $projectId
+            contentId: $contentId
+          }) {
+            item {
+              id
+            }
+          }
+        }
+        """
+
+        data = self.query(mutation, {
+            "projectId": project_id,
+            "contentId": issue_id
+        })
+        return data["addProjectV2ItemById"]["item"]
+
+    def get_issue_id(self, owner: str, repo: str, issue_number: int) -> str:
+        """Get issue node ID from issue number.
+
+        Args:
+            owner: Repository owner
+            repo: Repository name
+            issue_number: Issue number
+
+        Returns:
+            Issue node ID
+        """
+        query = """
+        query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            issue(number: $number) {
+              id
+            }
+          }
+        }
+        """
+
+        data = self.query(query, {
+            "owner": owner,
+            "repo": repo,
+            "number": issue_number
+        })
+        return data["repository"]["issue"]["id"]
+
+    def update_project_item_field_text(
+        self, project_id: str, item_id: str, field_id: str, value: str
+    ) -> dict[str, Any]:
+        """Update a text field on a project item.
+
+        Args:
+            project_id: Project node ID
+            item_id: Project item ID
+            field_id: Field node ID
+            value: Text value to set
+
+        Returns:
+            Updated project item
+        """
+        mutation = """
+        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+          updateProjectV2ItemFieldValue(input: {
+            projectId: $projectId
+            itemId: $itemId
+            fieldId: $fieldId
+            value: {
+              text: $value
+            }
+          }) {
+            projectV2Item {
+              id
+            }
+          }
+        }
+        """
+
+        data = self.query(mutation, {
+            "projectId": project_id,
+            "itemId": item_id,
+            "fieldId": field_id,
+            "value": value
+        })
+        return data["updateProjectV2ItemFieldValue"]["projectV2Item"]
+
+    def update_project_item_field_date(
+        self, project_id: str, item_id: str, field_id: str, value: str
+    ) -> dict[str, Any]:
+        """Update a date field on a project item.
+
+        Args:
+            project_id: Project node ID
+            item_id: Project item ID
+            field_id: Field node ID
+            value: Date string in ISO 8601 format (YYYY-MM-DD)
+
+        Returns:
+            Updated project item
+        """
+        mutation = """
+        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Date!) {
+          updateProjectV2ItemFieldValue(input: {
+            projectId: $projectId
+            itemId: $itemId
+            fieldId: $fieldId
+            value: {
+              date: $value
+            }
+          }) {
+            projectV2Item {
+              id
+            }
+          }
+        }
+        """
+
+        data = self.query(mutation, {
+            "projectId": project_id,
+            "itemId": item_id,
+            "fieldId": field_id,
+            "value": value
+        })
+        return data["updateProjectV2ItemFieldValue"]["projectV2Item"]
+
+    def update_project_item_field_single_select(
+        self, project_id: str, item_id: str, field_id: str, option_id: str
+    ) -> dict[str, Any]:
+        """Update a single-select field on a project item.
+
+        Args:
+            project_id: Project node ID
+            item_id: Project item ID
+            field_id: Field node ID
+            option_id: Option node ID (from field options)
+
+        Returns:
+            Updated project item
+        """
+        mutation = """
+        mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+          updateProjectV2ItemFieldValue(input: {
+            projectId: $projectId
+            itemId: $itemId
+            fieldId: $fieldId
+            value: {
+              singleSelectOptionId: $optionId
+            }
+          }) {
+            projectV2Item {
+              id
+            }
+          }
+        }
+        """
+
+        data = self.query(mutation, {
+            "projectId": project_id,
+            "itemId": item_id,
+            "fieldId": field_id,
+            "optionId": option_id
+        })
+        return data["updateProjectV2ItemFieldValue"]["projectV2Item"]
+
+    def get_project_item_by_content(
+        self, project_id: str, owner: str, repo: str, issue_number: int
+    ) -> dict[str, Any] | None:
+        """Get project item for a specific issue.
+
+        Args:
+            project_id: Project node ID
+            owner: Repository owner
+            repo: Repository name
+            issue_number: Issue number
+
+        Returns:
+            Project item data or None if not found
+        """
+        # First get the issue ID
+        issue_id = self.get_issue_id(owner, repo, issue_number)
+
+        query = """
+        query($projectId: ID!, $first: Int!) {
+          node(id: $projectId) {
+            ... on ProjectV2 {
+              items(first: $first) {
+                nodes {
+                  id
+                  content {
+                    ... on Issue {
+                      id
+                      number
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        data = self.query(query, {"projectId": project_id, "first": 100})
+        items = data.get("node", {}).get("items", {}).get("nodes", [])
+
+        for item in items:
+            content = item.get("content", {})
+            if content.get("id") == issue_id:
+                return item
+
+        return None

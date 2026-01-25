@@ -559,3 +559,167 @@ def auto_move_task_on_state_change(
     except Exception:
         # Silently fail - don't break task updates if project move fails
         return False
+
+
+def sync_task_fields_to_github(
+    task_id: str | int,
+    task_data: dict[str, Any],
+    project_path: Path | None = None,
+) -> bool:
+    """Sync task metadata to GitHub Projects custom fields.
+
+    Uses projects.field_mapping configuration to map IdlerGear task properties
+    to GitHub Projects v2 custom fields.
+
+    Args:
+        task_id: Task ID
+        task_data: Task data dict (must include priority, labels, due, etc.)
+        project_path: Override project path
+
+    Returns:
+        True if fields were synced, False otherwise
+
+    Configuration example:
+        [projects.field_mapping]
+        priority = "Priority"
+        due = "Due Date"
+        labels = "Labels"
+
+    Example:
+        >>> sync_task_fields_to_github(278, {"priority": "high", "due": "2026-02-01"})
+        True  # Synced priority and due date to GitHub Projects
+    """
+    from idlergear.config import get_config_value
+    from idlergear.github_graphql import GitHubGraphQL, GitHubGraphQLError
+
+    # Check if field sync is enabled
+    field_sync_enabled = get_config_value("projects.field_sync", project_path)
+    if field_sync_enabled is False:
+        return False
+
+    # Get default project
+    default_project_name = get_config_value("projects.default_project", project_path)
+    if not default_project_name:
+        return False
+
+    project = get_project(default_project_name, project_path)
+    if not project:
+        return False
+
+    # Must be linked to GitHub
+    github_project_id = project.get("github_project_id")
+    github_project_number = project.get("github_project_number")
+    if not github_project_id or not github_project_number:
+        return False
+
+    # Check if task is in project
+    task_id_str = str(task_id)
+    task_in_project = any(
+        task_id_str in col_tasks
+        for col_tasks in project["tasks"].values()
+    )
+    if not task_in_project:
+        return False
+
+    # Get repo info
+    root = project_path or find_idlergear_root()
+    owner = get_github_owner(root)
+    if not owner:
+        return False
+
+    # Determine repo name from git remote
+    try:
+        result = subprocess.run(
+            ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return False
+        repo_full = result.stdout.strip()
+        _, repo_name = repo_full.split("/")
+    except Exception:
+        return False
+
+    try:
+        graphql = GitHubGraphQL()
+
+        # Get project fields
+        project_data = graphql.get_project_v2(owner, github_project_number)
+        fields_by_name = {}
+        for field in project_data.get("fields", {}).get("nodes", []):
+            field_name = field.get("name")
+            if field_name:
+                fields_by_name[field_name] = field
+
+        # Get project item for this issue
+        project_item = graphql.get_project_item_by_content(
+            github_project_id, owner, repo_name, int(task_id)
+        )
+        if not project_item:
+            return False
+
+        item_id = project_item["id"]
+        synced_any = False
+
+        # Sync priority field (single-select)
+        priority = task_data.get("priority")
+        priority_field_name = get_config_value("projects.field_mapping.priority", project_path)
+        if priority and priority_field_name and priority_field_name in fields_by_name:
+            field_data = fields_by_name[priority_field_name]
+            field_id = field_data["id"]
+
+            # Find option ID for priority value
+            options = field_data.get("options", [])
+            option_id = None
+            for option in options:
+                if option["name"].lower() == priority.lower():
+                    option_id = option["id"]
+                    break
+
+            if option_id:
+                try:
+                    graphql.update_project_item_field_single_select(
+                        github_project_id, item_id, field_id, option_id
+                    )
+                    synced_any = True
+                except GitHubGraphQLError:
+                    pass
+
+        # Sync due date field (date)
+        due_date = task_data.get("due")
+        due_field_name = get_config_value("projects.field_mapping.due", project_path)
+        if due_date and due_field_name and due_field_name in fields_by_name:
+            field_data = fields_by_name[due_field_name]
+            field_id = field_data["id"]
+
+            try:
+                graphql.update_project_item_field_date(
+                    github_project_id, item_id, field_id, due_date
+                )
+                synced_any = True
+            except GitHubGraphQLError:
+                pass
+
+        # Sync labels field (text, comma-separated)
+        labels = task_data.get("labels", [])
+        labels_field_name = get_config_value("projects.field_mapping.labels", project_path)
+        if labels and labels_field_name and labels_field_name in fields_by_name:
+            field_data = fields_by_name[labels_field_name]
+            field_id = field_data["id"]
+
+            labels_text = ", ".join(labels)
+            try:
+                graphql.update_project_item_field_text(
+                    github_project_id, item_id, field_id, labels_text
+                )
+                synced_any = True
+            except GitHubGraphQLError:
+                pass
+
+        return synced_any
+
+    except Exception:
+        # Silently fail - don't break task operations if sync fails
+        return False
