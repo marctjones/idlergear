@@ -148,6 +148,11 @@ def start_run(
     register_with_daemon: bool = True,
     stream_logs: bool = False,
     use_tmux: bool = False,
+    use_container: bool = False,
+    container_image: str | None = None,
+    container_env: dict[str, str] | None = None,
+    container_memory: str | None = None,
+    container_cpus: str | None = None,
 ) -> dict[str, Any]:
     """Start a new run (execute a command in the background).
 
@@ -158,8 +163,13 @@ def start_run(
         register_with_daemon: Whether to register as an agent with the daemon
         stream_logs: Whether to stream logs to daemon (requires registration)
         use_tmux: Whether to run in a tmux session (allows attaching later)
+        use_container: Whether to run in a container (podman/docker)
+        container_image: Container image to use (required if use_container=True)
+        container_env: Environment variables for container
+        container_memory: Memory limit for container (e.g., "512m", "2g")
+        container_cpus: CPU limit for container (e.g., "1.5")
 
-    Returns the run data including name and PID, plus tmux_session if use_tmux=True.
+    Returns the run data including name and PID. If use_container, includes container_id.
     """
     runs_dir = get_runs_dir(project_path)
     if runs_dir is None:
@@ -211,11 +221,55 @@ def start_run(
     if project_path is None:
         project_path = find_idlergear_root()
 
-    # Start process (either in tmux or as background process)
+    # Start process (tmux, container, or background process)
     tmux_session_name = None
+    container_id = None
     pid = None
 
-    if use_tmux:
+    if use_container:
+        # Validate container image is provided
+        if not container_image:
+            stdout_handle.close()
+            stderr_handle.close()
+            raise RuntimeError("container_image is required when use_container=True")
+
+        # Start in container
+        from idlergear.pm import ProcessManager
+
+        pm = ProcessManager(project_path)
+        try:
+            container_name = f"idlergear-{name}"
+
+            # Mount project directory into container
+            volumes = {str(project_path): "/workspace"}
+
+            # Start container
+            container_info = pm.start_container(
+                image=container_image,
+                name=container_name,
+                command=f"sh -c 'cd /workspace && {command}'",
+                env=container_env,
+                volumes=volumes,
+                memory=container_memory,
+                cpus=container_cpus,
+                detach=True,
+            )
+            container_id = container_info["id"]
+
+            # Get container's main process PID
+            # For containers, we use the container ID as a pseudo-PID
+            pid = int(container_id[:8], 16) if container_id else -1
+
+            # Container logs will be fetched via pm.get_container_logs()
+            stdout_handle.close()
+            stderr_handle.close()
+
+        except Exception as e:
+            stdout_handle.close()
+            stderr_handle.close()
+            raise RuntimeError(f"Failed to start container: {e}")
+
+    elif use_tmux:
         # Start in tmux session
         from idlergear.pm import ProcessManager
 
@@ -262,6 +316,7 @@ def start_run(
     pid_file.write_text(str(pid))
 
     # Write metadata.json for rich run information
+    terminal_type = "container" if use_container else ("tmux" if use_tmux else "background")
     metadata = {
         "name": name,
         "command": command,
@@ -271,8 +326,10 @@ def start_run(
         "ended_at": None,
         "exit_code": None,
         "status": "running",
-        "terminal_type": "tmux" if use_tmux else "background",
+        "terminal_type": terminal_type,
         "tmux_session": tmux_session_name if use_tmux else None,
+        "container_id": container_id if use_container else None,
+        "container_image": container_image if use_container else None,
     }
     metadata_file = run_dir / "metadata.json"
     metadata_file.write_text(json.dumps(metadata, indent=2) + "\n")
@@ -504,6 +561,24 @@ def get_run_logs(
     if not run_dir.exists():
         return None
 
+    # Check if this is a container run
+    metadata_file = run_dir / "metadata.json"
+    if metadata_file.exists():
+        try:
+            metadata = json.loads(metadata_file.read_text())
+            container_id = metadata.get("container_id")
+
+            if container_id:
+                # Fetch logs from container
+                from idlergear.pm import ProcessManager
+
+                pm = ProcessManager(project_path)
+                content = pm.get_container_logs(container_id, tail=tail)
+                return content if content is not None else ""
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    # Fall back to file-based logs
     log_file = run_dir / f"{stream}.log"
     if not log_file.exists():
         return ""
@@ -574,18 +649,27 @@ def stop_run(name: str, project_path: Path | None = None) -> bool:
     runs_dir = get_runs_dir(project_path)
     run_dir = runs_dir / name
 
-    # Check if running in tmux
+    # Check if running in tmux or container
     metadata_file = run_dir / "metadata.json"
     tmux_session = None
+    container_id = None
     if metadata_file.exists():
         try:
             metadata = json.loads(metadata_file.read_text())
             tmux_session = metadata.get("tmux_session")
+            container_id = metadata.get("container_id")
         except (json.JSONDecodeError, KeyError):
             pass
 
     try:
-        if tmux_session:
+        if container_id:
+            # Stop container
+            from idlergear.pm import ProcessManager
+            pm = ProcessManager(project_path)
+            pm.stop_container(container_id, force=False)
+            # Also remove container
+            pm.remove_container(container_id, force=False)
+        elif tmux_session:
             # Kill tmux session
             from idlergear.pm import ProcessManager
             pm = ProcessManager(project_path)

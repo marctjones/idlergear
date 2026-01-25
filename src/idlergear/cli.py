@@ -4284,8 +4284,18 @@ def run_start(
     command: str,
     name: str = typer.Option(None, "--name", "-n", help="Run name"),
     tmux: bool = typer.Option(False, "--tmux", help="Run in a tmux session (allows attaching later)"),
+    container: bool = typer.Option(False, "--container", help="Run in a container (podman/docker)"),
+    image: str = typer.Option(None, "--image", help="Container image (required with --container)"),
+    memory: str = typer.Option(None, "--memory", help="Container memory limit (e.g., '512m', '2g')"),
+    cpus: str = typer.Option(None, "--cpus", help="Container CPU limit (e.g., '1.5')"),
 ):
-    """Start a script/command."""
+    """Start a script/command.
+
+    Examples:
+        idlergear run start "python server.py" --name backend
+        idlergear run start "pytest" --tmux --name tests
+        idlergear run start "npm start" --container --image node:18 --name frontend
+    """
     from idlergear.config import find_idlergear_root
     from idlergear.runs import start_run
 
@@ -4296,16 +4306,41 @@ def run_start(
         )
         raise typer.Exit(1)
 
+    # Validate container options
+    if container and not image:
+        typer.secho(
+            "Error: --image is required when using --container",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
     try:
-        run = start_run(command, name=name, use_tmux=tmux)
+        run = start_run(
+            command,
+            name=name,
+            use_tmux=tmux,
+            use_container=container,
+            container_image=image,
+            container_memory=memory,
+            container_cpus=cpus,
+        )
         typer.secho(
             f"Started run '{run['name']}' (PID {run['pid']})", fg=typer.colors.GREEN
         )
         typer.echo(f"  Command: {run['command']}")
-        if tmux and run.get("tmux_session"):
+
+        if container and run.get("container_id"):
+            typer.echo(f"  Container ID: {run['container_id']}")
+            typer.echo(f"  Image: {image}")
+            if memory:
+                typer.echo(f"  Memory limit: {memory}")
+            if cpus:
+                typer.echo(f"  CPU limit: {cpus}")
+        elif tmux and run.get("tmux_session"):
             typer.echo(f"  Tmux session: {run['tmux_session']}")
             typer.echo(f"  Attach: tmux attach-session -t {run['tmux_session']}")
             typer.echo(f"  Or use: idlergear run attach {run['name']}")
+
         typer.echo(f"  Logs: idlergear run logs {run['name']}")
     except RuntimeError as e:
         typer.secho(str(e), fg=typer.colors.RED)
