@@ -28,6 +28,9 @@ from .modals import (
     CommandPalette,
 )
 
+# Import logging
+from .logging_config import setup_tui_logging, get_logger
+
 
 class KnowledgeOverview(Static):
     """Dashboard showing overview of all knowledge types."""
@@ -46,7 +49,8 @@ class KnowledgeOverview(Static):
 
         lines = [
             "┌─────────────────────────────────────────────┐",
-            "│ [bold cyan]Knowledge Type[/]      [bold yellow]Count[/]   [bold green]Status[/]   │",
+            "│ [bold cyan]Knowledge Type[/]      "
+            "[bold yellow]Count[/]   [bold green]Status[/]   │",
             "├─────────────────────────────────────────────┤",
         ]
 
@@ -130,7 +134,8 @@ class TaskBrowser(Static):
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Label(
-            "📋 Task Browser - [Enter] Edit [s] State [p] Priority [a] Assign [n] New [Space] Select",
+            "📋 Task Browser - [Enter] Edit [s] State [p] Priority "
+            "[a] Assign [n] New [Space] Select",
             classes="header",
         )
         yield DataTable(id="task-table")
@@ -286,7 +291,8 @@ class GapAlerts(Static):
 
         if not gaps:
             content.update(
-                "[green]✅ No knowledge gaps detected!\n\nYour project knowledge base is healthy.[/]"
+                "[green]✅ No knowledge gaps detected!\n\n"
+                "Your project knowledge base is healthy.[/]"
             )
             return
 
@@ -558,6 +564,10 @@ class IdlerGearApp(App):
         super().__init__()
         self.project_root = project_root or Path.cwd()
 
+        # Initialize logging
+        self.logger = setup_tui_logging()
+        self.logger.info(f"TUI initialized for project: {self.project_root}")
+
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Header()
@@ -606,9 +616,11 @@ class IdlerGearApp(App):
 
     def load_stats(self) -> dict[str, Any]:
         """Load knowledge base statistics."""
+        logger = get_logger()
         stats = {}
 
         try:
+            logger.debug("Loading knowledge base statistics")
             from idlergear.backends.registry import get_backend
             from idlergear.config import find_idlergear_root
 
@@ -664,15 +676,16 @@ class IdlerGearApp(App):
 
             # Count graph nodes
             try:
-                from idlergear.graph import GraphDB
+                from idlergear.graph import get_database
 
-                graph = GraphDB()
+                graph = get_database()
                 result = graph.query("MATCH (n) RETURN count(n) AS count")
                 if result:
                     stats["graph_nodes"] = result[0].get("count", 0)
                 else:
                     stats["graph_nodes"] = 0
-            except Exception:
+            except Exception as e:
+                get_logger().debug(f"Failed to count graph nodes: {e}")
                 stats["graph_nodes"] = 0
 
             # Check daemon status
@@ -701,22 +714,32 @@ class IdlerGearApp(App):
                         [g for g in gaps if g.severity == GapSeverity.MEDIUM]
                     ),
                 }
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Failed to detect gaps: {e}")
                 stats["gaps"] = {}
 
         except Exception as e:
+            logger.error(f"Error loading stats: {e}", exc_info=True)
             self.notify(f"Error loading stats: {e}", severity="error")
 
+        logger.info(
+            f"Loaded stats: {stats.get('tasks', 0)} tasks, "
+            f"{stats.get('notes', 0)} notes, "
+            f"{stats.get('graph_nodes', 0)} graph nodes"
+        )
         return stats
 
     def load_tasks(self) -> None:
         """Load tasks into the task browser."""
+        logger = get_logger()
         try:
+            logger.debug("Loading tasks")
             from idlergear.backends.registry import get_backend
             from idlergear.config import find_idlergear_root
 
             root = find_idlergear_root()
             if root is None:
+                logger.warning("No IdlerGear root found")
                 return
 
             task_backend = get_backend("task", project_path=root)
@@ -726,17 +749,23 @@ class IdlerGearApp(App):
             task_browser = self.query_one(TaskBrowser)
             task_browser.tasks = tasks[:50]  # Limit to 50 for performance
 
+            logger.info(f"Loaded {len(tasks[:50])} tasks (of {len(tasks)} total open)")
+
         except Exception as e:
+            logger.error(f"Error loading tasks: {e}", exc_info=True)
             self.notify(f"Error loading tasks: {e}", severity="error")
 
     def load_notes(self) -> None:
         """Load notes into the note browser."""
+        logger = get_logger()
         try:
+            logger.debug("Loading notes")
             from idlergear.backends.registry import get_backend
             from idlergear.config import find_idlergear_root
 
             root = find_idlergear_root()
             if root is None:
+                logger.warning("No IdlerGear root found")
                 return
 
             note_backend = get_backend("note", project_path=root)
@@ -747,20 +776,26 @@ class IdlerGearApp(App):
             note_browser = self.query_one(NoteBrowser)
             note_browser.notes = open_notes[:50]  # Limit to 50 for performance
 
+            logger.info(
+                f"Loaded {len(open_notes[:50])} notes (of {len(open_notes)} total open)"
+            )
+
         except Exception as e:
+            logger.error(f"Error loading notes: {e}", exc_info=True)
             self.notify(f"Error loading notes: {e}", severity="error")
 
     def load_graph(self) -> None:
         """Load knowledge graph structure."""
+        logger = get_logger()
         try:
             from idlergear.config import find_idlergear_root
-            from idlergear.graph import GraphDB
+            from idlergear.graph import get_database
 
             root = find_idlergear_root()
             if root is None:
                 return
 
-            graph = GraphDB()
+            graph = get_database()
 
             tree = self.query_one(Tree)
             tree.clear()
@@ -782,22 +817,29 @@ class IdlerGearApp(App):
                         )
                         tree.root.add_leaf(f"{label_str}: {count} nodes")
 
-            except Exception:
+            except Exception as e:
+                logger.debug(f"Empty graph or error: {e}")
                 tree.root.add_leaf(
                     "(empty - populate with: idlergear graph populate-all)"
                 )
 
+            logger.info("Loaded knowledge graph structure")
+
         except Exception as e:
+            logger.error(f"Error loading graph: {e}", exc_info=True)
             self.notify(f"Error loading graph: {e}", severity="error")
 
     def load_gaps(self) -> None:
         """Load knowledge gaps."""
+        logger = get_logger()
         try:
+            logger.debug("Loading knowledge gaps")
             from idlergear.config import find_idlergear_root
             from idlergear.gap_detector import GapDetector
 
             root = find_idlergear_root()
             if root is None:
+                logger.warning("No IdlerGear root found")
                 return
 
             detector = GapDetector(project_root=root)
@@ -806,14 +848,17 @@ class IdlerGearApp(App):
             gap_alerts = self.query_one(GapAlerts)
             gap_alerts.update_gaps([g.to_dict() for g in gaps])
 
+            logger.info(f"Loaded {len(gaps)} knowledge gaps")
+
         except Exception as e:
+            logger.error(f"Error loading gaps: {e}", exc_info=True)
             self.notify(f"Error loading gaps: {e}", severity="error")
 
     def load_daemon_status(self) -> None:
         """Load daemon status."""
-        import asyncio
+        logger = get_logger()
 
-        async def _load_async() -> dict[str, Any]:
+        async def _load_async() -> None:
             """Async helper to load daemon data."""
             try:
                 from idlergear.config import find_idlergear_root
@@ -821,12 +866,18 @@ class IdlerGearApp(App):
 
                 root = find_idlergear_root()
                 if root is None:
-                    return {"running": False}
+                    status = {"running": False}
+                    daemon_monitor = self.query_one(DaemonMonitor)
+                    daemon_monitor.update_daemon_status(status)
+                    return
 
                 # Check if daemon is running
                 socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
                 if not socket_path.exists():
-                    return {"running": False}
+                    status = {"running": False}
+                    daemon_monitor = self.query_one(DaemonMonitor)
+                    daemon_monitor.update_daemon_status(status)
+                    return
 
                 # Connect and get full status
                 try:
@@ -844,7 +895,7 @@ class IdlerGearApp(App):
 
                     await client.disconnect()
 
-                    return {
+                    status = {
                         "running": True,
                         "pid": daemon_status.get("pid", "unknown"),
                         "uptime": daemon_status.get("uptime", "unknown"),
@@ -853,28 +904,30 @@ class IdlerGearApp(App):
                         "queue": queue,
                     }
 
+                    daemon_monitor = self.query_one(DaemonMonitor)
+                    daemon_monitor.update_daemon_status(status)
+
                 except Exception as e:
                     # Daemon socket exists but can't connect
-                    return {
+                    logger.warning(f"Failed to connect to daemon: {e}")
+                    status = {
                         "running": False,
                         "error": str(e),
                     }
+                    daemon_monitor = self.query_one(DaemonMonitor)
+                    daemon_monitor.update_daemon_status(status)
 
             except Exception as e:
-                return {
+                logger.error(f"Error loading daemon status: {e}", exc_info=True)
+                status = {
                     "running": False,
                     "error": str(e),
                 }
+                daemon_monitor = self.query_one(DaemonMonitor)
+                daemon_monitor.update_daemon_status(status)
 
-        try:
-            # Run async function in event loop
-            status = asyncio.run(_load_async())
-
-            daemon_monitor = self.query_one(DaemonMonitor)
-            daemon_monitor.update_daemon_status(status)
-
-        except Exception as e:
-            self.notify(f"Error loading daemon status: {e}", severity="error")
+        # Use run_worker to execute async code without blocking
+        self.run_worker(_load_async(), exclusive=False)
 
     def action_refresh(self) -> None:
         """Refresh all data."""
@@ -929,6 +982,7 @@ class IdlerGearApp(App):
 
     async def action_edit_task(self) -> None:
         """Edit the selected task."""
+        logger = get_logger()
         try:
             task_browser = self.query_one(TaskBrowser)
             task = task_browser.get_selected_task()
@@ -937,6 +991,7 @@ class IdlerGearApp(App):
                 self.notify("No task selected", severity="warning")
                 return
 
+            logger.info(f"Opening edit modal for task #{task.get('id')}")
             result = await self.push_screen(TaskEditModal(task), wait_for_dismiss=True)
 
             if result:
@@ -947,12 +1002,17 @@ class IdlerGearApp(App):
                     backend = get_backend("task", project_path=self.project_root)
                     backend.update(task_id=result["id"], **result)
 
+                    logger.info(f"Task #{result['id']} updated: {result.get('title')}")
                     self.notify(f"Task #{result['id']} updated", severity="information")
                     self.action_refresh()
                 except Exception as e:
+                    logger.error(f"Failed to update task: {e}", exc_info=True)
                     self.notify(f"Failed to update task: {e}", severity="error")
+            else:
+                logger.debug("Task edit cancelled")
 
         except Exception as e:
+            logger.error(f"Error editing task: {e}", exc_info=True)
             self.notify(f"Error editing task: {e}", severity="error")
 
     def action_toggle_selection(self) -> None:
@@ -1036,6 +1096,7 @@ class IdlerGearApp(App):
 
     async def action_create_task(self) -> None:
         """Create a new task."""
+        logger = get_logger()
         try:
             new_task = {
                 "title": "",
@@ -1045,6 +1106,7 @@ class IdlerGearApp(App):
                 "labels": [],
             }
 
+            logger.info("Opening task creation modal")
             result = await self.push_screen(
                 TaskEditModal(new_task), wait_for_dismiss=True
             )
@@ -1071,17 +1133,24 @@ class IdlerGearApp(App):
                             state=result.get("state"),
                         )
 
+                    logger.info(f"Task #{task_id} created: {result.get('title')}")
                     self.notify(f"Task #{task_id} created", severity="information")
                     self.action_refresh()
                 except Exception as e:
+                    logger.error(f"Failed to create task: {e}", exc_info=True)
                     self.notify(f"Failed to create task: {e}", severity="error")
+            else:
+                logger.debug("Task creation cancelled")
 
         except Exception as e:
+            logger.error(f"Error creating task: {e}", exc_info=True)
             self.notify(f"Error creating task: {e}", severity="error")
 
     async def action_create_reference(self) -> None:
         """Create a new reference document."""
+        logger = get_logger()
         try:
+            logger.info("Opening reference creation modal")
             result = await self.push_screen(ReferenceEditModal(), wait_for_dismiss=True)
 
             if result:
@@ -1095,14 +1164,19 @@ class IdlerGearApp(App):
                         tags=result.get("tags", []),
                     )
 
+                    logger.info(f"Reference created: {result['title']}")
                     self.notify(
                         f"Reference '{result['title']}' created", severity="information"
                     )
                     self.action_refresh()
                 except Exception as e:
+                    logger.error(f"Failed to create reference: {e}", exc_info=True)
                     self.notify(f"Failed to create reference: {e}", severity="error")
+            else:
+                logger.debug("Reference creation cancelled")
 
         except Exception as e:
+            logger.error(f"Error creating reference: {e}", exc_info=True)
             self.notify(f"Error creating reference: {e}", severity="error")
 
     async def action_create_note(self) -> None:
@@ -1114,6 +1188,7 @@ class IdlerGearApp(App):
 
     async def action_broadcast_message(self) -> None:
         """Broadcast message to all agents."""
+        logger = get_logger()
         try:
             # Get active agents
             from idlergear.config import find_idlergear_root
@@ -1121,29 +1196,37 @@ class IdlerGearApp(App):
 
             root = find_idlergear_root()
             if not root:
+                logger.warning("Not in IdlerGear project")
                 self.notify("Not in IdlerGear project", severity="error")
                 return
 
             socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
             if not socket_path.exists():
+                logger.warning("Daemon not running")
                 self.notify("Daemon not running", severity="warning")
                 return
 
+            logger.debug("Connecting to daemon for message broadcast")
             client = DaemonClient(socket_path)
             await client.connect()
             agents = await client.list_agents()
 
             if not agents:
                 await client.disconnect()
+                logger.warning("No active agents to send message to")
                 self.notify("No active agents", severity="warning")
                 return
 
+            logger.info(f"Opening message modal for {len(agents)} agents")
             result = await self.push_screen(MessageModal(agents), wait_for_dismiss=True)
 
             if result:
                 message = result.get("message")
                 priority = result.get("priority", "normal")
 
+                logger.info(
+                    f"Broadcasting {priority} priority message: {message[:50]}..."
+                )
                 await client.broadcast_message(
                     message=message,
                     event_type="high_priority" if priority == "high" else "message",
@@ -1153,17 +1236,21 @@ class IdlerGearApp(App):
 
                 recipient = result.get("recipient")
                 if recipient == "all":
+                    logger.info(f"Message broadcast to {len(agents)} agents")
                     self.notify(
                         "Message broadcast to all agents", severity="information"
                     )
                 else:
+                    logger.info(f"Message sent to agent {recipient[:8]}")
                     self.notify(
                         f"Message sent to {recipient[:8]}", severity="information"
                     )
             else:
+                logger.debug("Message broadcast cancelled")
                 await client.disconnect()
 
         except Exception as e:
+            logger.error(f"Error broadcasting message: {e}", exc_info=True)
             self.notify(f"Error broadcasting message: {e}", severity="error")
 
     async def action_send_message(self) -> None:
