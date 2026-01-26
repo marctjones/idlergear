@@ -13,6 +13,7 @@ from textual.widgets import (
     DataTable,
     Footer,
     Header,
+    Input,
     Label,
     Static,
     TabbedContent,
@@ -135,13 +136,18 @@ class TaskBrowser(Static):
 
     tasks: reactive[list[dict[str, Any]]] = reactive([])
     selected_tasks: reactive[set[int]] = reactive(set())
+    filter_text: reactive[str] = reactive("")
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Label(
             "📋 Task Browser - [Enter] Edit [s] State [p] Priority "
-            "[a] Assign [n] New [Space] Select",
+            "[a] Assign [n] New [Space] Select [f] Filter",
             classes="header",
+        )
+        yield Input(
+            placeholder="Filter tasks by title, labels, state, priority...",
+            id="task-filter",
         )
         yield DataTable(id="task-table")
 
@@ -152,12 +158,55 @@ class TaskBrowser(Static):
         table.cursor_type = "row"
         table.zebra_stripes = True
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle filter input changes."""
+        if event.input.id == "task-filter":
+            self.filter_text = event.value.lower()
+            self.watch_tasks(self.tasks)
+
+    def watch_filter_text(self, filter_text: str) -> None:
+        """Re-render tasks when filter changes."""
+        self.watch_tasks(self.tasks)
+
+    def _matches_filter(self, task: dict[str, Any]) -> bool:
+        """Check if task matches the current filter."""
+        if not self.filter_text:
+            return True
+
+        filter_terms = self.filter_text.lower()
+
+        # Search in title
+        if filter_terms in task.get("title", "").lower():
+            return True
+
+        # Search in labels
+        labels = " ".join(task.get("labels", [])).lower()
+        if filter_terms in labels:
+            return True
+
+        # Search in state
+        if filter_terms in task.get("state", "").lower():
+            return True
+
+        # Search in priority
+        if filter_terms in task.get("priority", "").lower():
+            return True
+
+        # Search in ID
+        if filter_terms in str(task.get("id", "")):
+            return True
+
+        return False
+
     def watch_tasks(self, tasks: list[dict[str, Any]]) -> None:
         """Update task display when tasks change."""
         table = self.query_one("#task-table", DataTable)
         table.clear()
 
-        for task in tasks:
+        # Apply filter
+        filtered_tasks = [task for task in tasks if self._matches_filter(task)]
+
+        for task in filtered_tasks:
             task_id = task.get("id", "")
             is_selected = task_id in self.selected_tasks
 
@@ -207,12 +256,17 @@ class NoteBrowser(Static):
     """Browse notes and explorations."""
 
     notes: reactive[list[dict[str, Any]]] = reactive([])
+    filter_text: reactive[str] = reactive("")
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Label(
-            "📝 Notes & Explorations - [Enter] View [p] Promote [n] New [x] Delete",
+            "📝 Notes & Explorations - [Enter] View [p] Promote [n] New [x] Delete [f] Filter",
             classes="header",
+        )
+        yield Input(
+            placeholder="Filter notes by content, tags, type...",
+            id="note-filter",
         )
         yield DataTable(id="note-table")
 
@@ -223,12 +277,57 @@ class NoteBrowser(Static):
         table.cursor_type = "row"
         table.zebra_stripes = True
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle filter input changes."""
+        if event.input.id == "note-filter":
+            self.filter_text = event.value.lower()
+            self.watch_notes(self.notes)
+
+    def watch_filter_text(self, filter_text: str) -> None:
+        """Re-render notes when filter changes."""
+        self.watch_notes(self.notes)
+
+    def _matches_filter(self, note: dict[str, Any]) -> bool:
+        """Check if note matches the current filter."""
+        if not self.filter_text:
+            return True
+
+        filter_terms = self.filter_text.lower()
+
+        # Search in content (title or body)
+        content = note.get("title", "") or note.get("body", "")
+        if filter_terms in content.lower():
+            return True
+
+        # Search in tags
+        labels = note.get("labels", [])
+        tags = " ".join(
+            [label.replace("tag:", "") for label in labels if label.startswith("tag:")]
+        )
+        if filter_terms in tags.lower():
+            return True
+
+        # Search by type (explore or note)
+        if "explore" in filter_terms and "tag:explore" in labels:
+            return True
+        if "note" in filter_terms and "tag:explore" not in labels:
+            return True
+
+        # Search in ID
+        if filter_terms in str(note.get("id", "")):
+            return True
+
+        return False
+
     def watch_notes(self, notes: list[dict[str, Any]]) -> None:
         """Update note display when notes change."""
         table = self.query_one("#note-table", DataTable)
         table.clear()
 
-        for note in notes:
+        # Apply filter
+        filtered_notes = [note for note in notes if self._matches_filter(note)]
+
+        for note in filtered_notes:
             content = note.get("title", "") or note.get("body", "")
             preview = content[:50] + "..." if len(content) > 50 else content
 
@@ -541,6 +640,8 @@ class IdlerGearApp(App):
         Binding("d", "show_daemon", "Daemon"),
         Binding("t", "show_tasks", "Tasks"),
         Binding("n", "show_notes", "Notes"),
+        # Search/filter
+        Binding("f", "focus_filter", "Filter", show=False),
         # Task actions (context-sensitive)
         Binding("enter", "edit_task", "Edit Task", show=False),
         Binding("space", "toggle_selection", "Select", show=False),
@@ -963,6 +1064,28 @@ class IdlerGearApp(App):
         """Switch to notes tab."""
         tabs = self.query_one("#main-tabs", TabbedContent)
         tabs.active = "notes-tab"
+
+    def action_focus_filter(self) -> None:
+        """Focus on the filter input for current tab."""
+        logger = get_logger()
+        try:
+            tabs = self.query_one("#main-tabs", TabbedContent)
+
+            if tabs.active == "tasks-tab":
+                # Focus on task filter
+                task_filter = self.query_one("#task-filter", Input)
+                task_filter.focus()
+            elif tabs.active == "notes-tab":
+                # Focus on note filter
+                note_filter = self.query_one("#note-filter", Input)
+                note_filter.focus()
+            else:
+                # No filter on this tab
+                self.notify("No filter available on this tab", severity="warning")
+
+        except Exception as e:
+            logger.error(f"Failed to focus filter: {e}", exc_info=True)
+            self.notify(f"Error focusing filter: {e}", severity="error")
 
     async def action_command_palette(self) -> None:
         """Show command palette for quick actions."""
