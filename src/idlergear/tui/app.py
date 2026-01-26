@@ -367,37 +367,37 @@ class NoteBrowser(Static):
         return None
 
 
-class KnowledgeGraph(Static):
-    """Visualize knowledge graph structure."""
+class KnowledgeExplorer(Static):
+    """Comprehensive knowledge browser showing all IdlerGear knowledge."""
 
     filter_text: reactive[str] = reactive("")
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Label(
-            "🕸️  Knowledge Graph Explorer - [f] Filter [Enter] Expand [r] Refresh",
+            "🔍 Knowledge Explorer - [f] Filter [Enter] Expand [e] Edit [a] Annotate [r] Refresh",
             classes="header",
         )
         yield Input(
-            placeholder="Filter by node type, name, or property...",
-            id="graph-filter",
+            placeholder="Filter by any knowledge type, content, or metadata...",
+            id="knowledge-filter",
         )
-        yield Tree("Knowledge Graph")
+        yield Tree("Knowledge Base")
 
     def on_mount(self) -> None:
-        """Initialize the graph tree."""
+        """Initialize the knowledge tree."""
         tree = self.query_one(Tree)
         tree.show_root = True
         tree.show_guides = True
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
-        if event.input.id == "graph-filter":
+        if event.input.id == "knowledge-filter":
             self.filter_text = event.value.lower()
-            # Trigger graph reload via app
+            # Trigger knowledge reload via app
             app = self.app
-            if hasattr(app, "load_graph"):
-                app.load_graph()
+            if hasattr(app, "load_knowledge_explorer"):
+                app.load_knowledge_explorer()
 
 
 class GapAlerts(Static):
@@ -712,8 +712,8 @@ class IdlerGearApp(App):
                 yield TaskBrowser()
             with TabPane("Notes", id="notes-tab"):
                 yield NoteBrowser()
-            with TabPane("Graph", id="graph-tab"):
-                yield KnowledgeGraph()
+            with TabPane("Knowledge", id="knowledge-tab"):
+                yield KnowledgeExplorer()
             with TabPane("Gaps", id="gaps-tab"):
                 yield GapAlerts()
             with TabPane("Daemon", id="daemon-tab"):
@@ -740,8 +740,8 @@ class IdlerGearApp(App):
         # Load notes
         self.load_notes()
 
-        # Load knowledge graph
-        self.load_graph()
+        # Load knowledge explorer
+        self.load_knowledge_explorer()
 
         # Load gaps
         self.load_gaps()
@@ -920,142 +920,254 @@ class IdlerGearApp(App):
             logger.error(f"Error loading notes: {e}", exc_info=True)
             self.notify(f"Error loading notes: {e}", severity="error")
 
-    def load_graph(self) -> None:
-        """Load knowledge graph structure with enhanced visualization."""
+    def load_knowledge_explorer(self) -> None:
+        """Load comprehensive knowledge view showing all IdlerGear knowledge."""
         logger = get_logger()
         try:
             from idlergear.config import find_idlergear_root
-            from idlergear.graph import get_database
+            from idlergear.backends.registry import get_backend
 
             root = find_idlergear_root()
             if root is None:
                 return
 
-            graph = get_database()
-
-            # Get filter text from graph widget
-            graph_widget = self.query_one(KnowledgeGraph)
-            filter_text = graph_widget.filter_text
+            # Get filter text from knowledge explorer widget
+            knowledge_widget = self.query_one(KnowledgeExplorer)
+            filter_text = knowledge_widget.filter_text
 
             tree = self.query_one(Tree)
             tree.clear()
-            tree.root.label = "Knowledge Graph"
+            tree.root.label = "📚 Knowledge Base"
 
-            # Add node type branches with actual nodes
+            def matches_filter(text: str) -> bool:
+                """Check if text matches filter."""
+                if not filter_text:
+                    return True
+                return filter_text in text.lower()
+
+            # 1. TASKS - Organized by priority and state
             try:
-                # Get all node types
-                type_result = graph.execute(
-                    "MATCH (n) RETURN DISTINCT labels(n) AS labels, count(n) AS count ORDER BY count DESC"
-                )
+                task_backend = get_backend("task", project_path=root)
+                all_tasks = task_backend.list()
 
-                type_rows = type_result.get_as_df()
+                tasks_branch = tree.root.add("📋 Tasks", expand=True)
 
-                if len(type_rows) == 0:
-                    tree.root.add_leaf(
-                        "(empty - populate with: idlergear graph populate-all)"
-                    )
-                    return
+                # Group by priority
+                priority_groups = {
+                    "critical": [],
+                    "high": [],
+                    "medium": [],
+                    "low": [],
+                    "backlog": [],
+                }
+                for task in all_tasks:
+                    if task.get("state") != "completed":
+                        priority = task.get("priority", "medium")
+                        if priority in priority_groups:
+                            priority_groups[priority].append(task)
 
-                for _, type_row in type_rows.iterrows():
-                    labels = type_row["labels"]
-                    total_count = type_row["count"]
+                for priority in ["critical", "high", "medium", "low", "backlog"]:
+                    tasks_in_priority = priority_groups[priority]
+                    if tasks_in_priority:
+                        priority_icon = {
+                            "critical": "🔴",
+                            "high": "🟠",
+                            "medium": "🟡",
+                            "low": "🟢",
+                            "backlog": "⚪",
+                        }.get(priority, "⚫")
 
-                    if not labels:
-                        continue
-
-                    label_str = labels[0] if isinstance(labels, list) else str(labels)
-
-                    # Apply filter to node type
-                    if filter_text and filter_text not in label_str.lower():
-                        # Check if any nodes of this type match the filter
-                        node_result = graph.execute(
-                            f"MATCH (n:{label_str}) WHERE "
-                            "toLower(toString(n.name)) CONTAINS $filter OR "
-                            "toLower(toString(n.title)) CONTAINS $filter OR "
-                            "toLower(toString(n.file_path)) CONTAINS $filter "
-                            "RETURN n LIMIT 100",
-                            {"filter": filter_text},
-                        )
-                        node_rows = node_result.get_as_df()
-                        if len(node_rows) == 0:
-                            continue  # Skip this type if no matches
-
-                    # Create branch for this node type
-                    type_branch = tree.root.add(
-                        f"{label_str} ({total_count} nodes)", expand=False
-                    )
-
-                    # Get sample nodes of this type (limit to 50 for performance)
-                    limit = 50
-                    query = f"MATCH (n:{label_str})"
-
-                    # Apply filter if present
-                    if filter_text:
-                        query += (
-                            " WHERE toLower(toString(n.name)) CONTAINS $filter OR "
-                            "toLower(toString(n.title)) CONTAINS $filter OR "
-                            "toLower(toString(n.file_path)) CONTAINS $filter "
-                            "OR toLower(toString(n.message)) CONTAINS $filter"
+                        priority_branch = tasks_branch.add(
+                            f"{priority_icon} {priority.title()} ({len(tasks_in_priority)} tasks)",
+                            expand=False,
                         )
 
-                    query += f" RETURN n LIMIT {limit}"
+                        for task in tasks_in_priority[:20]:  # Limit to 20 per priority
+                            title = task.get("title", "Untitled")
+                            if not matches_filter(title):
+                                continue
 
-                    params = {"filter": filter_text} if filter_text else {}
-                    node_result = graph.execute(query, params)
-                    node_rows = node_result.get_as_df()
+                            state = task.get("state", "open")
+                            state_icon = {
+                                "open": "○",
+                                "in_progress": "◐",
+                                "in_review": "◑",
+                                "blocked": "⊗",
+                                "completed": "●",
+                            }.get(state, "○")
 
-                    # Add each node as a leaf with relevant properties
-                    for _, node_row in node_rows.iterrows():
-                        node = node_row["n"]
+                            labels = task.get("labels", [])
+                            label_str = f" [{', '.join(labels[:2])}]" if labels else ""
 
-                        # Extract key properties based on node type
-                        if hasattr(node, "name"):
-                            node_label = f"📦 {node.name}"
-                        elif hasattr(node, "title"):
-                            title = (
-                                node.title[:50] + "..."
-                                if len(node.title) > 50
-                                else node.title
+                            title_preview = (
+                                title[:60] + "..." if len(title) > 60 else title
                             )
-                            node_label = f"📄 {title}"
-                        elif hasattr(node, "file_path"):
-                            path_parts = node.file_path.split("/")
-                            short_path = (
-                                "/".join(path_parts[-2:])
-                                if len(path_parts) > 2
-                                else node.file_path
+                            priority_branch.add_leaf(
+                                f"{state_icon} #{task.get('id')} {title_preview}{label_str}"
                             )
-                            node_label = f"📁 {short_path}"
-                        elif hasattr(node, "message"):
-                            msg = (
-                                node.message[:50] + "..."
-                                if len(node.message) > 50
-                                else node.message
-                            )
-                            node_label = f"💬 {msg}"
-                        else:
-                            # Fallback to any available property
-                            props = dict(node)
-                            first_prop = next(iter(props.items()), ("id", "unknown"))
-                            node_label = f"{first_prop[0]}: {str(first_prop[1])[:50]}"
-
-                        # Add node ID if available
-                        if hasattr(node, "id"):
-                            node_label += f" (#{node.id})"
-
-                        type_branch.add_leaf(node_label)
-
-                    # Show if more nodes exist
-                    if total_count > limit:
-                        type_branch.add_leaf(f"... ({total_count - limit} more nodes)")
 
             except Exception as e:
-                logger.debug(f"Empty graph or error: {e}")
-                tree.root.add_leaf(
-                    "(empty - populate with: idlergear graph populate-all)"
-                )
+                logger.debug(f"Error loading tasks: {e}")
+                tree.root.add_leaf("📋 Tasks (error loading)")
 
-            logger.info("Loaded knowledge graph structure")
+            # 2. NOTES - Organized by tags/type
+            try:
+                note_backend = get_backend("note", project_path=root)
+                all_notes = note_backend.list()
+
+                open_notes = [n for n in all_notes if n.get("state") != "closed"]
+
+                if open_notes:
+                    notes_branch = tree.root.add(
+                        f"📝 Notes & Explorations ({len(open_notes)})", expand=False
+                    )
+
+                    # Group by tag
+                    explores = [
+                        n for n in open_notes if "tag:explore" in n.get("labels", [])
+                    ]
+                    ideas = [n for n in open_notes if "tag:idea" in n.get("labels", [])]
+                    other_notes = [
+                        n
+                        for n in open_notes
+                        if "tag:explore" not in n.get("labels", [])
+                        and "tag:idea" not in n.get("labels", [])
+                    ]
+
+                    if explores:
+                        explore_branch = notes_branch.add(
+                            f"🔍 Explorations ({len(explores)})", expand=False
+                        )
+                        for note in explores[:15]:
+                            content = note.get("title", "") or note.get("body", "")
+                            if not matches_filter(content):
+                                continue
+                            preview = (
+                                content[:60] + "..." if len(content) > 60 else content
+                            )
+                            explore_branch.add_leaf(f"#{note.get('id')} {preview}")
+
+                    if ideas:
+                        ideas_branch = notes_branch.add(
+                            f"💡 Ideas ({len(ideas)})", expand=False
+                        )
+                        for note in ideas[:15]:
+                            content = note.get("title", "") or note.get("body", "")
+                            if not matches_filter(content):
+                                continue
+                            preview = (
+                                content[:60] + "..." if len(content) > 60 else content
+                            )
+                            ideas_branch.add_leaf(f"#{note.get('id')} {preview}")
+
+                    if other_notes:
+                        other_branch = notes_branch.add(
+                            f"📝 Other Notes ({len(other_notes)})", expand=False
+                        )
+                        for note in other_notes[:15]:
+                            content = note.get("title", "") or note.get("body", "")
+                            if not matches_filter(content):
+                                continue
+                            preview = (
+                                content[:60] + "..." if len(content) > 60 else content
+                            )
+                            other_branch.add_leaf(f"#{note.get('id')} {preview}")
+
+            except Exception as e:
+                logger.debug(f"Error loading notes: {e}")
+
+            # 3. REFERENCES - Documentation
+            try:
+                ref_backend = get_backend("reference", project_path=root)
+                references = ref_backend.list()
+
+                if references:
+                    ref_branch = tree.root.add(
+                        f"📖 References ({len(references)})", expand=False
+                    )
+                    for ref in references[:30]:
+                        title = ref.get("title", "Untitled")
+                        if not matches_filter(title):
+                            continue
+                        ref_branch.add_leaf(f"📄 {title}")
+
+            except Exception as e:
+                logger.debug(f"Error loading references: {e}")
+
+            # 4. VISION & PLANS
+            try:
+                vision_file = root / "VISION.md"
+                if vision_file.exists():
+                    tree.root.add_leaf("🎯 Vision: Defined")
+                else:
+                    tree.root.add_leaf(
+                        "🎯 Vision: [yellow]Not Set (run: idlergear vision edit)[/]"
+                    )
+            except Exception as e:
+                logger.debug(f"Error checking vision: {e}")
+
+            # 5. FILE ANNOTATIONS
+            try:
+                from idlergear.file_registry import FileRegistry
+
+                registry = FileRegistry(root)
+                annotated_files = registry.list_files()
+
+                if annotated_files:
+                    files_branch = tree.root.add(
+                        f"📁 Annotated Files ({len(annotated_files)})", expand=False
+                    )
+                    for file_info in annotated_files[:30]:
+                        file_path = file_info.get("path", "unknown")
+                        if not matches_filter(file_path):
+                            continue
+                        desc = file_info.get("description", "")
+                        desc_preview = desc[:40] + "..." if len(desc) > 40 else desc
+                        files_branch.add_leaf(f"📄 {file_path}: {desc_preview}")
+
+            except Exception as e:
+                logger.debug(f"Error loading file annotations: {e}")
+
+            # 6. GRAPH NODES - Neo4j data
+            try:
+                from idlergear.graph import get_database
+
+                graph = get_database()
+
+                # Count graph nodes
+                result = graph.execute("MATCH (n) RETURN count(n) AS count")
+                rows = result.get_as_df()
+                node_count = int(rows.iloc[0]["count"]) if len(rows) > 0 else 0
+
+                if node_count > 0:
+                    graph_branch = tree.root.add(
+                        f"🕸️  Graph Database ({node_count} nodes)", expand=False
+                    )
+
+                    # Get node type summary
+                    type_result = graph.execute(
+                        "MATCH (n) RETURN labels(n) AS labels, count(n) AS count ORDER BY count DESC LIMIT 10"
+                    )
+                    type_rows = type_result.get_as_df()
+
+                    for _, type_row in type_rows.iterrows():
+                        labels = type_row["labels"]
+                        count = type_row["count"]
+                        if labels:
+                            label_str = (
+                                labels[0] if isinstance(labels, list) else str(labels)
+                            )
+                            graph_branch.add_leaf(f"{label_str}: {count} nodes")
+                else:
+                    tree.root.add_leaf(
+                        "🕸️  Graph Database: [yellow]Empty (run: idlergear graph populate-all)[/]"
+                    )
+
+            except Exception as e:
+                logger.debug(f"Error loading graph: {e}")
+                tree.root.add_leaf("🕸️  Graph Database: [yellow]Not available[/]")
+
+            logger.info("Loaded comprehensive knowledge explorer")
 
         except Exception as e:
             logger.error(f"Error loading graph: {e}", exc_info=True)
@@ -1227,8 +1339,8 @@ class IdlerGearApp(App):
                         "knowledge.reference_created",
                         "knowledge.reference_updated",
                     ]:
-                        # Refresh graph
-                        self.app.load_graph()
+                        # Refresh knowledge explorer
+                        self.app.load_knowledge_explorer()
                         self.app.notify(
                             "References updated by another agent",
                             severity="information",
@@ -1236,8 +1348,8 @@ class IdlerGearApp(App):
                         )
 
                     elif method == "knowledge.graph_updated":
-                        # Refresh graph
-                        self.app.load_graph()
+                        # Refresh knowledge explorer
+                        self.app.load_knowledge_explorer()
                         self.app.notify(
                             "Knowledge graph updated", severity="information", timeout=2
                         )
@@ -1311,10 +1423,10 @@ class IdlerGearApp(App):
                 # Focus on note filter
                 note_filter = self.query_one("#note-filter", Input)
                 note_filter.focus()
-            elif tabs.active == "graph-tab":
-                # Focus on graph filter
-                graph_filter = self.query_one("#graph-filter", Input)
-                graph_filter.focus()
+            elif tabs.active == "knowledge-tab":
+                # Focus on knowledge filter
+                knowledge_filter = self.query_one("#knowledge-filter", Input)
+                knowledge_filter.focus()
             else:
                 # No filter on this tab
                 self.notify("No filter available on this tab", severity="warning")
