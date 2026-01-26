@@ -369,9 +369,18 @@ class NoteBrowser(Static):
 class KnowledgeGraph(Static):
     """Visualize knowledge graph structure."""
 
+    filter_text: reactive[str] = reactive("")
+
     def compose(self) -> ComposeResult:
         """Create child widgets."""
-        yield Label("🕸️  Knowledge Graph Explorer", classes="header")
+        yield Label(
+            "🕸️  Knowledge Graph Explorer - [f] Filter [Enter] Expand [r] Refresh",
+            classes="header",
+        )
+        yield Input(
+            placeholder="Filter by node type, name, or property...",
+            id="graph-filter",
+        )
         yield Tree("Knowledge Graph")
 
     def on_mount(self) -> None:
@@ -379,6 +388,15 @@ class KnowledgeGraph(Static):
         tree = self.query_one(Tree)
         tree.show_root = True
         tree.show_guides = True
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle filter input changes."""
+        if event.input.id == "graph-filter":
+            self.filter_text = event.value.lower()
+            # Trigger graph reload via app
+            app = self.app
+            if hasattr(app, "load_graph"):
+                app.load_graph()
 
 
 class GapAlerts(Static):
@@ -895,7 +913,7 @@ class IdlerGearApp(App):
             self.notify(f"Error loading notes: {e}", severity="error")
 
     def load_graph(self) -> None:
-        """Load knowledge graph structure."""
+        """Load knowledge graph structure with enhanced visualization."""
         logger = get_logger()
         try:
             from idlergear.config import find_idlergear_root
@@ -907,26 +925,121 @@ class IdlerGearApp(App):
 
             graph = get_database()
 
+            # Get filter text from graph widget
+            graph_widget = self.query_one(KnowledgeGraph)
+            filter_text = graph_widget.filter_text
+
             tree = self.query_one(Tree)
             tree.clear()
             tree.root.label = "Knowledge Graph"
 
-            # Add node type branches
+            # Add node type branches with actual nodes
             try:
-                # Count each node type
-                result = graph.execute(
-                    "MATCH (n) RETURN labels(n) AS labels, count(n) AS count"
+                # Get all node types
+                type_result = graph.execute(
+                    "MATCH (n) RETURN DISTINCT labels(n) AS labels, count(n) AS count ORDER BY count DESC"
                 )
 
-                rows = result.get_as_df()
-                for _, row in rows.iterrows():
-                    labels = row["labels"]
-                    count = row["count"]
-                    if labels:
-                        label_str = (
-                            labels[0] if isinstance(labels, list) else str(labels)
+                type_rows = type_result.get_as_df()
+
+                if len(type_rows) == 0:
+                    tree.root.add_leaf(
+                        "(empty - populate with: idlergear graph populate-all)"
+                    )
+                    return
+
+                for _, type_row in type_rows.iterrows():
+                    labels = type_row["labels"]
+                    total_count = type_row["count"]
+
+                    if not labels:
+                        continue
+
+                    label_str = labels[0] if isinstance(labels, list) else str(labels)
+
+                    # Apply filter to node type
+                    if filter_text and filter_text not in label_str.lower():
+                        # Check if any nodes of this type match the filter
+                        node_result = graph.execute(
+                            f"MATCH (n:{label_str}) WHERE "
+                            "toLower(toString(n.name)) CONTAINS $filter OR "
+                            "toLower(toString(n.title)) CONTAINS $filter OR "
+                            "toLower(toString(n.file_path)) CONTAINS $filter "
+                            "RETURN n LIMIT 100",
+                            {"filter": filter_text},
                         )
-                        tree.root.add_leaf(f"{label_str}: {count} nodes")
+                        node_rows = node_result.get_as_df()
+                        if len(node_rows) == 0:
+                            continue  # Skip this type if no matches
+
+                    # Create branch for this node type
+                    type_branch = tree.root.add(
+                        f"{label_str} ({total_count} nodes)", expand=False
+                    )
+
+                    # Get sample nodes of this type (limit to 50 for performance)
+                    limit = 50
+                    query = f"MATCH (n:{label_str})"
+
+                    # Apply filter if present
+                    if filter_text:
+                        query += (
+                            " WHERE toLower(toString(n.name)) CONTAINS $filter OR "
+                            "toLower(toString(n.title)) CONTAINS $filter OR "
+                            "toLower(toString(n.file_path)) CONTAINS $filter "
+                            "OR toLower(toString(n.message)) CONTAINS $filter"
+                        )
+
+                    query += f" RETURN n LIMIT {limit}"
+
+                    params = {"filter": filter_text} if filter_text else {}
+                    node_result = graph.execute(query, params)
+                    node_rows = node_result.get_as_df()
+
+                    # Add each node as a leaf with relevant properties
+                    for _, node_row in node_rows.iterrows():
+                        node = node_row["n"]
+
+                        # Extract key properties based on node type
+                        if hasattr(node, "name"):
+                            node_label = f"📦 {node.name}"
+                        elif hasattr(node, "title"):
+                            title = (
+                                node.title[:50] + "..."
+                                if len(node.title) > 50
+                                else node.title
+                            )
+                            node_label = f"📄 {title}"
+                        elif hasattr(node, "file_path"):
+                            path_parts = node.file_path.split("/")
+                            short_path = (
+                                "/".join(path_parts[-2:])
+                                if len(path_parts) > 2
+                                else node.file_path
+                            )
+                            node_label = f"📁 {short_path}"
+                        elif hasattr(node, "message"):
+                            msg = (
+                                node.message[:50] + "..."
+                                if len(node.message) > 50
+                                else node.message
+                            )
+                            node_label = f"💬 {msg}"
+                        else:
+                            # Fallback to any available property
+                            props = dict(node)
+                            first_prop = next(iter(props.items()), ("id", "unknown"))
+                            node_label = f"{first_prop[0]}: {str(first_prop[1])[:50]}"
+
+                        # Add node ID if available
+                        if hasattr(node, "id"):
+                            node_label += f" (#{node.id})"
+
+                        type_branch.add_leaf(node_label)
+
+                    # Show if more nodes exist
+                    if total_count > limit:
+                        type_branch.add_leaf(f"... ({total_count - limit} more nodes)")
 
             except Exception as e:
                 logger.debug(f"Empty graph or error: {e}")
@@ -1079,6 +1192,10 @@ class IdlerGearApp(App):
                 # Focus on note filter
                 note_filter = self.query_one("#note-filter", Input)
                 note_filter.focus()
+            elif tabs.active == "graph-tab":
+                # Focus on graph filter
+                graph_filter = self.query_one("#graph-filter", Input)
+                graph_filter.focus()
             else:
                 # No filter on this tab
                 self.notify("No filter available on this tab", severity="warning")
