@@ -20,6 +20,14 @@ from textual.widgets import (
     Tree,
 )
 
+# Import modals
+from .modals import (
+    TaskEditModal,
+    ReferenceEditModal,
+    MessageModal,
+    CommandPalette,
+)
+
 
 class KnowledgeOverview(Static):
     """Dashboard showing overview of all knowledge types."""
@@ -116,33 +124,137 @@ class KnowledgeOverview(Static):
 class TaskBrowser(Static):
     """Browse and filter tasks."""
 
+    tasks: reactive[list[dict[str, Any]]] = reactive([])
+    selected_tasks: reactive[set[int]] = reactive(set())
+
     def compose(self) -> ComposeResult:
         """Create child widgets."""
-        yield Label("📋 Task Browser", classes="header")
+        yield Label(
+            "📋 Task Browser - [Enter] Edit [s] State [p] Priority [a] Assign [n] New [Space] Select",
+            classes="header",
+        )
         yield DataTable(id="task-table")
 
     def on_mount(self) -> None:
         """Set up the task table."""
         table = self.query_one("#task-table", DataTable)
-        table.add_columns("ID", "Title", "Priority", "State", "Labels")
+        table.add_columns("✓", "ID", "Title", "Priority", "State", "Labels")
         table.cursor_type = "row"
         table.zebra_stripes = True
+
+    def watch_tasks(self, tasks: list[dict[str, Any]]) -> None:
+        """Update task display when tasks change."""
+        table = self.query_one("#task-table", DataTable)
+        table.clear()
+
+        for task in tasks:
+            task_id = task.get("id", "")
+            is_selected = task_id in self.selected_tasks
+
+            priority = task.get("priority", "medium")
+            priority_icon = {
+                "critical": "🔴",
+                "high": "🟠",
+                "medium": "🟡",
+                "low": "🟢",
+                "backlog": "⚪",
+            }.get(priority, "⚫")
+
+            labels = task.get("labels", [])
+            labels_str = ", ".join(labels[:3])
+            if len(labels) > 3:
+                labels_str += f" (+{len(labels) - 3})"
+
+            table.add_row(
+                "☑" if is_selected else "☐",
+                str(task_id),
+                task.get("title", ""),
+                f"{priority_icon} {priority}",
+                task.get("state", "open"),
+                labels_str,
+            )
+
+    def get_selected_task(self) -> dict[str, Any] | None:
+        """Get the currently highlighted task."""
+        table = self.query_one("#task-table", DataTable)
+        if table.cursor_row < len(self.tasks):
+            return self.tasks[table.cursor_row]
+        return None
+
+    def toggle_selection(self) -> None:
+        """Toggle selection of current task."""
+        task = self.get_selected_task()
+        if task:
+            task_id = task.get("id")
+            if task_id in self.selected_tasks:
+                self.selected_tasks.remove(task_id)
+            else:
+                self.selected_tasks.add(task_id)
+            self.watch_tasks(self.tasks)  # Refresh display
 
 
 class NoteBrowser(Static):
     """Browse notes and explorations."""
 
+    notes: reactive[list[dict[str, Any]]] = reactive([])
+
     def compose(self) -> ComposeResult:
         """Create child widgets."""
-        yield Label("📝 Notes & Explorations", classes="header")
+        yield Label(
+            "📝 Notes & Explorations - [Enter] View [p] Promote [n] New [x] Delete",
+            classes="header",
+        )
         yield DataTable(id="note-table")
 
     def on_mount(self) -> None:
         """Set up the note table."""
         table = self.query_one("#note-table", DataTable)
-        table.add_columns("ID", "Content Preview", "Tags", "Created")
+        table.add_columns("ID", "Type", "Content Preview", "Tags", "Created")
         table.cursor_type = "row"
         table.zebra_stripes = True
+
+    def watch_notes(self, notes: list[dict[str, Any]]) -> None:
+        """Update note display when notes change."""
+        table = self.query_one("#note-table", DataTable)
+        table.clear()
+
+        for note in notes:
+            content = note.get("title", "") or note.get("body", "")
+            preview = content[:50] + "..." if len(content) > 50 else content
+
+            labels = [
+                label for label in note.get("labels", []) if label.startswith("tag:")
+            ]
+            tags = ", ".join([label.replace("tag:", "") for label in labels])
+
+            note_type = (
+                "🔍 Explore" if "tag:explore" in note.get("labels", []) else "💡 Note"
+            )
+
+            created = note.get("created", "")
+            if created:
+                try:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                    created = dt.strftime("%Y-%m-%d")
+                except Exception:
+                    pass
+
+            table.add_row(
+                str(note.get("id", "")),
+                note_type,
+                preview,
+                tags,
+                created,
+            )
+
+    def get_selected_note(self) -> dict[str, Any] | None:
+        """Get the currently highlighted note."""
+        table = self.query_one("#note-table", DataTable)
+        if table.cursor_row < len(self.notes):
+            return self.notes[table.cursor_row]
+        return None
 
 
 class KnowledgeGraph(Static):
@@ -408,11 +520,31 @@ class IdlerGearApp(App):
     """
 
     BINDINGS = [
+        # Global actions
         Binding("q", "quit", "Quit", priority=True),
         Binding("r", "refresh", "Refresh"),
+        Binding("/", "command_palette", "Commands"),
+        Binding("?", "help", "Help"),
+        # Navigation
         Binding("g", "show_gaps", "Gaps"),
         Binding("d", "show_daemon", "Daemon"),
-        Binding("?", "help", "Help"),
+        Binding("t", "show_tasks", "Tasks"),
+        Binding("n", "show_notes", "Notes"),
+        # Task actions (context-sensitive)
+        Binding("enter", "edit_task", "Edit Task", show=False),
+        Binding("space", "toggle_selection", "Select", show=False),
+        Binding("s", "change_state", "State", show=False),
+        Binding("p", "change_priority", "Priority", show=False),
+        Binding("a", "assign_agent", "Assign", show=False),
+        Binding("l", "edit_labels", "Labels", show=False),
+        Binding("x", "delete_item", "Delete", show=False),
+        # Creation actions
+        Binding("ctrl+n", "create_task", "New Task"),
+        Binding("ctrl+r", "create_reference", "New Reference"),
+        Binding("ctrl+e", "create_note", "New Note"),
+        # Agent coordination
+        Binding("b", "broadcast_message", "Broadcast", show=False),
+        Binding("m", "send_message", "Message", show=False),
     ]
 
     TITLE = "IdlerGear TUI - Knowledge Base Explorer"
@@ -590,17 +722,9 @@ class IdlerGearApp(App):
             task_backend = get_backend("task", project_path=root)
             tasks = task_backend.list(state="open")
 
-            table = self.query_one("#task-table", DataTable)
-            table.clear()
-
-            for task in tasks[:50]:  # Limit to 50 for performance
-                table.add_row(
-                    str(task.get("id", "")),
-                    task.get("title", "")[:60],
-                    task.get("priority", "")[:10],
-                    task.get("state", ""),
-                    ", ".join(task.get("labels", []))[:30],
-                )
+            # Store tasks in TaskBrowser reactive variable
+            task_browser = self.query_one(TaskBrowser)
+            task_browser.tasks = tasks[:50]  # Limit to 50 for performance
 
         except Exception as e:
             self.notify(f"Error loading tasks: {e}", severity="error")
@@ -618,29 +742,10 @@ class IdlerGearApp(App):
             note_backend = get_backend("note", project_path=root)
             notes = note_backend.list()
 
-            table = self.query_one("#note-table", DataTable)
-            table.clear()
-
-            for note in notes[:50]:
-                if note.get("state") != "open":
-                    continue
-
-                content = note.get("title", "") or note.get("body", "")
-                preview = content[:50] + "..." if len(content) > 50 else content
-
-                labels = [
-                    label
-                    for label in note.get("labels", [])
-                    if label.startswith("tag:")
-                ]
-                tags = ", ".join([label.replace("tag:", "") for label in labels])
-
-                table.add_row(
-                    str(note.get("id", "")),
-                    preview,
-                    tags[:30],
-                    note.get("created_at", "")[:10],
-                )
+            # Filter open notes and store in NoteBrowser reactive variable
+            open_notes = [n for n in notes if n.get("state") == "open"]
+            note_browser = self.query_one(NoteBrowser)
+            note_browser.notes = open_notes[:50]  # Limit to 50 for performance
 
         except Exception as e:
             self.notify(f"Error loading notes: {e}", severity="error")
@@ -785,6 +890,285 @@ class IdlerGearApp(App):
         """Switch to daemon tab."""
         tabs = self.query_one("#main-tabs", TabbedContent)
         tabs.active = "daemon-tab"
+
+    def action_show_tasks(self) -> None:
+        """Switch to tasks tab."""
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = "tasks-tab"
+
+    def action_show_notes(self) -> None:
+        """Switch to notes tab."""
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = "notes-tab"
+
+    async def action_command_palette(self) -> None:
+        """Show command palette for quick actions."""
+        result = await self.push_screen(CommandPalette(), wait_for_dismiss=True)
+        if result:
+            command = result.get("command")
+            if command == "create_task":
+                await self.action_create_task()
+            elif command == "create_reference":
+                await self.action_create_reference()
+            elif command == "create_note":
+                await self.action_create_note()
+            elif command == "assign_task":
+                await self.action_assign_agent()
+            elif command == "broadcast_message":
+                await self.action_broadcast_message()
+            elif command == "set_priority":
+                await self.action_change_priority()
+            elif command == "change_state":
+                await self.action_change_state()
+            elif command == "view_gaps":
+                self.action_show_gaps()
+            elif command == "refresh":
+                self.action_refresh()
+            elif command == "show_daemon":
+                self.action_show_daemon()
+
+    async def action_edit_task(self) -> None:
+        """Edit the selected task."""
+        try:
+            task_browser = self.query_one(TaskBrowser)
+            task = task_browser.get_selected_task()
+
+            if not task:
+                self.notify("No task selected", severity="warning")
+                return
+
+            result = await self.push_screen(TaskEditModal(task), wait_for_dismiss=True)
+
+            if result:
+                # Save task changes
+                try:
+                    from idlergear.backends.registry import get_backend
+
+                    backend = get_backend("task", project_path=self.project_root)
+                    backend.update(task_id=result["id"], **result)
+
+                    self.notify(f"Task #{result['id']} updated", severity="information")
+                    self.action_refresh()
+                except Exception as e:
+                    self.notify(f"Failed to update task: {e}", severity="error")
+
+        except Exception as e:
+            self.notify(f"Error editing task: {e}", severity="error")
+
+    def action_toggle_selection(self) -> None:
+        """Toggle selection of current task."""
+        try:
+            tabs = self.query_one("#main-tabs", TabbedContent)
+            if tabs.active == "tasks-tab":
+                task_browser = self.query_one(TaskBrowser)
+                task_browser.toggle_selection()
+        except Exception as e:
+            self.notify(f"Error toggling selection: {e}", severity="error")
+
+    async def action_change_state(self) -> None:
+        """Change state of selected task(s)."""
+        # Simplified - just show notification for now
+        self.notify("State change - Use Edit (Enter) for now", severity="information")
+
+    async def action_change_priority(self) -> None:
+        """Change priority of selected task(s)."""
+        self.notify(
+            "Priority change - Use Edit (Enter) for now", severity="information"
+        )
+
+    async def action_assign_agent(self) -> None:
+        """Assign task to an AI agent."""
+        try:
+            task_browser = self.query_one(TaskBrowser)
+            task = task_browser.get_selected_task()
+
+            if not task:
+                self.notify("No task selected", severity="warning")
+                return
+
+            # Get active agents
+            from idlergear.config import find_idlergear_root
+            from idlergear.daemon.client import DaemonClient
+
+            root = find_idlergear_root()
+            if not root:
+                self.notify("Not in IdlerGear project", severity="error")
+                return
+
+            socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
+            if not socket_path.exists():
+                self.notify(
+                    "Daemon not running. Start with: idlergear daemon start",
+                    severity="warning",
+                )
+                return
+
+            client = DaemonClient(socket_path)
+            await client.connect()
+            agents = await client.list_agents()
+            await client.disconnect()
+
+            if not agents:
+                self.notify(
+                    "No active agents. Connect an AI assistant first.",
+                    severity="warning",
+                )
+                return
+
+            # For now, just broadcast task assignment
+            agent_names = ", ".join([a.get("agent_type", "unknown") for a in agents])
+            self.notify(
+                f"Task #{task.get('id')} - Available agents: {agent_names}",
+                severity="information",
+            )
+            self.notify("Full assignment UI coming soon", severity="information")
+
+        except Exception as e:
+            self.notify(f"Error assigning task: {e}", severity="error")
+
+    async def action_edit_labels(self) -> None:
+        """Edit labels for selected item."""
+        self.notify("Label editing - Use Edit (Enter) for now", severity="information")
+
+    async def action_delete_item(self) -> None:
+        """Delete selected item."""
+        self.notify("Delete - Use backend commands for now", severity="warning")
+
+    async def action_create_task(self) -> None:
+        """Create a new task."""
+        try:
+            new_task = {
+                "title": "",
+                "body": "",
+                "state": "open",
+                "priority": "medium",
+                "labels": [],
+            }
+
+            result = await self.push_screen(
+                TaskEditModal(new_task), wait_for_dismiss=True
+            )
+
+            if result:
+                try:
+                    from idlergear.backends.registry import get_backend
+
+                    backend = get_backend("task", project_path=self.project_root)
+                    task_id = backend.create(
+                        title=result["title"],
+                        body=result.get("body", ""),
+                        labels=result.get("labels", []),
+                    )
+
+                    # Update priority and state if not defaults
+                    if (
+                        result.get("priority") != "medium"
+                        or result.get("state") != "open"
+                    ):
+                        backend.update(
+                            task_id=task_id,
+                            priority=result.get("priority"),
+                            state=result.get("state"),
+                        )
+
+                    self.notify(f"Task #{task_id} created", severity="information")
+                    self.action_refresh()
+                except Exception as e:
+                    self.notify(f"Failed to create task: {e}", severity="error")
+
+        except Exception as e:
+            self.notify(f"Error creating task: {e}", severity="error")
+
+    async def action_create_reference(self) -> None:
+        """Create a new reference document."""
+        try:
+            result = await self.push_screen(ReferenceEditModal(), wait_for_dismiss=True)
+
+            if result:
+                try:
+                    from idlergear.backends.registry import get_backend
+
+                    backend = get_backend("reference", project_path=self.project_root)
+                    backend.create(
+                        title=result["title"],
+                        content=result["content"],
+                        tags=result.get("tags", []),
+                    )
+
+                    self.notify(
+                        f"Reference '{result['title']}' created", severity="information"
+                    )
+                    self.action_refresh()
+                except Exception as e:
+                    self.notify(f"Failed to create reference: {e}", severity="error")
+
+        except Exception as e:
+            self.notify(f"Error creating reference: {e}", severity="error")
+
+    async def action_create_note(self) -> None:
+        """Create a new note."""
+        self.notify(
+            "Note creation - Use: idlergear note create '<content>'",
+            severity="information",
+        )
+
+    async def action_broadcast_message(self) -> None:
+        """Broadcast message to all agents."""
+        try:
+            # Get active agents
+            from idlergear.config import find_idlergear_root
+            from idlergear.daemon.client import DaemonClient
+
+            root = find_idlergear_root()
+            if not root:
+                self.notify("Not in IdlerGear project", severity="error")
+                return
+
+            socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
+            if not socket_path.exists():
+                self.notify("Daemon not running", severity="warning")
+                return
+
+            client = DaemonClient(socket_path)
+            await client.connect()
+            agents = await client.list_agents()
+
+            if not agents:
+                await client.disconnect()
+                self.notify("No active agents", severity="warning")
+                return
+
+            result = await self.push_screen(MessageModal(agents), wait_for_dismiss=True)
+
+            if result:
+                message = result.get("message")
+                priority = result.get("priority", "normal")
+
+                await client.broadcast_message(
+                    message=message,
+                    event_type="high_priority" if priority == "high" else "message",
+                )
+
+                await client.disconnect()
+
+                recipient = result.get("recipient")
+                if recipient == "all":
+                    self.notify(
+                        "Message broadcast to all agents", severity="information"
+                    )
+                else:
+                    self.notify(
+                        f"Message sent to {recipient[:8]}", severity="information"
+                    )
+            else:
+                await client.disconnect()
+
+        except Exception as e:
+            self.notify(f"Error broadcasting message: {e}", severity="error")
+
+    async def action_send_message(self) -> None:
+        """Send message to specific agent."""
+        await self.action_broadcast_message()  # Use same modal for now
 
     def action_help(self) -> None:
         """Show help message."""
