@@ -8,7 +8,7 @@ from textual import on
 from textual.app import ComposeResult
 from textual.containers import Container, Grid, Vertical
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Select, TextArea, Checkbox
+from textual.widgets import Button, Input, Label, Select, TextArea, Checkbox, Static
 
 
 class TaskEditModal(ModalScreen[dict[str, Any] | None]):
@@ -527,7 +527,11 @@ class NoteViewModal(ModalScreen[dict[str, Any] | None]):
 
             # Show tags
             labels = self.note.get("labels", [])
-            tags = [l.replace("tag:", "") for l in labels if l.startswith("tag:")]
+            tags = [
+                label.replace("tag:", "")
+                for label in labels
+                if label.startswith("tag:")
+            ]
             if tags:
                 yield Label(f"Tags: {', '.join(tags)}")
             else:
@@ -658,3 +662,170 @@ class ConfirmDeleteModal(ModalScreen[bool]):
     def cancel_delete(self) -> None:
         """Cancel deletion."""
         self.dismiss(False)
+
+
+class BulkActionModal(ModalScreen[dict[str, Any] | None]):
+    """Modal for bulk operations on selected tasks."""
+
+    CSS = """
+    BulkActionModal {
+        align: center middle;
+    }
+
+    #dialog {
+        width: 70;
+        height: 25;
+        border: thick $primary 80%;
+        background: $surface;
+        padding: 1 2;
+    }
+
+    #buttons {
+        height: 3;
+        align: center middle;
+    }
+
+    Button {
+        margin: 0 1;
+    }
+
+    .action-grid {
+        height: 15;
+        grid-size: 2 4;
+        grid-gutter: 1;
+    }
+    """
+
+    def __init__(self, selected_count: int) -> None:
+        """Initialize bulk action modal.
+
+        Args:
+            selected_count: Number of selected tasks
+        """
+        super().__init__()
+        self.selected_count = selected_count
+        self.result: dict[str, Any] = {}
+
+    def compose(self) -> ComposeResult:
+        """Create modal widgets."""
+        with Container(id="dialog"):
+            yield Label(
+                f"🔀 Bulk Actions ({self.selected_count} tasks selected)",
+                classes="header",
+            )
+            yield Label("")
+            yield Label("Choose action to apply to all selected tasks:")
+            yield Label("")
+
+            with Grid(classes="action-grid"):
+                yield Button("Change State", id="bulk-state-btn", variant="primary")
+                yield Button(
+                    "Change Priority", id="bulk-priority-btn", variant="primary"
+                )
+                yield Button("Add Labels", id="bulk-labels-btn", variant="default")
+                yield Button("Assign Agent", id="bulk-assign-btn", variant="default")
+                yield Button("Mark Complete", id="bulk-complete-btn", variant="success")
+                yield Button("Delete All", id="bulk-delete-btn", variant="error")
+
+            yield Label("")
+            with Grid(id="buttons"):
+                yield Button("Cancel", variant="default", id="cancel-btn")
+
+    @on(Button.Pressed, "#bulk-state-btn")
+    def bulk_state(self) -> None:
+        """Bulk change state."""
+        self.result = {"action": "state"}
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#bulk-priority-btn")
+    def bulk_priority(self) -> None:
+        """Bulk change priority."""
+        self.result = {"action": "priority"}
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#bulk-labels-btn")
+    def bulk_labels(self) -> None:
+        """Bulk add labels."""
+        self.result = {"action": "labels"}
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#bulk-assign-btn")
+    def bulk_assign(self) -> None:
+        """Bulk assign to agent."""
+        self.result = {"action": "assign"}
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#bulk-complete-btn")
+    def bulk_complete(self) -> None:
+        """Bulk mark as completed."""
+        self.result = {"action": "complete"}
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#bulk-delete-btn")
+    def bulk_delete(self) -> None:
+        """Bulk delete."""
+        self.result = {"action": "delete"}
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel(self) -> None:
+        """Cancel bulk action."""
+        self.dismiss(None)
+
+
+class QuickSelectModal(ModalScreen[str | None]):
+    """Quick selection modal for choosing from a list."""
+
+    CSS = """
+    QuickSelectModal {
+        align: center middle;
+    }
+
+    #dialog {
+        width: 50;
+        height: auto;
+        border: thick $primary 80%;
+        background: $surface;
+        padding: 1 2;
+    }
+
+    .option-grid {
+        height: auto;
+        grid-size: 1;
+        grid-gutter: 1;
+    }
+
+    Button {
+        width: 100%;
+        margin: 0;
+    }
+    """
+
+    def __init__(self, title: str, options: list[tuple[str, str]]) -> None:
+        """Initialize quick select modal.
+
+        Args:
+            title: Modal title
+            options: List of (label, value) tuples
+        """
+        super().__init__()
+        self.modal_title = title
+        self.options = options
+
+    def compose(self) -> ComposeResult:
+        """Create modal widgets."""
+        with Container(id="dialog"):
+            yield Label(self.modal_title, classes="header")
+            yield Label("")
+
+            with Vertical(classes="option-grid"):
+                for label, value in self.options:
+                    yield Button(label, id=f"option-{value}", classes="option-btn")
+
+    @on(Button.Pressed, ".option-btn")
+    def select_option(self, event: Button.Pressed) -> None:
+        """Select an option."""
+        button_id = event.button.id
+        if button_id and button_id.startswith("option-"):
+            value = button_id[7:]  # Remove "option-" prefix
+            self.dismiss(value)

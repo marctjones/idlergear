@@ -29,6 +29,8 @@ from .modals import (
     NoteViewModal,
     NotePromoteModal,
     ConfirmDeleteModal,
+    BulkActionModal,
+    QuickSelectModal,
 )
 
 # Import logging
@@ -551,6 +553,8 @@ class IdlerGearApp(App):
         Binding("ctrl+n", "create_task", "New Task"),
         Binding("ctrl+r", "create_reference", "New Reference"),
         Binding("ctrl+e", "create_note", "New Note"),
+        # Bulk operations
+        Binding("ctrl+b", "bulk_actions", "Bulk Actions", show=False),
         # Agent coordination
         Binding("b", "broadcast_message", "Broadcast", show=False),
         Binding("m", "send_message", "Message", show=False),
@@ -1158,7 +1162,7 @@ class IdlerGearApp(App):
                     note_backend.update(note_id=note_id, state="closed")
 
                     logger.info(f"Note #{note_id} promoted to reference '{title}'")
-                    self.notify(f"Note promoted to reference", severity="information")
+                    self.notify("Note promoted to reference", severity="information")
 
                 self.action_refresh()
 
@@ -1177,18 +1181,7 @@ class IdlerGearApp(App):
                 self.notify("No task selected", severity="warning")
                 return
 
-            # Quick state selector
-            from textual.widgets import Select
-
-            states = [
-                ("Open", "open"),
-                ("In Progress", "in_progress"),
-                ("In Review", "in_review"),
-                ("Completed", "completed"),
-                ("Blocked", "blocked"),
-            ]
-
-            # For now, cycle through states (later add a quick-select modal)
+            # Quick state selector - cycle through states
             current_state = task.get("state", "open")
             state_cycle = ["open", "in_progress", "in_review", "completed", "blocked"]
 
@@ -1539,6 +1532,115 @@ class IdlerGearApp(App):
     async def action_send_message(self) -> None:
         """Send message to specific agent."""
         await self.action_broadcast_message()  # Use same modal for now
+
+    async def action_bulk_actions(self) -> None:
+        """Perform bulk actions on selected tasks."""
+        logger = get_logger()
+        try:
+            task_browser = self.query_one(TaskBrowser)
+            selected = task_browser.selected_tasks
+
+            if not selected:
+                self.notify("No tasks selected", severity="warning")
+                return
+
+            logger.info(f"Opening bulk actions modal for {len(selected)} tasks")
+            result = await self.push_screen(
+                BulkActionModal(len(selected)), wait_for_dismiss=True
+            )
+
+            if result:
+                action = result.get("action")
+
+                from idlergear.backends.registry import get_backend
+
+                backend = get_backend("task", project_path=self.project_root)
+
+                if action == "state":
+                    # Show state selector
+                    new_state = await self.push_screen(
+                        QuickSelectModal(
+                            "Select State",
+                            [
+                                ("Open", "open"),
+                                ("In Progress", "in_progress"),
+                                ("In Review", "in_review"),
+                                ("Completed", "completed"),
+                                ("Blocked", "blocked"),
+                            ],
+                        ),
+                        wait_for_dismiss=True,
+                    )
+                    if new_state:
+                        for task_id in selected:
+                            backend.update(task_id=task_id, state=new_state)
+                        logger.info(
+                            f"Updated {len(selected)} tasks to state={new_state}"
+                        )
+                        self.notify(
+                            f"Updated {len(selected)} tasks", severity="information"
+                        )
+
+                elif action == "priority":
+                    # Show priority selector
+                    new_priority = await self.push_screen(
+                        QuickSelectModal(
+                            "Select Priority",
+                            [
+                                ("🔴 Critical", "critical"),
+                                ("🟠 High", "high"),
+                                ("🟡 Medium", "medium"),
+                                ("🟢 Low", "low"),
+                                ("⚪ Backlog", "backlog"),
+                            ],
+                        ),
+                        wait_for_dismiss=True,
+                    )
+                    if new_priority:
+                        for task_id in selected:
+                            backend.update(task_id=task_id, priority=new_priority)
+                        logger.info(
+                            f"Updated {len(selected)} tasks to priority={new_priority}"
+                        )
+                        self.notify(
+                            f"Updated {len(selected)} tasks", severity="information"
+                        )
+
+                elif action == "complete":
+                    # Mark all as completed
+                    for task_id in selected:
+                        backend.update(task_id=task_id, state="completed")
+                    logger.info(f"Marked {len(selected)} tasks as completed")
+                    self.notify(
+                        f"Marked {len(selected)} tasks as completed",
+                        severity="information",
+                    )
+
+                elif action == "delete":
+                    # Confirm bulk delete
+                    confirmed = await self.push_screen(
+                        ConfirmDeleteModal(
+                            "tasks",
+                            f"{len(selected)}",
+                            f"{len(selected)} selected tasks",
+                        ),
+                        wait_for_dismiss=True,
+                    )
+                    if confirmed:
+                        for task_id in selected:
+                            backend.delete(task_id=task_id)
+                        logger.info(f"Deleted {len(selected)} tasks")
+                        self.notify(
+                            f"Deleted {len(selected)} tasks", severity="information"
+                        )
+
+                # Clear selection and refresh
+                task_browser.selected_tasks = set()
+                self.action_refresh()
+
+        except Exception as e:
+            logger.error(f"Error performing bulk action: {e}", exc_info=True)
+            self.notify(f"Error performing bulk action: {e}", severity="error")
 
     def action_help(self) -> None:
         """Show help message."""

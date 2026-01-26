@@ -21,6 +21,8 @@ from .modals import (
     CommandPalette,
     NoteViewModal,
     ConfirmDeleteModal,
+    BulkActionModal,
+    QuickSelectModal,
 )
 
 __all__ = [
@@ -32,4 +34,6 @@ __all__ = [
     "CommandPalette",
     "NoteViewModal",
     "ConfirmDeleteModal",
+    "BulkActionModal",
+    "QuickSelectModal",
 ]
