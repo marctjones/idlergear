@@ -1,0 +1,70 @@
+# AGENTS.md
+
+This file provides guidance to AI coding assistants working with {{ project_name }}.
+
+## Project Overview
+
+**This project uses IdlerGear for knowledge management.**
+
+IdlerGear provides a **command-based API** for persistent knowledge:
+- Tasks: Actionable work items
+- Notes: Quick thoughts and decisions
+- Vision: Project goals and direction
+- References: Permanent documentation
+- Context: Unified project state
+
+## CRITICAL: Session Start
+
+**ALWAYS run at the start of EVERY session:**
+
+```bash
+idlergear context
+```
+
+This loads project vision, current plan, and open tasks.
+
+## Quick Reference
+
+| Action | Command |
+|--------|---------|
+| Load context | `idlergear context` |
+| Create task | `idlergear task create "description"` |
+| List tasks | `idlergear task list` |
+| Capture note | `idlergear note create "content"` |
+| Check vision | `idlergear vision show` |
+
+## Forbidden Practices
+
+**DO NOT create these files:**
+- ❌ TODO.md, TASKS.md, BACKLOG.md
+- ❌ NOTES.md, SESSION_*.md, SCRATCH.md
+- ❌ Any markdown file for tracking work
+
+**DO NOT write these comments:**
+- ❌ `// TODO: ...`
+- ❌ `# FIXME: ...`
+- ❌ `/* HACK: ... */`
+
+**USE IdlerGear commands instead:**
+- ✅ `idlergear task create "..." --label tech-debt`
+- ✅ `idlergear note create "..."`
+
+## Integrated Assistants
+
+IdlerGear integrates with:
+{% for assistant in assistants %}
+- **{{ assistant.name }}**{% if assistant.supports_mcp %} (MCP support){% endif %}{% if assistant.supports_slash_commands %} (slash commands){% endif %}
+
+{% endfor %}
+
+See assistant-specific files (CLAUDE.md, GEMINI.md, etc.) for detailed integration.
+
+## Data Protection
+
+**NEVER modify `.idlergear/` files directly** - Use CLI commands only
+
+## Learn More
+
+- Run `idlergear --help` for all commands
+- Check project vision: `idlergear vision show`
+- View open tasks: `idlergear task list`

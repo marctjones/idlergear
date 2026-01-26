@@ -1,0 +1,107 @@
+# GEMINI.md
+
+This file provides guidance to Gemini CLI when working with {{ project_name }}.
+
+## CRITICAL: IdlerGear Usage
+
+**{{ project_name }} uses IdlerGear for knowledge management.**
+
+### Session Start (MANDATORY)
+
+**ALWAYS run at the start of EVERY session:**
+
+```bash
+idlergear context --mode detailed
+```
+
+**Use detailed mode!** Gemini 2.0 has a 2M token context window - take advantage of it.
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+### {{ category|category_title }}
+
+{% for skill in skills %}
+- **{{ skill.name }}**: `{{ skill.command }}`
+  - {{ skill.description }}
+  - When: {{ skill.when_to_use }}
+{% endfor %}
+
+{% endfor %}
+
+## Gemini-Specific Features
+
+### Large Context Window (2M tokens!)
+
+Gemini can handle comprehensive context:
+
+```bash
+# Use detailed mode for full project view
+idlergear context --mode detailed  # ~7,000 tokens - no problem!
+
+# Can even use full mode if needed
+idlergear context --mode full  # ~17,000+ tokens
+```
+
+### Multimodal Integration
+
+Gemini can analyze images! Use this for architecture diagrams:
+
+```bash
+# Add architecture diagram as reference
+idlergear reference add "System Architecture" --file docs/architecture.png
+
+# Then ask Gemini: "Analyze the system architecture"
+# Gemini will see and understand the diagram!
+```
+
+### Code Understanding
+
+Gemini excels at cross-file reasoning - great for:
+- Understanding how modules interact
+- Analyzing complex architectures
+- Finding patterns across files
+
+## Context Modes
+
+Since Gemini has a large window, prefer detailed/full modes:
+
+- `--mode minimal`: ~750 tokens (use for quick checks)
+- `--mode standard`: ~2,500 tokens (general work)
+- `--mode detailed`: ~7,000 tokens (**recommended for Gemini!**)
+- `--mode full`: ~17,000+ tokens (comprehensive analysis)
+
+## Forbidden Practices
+
+**DO NOT create:**
+- ❌ TODO.md, NOTES.md, SESSION_*.md
+- ❌ Inline TODO comments
+
+**USE instead:**
+- ✅ `idlergear task create "..."`
+- ✅ `idlergear note create "..."`
+
+## Integration Status
+
+- **MCP Support:** Planned for Q1 2026
+- **Current:** Manual command execution
+- **Future:** Full MCP integration with 60+ tools
+
+## Workflow Example
+
+```bash
+# Morning routine
+idlergear context --mode detailed
+
+# Check architecture diagram
+idlergear reference show "System Architecture"
+# Gemini sees the image!
+
+# Create task
+idlergear task create "Add caching layer" --label enhancement
+
+# End of session
+idlergear note create "Gemini suggested using Redis for session storage - good idea!"
+```
+
+See AGENTS.md for universal guidance.

@@ -1,0 +1,53 @@
+# .cursorrules
+
+## IdlerGear Integration
+
+**{{ project_name }} uses IdlerGear for knowledge management.**
+
+### CRITICAL: Session Start
+
+**ALWAYS run at the start of EVERY session:**
+
+```bash
+idlergear context
+```
+
+## Quick Commands
+
+| Action | Command |
+|--------|---------|
+| Load context | `idlergear context` |
+| Create task | `idlergear task create "description"` |
+| List tasks | `idlergear task list` |
+| Capture note | `idlergear note create "content"` |
+| Check vision | `idlergear vision show` |
+
+## Forbidden Practices
+
+**DO NOT create these files:**
+- ❌ TODO.md, NOTES.md, SESSION_*.md
+
+**DO NOT write these comments:**
+- ❌ `// TODO:`, `# FIXME:`, `/* HACK: */`
+
+**USE IdlerGear instead:**
+- ✅ `idlergear task create "..." --label tech-debt`
+- ✅ `idlergear note create "..."`
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+### {{ category|category_title }}
+{% for skill in skills %}
+- `{{ skill.command }}` - {{ skill.description }}
+{% endfor %}
+
+{% endfor %}
+
+## Integration Status
+
+- **MCP Support:** Coming soon! Cursor plans to add MCP integration
+- **Current:** Manual - you must remember to run commands
+- **Future:** Full automation when MCP arrives
+
+See AGENTS.md for full details.

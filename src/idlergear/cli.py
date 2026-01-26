@@ -1258,6 +1258,7 @@ def install(
     aider: bool = typer.Option(False, "--aider", help="Install for Aider"),
     goose: bool = typer.Option(False, "--goose", help="Install for Goose"),
     cursor: bool = typer.Option(False, "--cursor", help="Install Cursor AI IDE rules"),
+    cline: bool = typer.Option(False, "--cline", help="Install for Cline (VS Code)"),
 ):
     """Install IdlerGear integration for Claude Code (and other assistants).
 
@@ -1434,42 +1435,54 @@ def install(
 
     set_project_version(__version__)
 
-    # Handle multi-assistant installation
-    from idlergear.assistant_install import (
-        Assistant,
-        install_for_assistant,
-        install_for_all,
-    )
+    # Handle multi-assistant installation using template engine
+    from idlergear.template_engine import render_all_assistants
+    from idlergear.skills import ASSISTANTS
 
-    other_assistants = []
+    assistants_to_install = []
+
+    # Note: aider and cursor are handled above with their own modules
+    # Only handle assistants not already processed
     if gemini:
-        other_assistants.append(Assistant.GEMINI)
+        assistants_to_install.append("gemini")
     if copilot:
-        other_assistants.append(Assistant.COPILOT)
-    if codex:
-        other_assistants.append(Assistant.CODEX)
-    if aider:
-        other_assistants.append(Assistant.AIDER)
+        assistants_to_install.append("copilot")
     if goose:
-        other_assistants.append(Assistant.GOOSE)
+        assistants_to_install.append("goose")
+    if codex:
+        assistants_to_install.append("codex")
+    if cline:
+        assistants_to_install.append("cline")
 
     if all_assistants:
-        typer.echo("")
-        typer.secho("Installing for all detected assistants...", fg=typer.colors.CYAN)
-        all_results = install_for_all()
-        for assistant_name, results in all_results.items():
-            if results:
-                typer.secho(f"\n{assistant_name}:", bold=True)
-                report_results(results, "files")
-        if not all_results:
-            typer.echo("No additional AI assistants detected.")
+        # Install for all supported assistants (except those with custom installers)
+        assistants_to_install = [
+            a.id
+            for a in ASSISTANTS
+            if a.id not in ["claude-code", "cursor", "aider"]  # Already handled
+        ]
 
-    elif other_assistants:
+    if assistants_to_install:
         typer.echo("")
-        for assistant in other_assistants:
-            typer.secho(f"\nInstalling for {assistant.value}...", fg=typer.colors.CYAN)
-            results = install_for_assistant(assistant)
-            report_results(results, f"{assistant.value} files")
+        typer.secho("Installing for additional assistants...", fg=typer.colors.CYAN)
+
+        project_path = Path.cwd()
+        try:
+            generated = render_all_assistants(
+                project_path,
+                project_name=project_path.name,
+                assistants=assistants_to_install,
+            )
+
+            for assistant_id, files in generated.items():
+                if files:
+                    typer.secho(f"\n{assistant_id}:", bold=True)
+                    for file_path in files:
+                        typer.secho(
+                            f"  Created {file_path.name}", fg=typer.colors.GREEN
+                        )
+        except Exception as e:
+            typer.secho(f"Error generating assistant files: {e}", fg=typer.colors.RED)
 
     typer.echo("")
     typer.echo("Claude Code will now have access to IdlerGear tools.")
@@ -1479,7 +1492,7 @@ def install(
     )
     typer.echo("Restart Claude Code or run /mcp to verify.")
 
-    if other_assistants or all_assistants:
+    if assistants_to_install or all_assistants:
         typer.echo("")
         typer.echo("Other assistants configured - restart them to activate IdlerGear.")
 
@@ -5487,12 +5500,12 @@ def session_diff(
         )
 
         # Compare timestamps
-        typer.echo(f"\nTime:")
+        typer.echo("\nTime:")
         typer.echo(f"  {session1}: {snap1.timestamp}")
         typer.echo(f"  {session2}: {snap2.timestamp}")
 
         # Compare durations
-        typer.echo(f"\nDuration:")
+        typer.echo("\nDuration:")
         typer.echo(f"  {session1}: {snap1.duration_seconds}s")
         typer.echo(f"  {session2}: {snap2.duration_seconds}s")
 
@@ -5500,7 +5513,7 @@ def session_diff(
         task1 = snap1.state.get("current_task_id")
         task2 = snap2.state.get("current_task_id")
         if task1 != task2:
-            typer.echo(f"\nTask changed:")
+            typer.echo("\nTask changed:")
             typer.echo(f"  {session1}: #{task1}" if task1 else f"  {session1}: None")
             typer.echo(f"  {session2}: #{task2}" if task2 else f"  {session2}: None")
 
@@ -5512,7 +5525,7 @@ def session_diff(
         removed_files = files1 - files2
 
         if added_files or removed_files:
-            typer.echo(f"\nFiles changed:")
+            typer.echo("\nFiles changed:")
             if added_files:
                 typer.secho(f"  Added: {', '.join(added_files)}", fg=typer.colors.GREEN)
             if removed_files:
@@ -5524,7 +5537,7 @@ def session_diff(
         outcome1 = snap1.outcome.get("status")
         outcome2 = snap2.outcome.get("status")
         if outcome1 != outcome2:
-            typer.echo(f"\nOutcome:")
+            typer.echo("\nOutcome:")
             typer.echo(f"  {session1}: {outcome1}")
             typer.echo(f"  {session2}: {outcome2}")
 
@@ -6038,7 +6051,7 @@ def session_harvest(
 
             typer.echo(f"\n💡 Session {session_id} Knowledge:\n")
             typer.echo(f"  Duration: {knowledge['duration_minutes']} minutes")
-            typer.echo(f"  Insights:\n")
+            typer.echo("  Insights:\n")
 
             for insight in knowledge.get("insights", []):
                 typer.echo(f"    • {insight.get('content', '')}")
@@ -6117,7 +6130,7 @@ def session_analyze(
         # Tool usage
         tool_usage = outcome.get("tool_usage", {})
         if tool_usage:
-            typer.echo(f"\n🔧 Tool Usage:")
+            typer.echo("\n🔧 Tool Usage:")
             total_calls = sum(tool_usage.values())
 
             for tool, count in sorted(
@@ -6131,7 +6144,7 @@ def session_analyze(
         tasks_completed = outcome.get("tasks_completed", [])
 
         if tasks_created or tasks_completed:
-            typer.echo(f"\n✅ Tasks:")
+            typer.echo("\n✅ Tasks:")
             if tasks_created:
                 typer.echo(f"  Created: {len(tasks_created)}")
             if tasks_completed:
@@ -10212,7 +10225,7 @@ def file_status(
         typer.secho(f"Components: {', '.join(entry.components)}", fg=typer.colors.BLUE)
 
     if entry.related_files:
-        typer.secho(f"Related files:", fg=typer.colors.YELLOW)
+        typer.secho("Related files:", fg=typer.colors.YELLOW)
         for rf in entry.related_files:
             typer.secho(f"  - {rf}", fg=typer.colors.BRIGHT_BLACK)
 
@@ -10605,7 +10618,7 @@ def file_scan(
 
     # Text output
     typer.secho(
-        f"\n🔍 File Registry Auto-Detection Report",
+        "\n🔍 File Registry Auto-Detection Report",
         fg=typer.colors.BRIGHT_BLUE,
         bold=True,
     )
@@ -10649,7 +10662,7 @@ def file_scan(
                 )
 
             if suggestion.evidence:
-                typer.echo(f"     Evidence:")
+                typer.echo("     Evidence:")
                 for ev in suggestion.evidence:
                     typer.echo(f"       - {ev}")
 
@@ -10803,12 +10816,12 @@ def plugin_status(
             typer.secho(
                 f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True
             )
-            typer.secho(f"  Status: Loaded", fg=typer.colors.GREEN)
+            typer.secho("  Status: Loaded", fg=typer.colors.GREEN)
             typer.secho(
                 f"  Initialized: {plugin.is_initialized()}", fg=typer.colors.WHITE
             )
             typer.secho(f"  Healthy: {plugin.health_check()}", fg=typer.colors.WHITE)
-            typer.secho(f"  Capabilities:", fg=typer.colors.WHITE)
+            typer.secho("  Capabilities:", fg=typer.colors.WHITE)
             for cap in plugin.capabilities():
                 typer.secho(f"    - {cap.value}", fg=typer.colors.WHITE)
         else:
@@ -10818,7 +10831,7 @@ def plugin_status(
             typer.secho(
                 f"\nPlugin: {plugin_name}", fg=typer.colors.BRIGHT_BLUE, bold=True
             )
-            typer.secho(f"  Status: Not loaded", fg=typer.colors.YELLOW)
+            typer.secho("  Status: Not loaded", fg=typer.colors.YELLOW)
             typer.secho(f"  Enabled: {enabled}", fg=typer.colors.WHITE)
             typer.secho(f"  Available: {available}", fg=typer.colors.WHITE)
     else:
@@ -11768,14 +11781,14 @@ def graph_visualize_export(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n✅ Graph exported successfully!", fg=typer.colors.GREEN)
+            typer.secho("\n✅ Graph exported successfully!", fg=typer.colors.GREEN)
             typer.echo(f"Format: {format}")
             typer.echo(f"Nodes: {result['nodes']}")
             typer.echo(f"Edges: {result['edges']}")
             typer.echo(f"Output: {result['output']}")
 
             if "render_command" in result:
-                typer.secho(f"\n💡 Render with:", fg=typer.colors.CYAN)
+                typer.secho("\n💡 Render with:", fg=typer.colors.CYAN)
                 typer.echo(f"  {result['render_command']}")
             typer.echo()
 
@@ -11815,7 +11828,7 @@ def graph_visualize_task(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n✅ Task network exported!", fg=typer.colors.GREEN)
+            typer.secho("\n✅ Task network exported!", fg=typer.colors.GREEN)
             typer.echo(f"Task: #{task_id}")
             typer.echo(f"Nodes: {result['nodes']}")
             typer.echo(f"Edges: {result['edges']}")
@@ -11858,7 +11871,7 @@ def graph_visualize_deps(
         if ctx.obj.get("output_mode") == "json":
             typer.echo(json.dumps(result, indent=2))
         else:
-            typer.secho(f"\n✅ Dependency graph exported!", fg=typer.colors.GREEN)
+            typer.secho("\n✅ Dependency graph exported!", fg=typer.colors.GREEN)
             typer.echo(f"File: {file_path}")
             typer.echo(f"Nodes: {result['nodes']}")
             typer.echo(f"Edges: {result['edges']}")
@@ -12064,7 +12077,7 @@ def knowledge_prune(
             )
 
         if dry_run:
-            typer.echo(f"\n[Dry run - no changes made]")
+            typer.echo("\n[Dry run - no changes made]")
             return
 
         # Confirm before pruning

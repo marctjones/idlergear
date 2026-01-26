@@ -1,0 +1,108 @@
+# Aider + IdlerGear Integration
+
+**{{ project_name }} uses IdlerGear for knowledge management.**
+
+## Session Start
+
+Run this at the start of every session:
+
+```bash
+/run idlergear context
+```
+
+## Using IdlerGear in Aider
+
+Use the `/run` command to execute IdlerGear:
+
+### Common Operations
+
+```bash
+# Load project context
+/run idlergear context
+
+# Create task
+/run idlergear task create "Add authentication"
+
+# List tasks
+/run idlergear task list --preview --limit 10
+
+# Capture note
+/run idlergear note create "Decision: using JWT tokens instead of sessions"
+
+# Check vision
+/run idlergear vision show
+
+# Close completed task
+/run idlergear task close 123
+```
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+### {{ category|category_title }}
+{% for skill in skills %}
+- `{{ skill.command }}` - {{ skill.description }}
+{% endfor %}
+
+{% endfor %}
+
+## Workflow
+
+### 1. Start Session
+```
+/run idlergear context
+```
+
+### 2. Make Changes with Aider
+```
+Add login form validation
+```
+(Aider makes changes and auto-commits)
+
+### 3. Track Work
+```
+/run idlergear task create "Added form validation" --label enhancement
+```
+
+### 4. End Session
+```
+/run idlergear note create "Tomorrow: add password strength meter"
+```
+
+## Integration with Aider Features
+
+### Auto-Commits Work Well
+
+Aider auto-commits all changes. This integrates nicely with IdlerGear:
+- Aider commits the code
+- IdlerGear tracks the work (tasks)
+- Git history shows what happened
+- IdlerGear shows why it happened (vision, tasks)
+
+### Test Command
+
+You can configure Aider to run IdlerGear checks:
+
+```yaml
+# .aider.conf.yml
+test-cmd: echo "Remember to track with IdlerGear!"
+auto-test: false
+```
+
+## Forbidden Practices
+
+**DO NOT create:**
+- ❌ TODO.md, NOTES.md
+- ❌ Inline TODO comments
+
+**USE IdlerGear:**
+- ✅ `/run idlergear task create "..."`
+- ✅ `/run idlergear note create "..."`
+
+## Limitations
+
+- No MCP support yet (use `/run` for all commands)
+- Manual discipline required
+- No automation
+
+See AGENTS.md for universal guidance.

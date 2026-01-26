@@ -1,0 +1,58 @@
+# GitHub Copilot - IdlerGear Integration
+
+**{{ project_name }} uses IdlerGear for knowledge management.**
+
+## Quick Commands
+
+**Always start with:**
+```bash
+idlergear context
+```
+
+**Common commands:**
+- `idlergear task create "description"` - Create task
+- `idlergear task list` - View tasks
+- `idlergear note create "content"` - Capture note
+- `idlergear vision show` - Check project goals
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+### {{ category|category_title }}
+{% for skill in skills %}
+- `{{ skill.command }}` - {{ skill.description }}
+{% endfor %}
+
+{% endfor %}
+
+## Knowledge Management
+
+This project uses IdlerGear for persistent knowledge. Never create:
+- ❌ TODO.md, NOTES.md
+- ❌ Inline TODO comments (`// TODO:`)
+
+Use IdlerGear commands instead:
+- ✅ `idlergear task create "..."`
+- ✅ `idlergear note create "..."`
+
+## Integration Status
+
+- **MCP Support:** Not available yet
+- **Current:** Copilot reads this file for context
+- **Recommendation:** Run IdlerGear commands manually
+
+## Workflow
+
+```bash
+# Morning
+idlergear context
+idlergear task list
+
+# During work
+idlergear task create "Bug: login issue"
+
+# End of day
+idlergear task close 123
+```
+
+See AGENTS.md for full details.

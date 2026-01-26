@@ -1,0 +1,45 @@
+# .goosehints
+
+{{ project_name }} uses IdlerGear for knowledge management.
+
+## Session Start
+
+Run `idlergear context` at the start of every session.
+
+## Quick Reference
+
+- Create task: `idlergear task create "description"`
+- List tasks: `idlergear task list`
+- Capture note: `idlergear note create "content"`
+- Check vision: `idlergear vision show`
+
+## Forbidden
+
+Never create TODO.md or write `// TODO:` comments.
+Use IdlerGear commands instead.
+
+## MCP Integration
+
+IdlerGear can be configured as a Goose extension via MCP.
+See `~/.config/goose/config.yaml`:
+
+```yaml
+extensions:
+  idlergear:
+    type: mcp
+    command: idlergear
+    args:
+      - mcp
+```
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+{{ category|upper }}:
+{% for skill in skills %}
+- {{ skill.command }} - {{ skill.description }}
+{% endfor %}
+
+{% endfor %}
+
+See AGENTS.md for full details.

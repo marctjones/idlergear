@@ -1,0 +1,131 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code when working with {{ project_name }}.
+
+## CRITICAL: IdlerGear Usage
+
+**{{ project_name }} uses IdlerGear for knowledge management.**
+
+### Session Start (MANDATORY)
+
+**ALWAYS run at the start of EVERY session:**
+
+```bash
+idlergear context
+```
+
+This is automated via hooks, but you can also run it manually.
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+### {{ category|category_title }}
+
+{% for skill in skills %}
+**{{ skill.name }}** (`{{ skill.command }}`)
+- **When to use:** {{ skill.when_to_use }}
+- **Examples:**
+{% for example in skill.examples %}
+  - `{{ example }}`
+{% endfor %}
+{% if skill.token_impact == "high-savings" %}
+- ⚡ **Token savings:** 90-98% vs traditional methods
+{% endif %}
+{% if skill.mcp_tool %}
+- **MCP tool:** `{{ skill.mcp_tool }}`
+{% endif %}
+
+{% endfor %}
+{% endfor %}
+
+## Token Efficiency
+
+**IdlerGear provides massive token savings:**
+
+### Knowledge Graph (98% savings!)
+
+Instead of grep + file reads:
+```bash
+# ❌ Traditional (7,500 tokens)
+grep -r "calculate_relevance" && cat file1.py file2.py file3.py
+
+# ✅ Knowledge graph (100 tokens - 98.7% savings!)
+idlergear_graph_query_symbols(pattern="calculate_relevance")
+```
+
+### Context API (90% savings)
+
+Instead of reading multiple files:
+```bash
+# ❌ Reading 5 task files (5,000 tokens)
+cat .idlergear/issues/*.md
+
+# ✅ Context API (750 tokens - 85% savings!)
+idlergear context --mode minimal
+```
+
+### Modes
+
+- `--mode minimal`: ~750 tokens (session start, quick refresh)
+- `--mode standard`: ~2,500 tokens (general development)
+- `--mode detailed`: ~7,000 tokens (deep planning)
+- `--mode full`: ~17,000+ tokens (rare, comprehensive)
+
+## Integration Features
+
+### MCP Tools (60+ tools)
+
+You have access to these IdlerGear MCP tools:
+{% for skill in skills %}
+{% if skill.mcp_tool %}
+- `{{ skill.mcp_tool }}` - {{ skill.description }}
+{% endif %}
+{% endfor %}
+
+### Slash Commands
+
+- `/ig-start` - Run `idlergear context`
+- More commands available in `.claude/commands/`
+
+### Lifecycle Hooks
+
+- **user-prompt-submit**: Auto-runs `idlergear context` at session start
+- **pre-commit**: Blocks TODO comments and forbidden files
+- **post-commit**: Updates knowledge graph
+
+## Forbidden Practices
+
+**DO NOT create:**
+- ❌ TODO.md, NOTES.md, SESSION_*.md
+- ❌ Inline TODO comments
+
+**USE instead:**
+- ✅ `idlergear task create "..." --label tech-debt`
+- ✅ `idlergear note create "..."`
+
+## Workflow
+
+### Morning Routine
+```bash
+idlergear context              # Load project state
+idlergear task list --limit 5  # See top tasks
+# Pick a task and start working
+```
+
+### Bug Discovery
+```bash
+idlergear task create "Bug: description" --label bug
+# Continue fixing
+```
+
+### End of Session
+```bash
+idlergear task close 123       # Close completed task
+idlergear note create "Tomorrow: investigate performance"
+```
+
+## Data Protection
+
+**NEVER modify `.idlergear/` files directly** - Use CLI commands only
+
+See AGENTS.md for universal guidance.

@@ -1,0 +1,77 @@
+# Cline (VS Code) - IdlerGear Integration
+
+**{{ project_name }} uses IdlerGear for knowledge management.**
+
+## Setup
+
+1. Configure MCP in VS Code settings (`.vscode/settings.json`):
+
+```json
+{
+  "cline.mcpServers": {
+    "idlergear": {
+      "command": "idlergear",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+2. Reload VS Code
+
+## Session Start
+
+**Always run at session start:**
+
+```bash
+idlergear context
+```
+
+## MCP Tools Available
+
+You have access to 60+ IdlerGear MCP tools:
+
+{% for skill in skills %}
+{% if skill.mcp_tool %}
+- `{{ skill.mcp_tool }}` - {{ skill.description }}
+{% endif %}
+{% endfor %}
+
+## Available Skills
+
+{% for category, skills in skills_by_category.items() %}
+### {{ category|category_title }}
+{% for skill in skills %}
+- `{{ skill.command }}` - {{ skill.description }}
+{% endfor %}
+
+{% endfor %}
+
+## Token Efficiency
+
+Use knowledge graph for massive savings:
+
+```python
+# Instead of grep + reading files (7,500 tokens)
+idlergear_graph_query_symbols(pattern="function_name")
+# Returns symbol info in ~100 tokens (98% savings!)
+```
+
+## Forbidden Practices
+
+**DO NOT:**
+- ❌ Create TODO.md, NOTES.md files
+- ❌ Write `// TODO:` comments
+
+**USE:**
+- ✅ `idlergear_task_create(title="...")`
+- ✅ `idlergear_note_create(content="...")`
+
+## Workflow
+
+1. Start Cline chat in VS Code
+2. First message: run `idlergear context`
+3. Use MCP tools for all knowledge operations
+4. Cline has direct access - no manual commands needed!
+
+See AGENTS.md for universal guidance.
