@@ -3538,6 +3538,12 @@ This ensures messages don't derail your work - only context ones are shown immed
             description="Get summary of knowledge gaps by severity. Quick health check of knowledge base.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        # Proactive suggestions tool
+        Tool(
+            name="idlergear_get_suggestions",
+            description="Get proactive suggestions for improving the project. CALL AT SESSION START to surface actionable insights. Returns high-priority suggestions like gaps to fix, workflow improvements, and token efficiency tips.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -6755,6 +6761,23 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 else "good"
                 if by_severity["medium"] > 0
                 else "healthy",
+            }
+
+            return _format_result(result)
+
+        elif name == "idlergear_get_suggestions":
+            from idlergear.proactive import get_session_start_suggestions
+            from idlergear.config import find_idlergear_root
+
+            root = find_idlergear_root()
+            if root is None:
+                raise ValueError("Not in an IdlerGear project")
+
+            suggestions = get_session_start_suggestions(project_root=root)
+
+            result = {
+                "total_suggestions": len(suggestions),
+                "suggestions": [s.to_dict() for s in suggestions],
             }
 
             return _format_result(result)
