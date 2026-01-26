@@ -400,52 +400,179 @@ class KnowledgeExplorer(Static):
                 app.load_knowledge_explorer()
 
 
-class GapAlerts(Static):
-    """Show knowledge gap alerts and suggestions."""
+class GapExplorer(Static):
+    """Interactive knowledge gap explorer with actionable suggestions."""
+
+    filter_text: reactive[str] = reactive("")
+    gaps_data: list[dict[str, Any]] = []
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
-        yield Label("⚠️  Knowledge Gaps & Suggestions", classes="header")
-        yield VerticalScroll(Static(id="gaps-content"))
+        yield Label(
+            "⚠️  Knowledge Gaps & Actions - [f] Filter [Enter] Expand [t] Create Task [r] Refresh",
+            classes="header",
+        )
+        yield Input(
+            placeholder="Filter gaps by type, severity, or content...",
+            id="gaps-filter",
+        )
+        yield Tree("Knowledge Gaps")
+
+    def on_mount(self) -> None:
+        """Initialize the gaps tree."""
+        tree = self.query_one(Tree)
+        tree.show_root = True
+        tree.show_guides = True
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle filter input changes."""
+        if event.input.id == "gaps-filter":
+            self.filter_text = event.value.lower()
+            self.update_gaps(self.gaps_data)
 
     def update_gaps(self, gaps: list[dict[str, Any]]) -> None:
-        """Update gap display."""
-        content = self.query_one("#gaps-content", Static)
+        """Update gap display with interactive tree."""
+        self.gaps_data = gaps
+        tree = self.query_one(Tree)
+        tree.clear()
 
         if not gaps:
-            content.update(
-                "[green]✅ No knowledge gaps detected!\n\n"
-                "Your project knowledge base is healthy.[/]"
-            )
+            tree.root.label = "✅ No Knowledge Gaps Detected"
+            tree.root.add_leaf("[green]Your project knowledge base is healthy![/]")
             return
 
-        lines = []
-        for gap in gaps[:10]:  # Show top 10
-            severity = gap.get("severity", "info")
-            message = gap.get("message", "")
-            suggestion = gap.get("suggestion", "")
+        tree.root.label = f"⚠️  {len(gaps)} Knowledge Gaps Detected"
 
-            icon = {
+        def matches_filter(text: str) -> bool:
+            """Check if text matches filter."""
+            if not self.filter_text:
+                return True
+            return self.filter_text in text.lower()
+
+        # Group gaps by severity
+        severity_groups = {
+            "critical": [],
+            "high": [],
+            "medium": [],
+            "low": [],
+            "info": [],
+        }
+
+        for gap in gaps:
+            severity = gap.get("severity", "info")
+            if severity in severity_groups:
+                # Apply filter
+                gap_text = f"{gap.get('message', '')} {gap.get('suggestion', '')} {gap.get('type', '')}"
+                if matches_filter(gap_text):
+                    severity_groups[severity].append(gap)
+
+        # Display each severity group
+        for severity in ["critical", "high", "medium", "low", "info"]:
+            gaps_in_severity = severity_groups[severity]
+            if not gaps_in_severity:
+                continue
+
+            severity_icon = {
                 "critical": "🔴",
                 "high": "🟠",
                 "medium": "🟡",
                 "low": "🔵",
-                "info": "ℹ️ ",
+                "info": "ℹ️",
             }.get(severity, "•")
 
-            color = {
-                "critical": "red",
-                "high": "yellow",
-                "medium": "yellow",
-                "low": "blue",
-                "info": "cyan",
-            }.get(severity, "white")
+            severity_label = severity.title()
+            count = len(gaps_in_severity)
 
-            lines.append(f"{icon} [{color}]{message}[/]")
-            lines.append(f"   → {suggestion}")
-            lines.append("")
+            severity_branch = tree.root.add(
+                f"{severity_icon} {severity_label} ({count} gaps)",
+                expand=(severity in ["critical", "high"]),
+            )
 
-        content.update("\n".join(lines))
+            for gap in gaps_in_severity:
+                gap_type = gap.get("type", "unknown")
+                message = gap.get("message", "Unknown gap")
+                suggestion = gap.get("suggestion", "")
+                context = gap.get("context", {})
+                fixable = gap.get("fixable", False)
+                fix_command = gap.get("fix_command")
+
+                # Shorten message for display
+                message_preview = message[:80] + "..." if len(message) > 80 else message
+
+                # Create gap node
+                gap_node = severity_branch.add(f"📍 {message_preview}", expand=False)
+
+                # Add gap details as children
+                gap_node.add_leaf(f"[bold]Type:[/] {gap_type}")
+
+                if suggestion:
+                    suggestion_lines = suggestion.split("\n")
+                    gap_node.add_leaf(f"[bold]Suggestion:[/] {suggestion_lines[0]}")
+                    for line in suggestion_lines[1:]:
+                        if line.strip():
+                            gap_node.add_leaf(f"  {line}")
+
+                # Add context information
+                if context:
+                    context_node = gap_node.add("[bold]Related:[/]", expand=False)
+
+                    # Show files if available
+                    if "files" in context and context["files"]:
+                        files = context["files"]
+                        if isinstance(files, list):
+                            for file_path in files[:5]:
+                                context_node.add_leaf(f"📄 {file_path}")
+                            if len(files) > 5:
+                                context_node.add_leaf(
+                                    f"  ... and {len(files) - 5} more files"
+                                )
+                        else:
+                            context_node.add_leaf(f"📄 {files}")
+
+                    # Show task IDs if available
+                    if "task_ids" in context and context["task_ids"]:
+                        task_ids = context["task_ids"]
+                        if isinstance(task_ids, list):
+                            for task_id in task_ids[:5]:
+                                context_node.add_leaf(f"📋 Task #{task_id}")
+                        else:
+                            context_node.add_leaf(f"📋 Task #{task_ids}")
+
+                    # Show commits if available
+                    if "commits" in context and context["commits"]:
+                        commits = context["commits"]
+                        if isinstance(commits, list):
+                            for commit in commits[:3]:
+                                commit_msg = (
+                                    commit
+                                    if isinstance(commit, str)
+                                    else commit.get("message", "")
+                                )
+                                short_msg = (
+                                    commit_msg[:60] + "..."
+                                    if len(commit_msg) > 60
+                                    else commit_msg
+                                )
+                                context_node.add_leaf(f"🔀 {short_msg}")
+
+                    # Show count if available
+                    if "count" in context:
+                        context_node.add_leaf(f"Count: {context['count']}")
+
+                # Add actions
+                actions_node = gap_node.add("[bold cyan]Actions:[/]", expand=True)
+
+                if fixable and fix_command:
+                    actions_node.add_leaf(f"✓ [green]Auto-fix:[/] {fix_command}")
+                    actions_node.add_leaf("  [dim](Press Enter to run fix command)[/]")
+                else:
+                    actions_node.add_leaf("• Create task to address this gap")
+                    actions_node.add_leaf("• Add to current context for AI assistant")
+                    actions_node.add_leaf("• Generate fix command suggestion")
+
+                # Add separator
+                if gap != gaps_in_severity[-1]:
+                    gap_node.add_leaf("")
 
 
 class DaemonMonitor(Static):
@@ -715,7 +842,7 @@ class IdlerGearApp(App):
             with TabPane("Knowledge", id="knowledge-tab"):
                 yield KnowledgeExplorer()
             with TabPane("Gaps", id="gaps-tab"):
-                yield GapAlerts()
+                yield GapExplorer()
             with TabPane("Daemon", id="daemon-tab"):
                 yield DaemonMonitor()
         yield Footer()
@@ -1189,8 +1316,8 @@ class IdlerGearApp(App):
             detector = GapDetector(project_root=root)
             gaps = detector.detect_gaps()
 
-            gap_alerts = self.query_one(GapAlerts)
-            gap_alerts.update_gaps([g.to_dict() for g in gaps])
+            gap_explorer = self.query_one(GapExplorer)
+            gap_explorer.update_gaps([g.to_dict() for g in gaps])
 
             logger.info(f"Loaded {len(gaps)} knowledge gaps")
 
@@ -1427,6 +1554,10 @@ class IdlerGearApp(App):
                 # Focus on knowledge filter
                 knowledge_filter = self.query_one("#knowledge-filter", Input)
                 knowledge_filter.focus()
+            elif tabs.active == "gaps-tab":
+                # Focus on gaps filter
+                gaps_filter = self.query_one("#gaps-filter", Input)
+                gaps_filter.focus()
             else:
                 # No filter on this tab
                 self.notify("No filter available on this tab", severity="warning")
