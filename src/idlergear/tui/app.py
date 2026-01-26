@@ -1323,146 +1323,165 @@ class IdlerGearApp(App):
             logger.error(f"Failed to focus filter: {e}", exc_info=True)
             self.notify(f"Error focusing filter: {e}", severity="error")
 
-    async def action_command_palette(self) -> None:
+    def action_command_palette(self) -> None:
         """Show command palette for quick actions."""
-        result = await self.push_screen(CommandPalette(), wait_for_dismiss=True)
-        if result:
-            command = result.get("command")
-            if command == "create_task":
-                await self.action_create_task()
-            elif command == "create_reference":
-                await self.action_create_reference()
-            elif command == "create_note":
-                await self.action_create_note()
-            elif command == "assign_task":
-                await self.action_assign_agent()
-            elif command == "broadcast_message":
-                await self.action_broadcast_message()
-            elif command == "set_priority":
-                await self.action_change_priority()
-            elif command == "change_state":
-                await self.action_change_state()
-            elif command == "view_gaps":
-                self.action_show_gaps()
-            elif command == "refresh":
-                self.action_refresh()
-            elif command == "show_daemon":
-                self.action_show_daemon()
 
-    async def action_edit_task(self) -> None:
+        async def _show_palette() -> None:
+            """Async helper to show command palette."""
+            result = await self.push_screen(CommandPalette(), wait_for_dismiss=True)
+            if result:
+                command = result.get("command")
+                if command == "create_task":
+                    await self.action_create_task()
+                elif command == "create_reference":
+                    await self.action_create_reference()
+                elif command == "create_note":
+                    await self.action_create_note()
+                elif command == "assign_task":
+                    await self.action_assign_agent()
+                elif command == "broadcast_message":
+                    await self.action_broadcast_message()
+                elif command == "set_priority":
+                    await self.action_change_priority()
+                elif command == "change_state":
+                    await self.action_change_state()
+                elif command == "view_gaps":
+                    self.action_show_gaps()
+                elif command == "refresh":
+                    self.action_refresh()
+                elif command == "show_daemon":
+                    self.action_show_daemon()
+
+        self.run_worker(_show_palette(), exclusive=False)
+
+    def action_edit_task(self) -> None:
         """Edit the selected task or note (context-sensitive)."""
-        logger = get_logger()
-        try:
-            tabs = self.query_one("#main-tabs", TabbedContent)
 
-            if tabs.active == "tasks-tab":
-                # Edit task
-                task_browser = self.query_one(TaskBrowser)
-                task = task_browser.get_selected_task()
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                tabs = self.query_one("#main-tabs", TabbedContent)
 
-                if not task:
-                    self.notify("No task selected", severity="warning")
-                    return
+                if tabs.active == "tasks-tab":
+                    # Edit task
+                    task_browser = self.query_one(TaskBrowser)
+                    task = task_browser.get_selected_task()
 
-                logger.info(f"Opening edit modal for task #{task.get('id')}")
-                result = await self.push_screen(
-                    TaskEditModal(task), wait_for_dismiss=True
-                )
+                    if not task:
+                        self.notify("No task selected", severity="warning")
+                        return
 
-                if result:
-                    try:
-                        from idlergear.backends.registry import get_backend
+                    logger.info(f"Opening edit modal for task #{task.get('id')}")
+                    result = await self.push_screen(
+                        TaskEditModal(task), wait_for_dismiss=True
+                    )
 
-                        backend = get_backend("task", project_path=self.project_root)
-                        backend.update(task_id=result["id"], **result)
-
-                        logger.info(
-                            f"Task #{result['id']} updated: {result.get('title')}"
-                        )
-                        self.notify(
-                            f"Task #{result['id']} updated", severity="information"
-                        )
-                        self.action_refresh()
-                    except Exception as e:
-                        logger.error(f"Failed to update task: {e}", exc_info=True)
-                        self.notify(f"Failed to update task: {e}", severity="error")
-                else:
-                    logger.debug("Task edit cancelled")
-
-            elif tabs.active == "notes-tab":
-                # View/edit note
-                note_browser = self.query_one(NoteBrowser)
-                note = note_browser.get_selected_note()
-
-                if not note:
-                    self.notify("No note selected", severity="warning")
-                    return
-
-                logger.info(f"Opening view/edit modal for note #{note.get('id')}")
-                result = await self.push_screen(
-                    NoteViewModal(note, editable=True), wait_for_dismiss=True
-                )
-
-                if result:
-                    action = result.get("action")
-
-                    if action == "save":
-                        # Save note edits
+                    if result:
                         try:
                             from idlergear.backends.registry import get_backend
 
                             backend = get_backend(
-                                "note", project_path=self.project_root
+                                "task", project_path=self.project_root
                             )
-                            backend.update(note_id=result["id"], body=result["content"])
+                            backend.update(task_id=result["id"], **result)
 
-                            logger.info(f"Note #{result['id']} updated")
+                            logger.info(
+                                f"Task #{result['id']} updated: {result.get('title')}"
+                            )
                             self.notify(
-                                f"Note #{result['id']} updated", severity="information"
+                                f"Task #{result['id']} updated", severity="information"
                             )
                             self.action_refresh()
                         except Exception as e:
-                            logger.error(f"Failed to update note: {e}", exc_info=True)
-                            self.notify(f"Failed to update note: {e}", severity="error")
+                            logger.error(f"Failed to update task: {e}", exc_info=True)
+                            self.notify(f"Failed to update task: {e}", severity="error")
+                    else:
+                        logger.debug("Task edit cancelled")
 
-                    elif action == "promote":
-                        # Handle note promotion
-                        await self._handle_note_promotion(note)
+                elif tabs.active == "notes-tab":
+                    # View/edit note
+                    note_browser = self.query_one(NoteBrowser)
+                    note = note_browser.get_selected_note()
 
-                    elif action == "delete":
-                        # Handle note deletion
-                        confirmed = await self.push_screen(
-                            ConfirmDeleteModal(
-                                "note", result["id"], result.get("content", "")
-                            ),
-                            wait_for_dismiss=True,
-                        )
-                        if confirmed:
+                    if not note:
+                        self.notify("No note selected", severity="warning")
+                        return
+
+                    logger.info(f"Opening view/edit modal for note #{note.get('id')}")
+                    result = await self.push_screen(
+                        NoteViewModal(note, editable=True), wait_for_dismiss=True
+                    )
+
+                    if result:
+                        action = result.get("action")
+
+                        if action == "save":
+                            # Save note edits
                             try:
                                 from idlergear.backends.registry import get_backend
 
                                 backend = get_backend(
                                     "note", project_path=self.project_root
                                 )
-                                backend.delete(note_id=result["id"])
+                                backend.update(
+                                    note_id=result["id"], body=result["content"]
+                                )
 
-                                logger.info(f"Note #{result['id']} deleted")
+                                logger.info(f"Note #{result['id']} updated")
                                 self.notify(
-                                    f"Note #{result['id']} deleted",
+                                    f"Note #{result['id']} updated",
                                     severity="information",
                                 )
                                 self.action_refresh()
                             except Exception as e:
                                 logger.error(
-                                    f"Failed to delete note: {e}", exc_info=True
+                                    f"Failed to update note: {e}", exc_info=True
                                 )
                                 self.notify(
-                                    f"Failed to delete note: {e}", severity="error"
+                                    f"Failed to update note: {e}", severity="error"
                                 )
 
-        except Exception as e:
-            logger.error(f"Error editing item: {e}", exc_info=True)
-            self.notify(f"Error editing item: {e}", severity="error")
+                        elif action == "promote":
+                            # Handle note promotion
+                            await self._handle_note_promotion(note)
+
+                        elif action == "delete":
+                            # Handle note deletion
+                            confirmed = await self.push_screen(
+                                ConfirmDeleteModal(
+                                    "note", result["id"], result.get("content", "")
+                                ),
+                                wait_for_dismiss=True,
+                            )
+                            if confirmed:
+                                try:
+                                    from idlergear.backends.registry import get_backend
+
+                                    backend = get_backend(
+                                        "note", project_path=self.project_root
+                                    )
+                                    backend.delete(note_id=result["id"])
+
+                                    logger.info(f"Note #{result['id']} deleted")
+                                    self.notify(
+                                        f"Note #{result['id']} deleted",
+                                        severity="information",
+                                    )
+                                    self.action_refresh()
+                                except Exception as e:
+                                    logger.error(
+                                        f"Failed to delete note: {e}", exc_info=True
+                                    )
+                                    self.notify(
+                                        f"Failed to delete note: {e}", severity="error"
+                                    )
+
+            except Exception as e:
+                logger.error(f"Error editing item: {e}", exc_info=True)
+                self.notify(f"Error editing item: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
 
     def action_toggle_selection(self) -> None:
         """Toggle selection of current task."""
@@ -1529,148 +1548,13 @@ class IdlerGearApp(App):
             logger.error(f"Error promoting note: {e}", exc_info=True)
             self.notify(f"Error promoting note: {e}", severity="error")
 
-    async def action_change_state(self) -> None:
+    def action_change_state(self) -> None:
         """Change state of selected task(s) without full edit modal."""
-        logger = get_logger()
-        try:
-            task_browser = self.query_one(TaskBrowser)
-            task = task_browser.get_selected_task()
 
-            if not task:
-                self.notify("No task selected", severity="warning")
-                return
-
-            # Quick state selector - cycle through states
-            current_state = task.get("state", "open")
-            state_cycle = ["open", "in_progress", "in_review", "completed", "blocked"]
-
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
             try:
-                current_idx = state_cycle.index(current_state)
-                next_idx = (current_idx + 1) % len(state_cycle)
-                new_state = state_cycle[next_idx]
-            except ValueError:
-                new_state = "open"
-
-            from idlergear.backends.registry import get_backend
-
-            backend = get_backend("task", project_path=self.project_root)
-            backend.update(task_id=task.get("id"), state=new_state)
-
-            logger.info(
-                f"Task #{task.get('id')} state changed: {current_state} → {new_state}"
-            )
-            self.notify(
-                f"Task state: {current_state} → {new_state}", severity="information"
-            )
-            self.action_refresh()
-
-        except Exception as e:
-            logger.error(f"Error changing state: {e}", exc_info=True)
-            self.notify(f"Error changing state: {e}", severity="error")
-
-    async def action_change_priority(self) -> None:
-        """Change priority of selected task(s) without full edit modal."""
-        logger = get_logger()
-        try:
-            task_browser = self.query_one(TaskBrowser)
-            task = task_browser.get_selected_task()
-
-            if not task:
-                self.notify("No task selected", severity="warning")
-                return
-
-            # Quick priority cycling
-            current_priority = task.get("priority", "medium")
-            priority_cycle = ["critical", "high", "medium", "low", "backlog"]
-
-            try:
-                current_idx = priority_cycle.index(current_priority)
-                next_idx = (current_idx + 1) % len(priority_cycle)
-                new_priority = priority_cycle[next_idx]
-            except ValueError:
-                new_priority = "medium"
-
-            from idlergear.backends.registry import get_backend
-
-            backend = get_backend("task", project_path=self.project_root)
-            backend.update(task_id=task.get("id"), priority=new_priority)
-
-            logger.info(
-                f"Task #{task.get('id')} priority changed: "
-                f"{current_priority} → {new_priority}"
-            )
-            self.notify(
-                f"Task priority: {current_priority} → {new_priority}",
-                severity="information",
-            )
-            self.action_refresh()
-
-        except Exception as e:
-            logger.error(f"Error changing priority: {e}", exc_info=True)
-            self.notify(f"Error changing priority: {e}", severity="error")
-
-    async def action_assign_agent(self) -> None:
-        """Assign task to an AI agent."""
-        try:
-            task_browser = self.query_one(TaskBrowser)
-            task = task_browser.get_selected_task()
-
-            if not task:
-                self.notify("No task selected", severity="warning")
-                return
-
-            # Get active agents
-            from idlergear.config import find_idlergear_root
-            from idlergear.daemon.client import DaemonClient
-
-            root = find_idlergear_root()
-            if not root:
-                self.notify("Not in IdlerGear project", severity="error")
-                return
-
-            socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
-            if not socket_path.exists():
-                self.notify(
-                    "Daemon not running. Start with: idlergear daemon start",
-                    severity="warning",
-                )
-                return
-
-            client = DaemonClient(socket_path)
-            await client.connect()
-            agents = await client.list_agents()
-            await client.disconnect()
-
-            if not agents:
-                self.notify(
-                    "No active agents. Connect an AI assistant first.",
-                    severity="warning",
-                )
-                return
-
-            # For now, just broadcast task assignment
-            agent_names = ", ".join([a.get("agent_type", "unknown") for a in agents])
-            self.notify(
-                f"Task #{task.get('id')} - Available agents: {agent_names}",
-                severity="information",
-            )
-            self.notify("Full assignment UI coming soon", severity="information")
-
-        except Exception as e:
-            self.notify(f"Error assigning task: {e}", severity="error")
-
-    async def action_edit_labels(self) -> None:
-        """Edit labels for selected item."""
-        self.notify("Label editing - Use Edit (Enter) for now", severity="information")
-
-    async def action_delete_item(self) -> None:
-        """Delete selected item (task or note based on active tab)."""
-        logger = get_logger()
-        try:
-            tabs = self.query_one("#main-tabs", TabbedContent)
-
-            if tabs.active == "tasks-tab":
-                # Delete task
                 task_browser = self.query_one(TaskBrowser)
                 task = task_browser.get_selected_task()
 
@@ -1678,328 +1562,537 @@ class IdlerGearApp(App):
                     self.notify("No task selected", severity="warning")
                     return
 
-                task_id = task.get("id")
-                task_title = task.get("title", "")
+                # Quick state selector - cycle through states
+                current_state = task.get("state", "open")
+                state_cycle = [
+                    "open",
+                    "in_progress",
+                    "in_review",
+                    "completed",
+                    "blocked",
+                ]
 
-                # Show confirmation
-                confirmed = await self.push_screen(
-                    ConfirmDeleteModal("task", task_id, task_title),
-                    wait_for_dismiss=True,
-                )
-
-                if confirmed:
-                    from idlergear.backends.registry import get_backend
-
-                    backend = get_backend("task", project_path=self.project_root)
-                    backend.delete(task_id=task_id)
-
-                    logger.info(f"Task #{task_id} deleted: {task_title}")
-                    self.notify(f"Task #{task_id} deleted", severity="information")
-                    self.action_refresh()
-
-            elif tabs.active == "notes-tab":
-                # Delete note
-                note_browser = self.query_one(NoteBrowser)
-                note = note_browser.get_selected_note()
-
-                if not note:
-                    self.notify("No note selected", severity="warning")
-                    return
-
-                note_id = note.get("id")
-                note_content = note.get("body", "") or note.get("title", "")
-
-                # Show confirmation
-                confirmed = await self.push_screen(
-                    ConfirmDeleteModal("note", note_id, note_content),
-                    wait_for_dismiss=True,
-                )
-
-                if confirmed:
-                    from idlergear.backends.registry import get_backend
-
-                    backend = get_backend("note", project_path=self.project_root)
-                    backend.delete(note_id=note_id)
-
-                    logger.info(f"Note #{note_id} deleted")
-                    self.notify(f"Note #{note_id} deleted", severity="information")
-                    self.action_refresh()
-
-        except Exception as e:
-            logger.error(f"Error deleting item: {e}", exc_info=True)
-            self.notify(f"Error deleting item: {e}", severity="error")
-
-    async def action_create_task(self) -> None:
-        """Create a new task."""
-        logger = get_logger()
-        try:
-            new_task = {
-                "title": "",
-                "body": "",
-                "state": "open",
-                "priority": "medium",
-                "labels": [],
-            }
-
-            logger.info("Opening task creation modal")
-            result = await self.push_screen(
-                TaskEditModal(new_task), wait_for_dismiss=True
-            )
-
-            if result:
                 try:
-                    from idlergear.backends.registry import get_backend
-
-                    backend = get_backend("task", project_path=self.project_root)
-                    task_id = backend.create(
-                        title=result["title"],
-                        body=result.get("body", ""),
-                        labels=result.get("labels", []),
-                    )
-
-                    # Update priority and state if not defaults
-                    if (
-                        result.get("priority") != "medium"
-                        or result.get("state") != "open"
-                    ):
-                        backend.update(
-                            task_id=task_id,
-                            priority=result.get("priority"),
-                            state=result.get("state"),
-                        )
-
-                    logger.info(f"Task #{task_id} created: {result.get('title')}")
-                    self.notify(f"Task #{task_id} created", severity="information")
-                    self.action_refresh()
-                except Exception as e:
-                    logger.error(f"Failed to create task: {e}", exc_info=True)
-                    self.notify(f"Failed to create task: {e}", severity="error")
-            else:
-                logger.debug("Task creation cancelled")
-
-        except Exception as e:
-            logger.error(f"Error creating task: {e}", exc_info=True)
-            self.notify(f"Error creating task: {e}", severity="error")
-
-    async def action_create_reference(self) -> None:
-        """Create a new reference document."""
-        logger = get_logger()
-        try:
-            logger.info("Opening reference creation modal")
-            result = await self.push_screen(ReferenceEditModal(), wait_for_dismiss=True)
-
-            if result:
-                try:
-                    from idlergear.backends.registry import get_backend
-
-                    backend = get_backend("reference", project_path=self.project_root)
-                    backend.create(
-                        title=result["title"],
-                        content=result["content"],
-                        tags=result.get("tags", []),
-                    )
-
-                    logger.info(f"Reference created: {result['title']}")
-                    self.notify(
-                        f"Reference '{result['title']}' created", severity="information"
-                    )
-                    self.action_refresh()
-                except Exception as e:
-                    logger.error(f"Failed to create reference: {e}", exc_info=True)
-                    self.notify(f"Failed to create reference: {e}", severity="error")
-            else:
-                logger.debug("Reference creation cancelled")
-
-        except Exception as e:
-            logger.error(f"Error creating reference: {e}", exc_info=True)
-            self.notify(f"Error creating reference: {e}", severity="error")
-
-    async def action_create_note(self) -> None:
-        """Create a new note."""
-        self.notify(
-            "Note creation - Use: idlergear note create '<content>'",
-            severity="information",
-        )
-
-    async def action_broadcast_message(self) -> None:
-        """Broadcast message to all agents."""
-        logger = get_logger()
-        try:
-            # Get active agents
-            from idlergear.config import find_idlergear_root
-            from idlergear.daemon.client import DaemonClient
-
-            root = find_idlergear_root()
-            if not root:
-                logger.warning("Not in IdlerGear project")
-                self.notify("Not in IdlerGear project", severity="error")
-                return
-
-            socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
-            if not socket_path.exists():
-                logger.warning("Daemon not running")
-                self.notify("Daemon not running", severity="warning")
-                return
-
-            logger.debug("Connecting to daemon for message broadcast")
-            client = DaemonClient(socket_path)
-            await client.connect()
-            agents = await client.list_agents()
-
-            if not agents:
-                await client.disconnect()
-                logger.warning("No active agents to send message to")
-                self.notify("No active agents", severity="warning")
-                return
-
-            logger.info(f"Opening message modal for {len(agents)} agents")
-            result = await self.push_screen(MessageModal(agents), wait_for_dismiss=True)
-
-            if result:
-                message = result.get("message")
-                priority = result.get("priority", "normal")
-
-                logger.info(
-                    f"Broadcasting {priority} priority message: {message[:50]}..."
-                )
-                await client.broadcast_message(
-                    message=message,
-                    event_type="high_priority" if priority == "high" else "message",
-                )
-
-                await client.disconnect()
-
-                recipient = result.get("recipient")
-                if recipient == "all":
-                    logger.info(f"Message broadcast to {len(agents)} agents")
-                    self.notify(
-                        "Message broadcast to all agents", severity="information"
-                    )
-                else:
-                    logger.info(f"Message sent to agent {recipient[:8]}")
-                    self.notify(
-                        f"Message sent to {recipient[:8]}", severity="information"
-                    )
-            else:
-                logger.debug("Message broadcast cancelled")
-                await client.disconnect()
-
-        except Exception as e:
-            logger.error(f"Error broadcasting message: {e}", exc_info=True)
-            self.notify(f"Error broadcasting message: {e}", severity="error")
-
-    async def action_send_message(self) -> None:
-        """Send message to specific agent."""
-        await self.action_broadcast_message()  # Use same modal for now
-
-    async def action_bulk_actions(self) -> None:
-        """Perform bulk actions on selected tasks."""
-        logger = get_logger()
-        try:
-            task_browser = self.query_one(TaskBrowser)
-            selected = task_browser.selected_tasks
-
-            if not selected:
-                self.notify("No tasks selected", severity="warning")
-                return
-
-            logger.info(f"Opening bulk actions modal for {len(selected)} tasks")
-            result = await self.push_screen(
-                BulkActionModal(len(selected)), wait_for_dismiss=True
-            )
-
-            if result:
-                action = result.get("action")
+                    current_idx = state_cycle.index(current_state)
+                    next_idx = (current_idx + 1) % len(state_cycle)
+                    new_state = state_cycle[next_idx]
+                except ValueError:
+                    new_state = "open"
 
                 from idlergear.backends.registry import get_backend
 
                 backend = get_backend("task", project_path=self.project_root)
+                backend.update(task_id=task.get("id"), state=new_state)
 
-                if action == "state":
-                    # Show state selector
-                    new_state = await self.push_screen(
-                        QuickSelectModal(
-                            "Select State",
-                            [
-                                ("Open", "open"),
-                                ("In Progress", "in_progress"),
-                                ("In Review", "in_review"),
-                                ("Completed", "completed"),
-                                ("Blocked", "blocked"),
-                            ],
-                        ),
-                        wait_for_dismiss=True,
-                    )
-                    if new_state:
-                        for task_id in selected:
-                            backend.update(task_id=task_id, state=new_state)
-                        logger.info(
-                            f"Updated {len(selected)} tasks to state={new_state}"
-                        )
-                        self.notify(
-                            f"Updated {len(selected)} tasks", severity="information"
-                        )
-
-                elif action == "priority":
-                    # Show priority selector
-                    new_priority = await self.push_screen(
-                        QuickSelectModal(
-                            "Select Priority",
-                            [
-                                ("🔴 Critical", "critical"),
-                                ("🟠 High", "high"),
-                                ("🟡 Medium", "medium"),
-                                ("🟢 Low", "low"),
-                                ("⚪ Backlog", "backlog"),
-                            ],
-                        ),
-                        wait_for_dismiss=True,
-                    )
-                    if new_priority:
-                        for task_id in selected:
-                            backend.update(task_id=task_id, priority=new_priority)
-                        logger.info(
-                            f"Updated {len(selected)} tasks to priority={new_priority}"
-                        )
-                        self.notify(
-                            f"Updated {len(selected)} tasks", severity="information"
-                        )
-
-                elif action == "complete":
-                    # Mark all as completed
-                    for task_id in selected:
-                        backend.update(task_id=task_id, state="completed")
-                    logger.info(f"Marked {len(selected)} tasks as completed")
-                    self.notify(
-                        f"Marked {len(selected)} tasks as completed",
-                        severity="information",
-                    )
-
-                elif action == "delete":
-                    # Confirm bulk delete
-                    confirmed = await self.push_screen(
-                        ConfirmDeleteModal(
-                            "tasks",
-                            f"{len(selected)}",
-                            f"{len(selected)} selected tasks",
-                        ),
-                        wait_for_dismiss=True,
-                    )
-                    if confirmed:
-                        for task_id in selected:
-                            backend.delete(task_id=task_id)
-                        logger.info(f"Deleted {len(selected)} tasks")
-                        self.notify(
-                            f"Deleted {len(selected)} tasks", severity="information"
-                        )
-
-                # Clear selection and refresh
-                task_browser.selected_tasks = set()
+                logger.info(
+                    f"Task #{task.get('id')} state changed: {current_state} → {new_state}"
+                )
+                self.notify(
+                    f"Task state: {current_state} → {new_state}", severity="information"
+                )
                 self.action_refresh()
 
-        except Exception as e:
-            logger.error(f"Error performing bulk action: {e}", exc_info=True)
-            self.notify(f"Error performing bulk action: {e}", severity="error")
+            except Exception as e:
+                logger.error(f"Error changing state: {e}", exc_info=True)
+                self.notify(f"Error changing state: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_change_priority(self) -> None:
+        """Change priority of selected task(s) without full edit modal."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                task_browser = self.query_one(TaskBrowser)
+                task = task_browser.get_selected_task()
+
+                if not task:
+                    self.notify("No task selected", severity="warning")
+                    return
+
+                # Quick priority cycling
+                current_priority = task.get("priority", "medium")
+                priority_cycle = ["critical", "high", "medium", "low", "backlog"]
+
+                try:
+                    current_idx = priority_cycle.index(current_priority)
+                    next_idx = (current_idx + 1) % len(priority_cycle)
+                    new_priority = priority_cycle[next_idx]
+                except ValueError:
+                    new_priority = "medium"
+
+                from idlergear.backends.registry import get_backend
+
+                backend = get_backend("task", project_path=self.project_root)
+                backend.update(task_id=task.get("id"), priority=new_priority)
+
+                logger.info(
+                    f"Task #{task.get('id')} priority changed: "
+                    f"{current_priority} → {new_priority}"
+                )
+                self.notify(
+                    f"Task priority: {current_priority} → {new_priority}",
+                    severity="information",
+                )
+                self.action_refresh()
+
+            except Exception as e:
+                logger.error(f"Error changing priority: {e}", exc_info=True)
+                self.notify(f"Error changing priority: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_assign_agent(self) -> None:
+        """Assign task to an AI agent."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            try:
+                task_browser = self.query_one(TaskBrowser)
+                task = task_browser.get_selected_task()
+
+                if not task:
+                    self.notify("No task selected", severity="warning")
+                    return
+
+                # Get active agents
+                from idlergear.config import find_idlergear_root
+                from idlergear.daemon.client import DaemonClient
+
+                root = find_idlergear_root()
+                if not root:
+                    self.notify("Not in IdlerGear project", severity="error")
+                    return
+
+                socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
+                if not socket_path.exists():
+                    self.notify(
+                        "Daemon not running. Start with: idlergear daemon start",
+                        severity="warning",
+                    )
+                    return
+
+                client = DaemonClient(socket_path)
+                await client.connect()
+                agents = await client.list_agents()
+                await client.disconnect()
+
+                if not agents:
+                    self.notify(
+                        "No active agents. Connect an AI assistant first.",
+                        severity="warning",
+                    )
+                    return
+
+                # For now, just broadcast task assignment
+                agent_names = ", ".join(
+                    [a.get("agent_type", "unknown") for a in agents]
+                )
+                self.notify(
+                    f"Task #{task.get('id')} - Available agents: {agent_names}",
+                    severity="information",
+                )
+                self.notify("Full assignment UI coming soon", severity="information")
+
+            except Exception as e:
+                self.notify(f"Error assigning task: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_edit_labels(self) -> None:
+        """Edit labels for selected item."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            self.notify(
+                "Label editing - Use Edit (Enter) for now", severity="information"
+            )
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_delete_item(self) -> None:
+        """Delete selected item (task or note based on active tab)."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                tabs = self.query_one("#main-tabs", TabbedContent)
+
+                if tabs.active == "tasks-tab":
+                    # Delete task
+                    task_browser = self.query_one(TaskBrowser)
+                    task = task_browser.get_selected_task()
+
+                    if not task:
+                        self.notify("No task selected", severity="warning")
+                        return
+
+                    task_id = task.get("id")
+                    task_title = task.get("title", "")
+
+                    # Show confirmation
+                    confirmed = await self.push_screen(
+                        ConfirmDeleteModal("task", task_id, task_title),
+                        wait_for_dismiss=True,
+                    )
+
+                    if confirmed:
+                        from idlergear.backends.registry import get_backend
+
+                        backend = get_backend("task", project_path=self.project_root)
+                        backend.delete(task_id=task_id)
+
+                        logger.info(f"Task #{task_id} deleted: {task_title}")
+                        self.notify(f"Task #{task_id} deleted", severity="information")
+                        self.action_refresh()
+
+                elif tabs.active == "notes-tab":
+                    # Delete note
+                    note_browser = self.query_one(NoteBrowser)
+                    note = note_browser.get_selected_note()
+
+                    if not note:
+                        self.notify("No note selected", severity="warning")
+                        return
+
+                    note_id = note.get("id")
+                    note_content = note.get("body", "") or note.get("title", "")
+
+                    # Show confirmation
+                    confirmed = await self.push_screen(
+                        ConfirmDeleteModal("note", note_id, note_content),
+                        wait_for_dismiss=True,
+                    )
+
+                    if confirmed:
+                        from idlergear.backends.registry import get_backend
+
+                        backend = get_backend("note", project_path=self.project_root)
+                        backend.delete(note_id=note_id)
+
+                        logger.info(f"Note #{note_id} deleted")
+                        self.notify(f"Note #{note_id} deleted", severity="information")
+                        self.action_refresh()
+
+            except Exception as e:
+                logger.error(f"Error deleting item: {e}", exc_info=True)
+                self.notify(f"Error deleting item: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_create_task(self) -> None:
+        """Create a new task."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                new_task = {
+                    "title": "",
+                    "body": "",
+                    "state": "open",
+                    "priority": "medium",
+                    "labels": [],
+                }
+
+                logger.info("Opening task creation modal")
+                result = await self.push_screen(
+                    TaskEditModal(new_task), wait_for_dismiss=True
+                )
+
+                if result:
+                    try:
+                        from idlergear.backends.registry import get_backend
+
+                        backend = get_backend("task", project_path=self.project_root)
+                        task_id = backend.create(
+                            title=result["title"],
+                            body=result.get("body", ""),
+                            labels=result.get("labels", []),
+                        )
+
+                        # Update priority and state if not defaults
+                        if (
+                            result.get("priority") != "medium"
+                            or result.get("state") != "open"
+                        ):
+                            backend.update(
+                                task_id=task_id,
+                                priority=result.get("priority"),
+                                state=result.get("state"),
+                            )
+
+                        logger.info(f"Task #{task_id} created: {result.get('title')}")
+                        self.notify(f"Task #{task_id} created", severity="information")
+                        self.action_refresh()
+                    except Exception as e:
+                        logger.error(f"Failed to create task: {e}", exc_info=True)
+                        self.notify(f"Failed to create task: {e}", severity="error")
+                else:
+                    logger.debug("Task creation cancelled")
+
+            except Exception as e:
+                logger.error(f"Error creating task: {e}", exc_info=True)
+                self.notify(f"Error creating task: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_create_reference(self) -> None:
+        """Create a new reference document."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                logger.info("Opening reference creation modal")
+                result = await self.push_screen(
+                    ReferenceEditModal(), wait_for_dismiss=True
+                )
+
+                if result:
+                    try:
+                        from idlergear.backends.registry import get_backend
+
+                        backend = get_backend(
+                            "reference", project_path=self.project_root
+                        )
+                        backend.create(
+                            title=result["title"],
+                            content=result["content"],
+                            tags=result.get("tags", []),
+                        )
+
+                        logger.info(f"Reference created: {result['title']}")
+                        self.notify(
+                            f"Reference '{result['title']}' created",
+                            severity="information",
+                        )
+                        self.action_refresh()
+                    except Exception as e:
+                        logger.error(f"Failed to create reference: {e}", exc_info=True)
+                        self.notify(
+                            f"Failed to create reference: {e}", severity="error"
+                        )
+                else:
+                    logger.debug("Reference creation cancelled")
+
+            except Exception as e:
+                logger.error(f"Error creating reference: {e}", exc_info=True)
+                self.notify(f"Error creating reference: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_create_note(self) -> None:
+        """Create a new note."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            self.notify(
+                "Note creation - Use: idlergear note create '<content>'",
+                severity="information",
+            )
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_broadcast_message(self) -> None:
+        """Broadcast message to all agents."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                # Get active agents
+                from idlergear.config import find_idlergear_root
+                from idlergear.daemon.client import DaemonClient
+
+                root = find_idlergear_root()
+                if not root:
+                    logger.warning("Not in IdlerGear project")
+                    self.notify("Not in IdlerGear project", severity="error")
+                    return
+
+                socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
+                if not socket_path.exists():
+                    logger.warning("Daemon not running")
+                    self.notify("Daemon not running", severity="warning")
+                    return
+
+                logger.debug("Connecting to daemon for message broadcast")
+                client = DaemonClient(socket_path)
+                await client.connect()
+                agents = await client.list_agents()
+
+                if not agents:
+                    await client.disconnect()
+                    logger.warning("No active agents to send message to")
+                    self.notify("No active agents", severity="warning")
+                    return
+
+                logger.info(f"Opening message modal for {len(agents)} agents")
+                result = await self.push_screen(
+                    MessageModal(agents), wait_for_dismiss=True
+                )
+
+                if result:
+                    message = result.get("message")
+                    priority = result.get("priority", "normal")
+
+                    logger.info(
+                        f"Broadcasting {priority} priority message: {message[:50]}..."
+                    )
+                    await client.broadcast_message(
+                        message=message,
+                        event_type="high_priority" if priority == "high" else "message",
+                    )
+
+                    await client.disconnect()
+
+                    recipient = result.get("recipient")
+                    if recipient == "all":
+                        logger.info(f"Message broadcast to {len(agents)} agents")
+                        self.notify(
+                            "Message broadcast to all agents", severity="information"
+                        )
+                    else:
+                        logger.info(f"Message sent to agent {recipient[:8]}")
+                        self.notify(
+                            f"Message sent to {recipient[:8]}", severity="information"
+                        )
+                else:
+                    logger.debug("Message broadcast cancelled")
+                    await client.disconnect()
+
+            except Exception as e:
+                logger.error(f"Error broadcasting message: {e}", exc_info=True)
+                self.notify(f"Error broadcasting message: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_send_message(self) -> None:
+        """Send message to specific agent."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            await self.action_broadcast_message()  # Use same modal for now
+
+        self.run_worker(_async_helper(), exclusive=False)
+
+    def action_bulk_actions(self) -> None:
+        """Perform bulk actions on selected tasks."""
+
+        async def _async_helper() -> None:
+            """Async implementation."""
+            logger = get_logger()
+            try:
+                task_browser = self.query_one(TaskBrowser)
+                selected = task_browser.selected_tasks
+
+                if not selected:
+                    self.notify("No tasks selected", severity="warning")
+                    return
+
+                logger.info(f"Opening bulk actions modal for {len(selected)} tasks")
+                result = await self.push_screen(
+                    BulkActionModal(len(selected)), wait_for_dismiss=True
+                )
+
+                if result:
+                    action = result.get("action")
+
+                    from idlergear.backends.registry import get_backend
+
+                    backend = get_backend("task", project_path=self.project_root)
+
+                    if action == "state":
+                        # Show state selector
+                        new_state = await self.push_screen(
+                            QuickSelectModal(
+                                "Select State",
+                                [
+                                    ("Open", "open"),
+                                    ("In Progress", "in_progress"),
+                                    ("In Review", "in_review"),
+                                    ("Completed", "completed"),
+                                    ("Blocked", "blocked"),
+                                ],
+                            ),
+                            wait_for_dismiss=True,
+                        )
+                        if new_state:
+                            for task_id in selected:
+                                backend.update(task_id=task_id, state=new_state)
+                            logger.info(
+                                f"Updated {len(selected)} tasks to state={new_state}"
+                            )
+                            self.notify(
+                                f"Updated {len(selected)} tasks", severity="information"
+                            )
+
+                    elif action == "priority":
+                        # Show priority selector
+                        new_priority = await self.push_screen(
+                            QuickSelectModal(
+                                "Select Priority",
+                                [
+                                    ("🔴 Critical", "critical"),
+                                    ("🟠 High", "high"),
+                                    ("🟡 Medium", "medium"),
+                                    ("🟢 Low", "low"),
+                                    ("⚪ Backlog", "backlog"),
+                                ],
+                            ),
+                            wait_for_dismiss=True,
+                        )
+                        if new_priority:
+                            for task_id in selected:
+                                backend.update(task_id=task_id, priority=new_priority)
+                            logger.info(
+                                f"Updated {len(selected)} tasks to priority={new_priority}"
+                            )
+                            self.notify(
+                                f"Updated {len(selected)} tasks", severity="information"
+                            )
+
+                    elif action == "complete":
+                        # Mark all as completed
+                        for task_id in selected:
+                            backend.update(task_id=task_id, state="completed")
+                        logger.info(f"Marked {len(selected)} tasks as completed")
+                        self.notify(
+                            f"Marked {len(selected)} tasks as completed",
+                            severity="information",
+                        )
+
+                    elif action == "delete":
+                        # Confirm bulk delete
+                        confirmed = await self.push_screen(
+                            ConfirmDeleteModal(
+                                "tasks",
+                                f"{len(selected)}",
+                                f"{len(selected)} selected tasks",
+                            ),
+                            wait_for_dismiss=True,
+                        )
+                        if confirmed:
+                            for task_id in selected:
+                                backend.delete(task_id=task_id)
+                            logger.info(f"Deleted {len(selected)} tasks")
+                            self.notify(
+                                f"Deleted {len(selected)} tasks", severity="information"
+                            )
+
+                    # Clear selection and refresh
+                    task_browser.selected_tasks = set()
+                    self.action_refresh()
+
+            except Exception as e:
+                logger.error(f"Error performing bulk action: {e}", exc_info=True)
+                self.notify(f"Error performing bulk action: {e}", severity="error")
+
+        self.run_worker(_async_helper(), exclusive=False)
 
     def action_help(self) -> None:
         """Show help message."""
