@@ -123,9 +123,7 @@ async def _broadcast_registry_change(
             }
 
             # Broadcast via daemon
-            await client.notify(
-                "event", {"event": f"file.{action}", "data": message}
-            )
+            await client.notify("event", {"event": f"file.{action}", "data": message})
 
             await client.disconnect()
         except DaemonNotRunning:
@@ -471,7 +469,10 @@ def _check_file_access(
         path_str = str(file_path)
 
         # Skip non-file-like strings
-        if any(path_str.startswith(prefix) for prefix in ["http://", "https://", "ftp://", "git@"]):
+        if any(
+            path_str.startswith(prefix)
+            for prefix in ["http://", "https://", "ftp://", "git@"]
+        ):
             return (True, None)
 
         # Skip if it looks like a command or flag
@@ -804,7 +805,10 @@ async def list_tools() -> list[Tool]:
                     "name": {"type": "string", "description": "Plan name"},
                     "title": {"type": "string", "description": "New title"},
                     "body": {"type": "string", "description": "New body"},
-                    "state": {"type": "string", "description": "New state: active, completed"},
+                    "state": {
+                        "type": "string",
+                        "description": "New state: active, completed",
+                    },
                 },
                 "required": ["name"],
             },
@@ -1323,7 +1327,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "output_path": {"type": "string", "description": "Output file path (.graphml, .dot, or .json)"},
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path (.graphml, .dot, or .json)",
+                    },
                     "format": {
                         "type": "string",
                         "description": "Format: graphml, dot, or json (auto-detected from extension)",
@@ -1339,8 +1346,16 @@ async def list_tools() -> list[Tool]:
                         "items": {"type": "string"},
                         "description": "Filter by relationship types (e.g., ['MODIFIES', 'CONTAINS'])",
                     },
-                    "max_nodes": {"type": "integer", "description": "Maximum nodes to export (default: 1000)", "default": 1000},
-                    "d3_format": {"type": "boolean", "description": "Use D3.js format for JSON (default: false)", "default": False},
+                    "max_nodes": {
+                        "type": "integer",
+                        "description": "Maximum nodes to export (default: 1000)",
+                        "default": 1000,
+                    },
+                    "d3_format": {
+                        "type": "boolean",
+                        "description": "Use D3.js format for JSON (default: false)",
+                        "default": False,
+                    },
                     "layout": {
                         "type": "string",
                         "description": "Graphviz layout for DOT format (dot, neato, fdp, circo, twopi)",
@@ -1357,9 +1372,19 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "task_id": {"type": "integer", "description": "Task ID to visualize"},
-                    "output_path": {"type": "string", "description": "Output file path"},
-                    "depth": {"type": "integer", "description": "Relationship depth (1=direct, 2=2nd degree, default: 2)", "default": 2},
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Task ID to visualize",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path",
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Relationship depth (1=direct, 2=2nd degree, default: 2)",
+                        "default": 2,
+                    },
                     "format": {
                         "type": "string",
                         "description": "Output format (default: dot)",
@@ -1376,9 +1401,19 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "file_path": {"type": "string", "description": "File path to analyze"},
-                    "output_path": {"type": "string", "description": "Output file path"},
-                    "depth": {"type": "integer", "description": "Import depth (how many hops to follow, default: 2)", "default": 2},
+                    "file_path": {
+                        "type": "string",
+                        "description": "File path to analyze",
+                    },
+                    "output_path": {
+                        "type": "string",
+                        "description": "Output file path",
+                    },
+                    "depth": {
+                        "type": "integer",
+                        "description": "Import depth (how many hops to follow, default: 2)",
+                        "default": 2,
+                    },
                     "format": {
                         "type": "string",
                         "description": "Output format (default: dot)",
@@ -3476,6 +3511,33 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "required": ["note_id", "content"],
             },
         ),
+        # Knowledge gap detection tools
+        Tool(
+            name="idlergear_knowledge_detect_gaps",
+            description="Detect knowledge gaps in the project. Returns gaps like missing documentation, undocumented commits, stale tasks, etc. CALL PROACTIVELY to improve project knowledge base.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "gap_type": {
+                        "type": "string",
+                        "enum": [
+                            "missing_reference",
+                            "undocumented_commits",
+                            "unanswered_question",
+                            "stale_task",
+                            "orphaned_tasks",
+                            "unannotated_files",
+                        ],
+                        "description": "Filter by specific gap type (optional)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_knowledge_gap_summary",
+            description="Get summary of knowledge gaps by severity. Quick health check of knowledge base.",
+            inputSchema={"type": "object", "properties": {}},
+        ),
     ]
 
 
@@ -3996,16 +4058,21 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             try:
                 # Get documentation node
-                doc_result = conn.execute("""
+                doc_result = conn.execute(
+                    """
                     MATCH (d:Documentation {path: $path})
                     RETURN d.path, d.title, d.body, d.source, d.created_at, d.updated_at
-                """, {"path": arguments["path"]})
+                """,
+                    {"path": arguments["path"]},
+                )
 
                 if not doc_result.has_next():
-                    return _format_result({
-                        "error": f"Documentation not found: {arguments['path']}",
-                        "path": arguments["path"]
-                    })
+                    return _format_result(
+                        {
+                            "error": f"Documentation not found: {arguments['path']}",
+                            "path": arguments["path"],
+                        }
+                    )
 
                 doc = doc_result.get_next()
                 result = {
@@ -4021,41 +4088,50 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 }
 
                 # Get related files
-                files_result = conn.execute("""
+                files_result = conn.execute(
+                    """
                     MATCH (d:Documentation {path: $path})-[:DOC_DOCUMENTS_FILE]->(f:File)
                     RETURN f.path
                     LIMIT 20
-                """, {"path": arguments["path"]})
+                """,
+                    {"path": arguments["path"]},
+                )
                 result["related_files"] = [r[0] for r in files_result]
 
                 # Get related symbols
-                symbols_result = conn.execute("""
+                symbols_result = conn.execute(
+                    """
                     MATCH (d:Documentation {path: $path})-[:DOC_DOCUMENTS_SYMBOL]->(s:Symbol)
                     RETURN s.name, s.type, s.file_path
                     LIMIT 20
-                """, {"path": arguments["path"]})
+                """,
+                    {"path": arguments["path"]},
+                )
                 result["related_symbols"] = [
-                    {"name": r[0], "type": r[1], "file": r[2]}
-                    for r in symbols_result
+                    {"name": r[0], "type": r[1], "file": r[2]} for r in symbols_result
                 ]
 
                 # Get related tasks
-                tasks_result = conn.execute("""
+                tasks_result = conn.execute(
+                    """
                     MATCH (d:Documentation {path: $path})-[:DOC_REFERENCES_TASK]->(t:Task)
                     RETURN t.id, t.title, t.state
                     LIMIT 10
-                """, {"path": arguments["path"]})
+                """,
+                    {"path": arguments["path"]},
+                )
                 result["related_tasks"] = [
-                    {"id": r[0], "title": r[1], "state": r[2]}
-                    for r in tasks_result
+                    {"id": r[0], "title": r[1], "state": r[2]} for r in tasks_result
                 ]
 
                 return _format_result(result)
             except Exception as e:
                 if "does not exist" in str(e).lower():
-                    return _format_result({
-                        "error": "Knowledge graph not populated. Run idlergear_graph_populate_all() first."
-                    })
+                    return _format_result(
+                        {
+                            "error": "Knowledge graph not populated. Run idlergear_graph_populate_all() first."
+                        }
+                    )
                 raise
 
         elif name == "idlergear_graph_search_documentation":
@@ -4068,31 +4144,32 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             try:
                 # Search documentation by title or body
-                result = conn.execute("""
+                result = conn.execute(
+                    """
                     MATCH (d:Documentation)
                     WHERE d.title CONTAINS $query OR d.body CONTAINS $query
                     RETURN d.path, d.title, d.source
                     LIMIT $limit
-                """, {"query": arguments["query"], "limit": limit})
+                """,
+                    {"query": arguments["query"], "limit": limit},
+                )
 
                 docs = []
                 for record in result:
-                    docs.append({
-                        "path": record[0],
-                        "title": record[1],
-                        "source": record[2]
-                    })
+                    docs.append(
+                        {"path": record[0], "title": record[1], "source": record[2]}
+                    )
 
-                return _format_result({
-                    "query": arguments["query"],
-                    "count": len(docs),
-                    "documents": docs
-                })
+                return _format_result(
+                    {"query": arguments["query"], "count": len(docs), "documents": docs}
+                )
             except Exception as e:
                 if "does not exist" in str(e).lower():
-                    return _format_result({
-                        "error": "Knowledge graph not populated. Run idlergear_graph_populate_all() first."
-                    })
+                    return _format_result(
+                        {
+                            "error": "Knowledge graph not populated. Run idlergear_graph_populate_all() first."
+                        }
+                    )
                 raise
 
         elif name == "idlergear_graph_populate_all":
@@ -4102,9 +4179,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             incremental = arguments.get("incremental", True)
 
             result = populate_all(
-                max_commits=max_commits,
-                incremental=incremental,
-                verbose=False
+                max_commits=max_commits, incremental=incremental, verbose=False
             )
 
             return _format_result(result)
@@ -4124,9 +4199,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             db = get_database()
             result = query_test_coverage(
-                db,
-                arguments["target"],
-                arguments.get("target_type", "file")
+                db, arguments["target"], arguments.get("target_type", "file")
             )
             return _format_result(result)
 
@@ -4136,7 +4209,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             db = get_database()
             result = query_change_history(db, arguments["symbol_name"])
-            return _format_result({"symbol": arguments["symbol_name"], "commits": result})
+            return _format_result(
+                {"symbol": arguments["symbol_name"], "commits": result}
+            )
 
         elif name == "idlergear_graph_dependency_chain":
             from idlergear.graph import get_database
@@ -4144,9 +4219,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             db = get_database()
             result = query_dependency_chain(
-                db,
-                arguments["file_path"],
-                arguments.get("max_depth", 5)
+                db, arguments["file_path"], arguments.get("max_depth", 5)
             )
             return _format_result(result)
 
@@ -4172,9 +4245,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             db = get_database()
             result = query_file_timeline(
-                db,
-                arguments["file_path"],
-                arguments.get("limit", 20)
+                db, arguments["file_path"], arguments.get("limit", 20)
             )
             return _format_result(result)
 
@@ -4210,19 +4281,27 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 elif suffix == ".json":
                     format = "json"
                 else:
-                    raise ValueError(f"Unknown file extension: {suffix}. Please specify format parameter.")
+                    raise ValueError(
+                        f"Unknown file extension: {suffix}. Please specify format parameter."
+                    )
 
             db = get_database()
             viz = GraphVisualizer(db)
 
             # Export based on format
             if format == "graphml":
-                result = viz.export_graphml(output_path, node_types, relationship_types, max_nodes)
+                result = viz.export_graphml(
+                    output_path, node_types, relationship_types, max_nodes
+                )
             elif format == "dot":
-                result = viz.export_dot(output_path, node_types, relationship_types, max_nodes, layout)
+                result = viz.export_dot(
+                    output_path, node_types, relationship_types, max_nodes, layout
+                )
             elif format == "json":
                 json_format = "d3" if d3_format else "raw"
-                result = viz.export_json(output_path, node_types, relationship_types, max_nodes, json_format)
+                result = viz.export_json(
+                    output_path, node_types, relationship_types, max_nodes, json_format
+                )
             else:
                 raise ValueError(f"Unknown format: {format}")
 
@@ -4257,7 +4336,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             db = get_database()
             viz = GraphVisualizer(db)
 
-            result = viz.visualize_dependency_graph(file_path, output_path, depth, format)
+            result = viz.visualize_dependency_graph(
+                file_path, output_path, depth, format
+            )
             return _format_result(result)
 
         # Server management handlers
@@ -4377,15 +4458,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             success = sync_task_fields_to_github(task_id, task)
             if success:
-                return _format_result({
-                    "success": True,
-                    "message": f"Synced fields for task {task_id} to GitHub Projects"
-                })
+                return _format_result(
+                    {
+                        "success": True,
+                        "message": f"Synced fields for task {task_id} to GitHub Projects",
+                    }
+                )
             else:
-                return _format_result({
-                    "success": False,
-                    "message": f"Could not sync fields for task {task_id}. Check configuration and project setup."
-                })
+                return _format_result(
+                    {
+                        "success": False,
+                        "message": f"Could not sync fields for task {task_id}. Check configuration and project setup.",
+                    }
+                )
 
         elif name == "idlergear_project_pull":
             from idlergear.projects import pull_project_from_github
@@ -5287,7 +5372,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 )
                 return _format_result(session_info)
             except (RuntimeError, ValueError) as e:
-                return [TextContent(type="text", text=f"Error creating tmux session: {e}")]
+                return [
+                    TextContent(type="text", text=f"Error creating tmux session: {e}")
+                ]
 
         elif name == "idlergear_tmux_list_sessions":
             pm = _get_pm_server()
@@ -5318,10 +5405,13 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 window_index=arguments.get("window_index", 0),
                 pane_index=arguments.get("pane_index", 0),
             )
-            return _format_result({"success": success, "session": arguments["session_name"]})
+            return _format_result(
+                {"success": success, "session": arguments["session_name"]}
+            )
 
         elif name == "idlergear_run_attach":
             from idlergear.runs import attach_to_run
+
             try:
                 result = attach_to_run(arguments["name"])
                 return _format_result(result)
@@ -5432,6 +5522,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         # === Session Management Handlers ===
         elif name == "idlergear_session_start":
             from idlergear.session import start_session
+
             global _registered_agent_id, _current_session_id
 
             result = start_session(
@@ -5460,6 +5551,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_session_end":
             from idlergear.session import end_session
+
             global _registered_agent_id, _current_session_id
 
             result = end_session(
@@ -5804,7 +5896,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             elif lang == "rust":
                 return _format_result({"rust": {"available": check_cargo_available()}})
             elif lang == "dotnet":
-                return _format_result({"dotnet": {"available": check_dotnet_available()}})
+                return _format_result(
+                    {"dotnet": {"available": check_dotnet_available()}}
+                )
             else:
                 return _format_result(
                     {
@@ -6372,7 +6466,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Plugin handlers (NEW v0.8.0)
         elif name == "idlergear_plugin_list":
-            from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin, PluginRegistry
+            from idlergear.plugins import (
+                LangfusePlugin,
+                LlamaIndexPlugin,
+                PluginRegistry,
+            )
 
             registry = _get_plugin_registry()
 
@@ -6420,7 +6518,9 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             "loaded": True,
                             "initialized": plugin.is_initialized(),
                             "healthy": plugin.health_check(),
-                            "capabilities": [cap.value for cap in plugin.capabilities()],
+                            "capabilities": [
+                                cap.value for cap in plugin.capabilities()
+                            ],
                         }
                     )
                 else:
@@ -6431,7 +6531,8 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                             "plugin": plugin_name,
                             "loaded": False,
                             "enabled": enabled,
-                            "available": plugin_name in registry.list_available_plugins(),
+                            "available": plugin_name
+                            in registry.list_available_plugins(),
                         }
                     )
             else:
@@ -6589,6 +6690,74 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "note_id": arguments["note_id"],
                 }
             )
+
+        # Knowledge gap detection tools
+        elif name == "idlergear_knowledge_detect_gaps":
+            from idlergear.gap_detector import GapDetector, GapType
+            from idlergear.config import find_idlergear_root
+
+            root = find_idlergear_root()
+            if root is None:
+                raise ValueError("Not in an IdlerGear project")
+
+            detector = GapDetector(project_root=root)
+
+            # Parse gap type filter
+            gap_types = None
+            if arguments.get("gap_type"):
+                try:
+                    gap_types = [GapType(arguments["gap_type"])]
+                except ValueError:
+                    raise ValueError(f"Unknown gap type: {arguments['gap_type']}")
+
+            # Detect gaps
+            gaps = detector.detect_gaps(gap_types=gap_types)
+
+            # Convert to dict format
+            result = {
+                "total_gaps": len(gaps),
+                "gaps": [g.to_dict() for g in gaps],
+            }
+
+            return _format_result(result)
+
+        elif name == "idlergear_knowledge_gap_summary":
+            from idlergear.gap_detector import GapDetector, GapSeverity
+            from idlergear.config import find_idlergear_root
+
+            root = find_idlergear_root()
+            if root is None:
+                raise ValueError("Not in an IdlerGear project")
+
+            detector = GapDetector(project_root=root)
+            gaps = detector.detect_gaps()
+
+            # Group by severity
+            by_severity = {
+                "critical": len(
+                    [g for g in gaps if g.severity == GapSeverity.CRITICAL]
+                ),
+                "high": len([g for g in gaps if g.severity == GapSeverity.HIGH]),
+                "medium": len([g for g in gaps if g.severity == GapSeverity.MEDIUM]),
+                "low": len([g for g in gaps if g.severity == GapSeverity.LOW]),
+                "info": len([g for g in gaps if g.severity == GapSeverity.INFO]),
+            }
+
+            result = {
+                "total_gaps": len(gaps),
+                "by_severity": by_severity,
+                "has_critical": by_severity["critical"] > 0,
+                "has_high": by_severity["high"] > 0,
+                "health_status": "critical"
+                if by_severity["critical"] > 0
+                else "needs_attention"
+                if by_severity["high"] > 0
+                else "good"
+                if by_severity["medium"] > 0
+                else "healthy",
+            }
+
+            return _format_result(result)
 
         else:
             raise ValueError(f"Unknown tool: {name}")
