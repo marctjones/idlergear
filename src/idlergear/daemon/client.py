@@ -206,6 +206,83 @@ class DaemonClient:
         """Unsubscribe from an event."""
         await self.call("daemon.unsubscribe", {"event": event})
 
+    # Agent management methods
+    async def list_agents(
+        self,
+        agent_type: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """List all active AI agent sessions.
+
+        Args:
+            agent_type: Filter by agent type (e.g., "claude-code", "goose")
+            status: Filter by status (e.g., "active", "idle", "busy")
+
+        Returns:
+            List of agent session dictionaries with:
+            - agent_id, agent_type, status
+            - session_id, session_name
+            - working_files, current_task_id
+            - capabilities, metadata
+        """
+        params = {}
+        if agent_type:
+            params["agent_type"] = agent_type
+        if status:
+            params["status"] = status
+
+        result = await self.call("agent.list", params)
+        return result.get("agents", [])
+
+    async def get_agent(self, agent_id: str) -> dict[str, Any] | None:
+        """Get details for a specific agent."""
+        result = await self.call("agent.get", {"agent_id": agent_id})
+        return result.get("agent")
+
+    # Command queue methods
+    async def queue_list(self, status: str | None = None) -> list[dict[str, Any]]:
+        """List commands in the queue.
+
+        Args:
+            status: Filter by status ("pending", "in_progress", "completed", "failed")
+        """
+        params = {"status": status} if status else {}
+        result = await self.call("queue.list", params)
+        return result.get("commands", [])
+
+    async def queue_command(
+        self,
+        command: str,
+        priority: int = 5,
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Add a command to the queue.
+
+        Returns:
+            Command ID
+        """
+        params = {
+            "command": command,
+            "priority": priority,
+            "metadata": metadata or {},
+        }
+        result = await self.call("queue.add", params)
+        return result.get("command_id", "")
+
+    async def broadcast_message(
+        self,
+        message: str,
+        event_type: str = "message",
+    ) -> None:
+        """Broadcast a message to all connected agents."""
+        await self.notify(
+            "broadcast",
+            {
+                "type": event_type,
+                "message": message,
+            },
+        )
+
 
 def get_daemon_client(idlergear_root: Path) -> DaemonClient:
     """Get a daemon client for the given project root."""

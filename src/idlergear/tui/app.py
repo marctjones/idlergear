@@ -208,40 +208,155 @@ class GapAlerts(Static):
 
 
 class DaemonMonitor(Static):
-    """Monitor daemon status and active agents."""
+    """Monitor daemon status, active AI assistants, and MCP sessions."""
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
-        yield Label("🔄 Daemon & Agent Monitor", classes="header")
-        yield Static(id="daemon-status")
+        yield Label("🔄 Multi-Agent Coordination", classes="header")
+        yield VerticalScroll(Static(id="daemon-status"))
 
     def update_daemon_status(self, status: dict[str, Any]) -> None:
-        """Update daemon status display."""
-        display = self.query_one("#daemon-status", Static)
+        """Update daemon status and agent details display."""
+        container = self.query_one(VerticalScroll)
+        display = container.query_one("#daemon-status", Static)
 
         if not status.get("running"):
             display.update(
-                "[red]● Daemon not running[/]\n\nStart with: idlergear daemon start"
+                "[red]● Daemon not running[/]\n\n"
+                "Start with: [cyan]idlergear daemon start[/]\n\n"
+                "The daemon enables:\n"
+                "  • Multi-agent coordination\n"
+                "  • Session monitoring across AI assistants\n"
+                "  • Command queue for background tasks\n"
+                "  • Message broadcasting between agents"
             )
             return
 
         lines = [
-            "[green]● Daemon running[/]",
+            "[green bold]● Daemon Running[/]",
             "",
-            f"PID: {status.get('pid', 'unknown')}",
-            f"Uptime: {status.get('uptime', 'unknown')}",
+            f"[dim]PID:[/] {status.get('pid', 'unknown')}",
+            f"[dim]Uptime:[/] {status.get('uptime', 'unknown')}",
+            f"[dim]Socket:[/] {status.get('socket_path', 'unknown')}",
             "",
-            "Active Agents:",
+            "━" * 60,
+            "",
         ]
 
         agents = status.get("agents", [])
+        queue = status.get("queue", [])
+
+        # Show active AI assistants
+        lines.append(f"[bold cyan]Active AI Assistants ({len(agents)}):[/]")
+        lines.append("")
+
         if agents:
             for agent in agents:
+                agent_type = agent.get("agent_type", "unknown")
+                agent_id = agent.get("agent_id", "unknown")
+                agent_status = agent.get("status", "unknown")
+
+                # Status color
+                status_colors = {
+                    "active": "green",
+                    "idle": "yellow",
+                    "busy": "cyan",
+                }
+                status_color = status_colors.get(agent_status, "white")
+
+                lines.append(f"[bold white]{agent_type.upper()}[/] ({agent_id})")
                 lines.append(
-                    f"  • {agent.get('id', 'unknown')} ({agent.get('type', 'unknown')})"
+                    f"  [dim]Status:[/] [{status_color}]{agent_status}[/{status_color}]"
                 )
+
+                # Session information
+                session_id = agent.get("session_id")
+                session_name = agent.get("session_name")
+                if session_id:
+                    lines.append(
+                        f"  [dim]Session:[/] {session_name or session_id[:12]}"
+                    )
+
+                # Current task
+                task_id = agent.get("current_task_id")
+                if task_id:
+                    lines.append(f"  [dim]Working on task:[/] #{task_id}")
+
+                # Working files
+                working_files = agent.get("working_files", [])
+                if working_files:
+                    files_preview = ", ".join([Path(f).name for f in working_files[:3]])
+                    if len(working_files) > 3:
+                        files_preview += f" (+{len(working_files) - 3} more)"
+                    lines.append(f"  [dim]Files:[/] {files_preview}")
+
+                # Capabilities (MCP tools, etc.)
+                capabilities = agent.get("capabilities", [])
+                if capabilities:
+                    caps_preview = ", ".join(capabilities[:3])
+                    if len(capabilities) > 3:
+                        caps_preview += f" (+{len(capabilities) - 3} more)"
+                    lines.append(f"  [dim]Capabilities:[/] {caps_preview}")
+
+                # Connection info
+                connected_at = agent.get("connected_at", "unknown")
+                if connected_at and connected_at != "unknown":
+                    # Format timestamp nicely
+                    try:
+                        from datetime import datetime
+
+                        dt = datetime.fromisoformat(connected_at.replace("Z", "+00:00"))
+                        time_str = dt.strftime("%H:%M:%S")
+                        lines.append(f"  [dim]Connected:[/] {time_str}")
+                    except Exception:
+                        lines.append(f"  [dim]Connected:[/] {connected_at}")
+
+                lines.append("")
+
         else:
-            lines.append("  (none)")
+            lines.append("[dim]  No AI assistants currently connected[/]")
+            lines.append("")
+            lines.append("  Connect an AI assistant with IdlerGear MCP integration:")
+            lines.append("    • Claude Code (automatic)")
+            lines.append("    • Goose (if configured)")
+            lines.append("    • Other MCP-enabled assistants")
+            lines.append("")
+
+        # Show command queue
+        lines.append("━" * 60)
+        lines.append("")
+        lines.append(f"[bold cyan]Command Queue ({len(queue)}):[/]")
+        lines.append("")
+
+        if queue:
+            for cmd in queue[:5]:  # Show first 5
+                cmd_status = cmd.get("status", "unknown")
+                priority = cmd.get("priority", 0)
+                command = cmd.get("command", "")
+
+                # Truncate long commands
+                if len(command) > 50:
+                    command = command[:47] + "..."
+
+                status_icons = {
+                    "pending": "⏳",
+                    "in_progress": "▶️",
+                    "completed": "✅",
+                    "failed": "❌",
+                }
+                icon = status_icons.get(cmd_status, "❓")
+
+                lines.append(f"  {icon} [priority={priority}] {command}")
+
+            if len(queue) > 5:
+                lines.append(f"  [dim]... and {len(queue) - 5} more[/]")
+        else:
+            lines.append("[dim]  No queued commands[/]")
+
+        lines.append("")
+        lines.append("━" * 60)
+        lines.append("")
+        lines.append("[dim]Press 'r' to refresh[/]")
 
         display.update("\n".join(lines))
 
@@ -591,31 +706,64 @@ class IdlerGearApp(App):
 
     def load_daemon_status(self) -> None:
         """Load daemon status."""
-        try:
-            from idlergear.config import find_idlergear_root
-            from idlergear.daemon.lifecycle import DaemonLifecycle
+        import asyncio
 
-            root = find_idlergear_root()
-            if root is None:
-                return
+        async def _load_async() -> dict[str, Any]:
+            """Async helper to load daemon data."""
+            try:
+                from idlergear.config import find_idlergear_root
+                from idlergear.daemon.client import DaemonClient
 
-            lifecycle = DaemonLifecycle(root)
-            running = lifecycle.is_running()
+                root = find_idlergear_root()
+                if root is None:
+                    return {"running": False}
 
-            status = {"running": running}
+                # Check if daemon is running
+                socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
+                if not socket_path.exists():
+                    return {"running": False}
 
-            if running:
-                # Get more details if daemon is running
+                # Connect and get full status
                 try:
-                    from idlergear.daemon.client import get_daemon_client
+                    client = DaemonClient(socket_path)
+                    await client.connect()
 
-                    with get_daemon_client() as client:
-                        agents = client.list_agents()
-                        status["agents"] = agents
-                        status["pid"] = "unknown"  # Would need to get from daemon
-                        status["uptime"] = "unknown"
-                except Exception:
-                    pass
+                    # Get daemon status (includes PID, uptime)
+                    daemon_status = await client.status()
+
+                    # Get list of active agents with session details
+                    agents = await client.list_agents()
+
+                    # Get command queue
+                    queue = await client.queue_list()
+
+                    await client.disconnect()
+
+                    return {
+                        "running": True,
+                        "pid": daemon_status.get("pid", "unknown"),
+                        "uptime": daemon_status.get("uptime", "unknown"),
+                        "socket_path": str(socket_path),
+                        "agents": agents,
+                        "queue": queue,
+                    }
+
+                except Exception as e:
+                    # Daemon socket exists but can't connect
+                    return {
+                        "running": False,
+                        "error": str(e),
+                    }
+
+            except Exception as e:
+                return {
+                    "running": False,
+                    "error": str(e),
+                }
+
+        try:
+            # Run async function in event loop
+            status = asyncio.run(_load_async())
 
             daemon_monitor = self.query_one(DaemonMonitor)
             daemon_monitor.update_daemon_status(status)
