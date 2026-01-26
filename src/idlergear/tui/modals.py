@@ -476,3 +476,185 @@ class CommandPalette(ModalScreen[dict[str, Any] | None]):
         if command_id and command_id.startswith("cmd-"):
             command = command_id[4:]  # Remove "cmd-" prefix
             self.dismiss({"command": command})
+
+
+class NoteViewModal(ModalScreen[dict[str, Any] | None]):
+    """Modal for viewing and editing note content."""
+
+    CSS = """
+    NoteViewModal {
+        align: center middle;
+    }
+
+    #dialog {
+        width: 90;
+        height: 35;
+        border: thick $background 80%;
+        background: $surface;
+        padding: 1 2;
+    }
+
+    #content-area {
+        height: 20;
+    }
+
+    #buttons {
+        height: 3;
+        align: center middle;
+    }
+
+    Button {
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, note: dict[str, Any], editable: bool = True) -> None:
+        """Initialize note view modal.
+
+        Args:
+            note: Note data
+            editable: Whether to allow editing
+        """
+        super().__init__()
+        self.note = note
+        self.editable = editable
+        self.result: dict[str, Any] = {}
+
+    def compose(self) -> ComposeResult:
+        """Create modal widgets."""
+        with Container(id="dialog"):
+            yield Label(f"Note #{self.note.get('id', 'Unknown')}", classes="header")
+
+            # Show tags
+            labels = self.note.get("labels", [])
+            tags = [l.replace("tag:", "") for l in labels if l.startswith("tag:")]
+            if tags:
+                yield Label(f"Tags: {', '.join(tags)}")
+            else:
+                yield Label("Tags: (none)")
+
+            yield Label("")
+            yield Label("Content:")
+
+            # Content display/edit
+            content = self.note.get("body", "") or self.note.get("title", "")
+            if self.editable:
+                yield TextArea(text=content, id="content-area")
+            else:
+                yield Static(content, id="content-display")
+
+            with Grid(id="buttons"):
+                if self.editable:
+                    yield Button("Save", variant="primary", id="save-btn")
+                    yield Button("Promote", variant="default", id="promote-btn")
+                    yield Button("Delete", variant="error", id="delete-btn")
+                    yield Button("Close", variant="default", id="close-btn")
+                else:
+                    yield Button("Close", variant="primary", id="close-btn")
+
+    @on(Button.Pressed, "#save-btn")
+    def save_note(self) -> None:
+        """Save note changes."""
+        content_area = self.query_one("#content-area", TextArea)
+
+        self.result = {
+            "action": "save",
+            "id": self.note.get("id"),
+            "content": content_area.text,
+        }
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#promote-btn")
+    def promote_note(self) -> None:
+        """Promote note to task or reference."""
+        self.result = {
+            "action": "promote",
+            "id": self.note.get("id"),
+        }
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#delete-btn")
+    def delete_note(self) -> None:
+        """Delete note."""
+        self.result = {
+            "action": "delete",
+            "id": self.note.get("id"),
+        }
+        self.dismiss(self.result)
+
+    @on(Button.Pressed, "#close-btn")
+    def close_modal(self) -> None:
+        """Close modal."""
+        self.dismiss(None)
+
+
+class ConfirmDeleteModal(ModalScreen[bool]):
+    """Modal for confirming deletion."""
+
+    CSS = """
+    ConfirmDeleteModal {
+        align: center middle;
+    }
+
+    #dialog {
+        width: 60;
+        height: 15;
+        border: thick $error 80%;
+        background: $surface;
+        padding: 1 2;
+    }
+
+    #buttons {
+        height: 3;
+        align: center middle;
+    }
+
+    Button {
+        margin: 0 1;
+    }
+    """
+
+    def __init__(
+        self, item_type: str, item_id: str | int, item_title: str = ""
+    ) -> None:
+        """Initialize confirmation modal.
+
+        Args:
+            item_type: Type of item (task, note, reference)
+            item_id: ID of item to delete
+            item_title: Title/preview of item
+        """
+        super().__init__()
+        self.item_type = item_type
+        self.item_id = item_id
+        self.item_title = item_title
+
+    def compose(self) -> ComposeResult:
+        """Create modal widgets."""
+        with Container(id="dialog"):
+            yield Label("⚠️  Confirm Deletion", classes="header")
+            yield Label("")
+            yield Label(f"Delete {self.item_type} #{self.item_id}?")
+            if self.item_title:
+                preview = (
+                    self.item_title[:60] + "..."
+                    if len(self.item_title) > 60
+                    else self.item_title
+                )
+                yield Label(f'"{preview}"')
+            yield Label("")
+            yield Label("[red]This action cannot be undone.[/]")
+
+            with Grid(id="buttons"):
+                yield Button("Delete", variant="error", id="delete-btn")
+                yield Button("Cancel", variant="default", id="cancel-btn")
+
+    @on(Button.Pressed, "#delete-btn")
+    def confirm_delete(self) -> None:
+        """Confirm deletion."""
+        self.dismiss(True)
+
+    @on(Button.Pressed, "#cancel-btn")
+    def cancel_delete(self) -> None:
+        """Cancel deletion."""
+        self.dismiss(False)
