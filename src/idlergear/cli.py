@@ -108,6 +108,7 @@ plugin_app = typer.Typer(
 )
 graph_app = typer.Typer(help="Knowledge graph queries and population")
 knowledge_app = typer.Typer(help="Knowledge decay and relevance management")
+upstream_app = typer.Typer(help="Report bugs and features to IdlerGear upstream")
 
 app.add_typer(task_app, name="task")
 app.add_typer(note_app, name="note")
@@ -133,6 +134,7 @@ app.add_typer(file_app, name="file")
 app.add_typer(plugin_app, name="plugin")
 app.add_typer(graph_app, name="graph")
 app.add_typer(knowledge_app, name="knowledge")
+app.add_typer(upstream_app, name="upstream")
 
 
 # Helper functions
@@ -12319,6 +12321,126 @@ def knowledge_gaps(
     except Exception as e:
         typer.secho(f"Failed to detect gaps: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+
+
+@upstream_app.command("bug")
+def upstream_bug(
+    title: str = typer.Argument(..., help="Bug title"),
+    description: str = typer.Option(..., "--description", "-d", help="Bug description"),
+    steps: Optional[str] = typer.Option(
+        None, "--steps", "-s", help="Steps to reproduce"
+    ),
+    expected: Optional[str] = typer.Option(
+        None, "--expected", "-e", help="Expected behavior"
+    ),
+    actual: Optional[str] = typer.Option(
+        None, "--actual", "-a", help="Actual behavior"
+    ),
+    error: Optional[str] = typer.Option(None, "--error", help="Error output"),
+):
+    """Report a bug to IdlerGear upstream repository."""
+    from idlergear.upstream import report_bug, check_upstream_auth
+
+    # Check authentication
+    if not check_upstream_auth():
+        typer.secho(
+            "❌ Not authenticated with GitHub CLI",
+            fg=typer.colors.RED,
+        )
+        typer.echo("\nAuthenticate first:")
+        typer.echo("  gh auth login")
+        raise typer.Exit(1)
+
+    try:
+        typer.echo("📤 Creating bug report upstream...")
+
+        result = report_bug(
+            title=title,
+            description=description,
+            steps_to_reproduce=steps,
+            expected_behavior=expected,
+            actual_behavior=actual,
+            error_output=error,
+        )
+
+        typer.secho(
+            f"\n✅ Bug reported successfully!",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"   Issue: #{result['number']}")
+        typer.echo(f"   URL: {result['url']}")
+
+    except Exception as e:
+        typer.secho(f"Failed to report bug: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@upstream_app.command("feature")
+def upstream_feature(
+    title: str = typer.Argument(..., help="Feature title"),
+    description: str = typer.Option(
+        ..., "--description", "-d", help="Feature description"
+    ),
+    use_case: Optional[str] = typer.Option(
+        None, "--use-case", "-u", help="Why this is needed"
+    ),
+    solution: Optional[str] = typer.Option(
+        None, "--solution", "-s", help="Proposed solution"
+    ),
+):
+    """Request a feature for IdlerGear."""
+    from idlergear.upstream import report_feature, check_upstream_auth
+
+    # Check authentication
+    if not check_upstream_auth():
+        typer.secho(
+            "❌ Not authenticated with GitHub CLI",
+            fg=typer.colors.RED,
+        )
+        typer.echo("\nAuthenticate first:")
+        typer.echo("  gh auth login")
+        raise typer.Exit(1)
+
+    try:
+        typer.echo("📤 Creating feature request upstream...")
+
+        result = report_feature(
+            title=title,
+            description=description,
+            use_case=use_case,
+            proposed_solution=solution,
+        )
+
+        typer.secho(
+            f"\n✅ Feature request submitted!",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo(f"   Issue: #{result['number']}")
+        typer.echo(f"   URL: {result['url']}")
+
+    except Exception as e:
+        typer.secho(
+            f"Failed to submit feature request: {e}", fg=typer.colors.RED, err=True
+        )
+        raise typer.Exit(1)
+
+
+@upstream_app.command("status")
+def upstream_status():
+    """Check GitHub CLI authentication status."""
+    from idlergear.upstream import check_upstream_auth
+
+    if check_upstream_auth():
+        typer.secho("✅ Authenticated with GitHub CLI", fg=typer.colors.GREEN)
+        typer.echo("\nYou can report issues upstream:")
+        typer.echo('  idlergear upstream bug "Title" -d "Description"')
+        typer.echo('  idlergear upstream feature "Title" -d "Description"')
+    else:
+        typer.secho("❌ Not authenticated with GitHub CLI", fg=typer.colors.RED)
+        typer.echo("\nAuthenticate first:")
+        typer.echo("  gh auth login")
+        typer.echo("\nOr install GitHub CLI:")
+        typer.echo("  https://cli.github.com/")
 
 
 if __name__ == "__main__":
