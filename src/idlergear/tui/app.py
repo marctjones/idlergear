@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -695,6 +696,10 @@ class IdlerGearApp(App):
         self.logger = setup_tui_logging(project_name=project_name)
         self.logger.info(f"TUI initialized for project root: {self.project_root}")
 
+        # Daemon listener
+        self._daemon_client = None
+        self._daemon_listener_task = None
+
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield Header()
@@ -718,6 +723,9 @@ class IdlerGearApp(App):
     def on_mount(self) -> None:
         """Load initial data when app starts."""
         self.load_all_data()
+
+        # Start daemon event listener in background
+        self._daemon_listener_task = asyncio.create_task(self._daemon_event_listener())
 
     def load_all_data(self) -> None:
         """Load data from IdlerGear project."""
@@ -1152,6 +1160,117 @@ class IdlerGearApp(App):
 
         # Use run_worker to execute async code without blocking
         self.run_worker(_load_async(), exclusive=False)
+
+    async def _daemon_event_listener(self) -> None:
+        """Background task to listen for daemon broadcasts and auto-refresh."""
+        logger = get_logger()
+
+        try:
+            from idlergear.config import find_idlergear_root
+            from idlergear.daemon.client import DaemonClient
+
+            root = find_idlergear_root()
+            if root is None:
+                logger.debug("No IdlerGear root found, daemon listener disabled")
+                return
+
+            socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
+
+            if not socket_path.exists():
+                logger.debug(
+                    "Daemon socket not found, daemon listener disabled. "
+                    "Start daemon with: idlergear daemon start"
+                )
+                return
+
+            # Create custom client that handles notifications
+            class TUIDaemonClient(DaemonClient):
+                def __init__(self, socket_path, app):
+                    super().__init__(socket_path)
+                    self.app = app
+
+                async def _handle_notification(self, notification):
+                    """Handle daemon broadcast notifications."""
+                    method = notification.method
+
+                    logger.debug(f"Received daemon notification: {method}")
+
+                    # Map notification types to refresh actions
+                    if method in [
+                        "knowledge.task_created",
+                        "knowledge.task_updated",
+                        "knowledge.task_closed",
+                    ]:
+                        # Refresh tasks
+                        self.app.load_tasks()
+                        self.app.load_stats()
+                        self.app.notify(
+                            "Tasks updated by another agent",
+                            severity="information",
+                            timeout=2,
+                        )
+
+                    elif method in [
+                        "knowledge.note_created",
+                        "knowledge.note_updated",
+                    ]:
+                        # Refresh notes
+                        self.app.load_notes()
+                        self.app.load_stats()
+                        self.app.notify(
+                            "Notes updated by another agent",
+                            severity="information",
+                            timeout=2,
+                        )
+
+                    elif method in [
+                        "knowledge.reference_created",
+                        "knowledge.reference_updated",
+                    ]:
+                        # Refresh graph
+                        self.app.load_graph()
+                        self.app.notify(
+                            "References updated by another agent",
+                            severity="information",
+                            timeout=2,
+                        )
+
+                    elif method == "knowledge.graph_updated":
+                        # Refresh graph
+                        self.app.load_graph()
+                        self.app.notify(
+                            "Knowledge graph updated", severity="information", timeout=2
+                        )
+
+                    elif method == "daemon.agent_registered":
+                        # Refresh daemon status
+                        self.app.load_daemon_status()
+
+                    elif method == "daemon.agent_unregistered":
+                        # Refresh daemon status
+                        self.app.load_daemon_status()
+
+                    else:
+                        # Unknown notification type
+                        logger.debug(f"Unhandled notification: {method}")
+
+            # Connect to daemon
+            self._daemon_client = TUIDaemonClient(socket_path, self)
+            await self._daemon_client.connect()
+
+            logger.info("Connected to daemon for real-time updates")
+            self.notify(
+                "Connected to daemon - TUI will auto-refresh on changes",
+                severity="information",
+            )
+
+            # Keep connection alive until app exits
+            while True:
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.debug(f"Daemon listener error: {e}")
+            # Daemon not available, continue without real-time updates
 
     def action_refresh(self) -> None:
         """Refresh all data."""
