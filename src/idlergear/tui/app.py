@@ -564,9 +564,10 @@ class IdlerGearApp(App):
         super().__init__()
         self.project_root = project_root or Path.cwd()
 
-        # Initialize logging
-        self.logger = setup_tui_logging()
-        self.logger.info(f"TUI initialized for project: {self.project_root}")
+        # Initialize logging with project name
+        project_name = self.project_root.name
+        self.logger = setup_tui_logging(project_name=project_name)
+        self.logger.info(f"TUI initialized for project root: {self.project_root}")
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -679,9 +680,10 @@ class IdlerGearApp(App):
                 from idlergear.graph import get_database
 
                 graph = get_database()
-                result = graph.query("MATCH (n) RETURN count(n) AS count")
-                if result:
-                    stats["graph_nodes"] = result[0].get("count", 0)
+                result = graph.execute("MATCH (n) RETURN count(n) AS count")
+                rows = result.get_as_df()
+                if not rows.empty:
+                    stats["graph_nodes"] = int(rows.iloc[0]["count"])
                 else:
                     stats["graph_nodes"] = 0
             except Exception as e:
@@ -804,13 +806,14 @@ class IdlerGearApp(App):
             # Add node type branches
             try:
                 # Count each node type
-                result = graph.query(
+                result = graph.execute(
                     "MATCH (n) RETURN labels(n) AS labels, count(n) AS count"
                 )
 
-                for row in result:
-                    labels = row.get("labels", [])
-                    count = row.get("count", 0)
+                rows = result.get_as_df()
+                for _, row in rows.iterrows():
+                    labels = row["labels"]
+                    count = row["count"]
                     if labels:
                         label_str = (
                             labels[0] if isinstance(labels, list) else str(labels)
