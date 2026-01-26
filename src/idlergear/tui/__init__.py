@@ -1,13 +1,10 @@
-"""TUI (Terminal User Interface) package for IdlerGear."""
+"""IdlerGear Terminal User Interface (TUI).
 
-from idlergear.tui.app import run_monitor
-from idlergear.tui.monitor import SessionTailer, parse_event
-from idlergear.tui.session_finder import find_claude_session_file, get_session_metadata
+Interactive dashboard for examining project knowledge state across all IdlerGear
+knowledge types: tasks, notes, vision, plans, references, file registry, graph,
+sessions, and daemon state.
+"""
 
-__all__ = [
-    "run_monitor",
-    "SessionTailer",
-    "parse_event",
-    "find_claude_session_file",
-    "get_session_metadata",
-]
+from .app import IdlerGearApp
+
+__all__ = ["IdlerGearApp"]

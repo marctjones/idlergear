@@ -368,6 +368,54 @@ def context(
 
 
 @app.command()
+def tui(
+    project_path: Optional[Path] = typer.Option(
+        None, "--project", "-p", help="Project path (default: current directory)"
+    ),
+):
+    """Launch interactive TUI dashboard.
+
+    Opens a terminal-based interactive dashboard for examining IdlerGear state:
+    - Tasks overview with filtering and sorting
+    - Notes and explorations browser
+    - Knowledge graph visualization
+    - Gap detection and alerts
+    - Daemon monitoring
+    - Real-time statistics
+
+    Navigate with arrow keys, Tab to switch panels, 'q' to quit.
+
+    Examples:
+        idlergear tui                  # Launch TUI for current project
+        idlergear tui --project ~/dev  # Launch TUI for specific project
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.tui import IdlerGearApp
+
+    # Find project root
+    if project_path is None:
+        project_root = find_idlergear_root()
+        if project_root is None:
+            typer.secho(
+                "Not in an IdlerGear project. Run 'idlergear init' first.",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+    else:
+        project_root = project_path.resolve()
+        if not (project_root / ".idlergear").exists():
+            typer.secho(
+                f"Not an IdlerGear project: {project_root}",
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(1)
+
+    # Launch TUI
+    app = IdlerGearApp(project_root=project_root)
+    app.run()
+
+
+@app.command()
 def status(
     ctx: typer.Context,
     detailed: bool = typer.Option(
