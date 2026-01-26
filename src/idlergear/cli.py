@@ -12125,5 +12125,201 @@ def knowledge_prune(
         raise typer.Exit(1)
 
 
+@knowledge_app.command("gaps")
+def knowledge_gaps(
+    gap_type: Optional[str] = typer.Option(
+        None, "--type", help="Filter by gap type (missing_reference, stale_task, etc.)"
+    ),
+    fix: bool = typer.Option(False, "--fix", help="Auto-fix simple gaps"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    project_path: Optional[Path] = typer.Option(None, "--project", help="Project path"),
+):
+    """Detect knowledge gaps and suggest improvements."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.gap_detector import GapDetector, GapType, GapSeverity
+
+    if project_path is None:
+        project_path = find_idlergear_root()
+
+    if project_path is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        detector = GapDetector(project_root=project_path)
+
+        # Parse gap type filter
+        gap_types = None
+        if gap_type:
+            try:
+                gap_types = [GapType(gap_type)]
+            except ValueError:
+                typer.secho(
+                    f"Unknown gap type: {gap_type}",
+                    fg=typer.colors.RED,
+                )
+                typer.secho(
+                    f"Available types: {', '.join(t.value for t in GapType)}",
+                    fg=typer.colors.YELLOW,
+                )
+                raise typer.Exit(1)
+
+        # Detect gaps
+        gaps = detector.detect_gaps(gap_types=gap_types)
+
+        if json_output:
+            # JSON output
+            output = {
+                "total_gaps": len(gaps),
+                "by_severity": {
+                    "critical": len(
+                        [g for g in gaps if g.severity == GapSeverity.CRITICAL]
+                    ),
+                    "high": len([g for g in gaps if g.severity == GapSeverity.HIGH]),
+                    "medium": len(
+                        [g for g in gaps if g.severity == GapSeverity.MEDIUM]
+                    ),
+                    "low": len([g for g in gaps if g.severity == GapSeverity.LOW]),
+                    "info": len([g for g in gaps if g.severity == GapSeverity.INFO]),
+                },
+                "gaps": [g.to_dict() for g in gaps],
+            }
+            typer.echo(json.dumps(output, indent=2))
+            return
+
+        # Human-readable output
+        if not gaps:
+            typer.secho("💚 No knowledge gaps detected!", fg=typer.colors.GREEN)
+            typer.echo("\nYour project knowledge base looks healthy:")
+            typer.echo("  ✓ References exist for high-activity topics")
+            typer.echo("  ✓ Recent commits are documented")
+            typer.echo("  ✓ Questions have been answered")
+            typer.echo("  ✓ Tasks are organized and up-to-date")
+            return
+
+        typer.secho("\n📊 Knowledge Gap Analysis\n", bold=True)
+
+        # Group by severity
+        by_severity = {
+            GapSeverity.CRITICAL: [],
+            GapSeverity.HIGH: [],
+            GapSeverity.MEDIUM: [],
+            GapSeverity.LOW: [],
+            GapSeverity.INFO: [],
+        }
+
+        for gap in gaps:
+            by_severity[gap.severity].append(gap)
+
+        # Display by severity
+        if by_severity[GapSeverity.CRITICAL]:
+            typer.secho(
+                f"🔴 CRITICAL ({len(by_severity[GapSeverity.CRITICAL])} gaps)",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+            for gap in by_severity[GapSeverity.CRITICAL]:
+                typer.echo(f"  • {gap.message}")
+                typer.secho(f"    → {gap.suggestion}", fg=typer.colors.CYAN)
+                typer.echo()
+
+        if by_severity[GapSeverity.HIGH]:
+            typer.secho(
+                f"🟠 HIGH PRIORITY ({len(by_severity[GapSeverity.HIGH])} gaps)",
+                fg=typer.colors.YELLOW,
+                bold=True,
+            )
+            for gap in by_severity[GapSeverity.HIGH]:
+                typer.echo(f"  • {gap.message}")
+                typer.secho(f"    → {gap.suggestion}", fg=typer.colors.CYAN)
+                if fix and gap.fixable:
+                    typer.secho(
+                        f"    [Auto-fixable: {gap.fix_command}]", fg=typer.colors.GREEN
+                    )
+                typer.echo()
+
+        if by_severity[GapSeverity.MEDIUM]:
+            typer.secho(
+                f"🟡 MEDIUM PRIORITY ({len(by_severity[GapSeverity.MEDIUM])} gaps)",
+                fg=typer.colors.YELLOW,
+            )
+            for gap in by_severity[GapSeverity.MEDIUM]:
+                typer.echo(f"  • {gap.message}")
+                typer.secho(f"    → {gap.suggestion}", fg=typer.colors.CYAN)
+                if fix and gap.fixable:
+                    typer.secho(
+                        f"    [Auto-fixable: {gap.fix_command}]", fg=typer.colors.GREEN
+                    )
+                typer.echo()
+
+        if by_severity[GapSeverity.LOW]:
+            typer.secho(
+                f"🔵 LOW PRIORITY ({len(by_severity[GapSeverity.LOW])} gaps)",
+                fg=typer.colors.BLUE,
+            )
+            for gap in by_severity[GapSeverity.LOW]:
+                typer.echo(f"  • {gap.message}")
+                typer.secho(f"    → {gap.suggestion}", dim=True)
+
+        if by_severity[GapSeverity.INFO]:
+            typer.secho(
+                f"ℹ️  INFO ({len(by_severity[GapSeverity.INFO])} items)",
+                fg=typer.colors.CYAN,
+            )
+            for gap in by_severity[GapSeverity.INFO]:
+                typer.echo(f"  • {gap.message}")
+
+        # Summary
+        typer.echo()
+        fixable_count = len([g for g in gaps if g.fixable])
+        if fix:
+            # Auto-fix gaps
+            if fixable_count > 0:
+                typer.echo(f"\n🔧 Auto-fixing {fixable_count} gaps...")
+                fixed = 0
+                for gap in gaps:
+                    if gap.fixable and gap.fix_command:
+                        try:
+                            import subprocess
+
+                            result = subprocess.run(
+                                gap.fix_command.split(),
+                                capture_output=True,
+                                text=True,
+                            )
+                            if result.returncode == 0:
+                                typer.secho(
+                                    f"  ✓ Fixed: {gap.message}", fg=typer.colors.GREEN
+                                )
+                                fixed += 1
+                            else:
+                                typer.secho(
+                                    f"  ✗ Failed: {gap.message}", fg=typer.colors.RED
+                                )
+                        except Exception as e:
+                            typer.secho(
+                                f"  ✗ Error fixing {gap.message}: {e}",
+                                fg=typer.colors.RED,
+                            )
+
+                typer.secho(
+                    f"\n✅ Fixed {fixed}/{fixable_count} gaps", fg=typer.colors.GREEN
+                )
+            else:
+                typer.echo("No auto-fixable gaps found.")
+        elif fixable_count > 0:
+            typer.secho(
+                f"\n💡 Tip: Run with --fix to automatically fix {fixable_count} gaps",
+                fg=typer.colors.CYAN,
+            )
+
+    except Exception as e:
+        typer.secho(f"Failed to detect gaps: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
