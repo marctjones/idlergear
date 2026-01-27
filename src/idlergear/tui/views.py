@@ -28,6 +28,7 @@ class ByTypeView(BaseView):
         """Organize by type: tasks, notes, references, files."""
         root = Tree("📚 Knowledge Base (By Type)")
         root.data = {}
+        root.root.expand()  # Expand root node by default
 
         # Tasks organized by priority
         tasks = self.data.get("tasks", [])
@@ -83,8 +84,11 @@ class ByTypeView(BaseView):
                     f"#{tag} ({len(tag_notes)})", data={"type": "tag", "tag": tag}
                 )
                 for note in tag_notes[:10]:  # Limit to 10 per tag
+                    # Extract first line of content as title
+                    content = note.get('content', '')
+                    title = content.split('\n')[0][:50] if content else f"Note {note['id']}"
                     tag_node.add_leaf(
-                        f"#{note['id']} {note['title']}",
+                        f"#{note['id']} {title}",
                         data={"type": "note", "note": note},
                     )
 
@@ -131,33 +135,48 @@ class ByTypeView(BaseView):
 
     async def refresh_data(self) -> None:
         """Load all knowledge types."""
+        self.logger.info(f"refresh_data() - ByTypeView starting data load")
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
+            self.logger.warning(f"refresh_data() - No project_root found, skipping data load")
             return
+
+        # Build complete data dict first, then assign once to avoid multiple tree rebuilds
+        data = {}
 
         # Load tasks
         try:
+            self.logger.debug(f"refresh_data() - Loading tasks from {project_path}")
             tasks = list_tasks(state="open", project_path=project_path)
-            self.data = {"tasks": tasks}
-        except Exception:
-            self.data = {"tasks": []}
+            data["tasks"] = tasks
+            self.logger.debug(f"refresh_data() - Loaded {len(tasks)} tasks")
+        except Exception as e:
+            self.logger.error(f"refresh_data() - Error loading tasks: {e}", exc_info=True)
+            data["tasks"] = []
 
         # Load notes
         try:
+            self.logger.debug(f"refresh_data() - Loading notes from {project_path}")
             notes = list_notes(project_path=project_path)
-            self.data["notes"] = notes
-        except Exception:
-            self.data["notes"] = []
+            data["notes"] = notes
+            self.logger.debug(f"refresh_data() - Loaded {len(notes)} notes")
+        except Exception as e:
+            self.logger.error(f"refresh_data() - Error loading notes: {e}", exc_info=True)
+            data["notes"] = []
 
         # Load references
         try:
+            self.logger.debug(f"refresh_data() - Loading references from {project_path}")
             references = list_references(project_path=project_path)
-            self.data["references"] = references
-        except Exception:
-            self.data["references"] = []
+            data["references"] = references
+            self.logger.debug(f"refresh_data() - Loaded {len(references)} references")
+        except Exception as e:
+            self.logger.error(f"refresh_data() - Error loading references: {e}", exc_info=True)
+            data["references"] = []
 
         # Load files
         try:
+            self.logger.debug(f"refresh_data() - Loading files from registry")
             registry = FileRegistry()
             file_entries = registry.list_files()
             # Convert FileEntry objects to dicts for display
@@ -170,9 +189,15 @@ class ByTypeView(BaseView):
                 }
                 for entry in file_entries
             ]
-            self.data["files"] = files
-        except Exception:
-            self.data["files"] = []
+            data["files"] = files
+            self.logger.debug(f"refresh_data() - Loaded {len(files)} files")
+        except Exception as e:
+            self.logger.error(f"refresh_data() - Error loading files: {e}", exc_info=True)
+            data["files"] = []
+
+        # Assign complete data dict once to trigger single tree rebuild
+        self.data = data
+        self.logger.info(f"refresh_data() - ByTypeView data load complete")
 
 
 class ByProjectView(BaseView):
@@ -214,15 +239,22 @@ class ByProjectView(BaseView):
 
     async def refresh_data(self) -> None:
         """Load project data."""
+        self.logger.info(f"refresh_data() - ByProjectView starting data load")
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
+            self.logger.warning(f"refresh_data() - No project_root found, skipping data load")
             return
 
         try:
+            self.logger.debug(f"refresh_data() - Loading tasks from {project_path}")
             tasks = list_tasks(state="open", project_path=project_path)
             self.data = {"tasks": tasks}
-        except Exception:
+            self.logger.debug(f"refresh_data() - Loaded {len(tasks)} tasks")
+        except Exception as e:
+            self.logger.error(f"refresh_data() - Error loading tasks: {e}", exc_info=True)
             self.data = {"tasks": []}
+
+        self.logger.info(f"refresh_data() - ByProjectView data load complete")
 
 
 class ByTimeView(BaseView):
@@ -306,15 +338,22 @@ class ByTimeView(BaseView):
 
     async def refresh_data(self) -> None:
         """Load time-based data."""
+        self.logger.info(f"refresh_data() - ByTimeView starting data load")
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
+            self.logger.warning(f"refresh_data() - No project_root found, skipping data load")
             return
 
         try:
+            self.logger.debug(f"refresh_data() - Loading tasks from {project_path}")
             tasks = list_tasks(state="open", project_path=project_path)
             self.data = {"tasks": tasks}
-        except Exception:
+            self.logger.debug(f"refresh_data() - Loaded {len(tasks)} tasks")
+        except Exception as e:
+            self.logger.error(f"refresh_data() - Error loading tasks: {e}", exc_info=True)
             self.data = {"tasks": []}
+
+        self.logger.info(f"refresh_data() - ByTimeView data load complete")
 
 
 class GapsView(BaseView):
@@ -357,15 +396,19 @@ class GapsView(BaseView):
 
     async def refresh_data(self) -> None:
         """Load gap data."""
+        self.logger.info(f"refresh_data() - GapsView starting gap detection")
         from idlergear.gaps import detect_gaps
 
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
+            self.logger.warning(f"refresh_data() - No project_root found, skipping gap detection")
             self.data = {"gaps": []}
             return
 
         # Detect knowledge gaps
+        self.logger.debug(f"refresh_data() - Running gap detection on {project_path}")
         gaps = detect_gaps(project_path)
+        self.logger.debug(f"refresh_data() - Detected {len(gaps)} gaps")
 
         # Convert to dict format for tree
         gap_dicts = [
@@ -380,6 +423,7 @@ class GapsView(BaseView):
         ]
 
         self.data = {"gaps": gap_dicts}
+        self.logger.info(f"refresh_data() - GapsView gap detection complete")
 
 
 class ActivityView(BaseView):
@@ -413,15 +457,19 @@ class ActivityView(BaseView):
 
     async def refresh_data(self) -> None:
         """Load activity data and suggestions."""
+        self.logger.info(f"refresh_data() - ActivityView starting suggestion generation")
         from idlergear.suggestions import generate_suggestions
 
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
+            self.logger.warning(f"refresh_data() - No project_root found, skipping suggestions")
             self.data = {"suggestions": []}
             return
 
         # Generate suggestions
+        self.logger.debug(f"refresh_data() - Generating suggestions for {project_path}")
         suggestions = generate_suggestions(project_path)
+        self.logger.debug(f"refresh_data() - Generated {len(suggestions)} suggestions")
 
         # Convert to dict format
         suggestion_dicts = [
@@ -438,6 +486,7 @@ class ActivityView(BaseView):
         ]
 
         self.data = {"suggestions": suggestion_dicts}
+        self.logger.info(f"refresh_data() - ActivityView suggestion generation complete")
 
 
 class AIMonitorView(BaseView):
@@ -545,24 +594,32 @@ class AIMonitorView(BaseView):
 
     async def refresh_data(self) -> None:
         """Load AI monitoring data from daemon."""
+        self.logger.info(f"refresh_data() - AIMonitorView querying daemon for AI agents")
         from idlergear.daemon.client import get_daemon_client, DaemonNotRunning
 
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
+            self.logger.warning(f"refresh_data() - No project_root found, skipping daemon query")
             self.data = {"agents": []}
             return
 
         try:
             if self._daemon_client is None:
+                self.logger.debug(f"refresh_data() - Creating daemon client")
                 self._daemon_client = get_daemon_client(project_path)
 
             # Get list of active agents
+            self.logger.debug(f"refresh_data() - Calling agent.list on daemon")
             response = await self._daemon_client.call("agent.list", {})
             agents = response.get("agents", [])
+            self.logger.debug(f"refresh_data() - Received {len(agents)} active AI agents")
             self.data = {"agents": agents}
+            self.logger.info(f"refresh_data() - AIMonitorView daemon query complete")
         except DaemonNotRunning:
+            self.logger.warning(f"refresh_data() - Daemon not running")
             self.data = {"agents": [], "error": "Daemon not running"}
         except Exception as e:
+            self.logger.error(f"refresh_data() - Error querying daemon: {e}", exc_info=True)
             self.data = {"agents": [], "error": str(e)}
 
     def on_mount(self) -> None:

@@ -99,60 +99,114 @@ class IdlerGearAppV2(App):
         self.daemon_client = None
         self._daemon_listener_task = None
 
+        # Enable console logging for debugging
+        import logging
+        logging.basicConfig(
+            filename='/tmp/idlergear-tui.log',
+            level=logging.DEBUG,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        self.logger = logging.getLogger('IdlerGearTUI')
+        self.logger.info(f"=== TUI Initializing with project_root={project_root} ===")
+
     def compose(self) -> ComposeResult:
         """Compose app layout."""
+        self.logger.info("compose() - Starting composition")
+
+        self.logger.debug("compose() - Yielding Header")
         yield Header()
 
         # View switcher header
+        self.logger.debug("compose() - Creating ViewSwitcher")
         self.view_switcher = ViewSwitcher()
         yield self.view_switcher
 
         # Main container for views
+        self.logger.debug("compose() - Creating main container with 6 views")
         with Container(id="main-container"):
             # Create all 6 views with project_root (initially hidden except view 1)
+            self.logger.debug("compose() - Creating ByTypeView (view-1)")
             yield ByTypeView(project_root=self.project_root, id="view-1")
-            yield ByProjectView(project_root=self.project_root, id="view-2").add_class(
-                "hidden"
-            )
-            yield ByTimeView(project_root=self.project_root, id="view-3").add_class(
-                "hidden"
-            )
-            yield GapsView(project_root=self.project_root, id="view-4").add_class(
-                "hidden"
-            )
-            yield ActivityView(project_root=self.project_root, id="view-5").add_class(
-                "hidden"
-            )
-            yield AIMonitorView(project_root=self.project_root, id="view-6").add_class(
-                "hidden"
-            )
 
+            self.logger.debug("compose() - Creating ByProjectView (view-2)")
+            view2 = ByProjectView(project_root=self.project_root, id="view-2")
+            view2.display = False
+            yield view2
+
+            self.logger.debug("compose() - Creating ByTimeView (view-3)")
+            view3 = ByTimeView(project_root=self.project_root, id="view-3")
+            view3.display = False
+            yield view3
+
+            self.logger.debug("compose() - Creating GapsView (view-4)")
+            view4 = GapsView(project_root=self.project_root, id="view-4")
+            view4.display = False
+            yield view4
+
+            self.logger.debug("compose() - Creating ActivityView (view-5)")
+            view5 = ActivityView(project_root=self.project_root, id="view-5")
+            view5.display = False
+            yield view5
+
+            self.logger.debug("compose() - Creating AIMonitorView (view-6)")
+            view6 = AIMonitorView(project_root=self.project_root, id="view-6")
+            view6.display = False
+            yield view6
+
+        self.logger.debug("compose() - Yielding Footer")
         yield Footer()
+
+        self.logger.info("compose() - Composition complete")
 
     def on_mount(self) -> None:
         """Initialize view manager after mounting."""
-        container = self.query_one("#main-container", Container)
+        self.logger.info("on_mount() - App mounted, initializing views")
 
-        # Initialize view manager
-        self.view_manager = ViewManager(container)
+        try:
+            self.logger.debug("on_mount() - Querying main container")
+            container = self.query_one("#main-container", Container)
 
-        # Register all views
-        self.view_manager.register_view(self.query_one("#view-1", ByTypeView))
-        self.view_manager.register_view(self.query_one("#view-2", ByProjectView))
-        self.view_manager.register_view(self.query_one("#view-3", ByTimeView))
-        self.view_manager.register_view(self.query_one("#view-4", GapsView))
-        self.view_manager.register_view(self.query_one("#view-5", ActivityView))
-        self.view_manager.register_view(self.query_one("#view-6", AIMonitorView))
+            # Initialize view manager
+            self.logger.debug("on_mount() - Creating ViewManager")
+            self.view_manager = ViewManager(container)
 
-        # Switch to default view (By Type)
-        self.view_manager.switch_to_view(1)
+            # Register all views
+            self.logger.debug("on_mount() - Registering view 1 (ByTypeView)")
+            self.view_manager.register_view(self.query_one("#view-1", ByTypeView))
 
-        # Set app title
-        self.title = "IdlerGear - Multi-Agent Knowledge Management"
-        self.sub_title = "View 1: By Type"
+            self.logger.debug("on_mount() - Registering view 2 (ByProjectView)")
+            self.view_manager.register_view(self.query_one("#view-2", ByProjectView))
 
-        # Start daemon listener for real-time updates
-        self.run_worker(self._start_daemon_listener(), exclusive=True)
+            self.logger.debug("on_mount() - Registering view 3 (ByTimeView)")
+            self.view_manager.register_view(self.query_one("#view-3", ByTimeView))
+
+            self.logger.debug("on_mount() - Registering view 4 (GapsView)")
+            self.view_manager.register_view(self.query_one("#view-4", GapsView))
+
+            self.logger.debug("on_mount() - Registering view 5 (ActivityView)")
+            self.view_manager.register_view(self.query_one("#view-5", ActivityView))
+
+            self.logger.debug("on_mount() - Registering view 6 (AIMonitorView)")
+            self.view_manager.register_view(self.query_one("#view-6", AIMonitorView))
+
+            # Switch to default view (By Type)
+            self.logger.debug("on_mount() - Switching to default view (1)")
+            self.view_manager.switch_to_view(1)
+
+            # Set app title
+            self.logger.debug("on_mount() - Setting app title")
+            self.title = "IdlerGear - Multi-Agent Knowledge Management"
+            self.sub_title = "View 1: By Type"
+
+            # Start daemon listener for real-time updates
+            self.logger.debug("on_mount() - Starting daemon listener worker")
+            self.run_worker(self._start_daemon_listener(), exclusive=True)
+
+            self.logger.info("on_mount() - Mount complete, TUI ready")
+
+        except Exception as e:
+            self.logger.error(f"on_mount() - ERROR: {e}", exc_info=True)
+            raise
 
     def action_switch_view(self, view_id: int) -> None:
         """Switch to a different view.
@@ -223,7 +277,7 @@ class IdlerGearAppV2(App):
                         # Refresh AI Monitor view
                         view = self.app.view_manager.views.get(6)
                         if view:
-                            view.refresh()
+                            view.reload_data()
 
                     # Handle knowledge updates
                     elif method in [

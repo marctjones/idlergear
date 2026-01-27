@@ -40,6 +40,12 @@ class BaseView(Static):
         self.view_name = view_name
         self.project_root = project_root
         self._tree: Tree[dict] | None = None
+        self._rebuilding = False  # Flag to prevent recursive rebuilds
+
+        # Setup logging
+        import logging
+        self.logger = logging.getLogger(f'TUI.View.{view_name}')
+        self.logger.info(f"View {view_id} ({view_name}) initialized with project_root={project_root}")
 
     def compose_tree(self) -> Tree[dict]:
         """Compose the tree structure for this view.
@@ -64,51 +70,82 @@ class BaseView(Static):
 
     def on_mount(self) -> None:
         """Called when view is mounted."""
-        # Initialize with empty tree immediately so something shows
-        if self._tree is None:
-            self._tree = self.compose_tree()
-            self._tree.show_root = True
-            self._tree.show_guides = True
-            self.mount(self._tree)
+        self.logger.info(f"on_mount() - View {self.view_id} ({self.view_name}) mounting")
 
-        # Then load data asynchronously
+        # Load data asynchronously - tree will be created when data arrives via watch_data()
+        self.logger.debug(f"on_mount() - Starting async refresh worker for {self.view_name}")
         self.run_worker(self._async_refresh(), exclusive=True)
 
     async def _async_refresh(self) -> None:
         """Async helper to refresh data."""
+        self.logger.debug(f"_async_refresh() - Starting data refresh for {self.view_name}")
         try:
             await self.refresh_data()
-            # Schedule tree rebuild on main thread after data is loaded
-            self.call_from_thread(self._rebuild_tree)
+            self.logger.debug(f"_async_refresh() - Data loaded for {self.view_name}")
+            # Note: Setting self.data in refresh_data() triggers watch_data() automatically
+            # which will rebuild the tree, so no need to call _rebuild_tree() here
         except Exception as e:
             # Log error but don't crash the view
+            self.logger.error(f"_async_refresh() - Error refreshing {self.view_name}: {e}", exc_info=True)
             self.app.log.error(f"Error refreshing {self.view_name}: {e}")
             # Set empty data to show something
             self.data = {}
 
     def _rebuild_tree(self) -> None:
         """Rebuild tree from current data (must be called from main thread)."""
-        if self._tree is not None:
-            # Remove old tree
-            try:
-                self._tree.remove()
-            except:
-                pass
+        # Prevent recursive rebuilds
+        if self._rebuilding:
+            self.logger.debug(f"_rebuild_tree() - Already rebuilding, skipping")
+            return
 
-        # Create new tree
-        self._tree = self.compose_tree()
-        self._tree.show_root = True
-        self._tree.show_guides = True
+        self._rebuilding = True
+        try:
+            self.logger.debug(f"_rebuild_tree() - Rebuilding tree for {self.view_name}")
 
-        # Mount new tree (safe because called from main thread)
-        self.mount(self._tree)
+            if self._tree is None:
+                # First time - create and mount tree
+                self.logger.debug(f"_rebuild_tree() - Creating initial tree for {self.view_name}")
+                self._tree = self.compose_tree()
+                self._tree.show_root = True
+                self._tree.show_guides = True
+                self._tree.can_focus = True
+                self.mount(self._tree)
+            else:
+                # Subsequent updates - remove old tree and mount new one
+                self.logger.debug(f"_rebuild_tree() - Rebuilding existing tree for {self.view_name}")
+
+                # Remove old tree
+                try:
+                    self._tree.remove()
+                except Exception as e:
+                    self.logger.warning(f"_rebuild_tree() - Error removing tree: {e}")
+
+                # Create and mount new tree
+                self._tree = self.compose_tree()
+                self._tree.show_root = True
+                self._tree.show_guides = True
+                self._tree.can_focus = True
+                self.mount(self._tree)
+
+                # Focus is handled by ViewManager.switch_to_view() - don't focus here
+                # to avoid triggering additional refresh cycles
+
+            self.logger.info(f"_rebuild_tree() - Tree rebuild complete for {self.view_name}")
+        finally:
+            self._rebuilding = False
 
     def watch_data(self, data: dict[str, Any]) -> None:
         """React to data changes."""
+        if self._rebuilding:
+            self.logger.debug(f"watch_data() - Rebuild in progress, skipping")
+            return
+
+        self.logger.debug(f"watch_data() - Data changed for {self.view_name}, triggering rebuild")
         self._rebuild_tree()
 
-    def refresh(self, **kwargs) -> None:
-        """Trigger a refresh (can be called from key bindings)."""
+    def reload_data(self) -> None:
+        """Reload data from backend (can be called from key bindings)."""
+        self.logger.info(f"reload_data() - Manual data reload triggered for {self.view_name}")
         self.run_worker(self._async_refresh(), exclusive=True)
 
 
@@ -175,8 +212,14 @@ class ViewManager:
 
         self.current_view_id = view_id
 
-        # Trigger refresh of new view
-        new_view.refresh()
+        # Focus the tree in the new view so arrow keys work
+        if new_view._tree is not None:
+            new_view._tree.focus()
+
+        # Don't trigger refresh - view already has data from:
+        # 1. Initial mount (on_mount calls _async_refresh)
+        # 2. Restored state (line 222)
+        # 3. Tree rebuilt when display=True or data changes
 
         return True
 
@@ -191,7 +234,7 @@ class ViewManager:
         return self.views.get(self.current_view_id)
 
     def refresh_current_view(self) -> None:
-        """Refresh the currently active view."""
+        """Reload data for the currently active view."""
         view = self.get_current_view()
         if view:
-            view.refresh()
+            view.reload_data()
