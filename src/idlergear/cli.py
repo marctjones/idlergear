@@ -1548,17 +1548,23 @@ def install(
 
     # Add CLAUDE.md section
     if not skip_claude:
-        if add_claude_md_section():
-            typer.secho("Added IdlerGear section to CLAUDE.md", fg=typer.colors.GREEN)
+        claude_result = add_claude_md_section()
+        if claude_result == "created":
+            typer.secho("Created IdlerGear section in CLAUDE.md", fg=typer.colors.GREEN)
+        elif claude_result == "updated":
+            typer.secho("Updated IdlerGear section in CLAUDE.md", fg=typer.colors.YELLOW)
         else:
-            typer.echo("CLAUDE.md already has IdlerGear section")
+            typer.echo("CLAUDE.md IdlerGear section unchanged")
 
     # Add AGENTS.md section
     if not skip_agents:
-        if add_agents_md_section():
-            typer.secho("Added IdlerGear section to AGENTS.md", fg=typer.colors.GREEN)
+        agents_result = add_agents_md_section()
+        if agents_result == "created":
+            typer.secho("Created IdlerGear section in AGENTS.md", fg=typer.colors.GREEN)
+        elif agents_result == "updated":
+            typer.secho("Updated IdlerGear section in AGENTS.md", fg=typer.colors.YELLOW)
         else:
-            typer.echo("AGENTS.md already has IdlerGear section")
+            typer.echo("AGENTS.md IdlerGear section unchanged")
 
     # Create rules file
     if not skip_rules:

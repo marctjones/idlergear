@@ -175,11 +175,13 @@ The IdlerGear MCP server is configured in `.mcp.json` and provides these tools d
 """
 
 
-def add_agents_md_section(project_path: Path | None = None) -> bool:
-    """Add IdlerGear section to AGENTS.md.
+def add_agents_md_section(project_path: Path | None = None) -> str:
+    """Add or update IdlerGear section to AGENTS.md.
 
-    Returns True if added, False if already present.
+    Returns 'created', 'updated', or 'unchanged'.
     """
+    import re
+
     if project_path is None:
         project_path = find_idlergear_root()
     if project_path is None:
@@ -189,15 +191,32 @@ def add_agents_md_section(project_path: Path | None = None) -> bool:
 
     if agents_path.exists():
         content = agents_path.read_text()
-        if "## IdlerGear" in content:
-            return False
-        # Append section
-        content = content.rstrip() + "\n\n" + AGENTS_MD_SECTION
-    else:
-        content = "# Agent Instructions\n\n" + AGENTS_MD_SECTION
 
-    agents_path.write_text(content)
-    return True
+        # Check if IdlerGear section exists
+        pattern = r"## IdlerGear\n.*?(?=\n## |\Z)"
+        match = re.search(pattern, content, re.DOTALL)
+
+        if match:
+            existing_section = match.group(0).rstrip()
+            expected_section = AGENTS_MD_SECTION.rstrip()
+
+            if existing_section == expected_section:
+                return "unchanged"
+            else:
+                # Replace outdated section
+                new_content = re.sub(pattern, AGENTS_MD_SECTION, content, flags=re.DOTALL)
+                agents_path.write_text(new_content)
+                return "updated"
+        else:
+            # Section doesn't exist, append it
+            content = content.rstrip() + "\n\n" + AGENTS_MD_SECTION
+            agents_path.write_text(content)
+            return "created"
+    else:
+        # Create new file
+        content = "# Agent Instructions\n\n" + AGENTS_MD_SECTION
+        agents_path.write_text(content)
+        return "created"
 
 
 def remove_agents_md_section(project_path: Path | None = None) -> bool:
@@ -257,11 +276,12 @@ See AGENTS.md for full command reference.
 """
 
 
-def add_claude_md_section(project_path: Path | None = None) -> bool:
-    """Add IdlerGear section to CLAUDE.md.
+def add_claude_md_section(project_path: Path | None = None) -> str:
+    """Add or update IdlerGear section to CLAUDE.md.
 
-    Returns True if added, False if already present.
+    Returns 'created', 'updated', or 'unchanged'.
     """
+    import re
 
     if project_path is None:
         project_path = find_idlergear_root()
@@ -272,15 +292,32 @@ def add_claude_md_section(project_path: Path | None = None) -> bool:
 
     if claude_path.exists():
         content = claude_path.read_text()
-        if "## IdlerGear Usage" in content:
-            return False
-        # Append section
-        content = content.rstrip() + "\n\n" + CLAUDE_MD_SECTION
-    else:
-        content = "# CLAUDE.md\n\n" + CLAUDE_MD_SECTION
 
-    claude_path.write_text(content)
-    return True
+        # Check if IdlerGear section exists
+        pattern = r"## IdlerGear Usage\n.*?(?=\n## |\Z)"
+        match = re.search(pattern, content, re.DOTALL)
+
+        if match:
+            existing_section = match.group(0).rstrip()
+            expected_section = CLAUDE_MD_SECTION.rstrip()
+
+            if existing_section == expected_section:
+                return "unchanged"
+            else:
+                # Replace outdated section
+                new_content = re.sub(pattern, CLAUDE_MD_SECTION, content, flags=re.DOTALL)
+                claude_path.write_text(new_content)
+                return "updated"
+        else:
+            # Section doesn't exist, append it
+            content = content.rstrip() + "\n\n" + CLAUDE_MD_SECTION
+            claude_path.write_text(content)
+            return "created"
+    else:
+        # Create new file
+        content = "# CLAUDE.md\n\n" + CLAUDE_MD_SECTION
+        claude_path.write_text(content)
+        return "created"
 
 
 def remove_claude_md_section(project_path: Path | None = None) -> bool:

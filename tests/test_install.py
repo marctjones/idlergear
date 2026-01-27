@@ -137,7 +137,7 @@ class TestAddAgentsMdSection:
         from idlergear.install import add_agents_md_section
 
         result = add_agents_md_section()
-        assert result is True
+        assert result == "created"
 
         agents_path = initialized_project / "AGENTS.md"
         assert agents_path.exists()
@@ -153,7 +153,8 @@ class TestAddAgentsMdSection:
         agents_path = initialized_project / "AGENTS.md"
         agents_path.write_text("# Existing Content\n\nSome instructions.\n")
 
-        add_agents_md_section()
+        result = add_agents_md_section()
+        assert result == "created"
 
         content = agents_path.read_text()
         assert "# Existing Content" in content
@@ -165,7 +166,25 @@ class TestAddAgentsMdSection:
         add_agents_md_section()
         result = add_agents_md_section()
 
-        assert result is False  # Already present
+        assert result == "unchanged"  # Already present
+
+    def test_update_outdated_section(self, initialized_project):
+        from idlergear.install import add_agents_md_section
+
+        # Create AGENTS.md with outdated IdlerGear section
+        agents_path = initialized_project / "AGENTS.md"
+        agents_path.write_text(
+            "# Agent Instructions\n\n"
+            "## IdlerGear\n\n"
+            "Old content that should be replaced.\n"
+        )
+
+        result = add_agents_md_section()
+        assert result == "updated"
+
+        content = agents_path.read_text()
+        assert "Old content that should be replaced" not in content
+        assert "idlergear vision show" in content  # New content present
 
 
 class TestRemoveAgentsMdSection:
@@ -237,7 +256,7 @@ class TestAddClaudeMdSection:
         from idlergear.install import add_claude_md_section
 
         result = add_claude_md_section()
-        assert result is True
+        assert result == "created"
 
         claude_path = initialized_project / "CLAUDE.md"
         assert claude_path.exists()
@@ -253,7 +272,8 @@ class TestAddClaudeMdSection:
         claude_path = initialized_project / "CLAUDE.md"
         claude_path.write_text("# My Project\n\nCustom project info.\n")
 
-        add_claude_md_section()
+        result = add_claude_md_section()
+        assert result == "created"
 
         content = claude_path.read_text()
         assert "# My Project" in content
@@ -266,7 +286,25 @@ class TestAddClaudeMdSection:
         add_claude_md_section()
         result = add_claude_md_section()
 
-        assert result is False  # Already present
+        assert result == "unchanged"  # Already present
+
+    def test_update_outdated_section(self, initialized_project):
+        from idlergear.install import add_claude_md_section
+
+        # Create CLAUDE.md with outdated IdlerGear section
+        claude_path = initialized_project / "CLAUDE.md"
+        claude_path.write_text(
+            "# My Project\n\n"
+            "## IdlerGear Usage\n\n"
+            "Old outdated content.\n"
+        )
+
+        result = add_claude_md_section()
+        assert result == "updated"
+
+        content = claude_path.read_text()
+        assert "Old outdated content" not in content
+        assert "idlergear context" in content  # New content present
 
 
 class TestRemoveClaudeMdSection:
