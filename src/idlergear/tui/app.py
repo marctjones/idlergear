@@ -10,6 +10,9 @@ This is the redesigned TUI with 6 organizational views:
 """
 
 import asyncio
+import json
+import re
+import subprocess
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -220,13 +223,67 @@ class IdlerGearApp(App):
             # Generic fallback
             return self._format_generic_details(data)
 
+    def _extract_issue_number_from_url(self, url: str) -> int | None:
+        """Extract issue number from a GitHub issue URL.
+
+        Args:
+            url: GitHub issue URL like "https://github.com/owner/repo/issues/123"
+
+        Returns:
+            Issue number as int, or None if parsing fails
+        """
+        # Match URLs like https://github.com/owner/repo/issues/123
+        match = re.search(r"/issues/(\d+)(?:\s|$|#)", url)
+        if match:
+            return int(match.group(1))
+        return None
+
+    def _fetch_github_issue(self, issue_number: int) -> dict | None:
+        """Fetch GitHub issue details using gh CLI.
+
+        Args:
+            issue_number: GitHub issue number
+
+        Returns:
+            Issue data dict or None if fetch fails
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "gh", "issue", "view", str(issue_number),
+                    "--json", "body,comments,labels,assignees,state,createdAt,updatedAt"
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=self.project_root
+            )
+
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+            else:
+                self.logger.error(f"Failed to fetch GitHub issue #{issue_number}: {result.stderr}")
+                return None
+
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Timeout fetching GitHub issue #{issue_number}")
+            return None
+        except FileNotFoundError:
+            self.logger.error("gh CLI not found - install GitHub CLI to view issue details")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error fetching GitHub issue: {e}")
+            return None
+
     def _format_task_details(self, task: dict) -> str:
-        """Format task details."""
+        """Format task details with GitHub issue content if available."""
         lines = []
-        lines.append(f"[bold]Task #{task.get('id', task.get('task_id', 'N/A'))}[/bold]")
+        task_id = task.get('id', task.get('task_id', 'N/A'))
+        lines.append(f"[bold]Task #{task_id}[/bold]")
         lines.append(f"[bold cyan]{task.get('title', 'Untitled')}[/bold cyan]")
         lines.append("")
 
+        # Metadata
         if task.get("priority"):
             lines.append(f"Priority: [yellow]{task['priority']}[/yellow]")
         if task.get("labels"):
@@ -237,10 +294,73 @@ class IdlerGearApp(App):
         if task.get("state"):
             lines.append(f"State: {task['state']}")
 
+        # Check if task has GitHub issue URL
+        github_url = task.get("url", "")
+        github_issue = None
+        if github_url and "github.com" in github_url:
+            lines.append(f"GitHub: {github_url}")
+
+            # Extract issue number and fetch content
+            issue_number = self._extract_issue_number_from_url(github_url)
+            if issue_number:
+                github_issue = self._fetch_github_issue(issue_number)
+
         lines.append("")
-        body = task.get("body", "No description")
-        lines.append("[bold]Description:[/bold]")
-        lines.append(body)
+
+        # Display GitHub issue content if available
+        if github_issue:
+            lines.append("[bold]GitHub Issue:[/bold]")
+            lines.append("")
+
+            # Issue body
+            if github_issue.get("body"):
+                lines.append(github_issue["body"])
+            else:
+                lines.append("[dim]No description[/dim]")
+
+            # Comments
+            comments = github_issue.get("comments", [])
+            if comments:
+                lines.append("")
+                lines.append(f"[bold]Comments ({len(comments)}):[/bold]")
+                for i, comment in enumerate(comments[:5], 1):  # Show max 5 comments
+                    lines.append("")
+                    lines.append(f"[dim]Comment {i}:[/dim]")
+                    body = comment.get("body", "")
+                    # Truncate long comments
+                    if len(body) > 300:
+                        body = body[:297] + "..."
+                    lines.append(body)
+
+                if len(comments) > 5:
+                    lines.append("")
+                    lines.append(f"[dim]... and {len(comments) - 5} more comments[/dim]")
+
+            # Labels from GitHub (if different from local)
+            gh_labels = [label["name"] for label in github_issue.get("labels", [])]
+            if gh_labels:
+                gh_labels_str = ", ".join(gh_labels)
+                lines.append("")
+                lines.append(f"GitHub Labels: {gh_labels_str}")
+
+            # Assignees
+            assignees = github_issue.get("assignees", [])
+            if assignees:
+                assignee_names = [a.get("login", "unknown") for a in assignees]
+                lines.append(f"Assignees: {', '.join(assignee_names)}")
+
+            # State and timestamps
+            if github_issue.get("state"):
+                lines.append(f"GitHub State: {github_issue['state']}")
+            if github_issue.get("createdAt"):
+                lines.append(f"Created: {github_issue['createdAt']}")
+            if github_issue.get("updatedAt"):
+                lines.append(f"Updated: {github_issue['updatedAt']}")
+        else:
+            # Fallback to local task body if no GitHub issue
+            body = task.get("body", "No description")
+            lines.append("[bold]Description:[/bold]")
+            lines.append(body)
 
         return "\n".join(lines)
 
