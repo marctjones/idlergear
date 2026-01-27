@@ -154,6 +154,48 @@ def _cleanup_pid_file() -> None:
         pass
 
 
+def _ensure_daemon_running() -> None:
+    """Ensure IdlerGear daemon is running.
+
+    Starts the daemon automatically if it's not already running.
+    This enables real-time TUI monitoring and multi-agent coordination.
+    """
+    from idlergear.daemon.client import DaemonNotRunning, get_daemon_client, start_daemon_process
+
+    try:
+        # Check if daemon is already running
+        root = find_idlergear_root()
+        if root:
+            client = get_daemon_client(root)
+            # Try to ping daemon - if this succeeds, daemon is running
+            try:
+                # Quick check - daemon.ping is fast
+                import asyncio
+                asyncio.run(client.call("daemon.ping", {}))
+                # Daemon is running, we're good
+                return
+            except Exception:
+                # Daemon not responding, start it
+                pass
+    except (DaemonNotRunning, Exception):
+        # Daemon not running or error checking
+        pass
+
+    # Start daemon in background
+    try:
+        root = find_idlergear_root()
+        if root:
+            # Start daemon process (already runs in background via start_new_session=True)
+            start_daemon_process(root)
+            # Give it a moment to start up
+            import time
+            time.sleep(0.5)
+    except Exception as e:
+        # Daemon start failed - not fatal, continue without it
+        # AI state reporting will gracefully degrade
+        print(f"Warning: Could not start daemon: {e}", file=sys.stderr)
+
+
 def _activate_project_environment() -> None:
     """Detect and activate project development environments.
 
@@ -2710,6 +2752,141 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "required": ["name"],
             },
         ),
+        # === Container Management Tools (Podman/Docker) ===
+        Tool(
+            name="idlergear_container_list",
+            description="List running containers (supports Podman and Docker). Shows container ID, name, image, status, and creation time.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "all": {
+                        "type": "boolean",
+                        "description": "Include stopped containers (default: false)",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_container_start",
+            description="Start a new container with specified image and configuration. Supports environment variables, volume mounts, port mappings, and resource limits. Uses Podman if available, falls back to Docker.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string",
+                        "description": "Container image (e.g., 'python:3.11', 'postgres:15', 'redis:alpine')",
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Container name (optional, auto-generated if not provided)",
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "Command to run in container (optional)",
+                    },
+                    "env": {
+                        "type": "object",
+                        "description": "Environment variables as key-value pairs (e.g., {\"DATABASE_URL\": \"postgres://...\"})",
+                        "additionalProperties": {"type": "string"},
+                    },
+                    "volumes": {
+                        "type": "object",
+                        "description": "Volume mounts as host_path:container_path pairs (e.g., {\"/data\": \"/app/data\"})",
+                        "additionalProperties": {"type": "string"},
+                    },
+                    "ports": {
+                        "type": "object",
+                        "description": "Port mappings as host_port:container_port pairs (e.g., {\"8080\": \"80\"})",
+                        "additionalProperties": {"type": "string"},
+                    },
+                    "memory": {
+                        "type": "string",
+                        "description": "Memory limit (e.g., '512m', '2g')",
+                    },
+                    "cpus": {
+                        "type": "string",
+                        "description": "CPU limit (e.g., '1.5' for 1.5 CPUs)",
+                    },
+                    "detach": {
+                        "type": "boolean",
+                        "description": "Run in background (default: true)",
+                        "default": True,
+                    },
+                },
+                "required": ["image"],
+            },
+        ),
+        Tool(
+            name="idlergear_container_stop",
+            description="Stop a running container. Can force-stop (kill) if needed.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "container_id": {
+                        "type": "string",
+                        "description": "Container ID or name",
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force stop (kill instead of graceful shutdown)",
+                        "default": False,
+                    },
+                },
+                "required": ["container_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_container_remove",
+            description="Remove a container. Can force-remove running containers.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "container_id": {
+                        "type": "string",
+                        "description": "Container ID or name",
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force removal even if running",
+                        "default": False,
+                    },
+                },
+                "required": ["container_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_container_logs",
+            description="Get logs from a container. Useful for debugging and monitoring containerized processes.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "container_id": {
+                        "type": "string",
+                        "description": "Container ID or name",
+                    },
+                    "tail": {
+                        "type": "integer",
+                        "description": "Number of lines from end (optional, all lines if not specified)",
+                    },
+                },
+                "required": ["container_id"],
+            },
+        ),
+        Tool(
+            name="idlergear_container_stats",
+            description="Get real-time resource usage statistics for a container (CPU, memory, network, disk I/O).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "container_id": {
+                        "type": "string",
+                        "description": "Container ID or name",
+                    },
+                },
+                "required": ["container_id"],
+            },
+        ),
         # === OpenTelemetry Log Tools ===
         Tool(
             name="idlergear_otel_query_logs",
@@ -3688,6 +3865,8 @@ This ensures messages don't derail your work - only context ones are shown immed
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls."""
+    global _registered_agent_id, _current_session_id
+
     try:
         _check_initialized()
 
@@ -4624,7 +4803,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Daemon coordination handlers
         elif name == "idlergear_daemon_register_agent":
-            global _registered_agent_id
             from idlergear.daemon.mcp_handlers import handle_register_agent
 
             result = handle_register_agent(arguments)
@@ -5562,6 +5740,77 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             except RuntimeError as e:
                 return [TextContent(type="text", text=f"Error: {e}")]
 
+        # === Container Management Tool Handlers (Podman/Docker) ===
+        elif name == "idlergear_container_list":
+            pm = _get_pm_server()
+            containers = pm.list_containers(all_containers=arguments.get("all", False))
+            return _format_result(containers)
+
+        elif name == "idlergear_container_start":
+            pm = _get_pm_server()
+            try:
+                container_info = pm.start_container(
+                    image=arguments["image"],
+                    name=arguments.get("name"),
+                    command=arguments.get("command"),
+                    env=arguments.get("env"),
+                    volumes=arguments.get("volumes"),
+                    ports=arguments.get("ports"),
+                    memory=arguments.get("memory"),
+                    cpus=arguments.get("cpus"),
+                    detach=arguments.get("detach", True),
+                )
+                return _format_result(container_info)
+            except RuntimeError as e:
+                return [TextContent(type="text", text=f"Error starting container: {e}")]
+
+        elif name == "idlergear_container_stop":
+            pm = _get_pm_server()
+            success = pm.stop_container(
+                container_id=arguments["container_id"],
+                force=arguments.get("force", False),
+            )
+            return _format_result(
+                {"success": success, "container_id": arguments["container_id"]}
+            )
+
+        elif name == "idlergear_container_remove":
+            pm = _get_pm_server()
+            success = pm.remove_container(
+                container_id=arguments["container_id"],
+                force=arguments.get("force", False),
+            )
+            return _format_result(
+                {"success": success, "container_id": arguments["container_id"]}
+            )
+
+        elif name == "idlergear_container_logs":
+            pm = _get_pm_server()
+            logs = pm.get_container_logs(
+                container_id=arguments["container_id"],
+                tail=arguments.get("tail"),
+            )
+            if logs is None:
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Container not found: {arguments['container_id']}",
+                    )
+                ]
+            return [TextContent(type="text", text=logs)]
+
+        elif name == "idlergear_container_stats":
+            pm = _get_pm_server()
+            stats = pm.get_container_stats(arguments["container_id"])
+            if stats is None:
+                return [
+                    TextContent(
+                        type="text",
+                        text=f"Container not found: {arguments['container_id']}",
+                    )
+                ]
+            return _format_result(stats)
+
         # OpenTelemetry log query handlers
         elif name == "idlergear_otel_query_logs":
             from idlergear.otel_storage import OTelStorage
@@ -5667,8 +5916,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_session_start":
             from idlergear.session import start_session
 
-            global _registered_agent_id, _current_session_id
-
             result = start_session(
                 context_mode=arguments.get("context_mode", "minimal"),
                 load_state=arguments.get("load_state", True),
@@ -5695,8 +5942,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_session_end":
             from idlergear.session import end_session
-
-            global _registered_agent_id, _current_session_id
 
             result = end_session(
                 current_task_id=arguments.get("current_task_id"),
@@ -7234,6 +7479,9 @@ async def run_server():
 
     # Auto-detect and activate project virtual environment
     _activate_project_environment()
+
+    # Ensure daemon is running for real-time monitoring and coordination
+    _ensure_daemon_running()
 
     # Start daemon subscription in background (non-blocking)
     daemon_task = asyncio.create_task(_subscribe_to_registry_events())
