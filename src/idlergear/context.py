@@ -430,5 +430,6 @@ def format_context_json(ctx: ProjectContext) -> dict[str, Any]:
         "recent_notes": ctx.recent_notes,
         "references": ctx.references,
         "backends": ctx.backends,
+        "suggestions": ctx.suggestions,  # Phase 3: Proactive suggestions
         "errors": ctx.errors if ctx.errors else None,
     }

@@ -174,6 +174,7 @@ def load_task_from_file(filepath: Path) -> dict[str, Any] | None:
         "access_count": frontmatter.get("access_count", 0),
         "relevance_score": frontmatter.get("relevance_score", 1.0),
         "github_issue": frontmatter.get("github_issue"),
+        "blocked_by": frontmatter.get("blocked_by"),  # For task dependencies
         "path": str(filepath),
     }
 
