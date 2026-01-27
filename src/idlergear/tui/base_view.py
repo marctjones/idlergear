@@ -64,15 +64,30 @@ class BaseView(Static):
 
     def on_mount(self) -> None:
         """Called when view is mounted."""
+        # Initialize with empty tree immediately so something shows
+        if self._tree is None:
+            self._tree = self.compose_tree()
+            self._tree.show_root = True
+            self._tree.show_guides = True
+            self.mount(self._tree)
+
+        # Then load data asynchronously
         self.run_worker(self._async_refresh(), exclusive=True)
 
     async def _async_refresh(self) -> None:
         """Async helper to refresh data."""
-        await self.refresh_data()
-        self._rebuild_tree()
+        try:
+            await self.refresh_data()
+            # Schedule tree rebuild on main thread after data is loaded
+            self.call_from_thread(self._rebuild_tree)
+        except Exception as e:
+            # Log error but don't crash the view
+            self.app.log.error(f"Error refreshing {self.view_name}: {e}")
+            # Set empty data to show something
+            self.data = {}
 
     def _rebuild_tree(self) -> None:
-        """Rebuild tree from current data."""
+        """Rebuild tree from current data (must be called from main thread)."""
         if self._tree is not None:
             # Remove old tree
             try:
@@ -85,7 +100,7 @@ class BaseView(Static):
         self._tree.show_root = True
         self._tree.show_guides = True
 
-        # Mount new tree
+        # Mount new tree (safe because called from main thread)
         self.mount(self._tree)
 
     def watch_data(self, data: dict[str, Any]) -> None:
