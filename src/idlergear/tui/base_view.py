@@ -41,6 +41,7 @@ class BaseView(Static):
         self.project_root = project_root
         self._tree: Tree[dict] | None = None
         self._rebuilding = False  # Flag to prevent recursive rebuilds
+        self._data_loaded = False  # Track if data has been loaded (for lazy loading)
 
         # Setup logging
         import logging
@@ -72,15 +73,20 @@ class BaseView(Static):
         """Called when view is mounted."""
         self.logger.info(f"on_mount() - View {self.view_id} ({self.view_name}) mounting")
 
-        # Load data asynchronously - tree will be created when data arrives via watch_data()
-        self.logger.debug(f"on_mount() - Starting async refresh worker for {self.view_name}")
-        self.run_worker(self._async_refresh(), exclusive=True)
+        # LAZY LOADING: Only load data for View 1 (default view) on mount
+        # Other views load data when they become visible (see load_if_needed)
+        if self.view_id == 1:
+            self.logger.debug(f"on_mount() - View 1, loading data immediately")
+            self.run_worker(self._async_refresh(), exclusive=True)
+        else:
+            self.logger.debug(f"on_mount() - View {self.view_id}, deferring data load until visible")
 
     async def _async_refresh(self) -> None:
         """Async helper to refresh data."""
         self.logger.debug(f"_async_refresh() - Starting data refresh for {self.view_name}")
         try:
             await self.refresh_data()
+            self._data_loaded = True  # Mark as loaded
             self.logger.debug(f"_async_refresh() - Data loaded for {self.view_name}")
             # Note: Setting self.data in refresh_data() triggers watch_data() automatically
             # which will rebuild the tree, so no need to call _rebuild_tree() here
@@ -90,6 +96,7 @@ class BaseView(Static):
             self.app.log.error(f"Error refreshing {self.view_name}: {e}")
             # Set empty data to show something
             self.data = {}
+            self._data_loaded = True  # Mark as loaded even on error to avoid retry loops
 
     def _rebuild_tree(self) -> None:
         """Rebuild tree from current data (must be called from main thread)."""
@@ -143,9 +150,21 @@ class BaseView(Static):
         self.logger.debug(f"watch_data() - Data changed for {self.view_name}, triggering rebuild")
         self._rebuild_tree()
 
+    def load_if_needed(self) -> None:
+        """Load data if not already loaded (lazy loading).
+
+        Called by ViewManager when a view becomes visible for the first time.
+        """
+        if not self._data_loaded:
+            self.logger.info(f"load_if_needed() - First view of {self.view_name}, loading data")
+            self.run_worker(self._async_refresh(), exclusive=True)
+        else:
+            self.logger.debug(f"load_if_needed() - {self.view_name} already loaded, skipping")
+
     def reload_data(self) -> None:
         """Reload data from backend (can be called from key bindings)."""
         self.logger.info(f"reload_data() - Manual data reload triggered for {self.view_name}")
+        self._data_loaded = False  # Reset flag to force reload
         self.run_worker(self._async_refresh(), exclusive=True)
 
 
@@ -205,6 +224,9 @@ class ViewManager:
         new_view = self.views[view_id]
         new_view.display = True
 
+        # LAZY LOADING: Load data if this is the first time viewing
+        new_view.load_if_needed()
+
         # Restore state if exists
         if view_id in self._view_states:
             state = self._view_states[view_id]
@@ -215,11 +237,6 @@ class ViewManager:
         # Focus the tree in the new view so arrow keys work
         if new_view._tree is not None:
             new_view._tree.focus()
-
-        # Don't trigger refresh - view already has data from:
-        # 1. Initial mount (on_mount calls _async_refresh)
-        # 2. Restored state (line 222)
-        # 3. Tree rebuilt when display=True or data changes
 
         return True
 
