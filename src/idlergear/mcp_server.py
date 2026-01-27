@@ -216,10 +216,10 @@ async def _auto_register_agent() -> None:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         agent_id = f"claude-code-{timestamp}"
 
-        # Get daemon client
+        # Get daemon client and connect
         client = get_daemon_client(root)
 
-        # Register with daemon
+        # Register with daemon (must be within async context to connect)
         capabilities = [
             "task_management",
             "file_operations",
@@ -228,16 +228,17 @@ async def _auto_register_agent() -> None:
             "knowledge_management",
         ]
 
-        response = await client.call("agent.register", {
-            "agent_id": agent_id,
-            "agent_type": "claude-code",
-            "capabilities": capabilities,
-            "metadata": {
-                "version": __version__,
-                "pid": os.getpid(),
-                "started_at": datetime.now().isoformat(),
-            }
-        })
+        async with client:
+            response = await client.call("agent.register", {
+                "agent_id": agent_id,
+                "agent_type": "claude-code",
+                "capabilities": capabilities,
+                "metadata": {
+                    "version": __version__,
+                    "pid": os.getpid(),
+                    "started_at": datetime.now().isoformat(),
+                }
+            })
 
         # Store agent_id globally for use in AI state reporting
         _registered_agent_id = agent_id
