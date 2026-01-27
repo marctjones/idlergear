@@ -1,1427 +1,447 @@
-"""Main IdlerGear TUI application."""
+"""IdlerGear TUI v2 - Multi-view architecture with AI observability.
 
-from __future__ import annotations
+This is the redesigned TUI with 6 organizational views:
+1. By Type - Tasks, notes, references by category
+2. By Project - Organized by milestone/project
+3. By Time - Today, this week, this month
+4. Gaps - Knowledge gaps by severity
+5. Activity - Recent events feed
+6. AI Monitor - Real-time AI state (CRITICAL)
+"""
 
 import asyncio
 from pathlib import Path
-from typing import Any
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, VerticalScroll
-from textual.reactive import reactive
-from textual.widgets import (
-    DataTable,
-    Footer,
-    Header,
-    Input,
-    Label,
-    Static,
-    TabbedContent,
-    TabPane,
-    Tree,
+from textual.containers import Container, Horizontal, Vertical
+from textual.widgets import Footer, Header, Static, Label, Tree
+
+from .base_view import ViewManager
+from .views import (
+    ByTypeView,
+    ByProjectView,
+    ByTimeView,
+    GapsView,
+    ActivityView,
+    AIMonitorView,
 )
-
-# Import modals
-from .modals import (
-    TaskEditModal,
-    ReferenceEditModal,
-    MessageModal,
-    CommandPalette,
-    NoteViewModal,
-    NotePromoteModal,
-    ConfirmDeleteModal,
-    BulkActionModal,
-    QuickSelectModal,
-)
-
-# Import logging
-from .logging_config import setup_tui_logging, get_logger
+from .help_screen import HelpScreen
 
 
-class KnowledgeOverview(Static):
-    """Dashboard showing overview of all knowledge types."""
+class ViewSwitcher(Static):
+    """Header showing available views."""
 
-    stats: reactive[dict[str, Any]] = reactive({})
+    CSS = """
+    ViewSwitcher {
+        height: 3;
+        background: $surface;
+        border-bottom: solid $primary;
+        padding: 1;
+    }
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.current_view = 1
 
     def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Label("📊 Knowledge Base Overview", classes="header")
-        yield Static(id="stats-display")
+        """Compose view switcher."""
+        yield Label(self._get_switcher_text(), id="switcher-label")
 
-    def watch_stats(self, stats: dict[str, Any]) -> None:
-        """Update stats display when stats change."""
-        if not stats:
-            return
-
-        lines = [
-            "┌─────────────────────────────────────────────┐",
-            "│ [bold cyan]Knowledge Type[/]      "
-            "[bold yellow]Count[/]   [bold green]Status[/]   │",
-            "├─────────────────────────────────────────────┤",
+    def _get_switcher_text(self) -> str:
+        """Get switcher text with current view highlighted."""
+        views = [
+            ("1", "Type"),
+            ("2", "Project"),
+            ("3", "Time"),
+            ("4", "Gaps"),
+            ("5", "Activity"),
+            ("6", "AI Monitor"),
         ]
 
-        items = [
-            (
-                "📋 Tasks",
-                stats.get("tasks", 0),
-                "open" if stats.get("tasks", 0) > 0 else "none",
-            ),
-            (
-                "📝 Notes",
-                stats.get("notes", 0),
-                "active" if stats.get("notes", 0) > 0 else "none",
-            ),
-            (
-                "🎯 Vision",
-                "1" if stats.get("has_vision") else "0",
-                "set" if stats.get("has_vision") else "missing",
-            ),
-            (
-                "📊 Projects",
-                stats.get("projects", 0),
-                "active" if stats.get("projects", 0) > 0 else "none",
-            ),
-            (
-                "📖 References",
-                stats.get("references", 0),
-                "docs" if stats.get("references", 0) > 0 else "empty",
-            ),
-            (
-                "📁 Annotated Files",
-                stats.get("files", 0),
-                "tracked" if stats.get("files", 0) > 0 else "none",
-            ),
-            (
-                "🕸️  Graph Nodes",
-                stats.get("graph_nodes", 0),
-                "populated" if stats.get("graph_nodes", 0) > 0 else "empty",
-            ),
-            (
-                "🔄 Daemon",
-                "1" if stats.get("daemon_running") else "0",
-                (
-                    "[green]running[/]"
-                    if stats.get("daemon_running")
-                    else "[red]stopped[/]"
-                ),
-            ),
-        ]
-
-        for name, count, status in items:
-            lines.append(f"│ {name:<20} {str(count):>6}   {status:<8} │")
-
-        lines.append("└─────────────────────────────────────────────┘")
-
-        # Add gap detection summary
-        gaps = stats.get("gaps", {})
-        if gaps:
-            total = gaps.get("total", 0)
-            critical = gaps.get("critical", 0)
-            high = gaps.get("high", 0)
-
-            lines.append("")
-            if critical > 0:
-                lines.append(f"⚠️  [bold red]{critical} CRITICAL gaps detected![/]")
-            elif high > 0:
-                lines.append(f"⚠️  [bold yellow]{high} HIGH priority gaps detected[/]")
-            elif total > 0:
-                lines.append(f"ℹ️  {total} knowledge gaps detected")
+        parts = []
+        for num, name in views:
+            if int(num) == self.current_view:
+                parts.append(f"[bold cyan reverse] {num} {name} [/]")
             else:
-                lines.append("✅ [green]No critical knowledge gaps![/]")
-
-        display = self.query_one("#stats-display", Static)
-        display.update("\n".join(lines))
-
-
-class TaskBrowser(Static):
-    """Browse and filter tasks."""
-
-    tasks: reactive[list[dict[str, Any]]] = reactive([])
-    selected_tasks: reactive[set[int]] = reactive(set())
-    filter_text: reactive[str] = reactive("")
-
-    def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Label(
-            "📋 Task Browser - [Enter] Edit [s] State [p] Priority "
-            "[a] Assign [n] New [Space] Select [f] Filter",
-            classes="header",
-        )
-        yield Input(
-            placeholder="Filter tasks by title, labels, state, priority...",
-            id="task-filter",
-        )
-        yield DataTable(id="task-table")
-
-    def on_mount(self) -> None:
-        """Set up the task table."""
-        table = self.query_one("#task-table", DataTable)
-        table.add_columns("✓", "ID", "Title", "Priority", "State", "Labels")
-        table.cursor_type = "row"
-        table.zebra_stripes = True
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Handle filter input changes."""
-        if event.input.id == "task-filter":
-            self.filter_text = event.value.lower()
-            self.watch_tasks(self.tasks)
-
-    def watch_filter_text(self, filter_text: str) -> None:
-        """Re-render tasks when filter changes."""
-        self.watch_tasks(self.tasks)
-
-    def _matches_filter(self, task: dict[str, Any]) -> bool:
-        """Check if task matches the current filter."""
-        if not self.filter_text:
-            return True
-
-        filter_terms = self.filter_text.lower()
-
-        # Search in title
-        if filter_terms in task.get("title", "").lower():
-            return True
-
-        # Search in labels
-        labels = " ".join(task.get("labels", [])).lower()
-        if filter_terms in labels:
-            return True
-
-        # Search in state
-        if filter_terms in task.get("state", "").lower():
-            return True
-
-        # Search in priority
-        if filter_terms in task.get("priority", "").lower():
-            return True
-
-        # Search in ID
-        if filter_terms in str(task.get("id", "")):
-            return True
-
-        return False
-
-    def watch_tasks(self, tasks: list[dict[str, Any]]) -> None:
-        """Update task display when tasks change."""
-        table = self.query_one("#task-table", DataTable)
-        table.clear()
-
-        # Apply filter
-        filtered_tasks = [task for task in tasks if self._matches_filter(task)]
-
-        for task in filtered_tasks:
-            task_id = task.get("id", "")
-            is_selected = task_id in self.selected_tasks
-
-            priority = task.get("priority", "medium")
-            priority_icon = {
-                "critical": "🔴",
-                "high": "🟠",
-                "medium": "🟡",
-                "low": "🟢",
-                "backlog": "⚪",
-            }.get(priority, "⚫")
-
-            labels = task.get("labels", [])
-            labels_str = ", ".join(labels[:3])
-            if len(labels) > 3:
-                labels_str += f" (+{len(labels) - 3})"
-
-            table.add_row(
-                "☑" if is_selected else "☐",
-                str(task_id),
-                task.get("title", ""),
-                f"{priority_icon} {priority}",
-                task.get("state", "open"),
-                labels_str,
-            )
-
-    def get_selected_task(self) -> dict[str, Any] | None:
-        """Get the currently highlighted task."""
-        table = self.query_one("#task-table", DataTable)
-        if table.cursor_row < len(self.tasks):
-            return self.tasks[table.cursor_row]
-        return None
-
-    def toggle_selection(self) -> None:
-        """Toggle selection of current task."""
-        task = self.get_selected_task()
-        if task:
-            task_id = task.get("id")
-            if task_id in self.selected_tasks:
-                self.selected_tasks.remove(task_id)
-            else:
-                self.selected_tasks.add(task_id)
-            self.watch_tasks(self.tasks)  # Refresh display
-
-
-class NoteBrowser(Static):
-    """Browse notes and explorations."""
-
-    notes: reactive[list[dict[str, Any]]] = reactive([])
-    filter_text: reactive[str] = reactive("")
-
-    def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Label(
-            "📝 Notes & Explorations - [Enter] View [p] Promote [n] New [x] Delete [f] Filter",
-            classes="header",
-        )
-        yield Input(
-            placeholder="Filter notes by content, tags, type...",
-            id="note-filter",
-        )
-        yield DataTable(id="note-table")
-
-    def on_mount(self) -> None:
-        """Set up the note table."""
-        table = self.query_one("#note-table", DataTable)
-        table.add_columns("ID", "Type", "Content Preview", "Tags", "Created")
-        table.cursor_type = "row"
-        table.zebra_stripes = True
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Handle filter input changes."""
-        if event.input.id == "note-filter":
-            self.filter_text = event.value.lower()
-            self.watch_notes(self.notes)
-
-    def watch_filter_text(self, filter_text: str) -> None:
-        """Re-render notes when filter changes."""
-        self.watch_notes(self.notes)
-
-    def _matches_filter(self, note: dict[str, Any]) -> bool:
-        """Check if note matches the current filter."""
-        if not self.filter_text:
-            return True
-
-        filter_terms = self.filter_text.lower()
-
-        # Search in content (title or body)
-        content = note.get("title", "") or note.get("body", "")
-        if filter_terms in content.lower():
-            return True
-
-        # Search in tags
-        labels = note.get("labels", [])
-        tags = " ".join(
-            [label.replace("tag:", "") for label in labels if label.startswith("tag:")]
-        )
-        if filter_terms in tags.lower():
-            return True
-
-        # Search by type (explore or note)
-        if "explore" in filter_terms and "tag:explore" in labels:
-            return True
-        if "note" in filter_terms and "tag:explore" not in labels:
-            return True
-
-        # Search in ID
-        if filter_terms in str(note.get("id", "")):
-            return True
-
-        return False
-
-    def watch_notes(self, notes: list[dict[str, Any]]) -> None:
-        """Update note display when notes change."""
-        table = self.query_one("#note-table", DataTable)
-        table.clear()
-
-        # Apply filter
-        filtered_notes = [note for note in notes if self._matches_filter(note)]
-
-        for note in filtered_notes:
-            content = note.get("title", "") or note.get("body", "")
-            preview = content[:50] + "..." if len(content) > 50 else content
-
-            labels = [
-                label for label in note.get("labels", []) if label.startswith("tag:")
-            ]
-            tags = ", ".join([label.replace("tag:", "") for label in labels])
-
-            note_type = (
-                "🔍 Explore" if "tag:explore" in note.get("labels", []) else "💡 Note"
-            )
-
-            created = note.get("created", "")
-            if created:
-                try:
-                    from datetime import datetime
-
-                    dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
-                    created = dt.strftime("%Y-%m-%d")
-                except Exception:
-                    pass
-
-            table.add_row(
-                str(note.get("id", "")),
-                note_type,
-                preview,
-                tags,
-                created,
-            )
-
-    def get_selected_note(self) -> dict[str, Any] | None:
-        """Get the currently highlighted note."""
-        table = self.query_one("#note-table", DataTable)
-        if table.cursor_row < len(self.notes):
-            return self.notes[table.cursor_row]
-        return None
-
-
-class KnowledgeExplorer(Static):
-    """Comprehensive knowledge browser showing all IdlerGear knowledge."""
-
-    filter_text: reactive[str] = reactive("")
-
-    def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Label(
-            "🔍 Knowledge Explorer - [f] Filter [Enter] Expand [e] Edit [a] Annotate [r] Refresh",
-            classes="header",
-        )
-        yield Input(
-            placeholder="Filter by any knowledge type, content, or metadata...",
-            id="knowledge-filter",
-        )
-        yield Tree("Knowledge Base")
-
-    def on_mount(self) -> None:
-        """Initialize the knowledge tree."""
-        tree = self.query_one(Tree)
-        tree.show_root = True
-        tree.show_guides = True
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Handle filter input changes."""
-        if event.input.id == "knowledge-filter":
-            self.filter_text = event.value.lower()
-            # Trigger knowledge reload via app
-            app = self.app
-            if hasattr(app, "load_knowledge_explorer"):
-                app.load_knowledge_explorer()
-
-
-class GapExplorer(Static):
-    """Interactive knowledge gap explorer with actionable suggestions."""
-
-    filter_text: reactive[str] = reactive("")
-    gaps_data: list[dict[str, Any]] = []
-
-    def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Label(
-            "⚠️  Knowledge Gaps & Actions - [f] Filter [Enter] Expand [t] Create Task [r] Refresh",
-            classes="header",
-        )
-        yield Input(
-            placeholder="Filter gaps by type, severity, or content...",
-            id="gaps-filter",
-        )
-        yield Tree("Knowledge Gaps")
-
-    def on_mount(self) -> None:
-        """Initialize the gaps tree."""
-        tree = self.query_one(Tree)
-        tree.show_root = True
-        tree.show_guides = True
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Handle filter input changes."""
-        if event.input.id == "gaps-filter":
-            self.filter_text = event.value.lower()
-            self.update_gaps(self.gaps_data)
-
-    def update_gaps(self, gaps: list[dict[str, Any]]) -> None:
-        """Update gap display with interactive tree."""
-        self.gaps_data = gaps
-        tree = self.query_one(Tree)
-        tree.clear()
-
-        if not gaps:
-            tree.root.label = "✅ No Knowledge Gaps Detected"
-            tree.root.add_leaf("[green]Your project knowledge base is healthy![/]")
-            return
-
-        tree.root.label = f"⚠️  {len(gaps)} Knowledge Gaps Detected"
-
-        def matches_filter(text: str) -> bool:
-            """Check if text matches filter."""
-            if not self.filter_text:
-                return True
-            return self.filter_text in text.lower()
-
-        # Group gaps by severity
-        severity_groups = {
-            "critical": [],
-            "high": [],
-            "medium": [],
-            "low": [],
-            "info": [],
-        }
-
-        for gap in gaps:
-            severity = gap.get("severity", "info")
-            if severity in severity_groups:
-                # Apply filter
-                gap_text = f"{gap.get('message', '')} {gap.get('suggestion', '')} {gap.get('type', '')}"
-                if matches_filter(gap_text):
-                    severity_groups[severity].append(gap)
-
-        # Display each severity group
-        for severity in ["critical", "high", "medium", "low", "info"]:
-            gaps_in_severity = severity_groups[severity]
-            if not gaps_in_severity:
-                continue
-
-            severity_icon = {
-                "critical": "🔴",
-                "high": "🟠",
-                "medium": "🟡",
-                "low": "🔵",
-                "info": "ℹ️",
-            }.get(severity, "•")
-
-            severity_label = severity.title()
-            count = len(gaps_in_severity)
-
-            severity_branch = tree.root.add(
-                f"{severity_icon} {severity_label} ({count} gaps)",
-                expand=(severity in ["critical", "high"]),
-            )
-
-            for gap in gaps_in_severity:
-                gap_type = gap.get("type", "unknown")
-                message = gap.get("message", "Unknown gap")
-                suggestion = gap.get("suggestion", "")
-                context = gap.get("context", {})
-                fixable = gap.get("fixable", False)
-                fix_command = gap.get("fix_command")
-
-                # Shorten message for display
-                message_preview = message[:80] + "..." if len(message) > 80 else message
-
-                # Create gap node
-                gap_node = severity_branch.add(f"📍 {message_preview}", expand=False)
-
-                # Add gap details as children
-                gap_node.add_leaf(f"[bold]Type:[/] {gap_type}")
-
-                if suggestion:
-                    suggestion_lines = suggestion.split("\n")
-                    gap_node.add_leaf(f"[bold]Suggestion:[/] {suggestion_lines[0]}")
-                    for line in suggestion_lines[1:]:
-                        if line.strip():
-                            gap_node.add_leaf(f"  {line}")
-
-                # Add context information
-                if context:
-                    context_node = gap_node.add("[bold]Related:[/]", expand=False)
-
-                    # Show files if available
-                    if "files" in context and context["files"]:
-                        files = context["files"]
-                        if isinstance(files, list):
-                            for file_path in files[:5]:
-                                context_node.add_leaf(f"📄 {file_path}")
-                            if len(files) > 5:
-                                context_node.add_leaf(
-                                    f"  ... and {len(files) - 5} more files"
-                                )
-                        else:
-                            context_node.add_leaf(f"📄 {files}")
-
-                    # Show task IDs if available
-                    if "task_ids" in context and context["task_ids"]:
-                        task_ids = context["task_ids"]
-                        if isinstance(task_ids, list):
-                            for task_id in task_ids[:5]:
-                                context_node.add_leaf(f"📋 Task #{task_id}")
-                        else:
-                            context_node.add_leaf(f"📋 Task #{task_ids}")
-
-                    # Show commits if available
-                    if "commits" in context and context["commits"]:
-                        commits = context["commits"]
-                        if isinstance(commits, list):
-                            for commit in commits[:3]:
-                                commit_msg = (
-                                    commit
-                                    if isinstance(commit, str)
-                                    else commit.get("message", "")
-                                )
-                                short_msg = (
-                                    commit_msg[:60] + "..."
-                                    if len(commit_msg) > 60
-                                    else commit_msg
-                                )
-                                context_node.add_leaf(f"🔀 {short_msg}")
-
-                    # Show count if available
-                    if "count" in context:
-                        context_node.add_leaf(f"Count: {context['count']}")
-
-                # Add actions
-                actions_node = gap_node.add("[bold cyan]Actions:[/]", expand=True)
-
-                if fixable and fix_command:
-                    actions_node.add_leaf(f"✓ [green]Auto-fix:[/] {fix_command}")
-                    actions_node.add_leaf("  [dim](Press Enter to run fix command)[/]")
-                else:
-                    actions_node.add_leaf("• Create task to address this gap")
-                    actions_node.add_leaf("• Add to current context for AI assistant")
-                    actions_node.add_leaf("• Generate fix command suggestion")
-
-                # Add separator
-                if gap != gaps_in_severity[-1]:
-                    gap_node.add_leaf("")
-
-
-class DaemonMonitor(Static):
-    """Monitor daemon status, active AI assistants, and MCP sessions."""
-
-    def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Label("🔄 Multi-Agent Coordination", classes="header")
-        yield VerticalScroll(Static(id="daemon-status"))
-
-    def update_daemon_status(self, status: dict[str, Any]) -> None:
-        """Update daemon status and agent details display."""
-        container = self.query_one(VerticalScroll)
-        display = container.query_one("#daemon-status", Static)
-
-        if not status.get("running"):
-            display.update(
-                "[red]● Daemon not running[/]\n\n"
-                "Start with: [cyan]idlergear daemon start[/]\n\n"
-                "The daemon enables:\n"
-                "  • Multi-agent coordination\n"
-                "  • Session monitoring across AI assistants\n"
-                "  • Command queue for background tasks\n"
-                "  • Message broadcasting between agents"
-            )
-            return
-
-        lines = [
-            "[green bold]● Daemon Running[/]",
-            "",
-            f"[dim]PID:[/] {status.get('pid', 'unknown')}",
-            f"[dim]Uptime:[/] {status.get('uptime', 'unknown')}",
-            f"[dim]Socket:[/] {status.get('socket_path', 'unknown')}",
-            "",
-            "━" * 60,
-            "",
-        ]
-
-        agents = status.get("agents", [])
-        queue = status.get("queue", [])
-
-        # Show active AI assistants
-        lines.append(f"[bold cyan]Active AI Assistants ({len(agents)}):[/]")
-        lines.append("")
-
-        if agents:
-            for agent in agents:
-                agent_type = agent.get("agent_type", "unknown")
-                agent_id = agent.get("agent_id", "unknown")
-                agent_status = agent.get("status", "unknown")
-
-                # Status color
-                status_colors = {
-                    "active": "green",
-                    "idle": "yellow",
-                    "busy": "cyan",
-                }
-                status_color = status_colors.get(agent_status, "white")
-
-                lines.append(f"[bold white]{agent_type.upper()}[/] ({agent_id})")
-                lines.append(
-                    f"  [dim]Status:[/] [{status_color}]{agent_status}[/{status_color}]"
-                )
-
-                # Session information
-                session_id = agent.get("session_id")
-                session_name = agent.get("session_name")
-                if session_id:
-                    lines.append(
-                        f"  [dim]Session:[/] {session_name or session_id[:12]}"
-                    )
-
-                # Current task
-                task_id = agent.get("current_task_id")
-                if task_id:
-                    lines.append(f"  [dim]Working on task:[/] #{task_id}")
-
-                # Working files
-                working_files = agent.get("working_files", [])
-                if working_files:
-                    files_preview = ", ".join([Path(f).name for f in working_files[:3]])
-                    if len(working_files) > 3:
-                        files_preview += f" (+{len(working_files) - 3} more)"
-                    lines.append(f"  [dim]Files:[/] {files_preview}")
-
-                # Capabilities (MCP tools, etc.)
-                capabilities = agent.get("capabilities", [])
-                if capabilities:
-                    caps_preview = ", ".join(capabilities[:3])
-                    if len(capabilities) > 3:
-                        caps_preview += f" (+{len(capabilities) - 3} more)"
-                    lines.append(f"  [dim]Capabilities:[/] {caps_preview}")
-
-                # Connection info
-                connected_at = agent.get("connected_at", "unknown")
-                if connected_at and connected_at != "unknown":
-                    # Format timestamp nicely
-                    try:
-                        from datetime import datetime
-
-                        dt = datetime.fromisoformat(connected_at.replace("Z", "+00:00"))
-                        time_str = dt.strftime("%H:%M:%S")
-                        lines.append(f"  [dim]Connected:[/] {time_str}")
-                    except Exception:
-                        lines.append(f"  [dim]Connected:[/] {connected_at}")
-
-                lines.append("")
-
-        else:
-            lines.append("[dim]  No AI assistants currently connected[/]")
-            lines.append("")
-            lines.append("  Connect an AI assistant with IdlerGear MCP integration:")
-            lines.append("    • Claude Code (automatic)")
-            lines.append("    • Goose (if configured)")
-            lines.append("    • Other MCP-enabled assistants")
-            lines.append("")
-
-        # Show command queue
-        lines.append("━" * 60)
-        lines.append("")
-        lines.append(f"[bold cyan]Command Queue ({len(queue)}):[/]")
-        lines.append("")
-
-        if queue:
-            for cmd in queue[:5]:  # Show first 5
-                cmd_status = cmd.get("status", "unknown")
-                priority = cmd.get("priority", 0)
-                command = cmd.get("command", "")
-
-                # Truncate long commands
-                if len(command) > 50:
-                    command = command[:47] + "..."
-
-                status_icons = {
-                    "pending": "⏳",
-                    "in_progress": "▶️",
-                    "completed": "✅",
-                    "failed": "❌",
-                }
-                icon = status_icons.get(cmd_status, "❓")
-
-                lines.append(f"  {icon} [priority={priority}] {command}")
-
-            if len(queue) > 5:
-                lines.append(f"  [dim]... and {len(queue) - 5} more[/]")
-        else:
-            lines.append("[dim]  No queued commands[/]")
-
-        lines.append("")
-        lines.append("━" * 60)
-        lines.append("")
-        lines.append("[dim]Press 'r' to refresh[/]")
-
-        display.update("\n".join(lines))
+                parts.append(f" [dim]{num}[/] {name} ")
+
+        return "  ".join(parts) + "  │  [dim]? Help  r Refresh  q Quit[/]"
+
+    def update_current_view(self, view_id: int) -> None:
+        """Update highlighted view."""
+        self.current_view = view_id
+        label = self.query_one("#switcher-label", Label)
+        label.update(self._get_switcher_text())
 
 
 class IdlerGearApp(App):
-    """IdlerGear TUI - Interactive knowledge base explorer."""
+    """IdlerGear TUI with multi-view architecture and real-time AI observability."""
 
     CSS = """
-    Screen {
-        background: $surface;
+    #main-split {
+        height: 1fr;
     }
 
-    .header {
-        background: $primary;
-        color: $text;
-        padding: 1;
-        text-align: center;
-        text-style: bold;
+    .view-container {
+        width: 60%;
     }
 
-    TabbedContent {
-        height: 100%;
-    }
-
-    TabPane {
+    #detail-pane {
+        width: 40%;
+        border-left: solid $primary;
         padding: 1 2;
-    }
-
-    DataTable {
-        height: 100%;
-    }
-
-    Tree {
-        height: 100%;
-    }
-
-    #stats-display {
-        padding: 1 2;
-    }
-
-    #gaps-content {
-        height: 100%;
-        padding: 1 2;
-    }
-
-    #daemon-status {
-        padding: 1 2;
+        overflow-y: auto;
     }
     """
 
     BINDINGS = [
-        # Global actions
-        Binding("q", "quit", "Quit", priority=True),
-        Binding("r", "refresh", "Refresh"),
-        Binding("/", "command_palette", "Commands"),
-        Binding("?", "help", "Help"),
-        # Navigation
-        Binding("g", "show_gaps", "Gaps"),
-        Binding("d", "show_daemon", "Daemon"),
-        Binding("t", "show_tasks", "Tasks"),
-        Binding("n", "show_notes", "Notes"),
-        # Search/filter
-        Binding("f", "focus_filter", "Filter", show=False),
-        # Task actions (context-sensitive)
-        Binding("enter", "edit_task", "Edit Task", show=False),
-        Binding("space", "toggle_selection", "Select", show=False),
-        Binding("s", "change_state", "State", show=False),
-        Binding("p", "change_priority", "Priority", show=False),
-        Binding("a", "assign_agent", "Assign", show=False),
-        Binding("l", "edit_labels", "Labels", show=False),
-        Binding("x", "delete_item", "Delete", show=False),
-        # Creation actions
-        Binding("ctrl+n", "create_task", "New Task"),
-        Binding("ctrl+r", "create_reference", "New Reference"),
-        Binding("ctrl+e", "create_note", "New Note"),
-        # Bulk operations
-        Binding("ctrl+b", "bulk_actions", "Bulk Actions", show=False),
-        # Agent coordination
-        Binding("b", "broadcast_message", "Broadcast", show=False),
-        Binding("m", "send_message", "Message", show=False),
+        Binding("q", "quit", "Quit", show=False),
+        Binding("question_mark", "show_help", "Help", show=False, key_display="?"),
+        Binding("r", "refresh", "Refresh", show=False),
+        Binding("1", "switch_view(1)", "By Type", show=False),
+        Binding("2", "switch_view(2)", "By Project", show=False),
+        Binding("3", "switch_view(3)", "By Time", show=False),
+        Binding("4", "switch_view(4)", "Gaps", show=False),
+        Binding("5", "switch_view(5)", "Activity", show=False),
+        Binding("6", "switch_view(6)", "AI Monitor", show=False),
     ]
 
-    TITLE = "IdlerGear TUI - Knowledge Base Explorer"
-
-    def __init__(self, project_root: Path | None = None):
-        """Initialize app.
-
-        Args:
-            project_root: Project root directory (defaults to cwd)
-        """
-        super().__init__()
-        self.project_root = project_root or Path.cwd()
-
-        # Initialize logging with project name
-        project_name = self.project_root.name
-        self.logger = setup_tui_logging(project_name=project_name)
-        self.logger.info(f"TUI initialized for project root: {self.project_root}")
-
-        # Daemon listener
-        self._daemon_client = None
+    def __init__(self, project_root=None, **kwargs):
+        super().__init__(**kwargs)
+        self.project_root = project_root
+        self.view_manager: ViewManager | None = None
+        self.view_switcher: ViewSwitcher | None = None
+        self.daemon_client = None
         self._daemon_listener_task = None
 
-    def compose(self) -> ComposeResult:
-        """Create child widgets."""
-        yield Header()
-        yield Container(
-            KnowledgeOverview(),
-            id="overview-container",
+        # Enable console logging for debugging
+        import logging
+        logging.basicConfig(
+            filename='/tmp/idlergear-tui.log',
+            level=logging.DEBUG,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        with TabbedContent(id="main-tabs"):
-            with TabPane("Tasks", id="tasks-tab"):
-                yield TaskBrowser()
-            with TabPane("Notes", id="notes-tab"):
-                yield NoteBrowser()
-            with TabPane("Knowledge", id="knowledge-tab"):
-                yield KnowledgeExplorer()
-            with TabPane("Gaps", id="gaps-tab"):
-                yield GapExplorer()
-            with TabPane("Daemon", id="daemon-tab"):
-                yield DaemonMonitor()
+        self.logger = logging.getLogger('IdlerGearTUI')
+        self.logger.info(f"=== TUI Initializing with project_root={project_root} ===")
+
+    def compose(self) -> ComposeResult:
+        """Compose app layout."""
+        self.logger.info("compose() - Starting composition")
+
+        self.logger.debug("compose() - Yielding Header")
+        yield Header()
+
+        # View switcher header
+        self.logger.debug("compose() - Creating ViewSwitcher")
+        self.view_switcher = ViewSwitcher()
+        yield self.view_switcher
+
+        # Main split layout: tree view (left) + detail pane (right)
+        self.logger.debug("compose() - Creating split layout")
+        with Horizontal(id="main-split"):
+            # Left side: View container (60% width)
+            with Container(id="main-container", classes="view-container"):
+                # Create all 6 views with project_root (initially hidden except view 1)
+                self.logger.debug("compose() - Creating ByTypeView (view-1)")
+                yield ByTypeView(project_root=self.project_root, id="view-1")
+
+                self.logger.debug("compose() - Creating ByProjectView (view-2)")
+                view2 = ByProjectView(project_root=self.project_root, id="view-2")
+                view2.display = False
+                yield view2
+
+                self.logger.debug("compose() - Creating ByTimeView (view-3)")
+                view3 = ByTimeView(project_root=self.project_root, id="view-3")
+                view3.display = False
+                yield view3
+
+                self.logger.debug("compose() - Creating GapsView (view-4)")
+                view4 = GapsView(project_root=self.project_root, id="view-4")
+                view4.display = False
+                yield view4
+
+                self.logger.debug("compose() - Creating ActivityView (view-5)")
+                view5 = ActivityView(project_root=self.project_root, id="view-5")
+                view5.display = False
+                yield view5
+
+                self.logger.debug("compose() - Creating AIMonitorView (view-6)")
+                view6 = AIMonitorView(project_root=self.project_root, id="view-6")
+                view6.display = False
+                yield view6
+
+            # Right side: Detail pane (40% width)
+            self.logger.debug("compose() - Creating detail pane")
+            yield Static("Select an item to view details", id="detail-pane", classes="detail-pane")
+
+        self.logger.debug("compose() - Yielding Footer")
         yield Footer()
 
+        self.logger.info("compose() - Composition complete")
+
+    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
+        """Handle tree node selection - update detail pane."""
+        self.logger.debug(f"on_tree_node_highlighted() - Node selected: {event.node.label}")
+
+        try:
+            # Get the detail pane widget
+            detail_pane = self.query_one("#detail-pane", Static)
+
+            # Get node data
+            node_data = event.node.data if hasattr(event.node, 'data') else None
+
+            if not node_data or not isinstance(node_data, dict):
+                detail_pane.update("No details available")
+                return
+
+            # Format content based on type
+            content = self._format_detail_content(node_data)
+            detail_pane.update(content)
+
+        except Exception as e:
+            self.logger.error(f"Error updating detail pane: {e}", exc_info=True)
+
+    def _format_detail_content(self, data: dict) -> str:
+        """Format node data for display in detail pane."""
+        # Detect item type from data structure
+        if "task_id" in data or "id" in data and "title" in data:
+            return self._format_task_details(data)
+        elif "note_id" in data or "content" in data:
+            return self._format_note_details(data)
+        elif "path" in data and "description" in data:
+            return self._format_file_details(data)
+        elif "type" in data and "severity" in data:
+            return self._format_gap_details(data)
+        elif "phase" in data and "action" in data:
+            return self._format_activity_details(data)
+        else:
+            # Generic fallback
+            return self._format_generic_details(data)
+
+    def _format_task_details(self, task: dict) -> str:
+        """Format task details."""
+        lines = []
+        lines.append(f"[bold]Task #{task.get('id', task.get('task_id', 'N/A'))}[/bold]")
+        lines.append(f"[bold cyan]{task.get('title', 'Untitled')}[/bold cyan]")
+        lines.append("")
+
+        if task.get("priority"):
+            lines.append(f"Priority: [yellow]{task['priority']}[/yellow]")
+        if task.get("labels"):
+            labels_str = ", ".join(task["labels"])
+            lines.append(f"Labels: {labels_str}")
+        if task.get("due"):
+            lines.append(f"Due: {task['due']}")
+        if task.get("state"):
+            lines.append(f"State: {task['state']}")
+
+        lines.append("")
+        body = task.get("body", "No description")
+        lines.append("[bold]Description:[/bold]")
+        lines.append(body)
+
+        return "\n".join(lines)
+
+    def _format_note_details(self, note: dict) -> str:
+        """Format note details."""
+        lines = []
+        lines.append(f"[bold]Note #{note.get('id', note.get('note_id', 'N/A'))}[/bold]")
+        lines.append("")
+
+        if note.get("tags"):
+            tags_str = ", ".join(note["tags"])
+            lines.append(f"Tags: {tags_str}")
+        if note.get("created"):
+            lines.append(f"Created: {note['created']}")
+
+        lines.append("")
+        content = note.get("content", "No content")
+        lines.append(content)
+
+        return "\n".join(lines)
+
+    def _format_file_details(self, file: dict) -> str:
+        """Format file annotation details."""
+        lines = []
+        lines.append(f"[bold]File:[/bold] {file.get('path', 'Unknown')}")
+        lines.append("")
+
+        if file.get("description"):
+            lines.append(f"[bold]Description:[/bold]")
+            lines.append(file["description"])
+            lines.append("")
+
+        if file.get("tags"):
+            tags_str = ", ".join(file["tags"])
+            lines.append(f"Tags: {tags_str}")
+
+        if file.get("components"):
+            lines.append(f"\n[bold]Components:[/bold]")
+            for comp in file["components"]:
+                lines.append(f"  • {comp}")
+
+        if file.get("related_files"):
+            lines.append(f"\n[bold]Related Files:[/bold]")
+            for rel in file["related_files"]:
+                lines.append(f"  • {rel}")
+
+        return "\n".join(lines)
+
+    def _format_gap_details(self, gap: dict) -> str:
+        """Format knowledge gap details."""
+        lines = []
+        lines.append(f"[bold red]Knowledge Gap: {gap.get('type', 'Unknown')}[/bold red]")
+        lines.append(f"Severity: [yellow]{gap.get('severity', 'unknown')}[/yellow]")
+        lines.append("")
+
+        if gap.get("description"):
+            lines.append(f"[bold]Description:[/bold]")
+            lines.append(gap["description"])
+            lines.append("")
+
+        if gap.get("location"):
+            lines.append(f"Location: {gap['location']}")
+
+        if gap.get("suggestion"):
+            lines.append(f"\n[bold green]How to Fix:[/bold green]")
+            lines.append(gap["suggestion"])
+
+        return "\n".join(lines)
+
+    def _format_activity_details(self, activity: dict) -> str:
+        """Format AI activity details."""
+        lines = []
+        lines.append("[bold]AI Activity[/bold]")
+        lines.append("")
+        lines.append(f"Phase: {activity.get('phase', 'unknown')}")
+        lines.append(f"Action: {activity.get('action', 'unknown')}")
+
+        if activity.get("target"):
+            lines.append(f"Target: {activity['target']}")
+        if activity.get("reason"):
+            lines.append(f"\nReason: {activity['reason']}")
+        if activity.get("timestamp"):
+            lines.append(f"\nTimestamp: {activity['timestamp']}")
+
+        return "\n".join(lines)
+
+    def _format_generic_details(self, data: dict) -> str:
+        """Generic formatting for unknown data types."""
+        lines = []
+        lines.append("[bold]Item Details[/bold]")
+        lines.append("")
+
+        for key, value in data.items():
+            if isinstance(value, (str, int, float, bool)):
+                lines.append(f"{key}: {value}")
+            elif isinstance(value, list) and value:
+                lines.append(f"{key}:")
+                for item in value[:5]:  # Limit to 5 items
+                    lines.append(f"  • {item}")
+                if len(value) > 5:
+                    lines.append(f"  ... and {len(value) - 5} more")
+
+        return "\n".join(lines)
+
     def on_mount(self) -> None:
-        """Load initial data when app starts."""
-        self.load_all_data()
-
-        # Start daemon event listener in background
-        self._daemon_listener_task = asyncio.create_task(self._daemon_event_listener())
-
-    def load_all_data(self) -> None:
-        """Load data from IdlerGear project."""
-        # Load statistics
-        stats = self.load_stats()
-        overview = self.query_one(KnowledgeOverview)
-        overview.stats = stats
-
-        # Load tasks
-        self.load_tasks()
-
-        # Load notes
-        self.load_notes()
-
-        # Load knowledge explorer
-        self.load_knowledge_explorer()
-
-        # Load gaps
-        self.load_gaps()
-
-        # Load daemon status
-        self.load_daemon_status()
-
-    def load_stats(self) -> dict[str, Any]:
-        """Load knowledge base statistics."""
-        logger = get_logger()
-        stats = {}
+        """Initialize view manager after mounting."""
+        self.logger.info("on_mount() - App mounted, initializing views")
 
         try:
-            logger.debug("Loading knowledge base statistics")
-            from idlergear.backends.registry import get_backend
-            from idlergear.config import find_idlergear_root
+            self.logger.debug("on_mount() - Querying main container")
+            container = self.query_one("#main-container", Container)
 
-            root = find_idlergear_root()
-            if root is None:
-                return stats
+            # Initialize view manager
+            self.logger.debug("on_mount() - Creating ViewManager")
+            self.view_manager = ViewManager(container)
 
-            # Count tasks
-            try:
-                task_backend = get_backend("task", project_path=root)
-                tasks = task_backend.list(state="open")
-                stats["tasks"] = len(tasks)
-            except Exception:
-                stats["tasks"] = 0
+            # Register all views
+            self.logger.debug("on_mount() - Registering view 1 (ByTypeView)")
+            self.view_manager.register_view(self.query_one("#view-1", ByTypeView))
 
-            # Count notes
-            try:
-                note_backend = get_backend("note", project_path=root)
-                notes = note_backend.list()
-                stats["notes"] = len([n for n in notes if n.get("state") == "open"])
-            except Exception:
-                stats["notes"] = 0
+            self.logger.debug("on_mount() - Registering view 2 (ByProjectView)")
+            self.view_manager.register_view(self.query_one("#view-2", ByProjectView))
 
-            # Check vision
-            vision_file = root / "VISION.md"
-            stats["has_vision"] = vision_file.exists()
+            self.logger.debug("on_mount() - Registering view 3 (ByTimeView)")
+            self.view_manager.register_view(self.query_one("#view-3", ByTimeView))
 
-            # Count projects
-            try:
-                from idlergear.projects import list_projects
+            self.logger.debug("on_mount() - Registering view 4 (GapsView)")
+            self.view_manager.register_view(self.query_one("#view-4", GapsView))
 
-                projects = list_projects(project_path=root)
-                stats["projects"] = len(projects)
-            except Exception:
-                stats["projects"] = 0
+            self.logger.debug("on_mount() - Registering view 5 (ActivityView)")
+            self.view_manager.register_view(self.query_one("#view-5", ActivityView))
 
-            # Count references (wiki pages)
-            wiki_dir = root / ".wiki"
-            if wiki_dir.exists():
-                stats["references"] = len(list(wiki_dir.glob("*.md")))
-            else:
-                stats["references"] = 0
+            self.logger.debug("on_mount() - Registering view 6 (AIMonitorView)")
+            self.view_manager.register_view(self.query_one("#view-6", AIMonitorView))
 
-            # Count annotated files
-            try:
-                from idlergear.file_registry import FileRegistry
+            # Switch to default view (By Type)
+            self.logger.debug("on_mount() - Switching to default view (1)")
+            self.view_manager.switch_to_view(1)
 
-                registry = FileRegistry()
-                entries = registry.list_files()
-                stats["files"] = len([e for e in entries if e.get("description")])
-            except Exception:
-                stats["files"] = 0
+            # Set app title
+            self.logger.debug("on_mount() - Setting app title")
+            self.title = "IdlerGear - Multi-Agent Knowledge Management"
+            self.sub_title = "View 1: By Type"
 
-            # Count graph nodes
-            try:
-                from idlergear.graph import get_database
+            # Start daemon listener for real-time updates
+            self.logger.debug("on_mount() - Starting daemon listener worker")
+            self.run_worker(self._start_daemon_listener(), exclusive=True)
 
-                graph = get_database()
-                result = graph.execute("MATCH (n) RETURN count(n) AS count")
-                rows = result.get_as_df()
-                if not rows.empty:
-                    stats["graph_nodes"] = int(rows.iloc[0]["count"])
-                else:
-                    stats["graph_nodes"] = 0
-            except Exception as e:
-                get_logger().debug(f"Failed to count graph nodes: {e}")
-                stats["graph_nodes"] = 0
+            self.logger.info("on_mount() - Mount complete, TUI ready")
 
-            # Check daemon status
-            try:
-                from idlergear.daemon.lifecycle import DaemonLifecycle
+        except Exception as e:
+            self.logger.error(f"on_mount() - ERROR: {e}", exc_info=True)
+            raise
 
-                lifecycle = DaemonLifecycle(root)
-                stats["daemon_running"] = lifecycle.is_running()
-            except Exception:
-                stats["daemon_running"] = False
+    def action_switch_view(self, view_id: int) -> None:
+        """Switch to a different view.
 
-            # Get gap summary
-            try:
-                from idlergear.gap_detector import GapDetector, GapSeverity
+        Args:
+            view_id: View ID (1-6) to switch to
+        """
+        if self.view_manager:
+            success = self.view_manager.switch_to_view(view_id)
+            if success:
+                # Update view switcher highlight
+                if self.view_switcher:
+                    self.view_switcher.update_current_view(view_id)
 
-                detector = GapDetector(project_root=root)
-                gaps = detector.detect_gaps()
-
-                stats["gaps"] = {
-                    "total": len(gaps),
-                    "critical": len(
-                        [g for g in gaps if g.severity == GapSeverity.CRITICAL]
-                    ),
-                    "high": len([g for g in gaps if g.severity == GapSeverity.HIGH]),
-                    "medium": len(
-                        [g for g in gaps if g.severity == GapSeverity.MEDIUM]
-                    ),
+                # Update subtitle
+                view_names = {
+                    1: "By Type",
+                    2: "By Project",
+                    3: "By Time",
+                    4: "Gaps",
+                    5: "Activity",
+                    6: "AI Monitor",
                 }
-            except Exception as e:
-                logger.debug(f"Failed to detect gaps: {e}")
-                stats["gaps"] = {}
+                self.sub_title = f"View {view_id}: {view_names.get(view_id, 'Unknown')}"
 
-        except Exception as e:
-            logger.error(f"Error loading stats: {e}", exc_info=True)
-            self.notify(f"Error loading stats: {e}", severity="error")
+    def action_show_help(self) -> None:
+        """Show help screen."""
+        self.push_screen(HelpScreen())
 
-        logger.info(
-            f"Loaded stats: {stats.get('tasks', 0)} tasks, "
-            f"{stats.get('notes', 0)} notes, "
-            f"{stats.get('graph_nodes', 0)} graph nodes"
-        )
-        return stats
+    def action_refresh(self) -> None:
+        """Refresh current view."""
+        if self.view_manager:
+            self.view_manager.refresh_current_view()
+            self.notify("View refreshed")
 
-    def load_tasks(self) -> None:
-        """Load tasks into the task browser."""
-        logger = get_logger()
+    async def _start_daemon_listener(self) -> None:
+        """Start listening for daemon broadcasts."""
         try:
-            logger.debug("Loading tasks")
-            from idlergear.backends.registry import get_backend
-            from idlergear.config import find_idlergear_root
-
-            root = find_idlergear_root()
-            if root is None:
-                logger.warning("No IdlerGear root found")
-                return
-
-            task_backend = get_backend("task", project_path=root)
-            tasks = task_backend.list(state="open")
-
-            # Store tasks in TaskBrowser reactive variable
-            task_browser = self.query_one(TaskBrowser)
-            task_browser.tasks = tasks[:50]  # Limit to 50 for performance
-
-            logger.info(f"Loaded {len(tasks[:50])} tasks (of {len(tasks)} total open)")
-
-        except Exception as e:
-            logger.error(f"Error loading tasks: {e}", exc_info=True)
-            self.notify(f"Error loading tasks: {e}", severity="error")
-
-    def load_notes(self) -> None:
-        """Load notes into the note browser."""
-        logger = get_logger()
-        try:
-            logger.debug("Loading notes")
-            from idlergear.backends.registry import get_backend
-            from idlergear.config import find_idlergear_root
-
-            root = find_idlergear_root()
-            if root is None:
-                logger.warning("No IdlerGear root found")
-                return
-
-            note_backend = get_backend("note", project_path=root)
-            notes = note_backend.list()
-
-            # Filter open notes and store in NoteBrowser reactive variable
-            open_notes = [n for n in notes if n.get("state") == "open"]
-            note_browser = self.query_one(NoteBrowser)
-            note_browser.notes = open_notes[:50]  # Limit to 50 for performance
-
-            logger.info(
-                f"Loaded {len(open_notes[:50])} notes (of {len(open_notes)} total open)"
-            )
-
-        except Exception as e:
-            logger.error(f"Error loading notes: {e}", exc_info=True)
-            self.notify(f"Error loading notes: {e}", severity="error")
-
-    def load_knowledge_explorer(self) -> None:
-        """Load comprehensive knowledge view showing all IdlerGear knowledge."""
-        logger = get_logger()
-        try:
-            from idlergear.config import find_idlergear_root
-            from idlergear.backends.registry import get_backend
-
-            root = find_idlergear_root()
-            if root is None:
-                return
-
-            # Get filter text from knowledge explorer widget
-            knowledge_widget = self.query_one(KnowledgeExplorer)
-            filter_text = knowledge_widget.filter_text
-
-            tree = self.query_one(Tree)
-            tree.clear()
-            tree.root.label = "📚 Knowledge Base"
-
-            def matches_filter(text: str) -> bool:
-                """Check if text matches filter."""
-                if not filter_text:
-                    return True
-                return filter_text in text.lower()
-
-            # 1. TASKS - Organized by priority and state
-            try:
-                task_backend = get_backend("task", project_path=root)
-                all_tasks = task_backend.list()
-
-                tasks_branch = tree.root.add("📋 Tasks", expand=True)
-
-                # Group by priority
-                priority_groups = {
-                    "critical": [],
-                    "high": [],
-                    "medium": [],
-                    "low": [],
-                    "backlog": [],
-                }
-                for task in all_tasks:
-                    if task.get("state") != "completed":
-                        priority = task.get("priority", "medium")
-                        if priority in priority_groups:
-                            priority_groups[priority].append(task)
-
-                for priority in ["critical", "high", "medium", "low", "backlog"]:
-                    tasks_in_priority = priority_groups[priority]
-                    if tasks_in_priority:
-                        priority_icon = {
-                            "critical": "🔴",
-                            "high": "🟠",
-                            "medium": "🟡",
-                            "low": "🟢",
-                            "backlog": "⚪",
-                        }.get(priority, "⚫")
-
-                        priority_branch = tasks_branch.add(
-                            f"{priority_icon} {priority.title()} ({len(tasks_in_priority)} tasks)",
-                            expand=False,
-                        )
-
-                        for task in tasks_in_priority[:20]:  # Limit to 20 per priority
-                            title = task.get("title", "Untitled")
-                            if not matches_filter(title):
-                                continue
-
-                            state = task.get("state", "open")
-                            state_icon = {
-                                "open": "○",
-                                "in_progress": "◐",
-                                "in_review": "◑",
-                                "blocked": "⊗",
-                                "completed": "●",
-                            }.get(state, "○")
-
-                            labels = task.get("labels", [])
-                            label_str = f" [{', '.join(labels[:2])}]" if labels else ""
-
-                            title_preview = (
-                                title[:60] + "..." if len(title) > 60 else title
-                            )
-                            priority_branch.add_leaf(
-                                f"{state_icon} #{task.get('id')} {title_preview}{label_str}"
-                            )
-
-            except Exception as e:
-                logger.debug(f"Error loading tasks: {e}")
-                tree.root.add_leaf("📋 Tasks (error loading)")
-
-            # 2. NOTES - Organized by tags/type
-            try:
-                note_backend = get_backend("note", project_path=root)
-                all_notes = note_backend.list()
-
-                open_notes = [n for n in all_notes if n.get("state") != "closed"]
-
-                if open_notes:
-                    notes_branch = tree.root.add(
-                        f"📝 Notes & Explorations ({len(open_notes)})", expand=False
-                    )
-
-                    # Group by tag
-                    explores = [
-                        n for n in open_notes if "tag:explore" in n.get("labels", [])
-                    ]
-                    ideas = [n for n in open_notes if "tag:idea" in n.get("labels", [])]
-                    other_notes = [
-                        n
-                        for n in open_notes
-                        if "tag:explore" not in n.get("labels", [])
-                        and "tag:idea" not in n.get("labels", [])
-                    ]
-
-                    if explores:
-                        explore_branch = notes_branch.add(
-                            f"🔍 Explorations ({len(explores)})", expand=False
-                        )
-                        for note in explores[:15]:
-                            content = note.get("title", "") or note.get("body", "")
-                            if not matches_filter(content):
-                                continue
-                            preview = (
-                                content[:60] + "..." if len(content) > 60 else content
-                            )
-                            explore_branch.add_leaf(f"#{note.get('id')} {preview}")
-
-                    if ideas:
-                        ideas_branch = notes_branch.add(
-                            f"💡 Ideas ({len(ideas)})", expand=False
-                        )
-                        for note in ideas[:15]:
-                            content = note.get("title", "") or note.get("body", "")
-                            if not matches_filter(content):
-                                continue
-                            preview = (
-                                content[:60] + "..." if len(content) > 60 else content
-                            )
-                            ideas_branch.add_leaf(f"#{note.get('id')} {preview}")
-
-                    if other_notes:
-                        other_branch = notes_branch.add(
-                            f"📝 Other Notes ({len(other_notes)})", expand=False
-                        )
-                        for note in other_notes[:15]:
-                            content = note.get("title", "") or note.get("body", "")
-                            if not matches_filter(content):
-                                continue
-                            preview = (
-                                content[:60] + "..." if len(content) > 60 else content
-                            )
-                            other_branch.add_leaf(f"#{note.get('id')} {preview}")
-
-            except Exception as e:
-                logger.debug(f"Error loading notes: {e}")
-
-            # 3. REFERENCES - Documentation
-            try:
-                ref_backend = get_backend("reference", project_path=root)
-                references = ref_backend.list()
-
-                if references:
-                    ref_branch = tree.root.add(
-                        f"📖 References ({len(references)})", expand=False
-                    )
-                    for ref in references[:30]:
-                        title = ref.get("title", "Untitled")
-                        if not matches_filter(title):
-                            continue
-                        ref_branch.add_leaf(f"📄 {title}")
-
-            except Exception as e:
-                logger.debug(f"Error loading references: {e}")
-
-            # 4. VISION & PLANS
-            try:
-                vision_file = root / "VISION.md"
-                if vision_file.exists():
-                    tree.root.add_leaf("🎯 Vision: Defined")
-                else:
-                    tree.root.add_leaf(
-                        "🎯 Vision: [yellow]Not Set (run: idlergear vision edit)[/]"
-                    )
-            except Exception as e:
-                logger.debug(f"Error checking vision: {e}")
-
-            # 5. FILE ANNOTATIONS
-            try:
-                from idlergear.file_registry import FileRegistry
-
-                registry = FileRegistry(root)
-                annotated_files = registry.list_files()
-
-                if annotated_files:
-                    files_branch = tree.root.add(
-                        f"📁 Annotated Files ({len(annotated_files)})", expand=False
-                    )
-                    for file_info in annotated_files[:30]:
-                        file_path = file_info.get("path", "unknown")
-                        if not matches_filter(file_path):
-                            continue
-                        desc = file_info.get("description", "")
-                        desc_preview = desc[:40] + "..." if len(desc) > 40 else desc
-                        files_branch.add_leaf(f"📄 {file_path}: {desc_preview}")
-
-            except Exception as e:
-                logger.debug(f"Error loading file annotations: {e}")
-
-            # 6. GRAPH NODES - Neo4j data
-            try:
-                from idlergear.graph import get_database
-
-                graph = get_database()
-
-                # Count graph nodes
-                result = graph.execute("MATCH (n) RETURN count(n) AS count")
-                rows = result.get_as_df()
-                node_count = int(rows.iloc[0]["count"]) if len(rows) > 0 else 0
-
-                if node_count > 0:
-                    graph_branch = tree.root.add(
-                        f"🕸️  Graph Database ({node_count} nodes)", expand=False
-                    )
-
-                    # Get node type summary
-                    type_result = graph.execute(
-                        "MATCH (n) RETURN labels(n) AS labels, count(n) AS count ORDER BY count DESC LIMIT 10"
-                    )
-                    type_rows = type_result.get_as_df()
-
-                    for _, type_row in type_rows.iterrows():
-                        labels = type_row["labels"]
-                        count = type_row["count"]
-                        if labels:
-                            label_str = (
-                                labels[0] if isinstance(labels, list) else str(labels)
-                            )
-                            graph_branch.add_leaf(f"{label_str}: {count} nodes")
-                else:
-                    tree.root.add_leaf(
-                        "🕸️  Graph Database: [yellow]Empty (run: idlergear graph populate-all)[/]"
-                    )
-
-            except Exception as e:
-                logger.debug(f"Error loading graph: {e}")
-                tree.root.add_leaf("🕸️  Graph Database: [yellow]Not available[/]")
-
-            logger.info("Loaded comprehensive knowledge explorer")
-
-        except Exception as e:
-            logger.error(f"Error loading graph: {e}", exc_info=True)
-            self.notify(f"Error loading graph: {e}", severity="error")
-
-    def load_gaps(self) -> None:
-        """Load knowledge gaps."""
-        logger = get_logger()
-        try:
-            logger.debug("Loading knowledge gaps")
-            from idlergear.config import find_idlergear_root
-            from idlergear.gap_detector import GapDetector
-
-            root = find_idlergear_root()
-            if root is None:
-                logger.warning("No IdlerGear root found")
-                return
-
-            detector = GapDetector(project_root=root)
-            gaps = detector.detect_gaps()
-
-            gap_explorer = self.query_one(GapExplorer)
-            gap_explorer.update_gaps([g.to_dict() for g in gaps])
-
-            logger.info(f"Loaded {len(gaps)} knowledge gaps")
-
-        except Exception as e:
-            logger.error(f"Error loading gaps: {e}", exc_info=True)
-            self.notify(f"Error loading gaps: {e}", severity="error")
-
-    def load_daemon_status(self) -> None:
-        """Load daemon status."""
-        logger = get_logger()
-
-        async def _load_async() -> None:
-            """Async helper to load daemon data."""
-            try:
-                from idlergear.config import find_idlergear_root
-                from idlergear.daemon.client import DaemonClient
-
-                root = find_idlergear_root()
-                if root is None:
-                    status = {"running": False}
-                    daemon_monitor = self.query_one(DaemonMonitor)
-                    daemon_monitor.update_daemon_status(status)
-                    return
-
-                # Check if daemon is running
-                socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
-                if not socket_path.exists():
-                    status = {"running": False}
-                    daemon_monitor = self.query_one(DaemonMonitor)
-                    daemon_monitor.update_daemon_status(status)
-                    return
-
-                # Connect and get full status
-                try:
-                    client = DaemonClient(socket_path)
-                    await client.connect()
-
-                    # Get daemon status (includes PID, uptime)
-                    daemon_status = await client.status()
-
-                    # Get list of active agents with session details
-                    agents = await client.list_agents()
-
-                    # Get command queue
-                    queue = await client.queue_list()
-
-                    await client.disconnect()
-
-                    status = {
-                        "running": True,
-                        "pid": daemon_status.get("pid", "unknown"),
-                        "uptime": daemon_status.get("uptime", "unknown"),
-                        "socket_path": str(socket_path),
-                        "agents": agents,
-                        "queue": queue,
-                    }
-
-                    daemon_monitor = self.query_one(DaemonMonitor)
-                    daemon_monitor.update_daemon_status(status)
-
-                except Exception as e:
-                    # Daemon socket exists but can't connect
-                    logger.warning(f"Failed to connect to daemon: {e}")
-                    status = {
-                        "running": False,
-                        "error": str(e),
-                    }
-                    daemon_monitor = self.query_one(DaemonMonitor)
-                    daemon_monitor.update_daemon_status(status)
-
-            except Exception as e:
-                logger.error(f"Error loading daemon status: {e}", exc_info=True)
-                status = {
-                    "running": False,
-                    "error": str(e),
-                }
-                daemon_monitor = self.query_one(DaemonMonitor)
-                daemon_monitor.update_daemon_status(status)
-
-        # Use run_worker to execute async code without blocking
-        self.run_worker(_load_async(), exclusive=False)
-
-    async def _daemon_event_listener(self) -> None:
-        """Background task to listen for daemon broadcasts and auto-refresh."""
-        logger = get_logger()
-
-        try:
-            from idlergear.config import find_idlergear_root
             from idlergear.daemon.client import DaemonClient
+            from idlergear.config import find_idlergear_root
 
-            root = find_idlergear_root()
-            if root is None:
-                logger.debug("No IdlerGear root found, daemon listener disabled")
+            # Find socket path
+            project_root = self.project_root or find_idlergear_root()
+            if not project_root:
                 return
 
-            socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
-
+            socket_path = Path.home() / ".idlergear" / "daemon.sock"
             if not socket_path.exists():
-                logger.debug(
-                    "Daemon socket not found, daemon listener disabled. "
-                    "Start daemon with: idlergear daemon start"
-                )
                 return
 
             # Create custom client that handles notifications
@@ -1434,925 +454,61 @@ class IdlerGearApp(App):
                     """Handle daemon broadcast notifications."""
                     method = notification.method
 
-                    logger.debug(f"Received daemon notification: {method}")
-
-                    # Map notification types to refresh actions
+                    # Handle AI state updates
                     if method in [
+                        "ai.activity_changed",
+                        "ai.plan_updated",
+                        "ai.uncertainty_detected",
+                        "ai.search_repeated",
+                    ]:
+                        # Refresh AI Monitor view
+                        view = self.app.view_manager.views.get(6)
+                        if view:
+                            view.reload_data()
+
+                    # Handle knowledge updates
+                    elif method in [
                         "knowledge.task_created",
                         "knowledge.task_updated",
                         "knowledge.task_closed",
-                    ]:
-                        # Refresh tasks
-                        self.app.load_tasks()
-                        self.app.load_stats()
-                        self.app.notify(
-                            "Tasks updated by another agent",
-                            severity="information",
-                            timeout=2,
-                        )
-
-                    elif method in [
                         "knowledge.note_created",
                         "knowledge.note_updated",
-                    ]:
-                        # Refresh notes
-                        self.app.load_notes()
-                        self.app.load_stats()
-                        self.app.notify(
-                            "Notes updated by another agent",
-                            severity="information",
-                            timeout=2,
-                        )
-
-                    elif method in [
                         "knowledge.reference_created",
                         "knowledge.reference_updated",
                     ]:
-                        # Refresh knowledge explorer
-                        self.app.load_knowledge_explorer()
-                        self.app.notify(
-                            "References updated by another agent",
-                            severity="information",
-                            timeout=2,
-                        )
+                        # Refresh current view
+                        self.app.action_refresh()
 
-                    elif method == "knowledge.graph_updated":
-                        # Refresh knowledge explorer
-                        self.app.load_knowledge_explorer()
-                        self.app.notify(
-                            "Knowledge graph updated", severity="information", timeout=2
-                        )
+            # Initialize client
+            self.daemon_client = TUIDaemonClient(socket_path, self)
+            await self.daemon_client.connect()
 
-                    elif method == "daemon.agent_registered":
-                        # Refresh daemon status
-                        self.app.load_daemon_status()
+            # Subscribe to AI events
+            await self.daemon_client.subscribe("ai.activity_changed")
+            await self.daemon_client.subscribe("ai.plan_updated")
+            await self.daemon_client.subscribe("ai.uncertainty_detected")
+            await self.daemon_client.subscribe("ai.search_repeated")
 
-                    elif method == "daemon.agent_unregistered":
-                        # Refresh daemon status
-                        self.app.load_daemon_status()
+            # Subscribe to knowledge events
+            await self.daemon_client.subscribe("knowledge.task_created")
+            await self.daemon_client.subscribe("knowledge.task_updated")
+            await self.daemon_client.subscribe("knowledge.task_closed")
+            await self.daemon_client.subscribe("knowledge.note_created")
+            await self.daemon_client.subscribe("knowledge.note_updated")
 
-                    else:
-                        # Unknown notification type
-                        logger.debug(f"Unhandled notification: {method}")
-
-            # Connect to daemon
-            self._daemon_client = TUIDaemonClient(socket_path, self)
-            await self._daemon_client.connect()
-
-            logger.info("Connected to daemon for real-time updates")
-            self.notify(
-                "Connected to daemon - TUI will auto-refresh on changes",
-                severity="information",
-            )
-
-            # Keep connection alive until app exits
-            while True:
-                await asyncio.sleep(1)
+            # Keep listening
+            await self.daemon_client.listen()
 
         except Exception as e:
-            logger.debug(f"Daemon listener error: {e}")
-            # Daemon not available, continue without real-time updates
+            # Daemon not running - graceful degradation
+            pass
 
-    def action_refresh(self) -> None:
-        """Refresh all data."""
-        self.load_all_data()
-        self.notify("Data refreshed", severity="information")
 
-    def action_show_gaps(self) -> None:
-        """Switch to gaps tab."""
-        tabs = self.query_one("#main-tabs", TabbedContent)
-        tabs.active = "gaps-tab"
-
-    def action_show_daemon(self) -> None:
-        """Switch to daemon tab."""
-        tabs = self.query_one("#main-tabs", TabbedContent)
-        tabs.active = "daemon-tab"
-
-    def action_show_tasks(self) -> None:
-        """Switch to tasks tab."""
-        tabs = self.query_one("#main-tabs", TabbedContent)
-        tabs.active = "tasks-tab"
-
-    def action_show_notes(self) -> None:
-        """Switch to notes tab."""
-        tabs = self.query_one("#main-tabs", TabbedContent)
-        tabs.active = "notes-tab"
-
-    def action_focus_filter(self) -> None:
-        """Focus on the filter input for current tab."""
-        logger = get_logger()
-        try:
-            tabs = self.query_one("#main-tabs", TabbedContent)
-
-            if tabs.active == "tasks-tab":
-                # Focus on task filter
-                task_filter = self.query_one("#task-filter", Input)
-                task_filter.focus()
-            elif tabs.active == "notes-tab":
-                # Focus on note filter
-                note_filter = self.query_one("#note-filter", Input)
-                note_filter.focus()
-            elif tabs.active == "knowledge-tab":
-                # Focus on knowledge filter
-                knowledge_filter = self.query_one("#knowledge-filter", Input)
-                knowledge_filter.focus()
-            elif tabs.active == "gaps-tab":
-                # Focus on gaps filter
-                gaps_filter = self.query_one("#gaps-filter", Input)
-                gaps_filter.focus()
-            else:
-                # No filter on this tab
-                self.notify("No filter available on this tab", severity="warning")
-
-        except Exception as e:
-            logger.error(f"Failed to focus filter: {e}", exc_info=True)
-            self.notify(f"Error focusing filter: {e}", severity="error")
-
-    def action_command_palette(self) -> None:
-        """Show command palette for quick actions."""
-
-        async def _show_palette() -> None:
-            """Async helper to show command palette."""
-            result = await self.push_screen(CommandPalette(), wait_for_dismiss=True)
-            if result:
-                command = result.get("command")
-                if command == "create_task":
-                    await self.action_create_task()
-                elif command == "create_reference":
-                    await self.action_create_reference()
-                elif command == "create_note":
-                    await self.action_create_note()
-                elif command == "assign_task":
-                    await self.action_assign_agent()
-                elif command == "broadcast_message":
-                    await self.action_broadcast_message()
-                elif command == "set_priority":
-                    await self.action_change_priority()
-                elif command == "change_state":
-                    await self.action_change_state()
-                elif command == "view_gaps":
-                    self.action_show_gaps()
-                elif command == "refresh":
-                    self.action_refresh()
-                elif command == "show_daemon":
-                    self.action_show_daemon()
-
-        self.run_worker(_show_palette(), exclusive=False)
-
-    def action_edit_task(self) -> None:
-        """Edit the selected task or note (context-sensitive)."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                tabs = self.query_one("#main-tabs", TabbedContent)
-
-                if tabs.active == "tasks-tab":
-                    # Edit task
-                    task_browser = self.query_one(TaskBrowser)
-                    task = task_browser.get_selected_task()
-
-                    if not task:
-                        self.notify("No task selected", severity="warning")
-                        return
-
-                    logger.info(f"Opening edit modal for task #{task.get('id')}")
-                    result = await self.push_screen(
-                        TaskEditModal(task), wait_for_dismiss=True
-                    )
-
-                    if result:
-                        try:
-                            from idlergear.backends.registry import get_backend
-
-                            backend = get_backend(
-                                "task", project_path=self.project_root
-                            )
-                            backend.update(task_id=result["id"], **result)
-
-                            logger.info(
-                                f"Task #{result['id']} updated: {result.get('title')}"
-                            )
-                            self.notify(
-                                f"Task #{result['id']} updated", severity="information"
-                            )
-                            self.action_refresh()
-                        except Exception as e:
-                            logger.error(f"Failed to update task: {e}", exc_info=True)
-                            self.notify(f"Failed to update task: {e}", severity="error")
-                    else:
-                        logger.debug("Task edit cancelled")
-
-                elif tabs.active == "notes-tab":
-                    # View/edit note
-                    note_browser = self.query_one(NoteBrowser)
-                    note = note_browser.get_selected_note()
-
-                    if not note:
-                        self.notify("No note selected", severity="warning")
-                        return
-
-                    logger.info(f"Opening view/edit modal for note #{note.get('id')}")
-                    result = await self.push_screen(
-                        NoteViewModal(note, editable=True), wait_for_dismiss=True
-                    )
-
-                    if result:
-                        action = result.get("action")
-
-                        if action == "save":
-                            # Save note edits
-                            try:
-                                from idlergear.backends.registry import get_backend
-
-                                backend = get_backend(
-                                    "note", project_path=self.project_root
-                                )
-                                backend.update(
-                                    note_id=result["id"], body=result["content"]
-                                )
-
-                                logger.info(f"Note #{result['id']} updated")
-                                self.notify(
-                                    f"Note #{result['id']} updated",
-                                    severity="information",
-                                )
-                                self.action_refresh()
-                            except Exception as e:
-                                logger.error(
-                                    f"Failed to update note: {e}", exc_info=True
-                                )
-                                self.notify(
-                                    f"Failed to update note: {e}", severity="error"
-                                )
-
-                        elif action == "promote":
-                            # Handle note promotion
-                            await self._handle_note_promotion(note)
-
-                        elif action == "delete":
-                            # Handle note deletion
-                            confirmed = await self.push_screen(
-                                ConfirmDeleteModal(
-                                    "note", result["id"], result.get("content", "")
-                                ),
-                                wait_for_dismiss=True,
-                            )
-                            if confirmed:
-                                try:
-                                    from idlergear.backends.registry import get_backend
-
-                                    backend = get_backend(
-                                        "note", project_path=self.project_root
-                                    )
-                                    backend.delete(note_id=result["id"])
-
-                                    logger.info(f"Note #{result['id']} deleted")
-                                    self.notify(
-                                        f"Note #{result['id']} deleted",
-                                        severity="information",
-                                    )
-                                    self.action_refresh()
-                                except Exception as e:
-                                    logger.error(
-                                        f"Failed to delete note: {e}", exc_info=True
-                                    )
-                                    self.notify(
-                                        f"Failed to delete note: {e}", severity="error"
-                                    )
-
-            except Exception as e:
-                logger.error(f"Error editing item: {e}", exc_info=True)
-                self.notify(f"Error editing item: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_toggle_selection(self) -> None:
-        """Toggle selection of current task."""
-        try:
-            tabs = self.query_one("#main-tabs", TabbedContent)
-            if tabs.active == "tasks-tab":
-                task_browser = self.query_one(TaskBrowser)
-                task_browser.toggle_selection()
-        except Exception as e:
-            self.notify(f"Error toggling selection: {e}", severity="error")
-
-    async def _handle_note_promotion(self, note: dict[str, Any]) -> None:
-        """Handle promoting a note to task or reference.
-
-        Args:
-            note: Note to promote
-        """
-        logger = get_logger()
-        try:
-            logger.info(f"Opening promotion modal for note #{note.get('id')}")
-            result = await self.push_screen(
-                NotePromoteModal(note), wait_for_dismiss=True
-            )
-
-            if result:
-                promote_type = result.get("type")
-                title = result.get("title")
-                content = result.get("content")
-                note_id = result.get("note_id")
-
-                from idlergear.backends.registry import get_backend
-
-                if promote_type == "task":
-                    # Promote to task
-                    task_backend = get_backend("task", project_path=self.project_root)
-                    task_id = task_backend.create(title=title, body=content)
-
-                    # Close the note
-                    note_backend = get_backend("note", project_path=self.project_root)
-                    note_backend.update(note_id=note_id, state="closed")
-
-                    logger.info(f"Note #{note_id} promoted to task #{task_id}")
-                    self.notify(
-                        f"Note promoted to task #{task_id}", severity="information"
-                    )
-
-                elif promote_type == "reference":
-                    # Promote to reference
-                    ref_backend = get_backend(
-                        "reference", project_path=self.project_root
-                    )
-                    ref_backend.create(title=title, content=content)
-
-                    # Close the note
-                    note_backend = get_backend("note", project_path=self.project_root)
-                    note_backend.update(note_id=note_id, state="closed")
-
-                    logger.info(f"Note #{note_id} promoted to reference '{title}'")
-                    self.notify("Note promoted to reference", severity="information")
-
-                self.action_refresh()
-
-        except Exception as e:
-            logger.error(f"Error promoting note: {e}", exc_info=True)
-            self.notify(f"Error promoting note: {e}", severity="error")
-
-    def action_change_state(self) -> None:
-        """Change state of selected task(s) without full edit modal."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                task_browser = self.query_one(TaskBrowser)
-                task = task_browser.get_selected_task()
-
-                if not task:
-                    self.notify("No task selected", severity="warning")
-                    return
-
-                # Quick state selector - cycle through states
-                current_state = task.get("state", "open")
-                state_cycle = [
-                    "open",
-                    "in_progress",
-                    "in_review",
-                    "completed",
-                    "blocked",
-                ]
-
-                try:
-                    current_idx = state_cycle.index(current_state)
-                    next_idx = (current_idx + 1) % len(state_cycle)
-                    new_state = state_cycle[next_idx]
-                except ValueError:
-                    new_state = "open"
-
-                from idlergear.backends.registry import get_backend
-
-                backend = get_backend("task", project_path=self.project_root)
-                backend.update(task_id=task.get("id"), state=new_state)
-
-                logger.info(
-                    f"Task #{task.get('id')} state changed: {current_state} → {new_state}"
-                )
-                self.notify(
-                    f"Task state: {current_state} → {new_state}", severity="information"
-                )
-                self.action_refresh()
-
-            except Exception as e:
-                logger.error(f"Error changing state: {e}", exc_info=True)
-                self.notify(f"Error changing state: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_change_priority(self) -> None:
-        """Change priority of selected task(s) without full edit modal."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                task_browser = self.query_one(TaskBrowser)
-                task = task_browser.get_selected_task()
-
-                if not task:
-                    self.notify("No task selected", severity="warning")
-                    return
-
-                # Quick priority cycling
-                current_priority = task.get("priority", "medium")
-                priority_cycle = ["critical", "high", "medium", "low", "backlog"]
-
-                try:
-                    current_idx = priority_cycle.index(current_priority)
-                    next_idx = (current_idx + 1) % len(priority_cycle)
-                    new_priority = priority_cycle[next_idx]
-                except ValueError:
-                    new_priority = "medium"
-
-                from idlergear.backends.registry import get_backend
-
-                backend = get_backend("task", project_path=self.project_root)
-                backend.update(task_id=task.get("id"), priority=new_priority)
-
-                logger.info(
-                    f"Task #{task.get('id')} priority changed: "
-                    f"{current_priority} → {new_priority}"
-                )
-                self.notify(
-                    f"Task priority: {current_priority} → {new_priority}",
-                    severity="information",
-                )
-                self.action_refresh()
-
-            except Exception as e:
-                logger.error(f"Error changing priority: {e}", exc_info=True)
-                self.notify(f"Error changing priority: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_assign_agent(self) -> None:
-        """Assign task to an AI agent."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            try:
-                task_browser = self.query_one(TaskBrowser)
-                task = task_browser.get_selected_task()
-
-                if not task:
-                    self.notify("No task selected", severity="warning")
-                    return
-
-                # Get active agents
-                from idlergear.config import find_idlergear_root
-                from idlergear.daemon.client import DaemonClient
-
-                root = find_idlergear_root()
-                if not root:
-                    self.notify("Not in IdlerGear project", severity="error")
-                    return
-
-                socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
-                if not socket_path.exists():
-                    self.notify(
-                        "Daemon not running. Start with: idlergear daemon start",
-                        severity="warning",
-                    )
-                    return
-
-                client = DaemonClient(socket_path)
-                await client.connect()
-                agents = await client.list_agents()
-                await client.disconnect()
-
-                if not agents:
-                    self.notify(
-                        "No active agents. Connect an AI assistant first.",
-                        severity="warning",
-                    )
-                    return
-
-                # For now, just broadcast task assignment
-                agent_names = ", ".join(
-                    [a.get("agent_type", "unknown") for a in agents]
-                )
-                self.notify(
-                    f"Task #{task.get('id')} - Available agents: {agent_names}",
-                    severity="information",
-                )
-                self.notify("Full assignment UI coming soon", severity="information")
-
-            except Exception as e:
-                self.notify(f"Error assigning task: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_edit_labels(self) -> None:
-        """Edit labels for selected item."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            self.notify(
-                "Label editing - Use Edit (Enter) for now", severity="information"
-            )
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_delete_item(self) -> None:
-        """Delete selected item (task or note based on active tab)."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                tabs = self.query_one("#main-tabs", TabbedContent)
-
-                if tabs.active == "tasks-tab":
-                    # Delete task
-                    task_browser = self.query_one(TaskBrowser)
-                    task = task_browser.get_selected_task()
-
-                    if not task:
-                        self.notify("No task selected", severity="warning")
-                        return
-
-                    task_id = task.get("id")
-                    task_title = task.get("title", "")
-
-                    # Show confirmation
-                    confirmed = await self.push_screen(
-                        ConfirmDeleteModal("task", task_id, task_title),
-                        wait_for_dismiss=True,
-                    )
-
-                    if confirmed:
-                        from idlergear.backends.registry import get_backend
-
-                        backend = get_backend("task", project_path=self.project_root)
-                        backend.delete(task_id=task_id)
-
-                        logger.info(f"Task #{task_id} deleted: {task_title}")
-                        self.notify(f"Task #{task_id} deleted", severity="information")
-                        self.action_refresh()
-
-                elif tabs.active == "notes-tab":
-                    # Delete note
-                    note_browser = self.query_one(NoteBrowser)
-                    note = note_browser.get_selected_note()
-
-                    if not note:
-                        self.notify("No note selected", severity="warning")
-                        return
-
-                    note_id = note.get("id")
-                    note_content = note.get("body", "") or note.get("title", "")
-
-                    # Show confirmation
-                    confirmed = await self.push_screen(
-                        ConfirmDeleteModal("note", note_id, note_content),
-                        wait_for_dismiss=True,
-                    )
-
-                    if confirmed:
-                        from idlergear.backends.registry import get_backend
-
-                        backend = get_backend("note", project_path=self.project_root)
-                        backend.delete(note_id=note_id)
-
-                        logger.info(f"Note #{note_id} deleted")
-                        self.notify(f"Note #{note_id} deleted", severity="information")
-                        self.action_refresh()
-
-            except Exception as e:
-                logger.error(f"Error deleting item: {e}", exc_info=True)
-                self.notify(f"Error deleting item: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_create_task(self) -> None:
-        """Create a new task."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                new_task = {
-                    "title": "",
-                    "body": "",
-                    "state": "open",
-                    "priority": "medium",
-                    "labels": [],
-                }
-
-                logger.info("Opening task creation modal")
-                result = await self.push_screen(
-                    TaskEditModal(new_task), wait_for_dismiss=True
-                )
-
-                if result:
-                    try:
-                        from idlergear.backends.registry import get_backend
-
-                        backend = get_backend("task", project_path=self.project_root)
-                        task_id = backend.create(
-                            title=result["title"],
-                            body=result.get("body", ""),
-                            labels=result.get("labels", []),
-                        )
-
-                        # Update priority and state if not defaults
-                        if (
-                            result.get("priority") != "medium"
-                            or result.get("state") != "open"
-                        ):
-                            backend.update(
-                                task_id=task_id,
-                                priority=result.get("priority"),
-                                state=result.get("state"),
-                            )
-
-                        logger.info(f"Task #{task_id} created: {result.get('title')}")
-                        self.notify(f"Task #{task_id} created", severity="information")
-                        self.action_refresh()
-                    except Exception as e:
-                        logger.error(f"Failed to create task: {e}", exc_info=True)
-                        self.notify(f"Failed to create task: {e}", severity="error")
-                else:
-                    logger.debug("Task creation cancelled")
-
-            except Exception as e:
-                logger.error(f"Error creating task: {e}", exc_info=True)
-                self.notify(f"Error creating task: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_create_reference(self) -> None:
-        """Create a new reference document."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                logger.info("Opening reference creation modal")
-                result = await self.push_screen(
-                    ReferenceEditModal(), wait_for_dismiss=True
-                )
-
-                if result:
-                    try:
-                        from idlergear.backends.registry import get_backend
-
-                        backend = get_backend(
-                            "reference", project_path=self.project_root
-                        )
-                        backend.create(
-                            title=result["title"],
-                            content=result["content"],
-                            tags=result.get("tags", []),
-                        )
-
-                        logger.info(f"Reference created: {result['title']}")
-                        self.notify(
-                            f"Reference '{result['title']}' created",
-                            severity="information",
-                        )
-                        self.action_refresh()
-                    except Exception as e:
-                        logger.error(f"Failed to create reference: {e}", exc_info=True)
-                        self.notify(
-                            f"Failed to create reference: {e}", severity="error"
-                        )
-                else:
-                    logger.debug("Reference creation cancelled")
-
-            except Exception as e:
-                logger.error(f"Error creating reference: {e}", exc_info=True)
-                self.notify(f"Error creating reference: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_create_note(self) -> None:
-        """Create a new note."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            self.notify(
-                "Note creation - Use: idlergear note create '<content>'",
-                severity="information",
-            )
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_broadcast_message(self) -> None:
-        """Broadcast message to all agents."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                # Get active agents
-                from idlergear.config import find_idlergear_root
-                from idlergear.daemon.client import DaemonClient
-
-                root = find_idlergear_root()
-                if not root:
-                    logger.warning("Not in IdlerGear project")
-                    self.notify("Not in IdlerGear project", severity="error")
-                    return
-
-                socket_path = root / ".idlergear" / "daemon" / "daemon.sock"
-                if not socket_path.exists():
-                    logger.warning("Daemon not running")
-                    self.notify("Daemon not running", severity="warning")
-                    return
-
-                logger.debug("Connecting to daemon for message broadcast")
-                client = DaemonClient(socket_path)
-                await client.connect()
-                agents = await client.list_agents()
-
-                if not agents:
-                    await client.disconnect()
-                    logger.warning("No active agents to send message to")
-                    self.notify("No active agents", severity="warning")
-                    return
-
-                logger.info(f"Opening message modal for {len(agents)} agents")
-                result = await self.push_screen(
-                    MessageModal(agents), wait_for_dismiss=True
-                )
-
-                if result:
-                    message = result.get("message")
-                    priority = result.get("priority", "normal")
-
-                    logger.info(
-                        f"Broadcasting {priority} priority message: {message[:50]}..."
-                    )
-                    await client.broadcast_message(
-                        message=message,
-                        event_type="high_priority" if priority == "high" else "message",
-                    )
-
-                    await client.disconnect()
-
-                    recipient = result.get("recipient")
-                    if recipient == "all":
-                        logger.info(f"Message broadcast to {len(agents)} agents")
-                        self.notify(
-                            "Message broadcast to all agents", severity="information"
-                        )
-                    else:
-                        logger.info(f"Message sent to agent {recipient[:8]}")
-                        self.notify(
-                            f"Message sent to {recipient[:8]}", severity="information"
-                        )
-                else:
-                    logger.debug("Message broadcast cancelled")
-                    await client.disconnect()
-
-            except Exception as e:
-                logger.error(f"Error broadcasting message: {e}", exc_info=True)
-                self.notify(f"Error broadcasting message: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_send_message(self) -> None:
-        """Send message to specific agent."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            await self.action_broadcast_message()  # Use same modal for now
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_bulk_actions(self) -> None:
-        """Perform bulk actions on selected tasks."""
-
-        async def _async_helper() -> None:
-            """Async implementation."""
-            logger = get_logger()
-            try:
-                task_browser = self.query_one(TaskBrowser)
-                selected = task_browser.selected_tasks
-
-                if not selected:
-                    self.notify("No tasks selected", severity="warning")
-                    return
-
-                logger.info(f"Opening bulk actions modal for {len(selected)} tasks")
-                result = await self.push_screen(
-                    BulkActionModal(len(selected)), wait_for_dismiss=True
-                )
-
-                if result:
-                    action = result.get("action")
-
-                    from idlergear.backends.registry import get_backend
-
-                    backend = get_backend("task", project_path=self.project_root)
-
-                    if action == "state":
-                        # Show state selector
-                        new_state = await self.push_screen(
-                            QuickSelectModal(
-                                "Select State",
-                                [
-                                    ("Open", "open"),
-                                    ("In Progress", "in_progress"),
-                                    ("In Review", "in_review"),
-                                    ("Completed", "completed"),
-                                    ("Blocked", "blocked"),
-                                ],
-                            ),
-                            wait_for_dismiss=True,
-                        )
-                        if new_state:
-                            for task_id in selected:
-                                backend.update(task_id=task_id, state=new_state)
-                            logger.info(
-                                f"Updated {len(selected)} tasks to state={new_state}"
-                            )
-                            self.notify(
-                                f"Updated {len(selected)} tasks", severity="information"
-                            )
-
-                    elif action == "priority":
-                        # Show priority selector
-                        new_priority = await self.push_screen(
-                            QuickSelectModal(
-                                "Select Priority",
-                                [
-                                    ("🔴 Critical", "critical"),
-                                    ("🟠 High", "high"),
-                                    ("🟡 Medium", "medium"),
-                                    ("🟢 Low", "low"),
-                                    ("⚪ Backlog", "backlog"),
-                                ],
-                            ),
-                            wait_for_dismiss=True,
-                        )
-                        if new_priority:
-                            for task_id in selected:
-                                backend.update(task_id=task_id, priority=new_priority)
-                            logger.info(
-                                f"Updated {len(selected)} tasks to priority={new_priority}"
-                            )
-                            self.notify(
-                                f"Updated {len(selected)} tasks", severity="information"
-                            )
-
-                    elif action == "complete":
-                        # Mark all as completed
-                        for task_id in selected:
-                            backend.update(task_id=task_id, state="completed")
-                        logger.info(f"Marked {len(selected)} tasks as completed")
-                        self.notify(
-                            f"Marked {len(selected)} tasks as completed",
-                            severity="information",
-                        )
-
-                    elif action == "delete":
-                        # Confirm bulk delete
-                        confirmed = await self.push_screen(
-                            ConfirmDeleteModal(
-                                "tasks",
-                                f"{len(selected)}",
-                                f"{len(selected)} selected tasks",
-                            ),
-                            wait_for_dismiss=True,
-                        )
-                        if confirmed:
-                            for task_id in selected:
-                                backend.delete(task_id=task_id)
-                            logger.info(f"Deleted {len(selected)} tasks")
-                            self.notify(
-                                f"Deleted {len(selected)} tasks", severity="information"
-                            )
-
-                    # Clear selection and refresh
-                    task_browser.selected_tasks = set()
-                    self.action_refresh()
-
-            except Exception as e:
-                logger.error(f"Error performing bulk action: {e}", exc_info=True)
-                self.notify(f"Error performing bulk action: {e}", severity="error")
-
-        self.run_worker(_async_helper(), exclusive=False)
-
-    def action_help(self) -> None:
-        """Show help message."""
-        self.notify(
-            "Keys: [q]uit [r]efresh [g]aps [d]aemon [?]help",
-            severity="information",
-            timeout=5,
-        )
-
-
-def run_tui(project_root: Path | None = None) -> None:
-    """Run the TUI application.
-
-    Args:
-        project_root: Project root directory (defaults to cwd)
-    """
-    app = IdlerGearApp(project_root=project_root)
+def run_tui_v2():
+    """Run the TUI v2 application."""
+    app = IdlerGearAppV2()
     app.run()
+
+
+if __name__ == "__main__":
+    run_tui_v2()

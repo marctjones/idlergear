@@ -395,7 +395,7 @@ def tui(
         idlergear tui --project ~/dev  # Launch TUI for specific project
     """
     from idlergear.config import find_idlergear_root
-    from idlergear.tui.app_v2 import IdlerGearAppV2
+    from idlergear.tui.app import IdlerGearApp
 
     # Find project root
     if project_path is None:
@@ -416,7 +416,7 @@ def tui(
             raise typer.Exit(1)
 
     # Launch TUI with AI observability
-    app = IdlerGearAppV2(project_root=project_root)
+    app = IdlerGearApp(project_root=project_root)
     typer.secho(
         "🚀 Launching IdlerGear TUI with AI Observability",
         fg=typer.colors.CYAN,
