@@ -397,7 +397,6 @@ class GapsView(BaseView):
     async def refresh_data(self) -> None:
         """Load gap data."""
         self.logger.info(f"refresh_data() - GapsView starting gap detection")
-        from idlergear.gaps import detect_gaps
 
         project_path = self.project_root or find_idlergear_root()
         if not project_path:
@@ -405,25 +404,21 @@ class GapsView(BaseView):
             self.data = {"gaps": []}
             return
 
-        # Detect knowledge gaps
-        self.logger.debug(f"refresh_data() - Running gap detection on {project_path}")
-        gaps = detect_gaps(project_path)
-        self.logger.debug(f"refresh_data() - Detected {len(gaps)} gaps")
+        # TEMPORARY FIX: Gap detection is disabled to prevent TUI freeze
+        # See task #383 for full implementation with async detection
+        self.logger.warning(f"refresh_data() - Gap detection temporarily disabled (task #383)")
 
-        # Convert to dict format for tree
-        gap_dicts = [
-            {
-                "type": gap.type,
-                "severity": gap.severity,
-                "location": gap.location,
-                "description": gap.description,
-                "suggestion": gap.suggestion,
-            }
-            for gap in gaps
-        ]
+        # Return placeholder message instead of running blocking detect_gaps()
+        placeholder_gap = {
+            "type": "info",
+            "severity": "high",
+            "location": "TUI View 4",
+            "description": "Gap detection temporarily disabled - causes TUI freeze",
+            "suggestion": "See task #383: Implement async gap detection with caching and progress indicator",
+        }
 
-        self.data = {"gaps": gap_dicts}
-        self.logger.info(f"refresh_data() - GapsView gap detection complete")
+        self.data = {"gaps": [placeholder_gap]}
+        self.logger.info(f"refresh_data() - GapsView placeholder loaded (detection disabled)")
 
 
 class ActivityView(BaseView):
