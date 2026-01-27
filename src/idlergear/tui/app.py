@@ -208,14 +208,28 @@ class IdlerGearApp(App):
 
     def _format_detail_content(self, data: dict) -> str:
         """Format node data for display in detail pane."""
-        # Detect item type from data structure
-        if "task_id" in data or "id" in data and "title" in data:
+        # Handle nested structure from tree nodes: {"type": "task", "task": {...}}
+        item_type = data.get("type")
+
+        if item_type == "task" and "task" in data:
+            return self._format_task_details(data["task"])
+        elif item_type == "note" and "note" in data:
+            return self._format_note_details(data["note"])
+        elif item_type == "file" and "file" in data:
+            return self._format_file_details(data["file"])
+        elif item_type == "gap" and "gap" in data:
+            return self._format_gap_details(data["gap"])
+        elif item_type == "activity" and "activity" in data:
+            return self._format_activity_details(data["activity"])
+
+        # Fallback: try detecting from direct properties (legacy support)
+        if "task_id" in data or ("id" in data and "title" in data):
             return self._format_task_details(data)
         elif "note_id" in data or "content" in data:
             return self._format_note_details(data)
         elif "path" in data and "description" in data:
             return self._format_file_details(data)
-        elif "type" in data and "severity" in data:
+        elif "severity" in data:
             return self._format_gap_details(data)
         elif "phase" in data and "action" in data:
             return self._format_activity_details(data)

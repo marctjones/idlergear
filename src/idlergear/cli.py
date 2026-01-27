@@ -1885,7 +1885,8 @@ def daemon_agents():
         raise typer.Exit(1)
 
     async def list_agents():
-        async with DaemonClient(root) as client:
+        socket_path = root / "daemon.sock"
+        async with DaemonClient(socket_path) as client:
             agents = await client.list_agents()
 
             if not agents:
