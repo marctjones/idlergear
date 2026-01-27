@@ -196,6 +196,59 @@ def _ensure_daemon_running() -> None:
         print(f"Warning: Could not start daemon: {e}", file=sys.stderr)
 
 
+async def _auto_register_agent() -> None:
+    """Automatically register this MCP server as an agent with the daemon.
+
+    This enables the AI Monitor to show this assistant's activity in real-time.
+    Registers with unique agent_id and capabilities list.
+    """
+    global _registered_agent_id
+
+    from datetime import datetime
+    from idlergear.daemon.client import get_daemon_client, DaemonNotRunning
+
+    try:
+        root = find_idlergear_root()
+        if not root:
+            return
+
+        # Generate unique agent ID
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        agent_id = f"claude-code-{timestamp}"
+
+        # Get daemon client
+        client = get_daemon_client(root)
+
+        # Register with daemon
+        capabilities = [
+            "task_management",
+            "file_operations",
+            "code_analysis",
+            "ai_state_reporting",
+            "knowledge_management",
+        ]
+
+        response = await client.call("agent.register", {
+            "agent_id": agent_id,
+            "agent_type": "claude-code",
+            "capabilities": capabilities,
+            "metadata": {
+                "version": __version__,
+                "pid": os.getpid(),
+                "started_at": datetime.now().isoformat(),
+            }
+        })
+
+        # Store agent_id globally for use in AI state reporting
+        _registered_agent_id = agent_id
+
+        print(f"Registered as agent: {agent_id}", file=sys.stderr)
+
+    except (DaemonNotRunning, Exception) as e:
+        # Graceful degradation - AI reporting will still work, just won't show in daemon
+        print(f"Note: Could not register with daemon: {e}", file=sys.stderr)
+
+
 def _activate_project_environment() -> None:
     """Detect and activate project development environments.
 
@@ -7482,6 +7535,9 @@ async def run_server():
 
     # Ensure daemon is running for real-time monitoring and coordination
     _ensure_daemon_running()
+
+    # Auto-register this MCP server as an agent
+    await _auto_register_agent()
 
     # Start daemon subscription in background (non-blocking)
     daemon_task = asyncio.create_task(_subscribe_to_registry_events())

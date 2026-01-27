@@ -626,6 +626,7 @@ class AIMonitorView(BaseView):
         """Subscribe to AI state updates when mounted."""
         super().on_mount()
 
-        # TODO: Subscribe to daemon broadcasts for real-time updates
-        # This will make the view update automatically when AI state changes
-        # For now, we'll rely on periodic refresh (via 'r' key)
+        # Note: Daemon broadcast subscription is handled at the app level (app_v2.py:245-277)
+        # The app listens for ai.activity_changed, ai.plan_updated, ai.uncertainty_detected,
+        # and ai.search_repeated events, then refreshes this view automatically.
+        # Manual refresh is also available via 'r' key.
