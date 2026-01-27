@@ -54,6 +54,7 @@ class HelpScreen(ModalScreen):
 [bold cyan]═══ Navigation ═══[/]
 
 [yellow]↑↓←→[/] or [yellow]hjkl[/]    Navigate tree (vi-style)
+[yellow]Tab[/]              Cycle focus between panes
 [yellow]Enter[/]            Select/open item details
 [yellow]Esc[/]              Back/cancel/close
 [yellow]Space[/]            Toggle expand/collapse node

@@ -117,6 +117,11 @@ class BaseView(Static):
                 self._tree.show_guides = True
                 self._tree.can_focus = True
                 self.mount(self._tree)
+
+                # Auto-focus tree if this is the visible view
+                if self.display:
+                    self.logger.debug(f"_rebuild_tree() - Auto-focusing tree for visible view {self.view_name}")
+                    self._tree.focus()
             else:
                 # Subsequent updates - remove old tree and mount new one
                 self.logger.debug(f"_rebuild_tree() - Rebuilding existing tree for {self.view_name}")

@@ -111,6 +111,9 @@ class IdlerGearApp(App):
         Binding("6", "switch_view(6)", "AI Monitor", show=False),
     ]
 
+    # Enable Textual's default bindings (Tab for focus cycling, arrow keys for navigation)
+    # These are enabled by default but explicitly documenting them here
+
     def __init__(self, project_root=None, **kwargs):
         super().__init__(**kwargs)
         self.project_root = project_root
