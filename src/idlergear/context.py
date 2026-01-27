@@ -64,6 +64,7 @@ class ProjectContext:
     references: list[dict[str, Any]] = field(default_factory=list)
     backends: dict[str, str] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
+    suggestions: list[dict[str, Any]] = field(default_factory=list)
 
 
 def gather_context(
@@ -259,6 +260,27 @@ def gather_context(
         except Exception as e:
             ctx.errors.append(f"References: {e}")
 
+    # Generate proactive suggestions (CRITICAL for AI visibility)
+    try:
+        from idlergear.suggestions import generate_suggestions
+
+        suggestions = generate_suggestions(project_path)
+        # Convert to dict format
+        ctx.suggestions = [
+            {
+                "type": s.type,
+                "priority": s.priority,
+                "title": s.title,
+                "description": s.description,
+                "action": s.action,
+                "reason": s.reason,
+                "confidence": s.confidence,
+            }
+            for s in suggestions[:3]  # Top 3 suggestions
+        ]
+    except Exception as e:
+        ctx.errors.append(f"Suggestions: {e}")
+
     return ctx
 
 
@@ -356,6 +378,22 @@ def format_context(ctx: ProjectContext, verbose: bool = False) -> str:
         for ref in ctx.references:
             title = ref.get("title", "Untitled")
             lines.append(f"- {title}")
+        lines.append("")
+
+    # Proactive Suggestions (CRITICAL for AI workflow)
+    if ctx.suggestions:
+        lines.append("## Suggested Next Steps")
+        for i, suggestion in enumerate(ctx.suggestions, 1):
+            priority = suggestion.get("priority", 0)
+            confidence = suggestion.get("confidence", 0.0)
+            conf_pct = int(confidence * 100)
+            title = suggestion.get("title", "")
+            action = suggestion.get("action", "")
+            reason = suggestion.get("reason", "")
+
+            lines.append(f"{i}. [{priority}/10, {conf_pct}%] {title}")
+            lines.append(f"   → {action}")
+            lines.append(f"   {reason}")
         lines.append("")
 
     # Backend configuration (verbose mode)

@@ -28,6 +28,10 @@ class AgentSession:
     session_name: Optional[str] = None  # Human-readable session name
     working_files: list[str] = field(default_factory=list)  # Files being worked on
     current_task_id: Optional[int] = None  # IdlerGear task ID
+    # AI observability state (for real-time monitoring)
+    ai_state: dict[str, Any] = field(
+        default_factory=dict
+    )  # AI activity, plan, uncertainties, searches
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -183,6 +187,38 @@ class AgentRegistry:
                 agent.working_files = working_files
             if current_task_id is not None:
                 agent.current_task_id = current_task_id
+
+            agent.last_heartbeat = datetime.now(timezone.utc).isoformat()
+            await self._save()
+            return True
+
+    async def update_ai_state(
+        self,
+        agent_id: str,
+        ai_state: dict[str, Any],
+        merge: bool = True,
+    ) -> bool:
+        """Update agent's AI observability state.
+
+        Args:
+            agent_id: Agent ID
+            ai_state: AI state dictionary (current_activity, planned_steps, etc.)
+            merge: If True, merge with existing state; if False, replace entirely
+
+        Returns:
+            True if update successful, False if agent not found
+        """
+        async with self._lock:
+            agent = self._agents.get(agent_id)
+            if not agent:
+                return False
+
+            if merge:
+                # Merge new state into existing state
+                agent.ai_state.update(ai_state)
+            else:
+                # Replace entire state
+                agent.ai_state = ai_state
 
             agent.last_heartbeat = datetime.now(timezone.utc).isoformat()
             await self._save()

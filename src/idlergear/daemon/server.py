@@ -112,6 +112,11 @@ class DaemonServer:
         self.register_method("agent.unregister", self._handle_agent_unregister)
         self.register_method("agent.heartbeat", self._handle_agent_heartbeat)
         self.register_method("agent.update_status", self._handle_agent_update_status)
+        self.register_method("agent.update_state", self._handle_agent_update_state)
+        self.register_method(
+            "agent.append_uncertainty", self._handle_agent_append_uncertainty
+        )
+        self.register_method("agent.append_search", self._handle_agent_append_search)
         self.register_method("agent.list", self._handle_agent_list)
 
         # Session monitoring methods
@@ -269,6 +274,173 @@ class DaemonServer:
             agent_type=params.get("agent_type"), status=params.get("status")
         )
         return {"agents": [a.to_dict() for a in agents]}
+
+    async def _handle_agent_update_state(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Handle AI state update for observability.
+
+        Updates agent's AI state (current activity, planned steps, uncertainties, etc.)
+        and broadcasts changes to subscribers for real-time monitoring.
+        """
+        agent_id = params.get("agent_id")
+        ai_state = params.get("ai_state")
+
+        if not agent_id:
+            raise ValueError("Missing agent_id")
+        if not ai_state or not isinstance(ai_state, dict):
+            raise ValueError("Missing or invalid ai_state (must be dict)")
+
+        # Update agent's AI state in registry
+        merge = params.get("merge", True)
+        success = await self.agents.update_ai_state(agent_id, ai_state, merge=merge)
+
+        if success:
+            # Broadcast specific event types based on what was updated
+            if "current_activity" in ai_state:
+                await self.broadcast(
+                    "ai.activity_changed",
+                    {
+                        "agent_id": agent_id,
+                        "activity": ai_state["current_activity"],
+                    },
+                )
+
+            if "planned_steps" in ai_state:
+                await self.broadcast(
+                    "ai.plan_updated",
+                    {
+                        "agent_id": agent_id,
+                        "plan": ai_state["planned_steps"],
+                    },
+                )
+
+            if "uncertainties" in ai_state:
+                # Check if there are uncertainties with low confidence
+                uncertainties = ai_state["uncertainties"]
+                if isinstance(uncertainties, list) and uncertainties:
+                    # Get most recent uncertainty
+                    latest = uncertainties[-1] if uncertainties else None
+                    if latest:
+                        await self.broadcast(
+                            "ai.uncertainty_detected",
+                            {
+                                "agent_id": agent_id,
+                                "uncertainty": latest,
+                            },
+                        )
+
+            if "search_history" in ai_state:
+                # Check for repeated searches (same query multiple times)
+                history = ai_state["search_history"]
+                if isinstance(history, list) and len(history) >= 2:
+                    latest_search = history[-1]
+                    # Count how many times this query appeared
+                    query = latest_search.get("query", "")
+                    count = sum(1 for s in history if s.get("query") == query)
+                    if count >= 2:
+                        await self.broadcast(
+                            "ai.search_repeated",
+                            {
+                                "agent_id": agent_id,
+                                "query": query,
+                                "count": count,
+                                "search": latest_search,
+                            },
+                        )
+
+        return {"success": success}
+
+    async def _handle_agent_append_uncertainty(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Append an uncertainty report to agent's AI state.
+
+        Used when AI is confused or has low confidence about something.
+        """
+        agent_id = params.get("agent_id")
+        uncertainty = params.get("uncertainty")
+
+        if not agent_id:
+            raise ValueError("Missing agent_id")
+        if not uncertainty or not isinstance(uncertainty, dict):
+            raise ValueError("Missing or invalid uncertainty (must be dict)")
+
+        # Get current agent state
+        agent = await self.agents.get(agent_id)
+        if not agent:
+            return {"success": False, "error": "Agent not found"}
+
+        # Append to uncertainties list
+        uncertainties = agent.ai_state.get("uncertainties", [])
+        uncertainties.append(uncertainty)
+
+        # Update state with new list
+        success = await self.agents.update_ai_state(
+            agent_id, {"uncertainties": uncertainties}, merge=True
+        )
+
+        if success:
+            # Broadcast uncertainty detected event
+            await self.broadcast(
+                "ai.uncertainty_detected",
+                {
+                    "agent_id": agent_id,
+                    "uncertainty": uncertainty,
+                },
+            )
+
+        return {"success": success}
+
+    async def _handle_agent_append_search(
+        self, params: dict[str, Any], conn: Connection
+    ) -> dict[str, Any]:
+        """Append a search report to agent's AI state.
+
+        Tracks search activity to detect inefficiency (repeated searches).
+        """
+        agent_id = params.get("agent_id")
+        search = params.get("search")
+
+        if not agent_id:
+            raise ValueError("Missing agent_id")
+        if not search or not isinstance(search, dict):
+            raise ValueError("Missing or invalid search (must be dict)")
+
+        # Get current agent state
+        agent = await self.agents.get(agent_id)
+        if not agent:
+            return {"success": False, "error": "Agent not found"}
+
+        # Append to search history (keep last 20 searches)
+        search_history = agent.ai_state.get("search_history", [])
+        search_history.append(search)
+        if len(search_history) > 20:
+            search_history = search_history[-20:]  # Keep only last 20
+
+        # Update state with new list
+        success = await self.agents.update_ai_state(
+            agent_id, {"search_history": search_history}, merge=True
+        )
+
+        if success:
+            # Check for repeated searches
+            query = search.get("query", "")
+            count = sum(1 for s in search_history if s.get("query") == query)
+
+            if count >= 2:
+                # Repeated search detected - broadcast warning
+                await self.broadcast(
+                    "ai.search_repeated",
+                    {
+                        "agent_id": agent_id,
+                        "query": query,
+                        "count": count,
+                        "search": search,
+                    },
+                )
+
+        return {"success": success, "search_count": len(search_history)}
 
     # Session monitoring handlers
     async def _handle_session_start(

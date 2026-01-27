@@ -3544,6 +3544,144 @@ This ensures messages don't derail your work - only context ones are shown immed
             description="Get proactive suggestions for improving the project. CALL AT SESSION START to surface actionable insights. Returns high-priority suggestions like gaps to fix, workflow improvements, and token efficiency tips.",
             inputSchema={"type": "object", "properties": {}},
         ),
+        # AI State Reporting Tools (for AI observability - #374)
+        Tool(
+            name="idlergear_ai_report_activity",
+            description="Report your current activity to enable real-time AI observability. CALL THIS BEFORE major actions (reading files, running commands, editing code) to let users see what you're doing and why. Enables users to intervene if you're going down the wrong path.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "phase": {
+                        "type": "string",
+                        "enum": ["researching", "planning", "implementing", "testing"],
+                        "description": "Current phase of work",
+                    },
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Task ID being worked on (optional)",
+                    },
+                    "action": {
+                        "type": "string",
+                        "description": "Current action (e.g., 'reading file', 'running command', 'editing file')",
+                    },
+                    "target": {
+                        "type": "string",
+                        "description": "Target of action (file path, command, etc.)",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why you're doing this action - your reasoning",
+                    },
+                },
+                "required": ["phase", "action", "target", "reason"],
+            },
+        ),
+        Tool(
+            name="idlergear_ai_report_plan",
+            description="Report your planned next steps. CALL THIS when you have a multi-step plan to let users see what you'll do before you do it. Users can redirect you if the plan is wrong, saving time.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "steps": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {
+                                    "type": "string",
+                                    "description": "Action to take",
+                                },
+                                "target": {
+                                    "type": "string",
+                                    "description": "Target (file, command, etc.)",
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "Why this step is needed",
+                                },
+                            },
+                            "required": ["action", "target"],
+                        },
+                        "description": "List of planned steps (in order)",
+                    },
+                    "confidence": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "description": "Confidence in this plan (0.0-1.0). Report low confidence (<0.7) to get user input.",
+                    },
+                },
+                "required": ["steps", "confidence"],
+            },
+        ),
+        Tool(
+            name="idlergear_ai_report_uncertainty",
+            description="Report when you're uncertain or confused. CALL THIS when confidence < 0.7 or you can't find something. Lets users provide answers before you waste time searching. Be honest about what you don't know.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "What you're uncertain about or trying to figure out",
+                    },
+                    "confidence": {
+                        "type": "number",
+                        "minimum": 0.0,
+                        "maximum": 1.0,
+                        "description": "Confidence level (0.0-1.0). < 0.5 = very uncertain",
+                    },
+                    "context": {
+                        "type": "object",
+                        "description": "What you've tried or what you know",
+                        "properties": {
+                            "searched_files": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Files you've searched",
+                            },
+                            "searched_docs": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Documentation you've checked",
+                            },
+                            "not_found": {
+                                "type": "string",
+                                "description": "What you couldn't find",
+                            },
+                        },
+                    },
+                },
+                "required": ["question", "confidence"],
+            },
+        ),
+        Tool(
+            name="idlergear_ai_report_search",
+            description="Report search activity. CALL THIS after grep/file searches (especially repeated searches for the same thing). Helps detect search inefficiency and lets users provide answers directly.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "What you searched for",
+                    },
+                    "search_type": {
+                        "type": "string",
+                        "enum": ["grep", "file", "documentation", "web"],
+                        "description": "Type of search performed",
+                    },
+                    "results_found": {
+                        "type": "integer",
+                        "description": "Number of results found",
+                    },
+                    "files_searched": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Files or paths searched",
+                    },
+                },
+                "required": ["query", "search_type", "results_found"],
+            },
+        ),
     ]
 
 
@@ -6781,6 +6919,217 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             }
 
             return _format_result(result)
+
+        # AI State Reporting Handlers (#374 - AI Observability)
+        elif name == "idlergear_ai_report_activity":
+            from datetime import datetime
+            from idlergear.daemon.client import get_daemon_client, DaemonNotRunning
+
+            # Extract parameters
+            phase = arguments.get("phase")
+            task_id = arguments.get("task_id")
+            action = arguments.get("action")
+            target = arguments.get("target")
+            reason = arguments.get("reason")
+
+            # Create activity report
+            activity = {
+                "phase": phase,
+                "task_id": task_id,
+                "action": action,
+                "target": target,
+                "reason": reason,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            # Try to send to daemon
+            try:
+                root = find_idlergear_root()
+                if root and _registered_agent_id:
+                    client = get_daemon_client(root)
+                    # Update agent state in daemon
+                    await client.call(
+                        "agent.update_state",
+                        {
+                            "agent_id": _registered_agent_id,
+                            "ai_state": {"current_activity": activity},
+                        },
+                    )
+                    # Broadcast to subscribers (TUI)
+                    await client.call(
+                        "broadcast",
+                        {
+                            "type": "ai.activity_changed",
+                            "agent_id": _registered_agent_id,
+                            "activity": activity,
+                        },
+                    )
+            except (DaemonNotRunning, Exception):
+                # Gracefully degrade if daemon not available
+                pass
+
+            return _format_result(
+                {
+                    "status": "reported",
+                    "phase": phase,
+                    "action": action,
+                    "target": target,
+                }
+            )
+
+        elif name == "idlergear_ai_report_plan":
+            from datetime import datetime
+            from idlergear.daemon.client import get_daemon_client, DaemonNotRunning
+
+            # Extract parameters
+            steps = arguments.get("steps", [])
+            confidence = arguments.get("confidence")
+
+            # Create plan report
+            plan = {
+                "steps": steps,
+                "confidence": confidence,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            # Try to send to daemon
+            try:
+                root = find_idlergear_root()
+                if root and _registered_agent_id:
+                    client = get_daemon_client(root)
+                    # Update agent state
+                    await client.call(
+                        "agent.update_state",
+                        {
+                            "agent_id": _registered_agent_id,
+                            "ai_state": {"planned_steps": plan},
+                        },
+                    )
+                    # Broadcast
+                    await client.call(
+                        "broadcast",
+                        {
+                            "type": "ai.plan_updated",
+                            "agent_id": _registered_agent_id,
+                            "plan": plan,
+                        },
+                    )
+            except (DaemonNotRunning, Exception):
+                pass
+
+            return _format_result(
+                {
+                    "status": "reported",
+                    "num_steps": len(steps),
+                    "confidence": confidence,
+                    "low_confidence_warning": confidence < 0.7,
+                }
+            )
+
+        elif name == "idlergear_ai_report_uncertainty":
+            from datetime import datetime
+            from idlergear.daemon.client import get_daemon_client, DaemonNotRunning
+
+            # Extract parameters
+            question = arguments.get("question")
+            confidence = arguments.get("confidence")
+            context = arguments.get("context", {})
+
+            # Create uncertainty report
+            uncertainty = {
+                "question": question,
+                "confidence": confidence,
+                "context": context,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            # Try to send to daemon
+            try:
+                root = find_idlergear_root()
+                if root and _registered_agent_id:
+                    client = get_daemon_client(root)
+                    # Update agent state (append to uncertainties list)
+                    await client.call(
+                        "agent.append_uncertainty",
+                        {
+                            "agent_id": _registered_agent_id,
+                            "uncertainty": uncertainty,
+                        },
+                    )
+                    # Broadcast
+                    await client.call(
+                        "broadcast",
+                        {
+                            "type": "ai.uncertainty_detected",
+                            "agent_id": _registered_agent_id,
+                            "uncertainty": uncertainty,
+                        },
+                    )
+            except (DaemonNotRunning, Exception):
+                pass
+
+            return _format_result(
+                {
+                    "status": "reported",
+                    "question": question,
+                    "confidence": confidence,
+                    "intervention_recommended": confidence < 0.5,
+                }
+            )
+
+        elif name == "idlergear_ai_report_search":
+            from datetime import datetime
+            from idlergear.daemon.client import get_daemon_client, DaemonNotRunning
+
+            # Extract parameters
+            query = arguments.get("query")
+            search_type = arguments.get("search_type")
+            results_found = arguments.get("results_found")
+            files_searched = arguments.get("files_searched", [])
+
+            # Create search report
+            search = {
+                "query": query,
+                "search_type": search_type,
+                "results_found": results_found,
+                "files_searched": files_searched,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            # Detect repeated searches (simple heuristic: check last 5 searches)
+            # This would ideally be more sophisticated in daemon
+            try:
+                root = find_idlergear_root()
+                if root and _registered_agent_id:
+                    client = get_daemon_client(root)
+                    # Append to search history
+                    await client.call(
+                        "agent.append_search",
+                        {
+                            "agent_id": _registered_agent_id,
+                            "search": search,
+                        },
+                    )
+                    # Broadcast (daemon will detect repetition)
+                    await client.call(
+                        "broadcast",
+                        {
+                            "type": "ai.search_performed",
+                            "agent_id": _registered_agent_id,
+                            "search": search,
+                        },
+                    )
+            except (DaemonNotRunning, Exception):
+                pass
+
+            return _format_result(
+                {
+                    "status": "reported",
+                    "query": query,
+                    "results_found": results_found,
+                    "search_inefficiency_warning": results_found == 0,
+                }
+            )
 
         else:
             raise ValueError(f"Unknown tool: {name}")

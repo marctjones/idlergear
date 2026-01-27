@@ -100,9 +100,11 @@ class KnowledgeOverview(Static):
             (
                 "🔄 Daemon",
                 "1" if stats.get("daemon_running") else "0",
-                "[green]running[/]"
-                if stats.get("daemon_running")
-                else "[red]stopped[/]",
+                (
+                    "[green]running[/]"
+                    if stats.get("daemon_running")
+                    else "[red]stopped[/]"
+                ),
             ),
         ]
 

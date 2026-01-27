@@ -373,24 +373,29 @@ def tui(
         None, "--project", "-p", help="Project path (default: current directory)"
     ),
 ):
-    """Launch interactive TUI dashboard.
+    """Launch interactive TUI dashboard with AI observability.
 
-    Opens a terminal-based interactive dashboard for examining IdlerGear state:
-    - Tasks overview with filtering and sorting
-    - Notes and explorations browser
-    - Knowledge graph visualization
-    - Gap detection and alerts
-    - Daemon monitoring
-    - Real-time statistics
+    Opens a terminal-based interactive dashboard with 6 organizational views:
+    - View 1: By Type (tasks, notes, references, files)
+    - View 2: By Project (grouped by milestone)
+    - View 3: By Time (today, this week, this month)
+    - View 4: Gaps (knowledge gaps by severity)
+    - View 5: Activity (recent events feed)
+    - View 6: AI Monitor (real-time AI activity - THE KILLER FEATURE!)
 
-    Navigate with arrow keys, Tab to switch panels, 'q' to quit.
+    Navigation:
+    - Press 1-6 to switch between views
+    - Use arrow keys or hjkl to navigate trees
+    - Press ? for help
+    - Press r to refresh
+    - Press q to quit
 
     Examples:
-        idlergear tui                  # Launch TUI for current project
+        idlergear tui                  # Launch TUI with AI observability
         idlergear tui --project ~/dev  # Launch TUI for specific project
     """
     from idlergear.config import find_idlergear_root
-    from idlergear.tui import IdlerGearApp
+    from idlergear.tui.app_v2 import IdlerGearAppV2
 
     # Find project root
     if project_path is None:
@@ -410,8 +415,13 @@ def tui(
             )
             raise typer.Exit(1)
 
-    # Launch TUI
-    app = IdlerGearApp(project_root=project_root)
+    # Launch TUI with AI observability
+    app = IdlerGearAppV2(project_root=project_root)
+    typer.secho(
+        "🚀 Launching IdlerGear TUI with AI Observability",
+        fg=typer.colors.CYAN,
+    )
+    typer.secho("   Press ? for help, 1-6 to switch views, 6 for AI Monitor", dim=True)
     app.run()
 
 
@@ -650,6 +660,156 @@ def check(
         raise typer.Exit(1)
     elif not quiet and not context_reminder:
         typer.secho("No violations found.", fg=typer.colors.GREEN)
+
+
+@app.command()
+def gaps(
+    ctx: typer.Context,
+    fix: bool = typer.Option(False, "--fix", "-f", help="Auto-fix fixable gaps"),
+    show_all: bool = typer.Option(
+        False, "--all", "-a", help="Show all gaps (default: high/medium only)"
+    ),
+):
+    """Detect knowledge gaps in the project.
+
+    Finds:
+    - Orphaned files (code without annotations)
+    - Undefined acronyms (used but not documented)
+    - Broken links (references to missing files)
+
+    Examples:
+        idlergear gaps              # Show high/medium priority gaps
+        idlergear gaps --all        # Show all gaps including low priority
+        idlergear gaps --fix        # Auto-fix fixable gaps
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.gaps import detect_gaps, gap_report, auto_fix_gap
+
+    project_root = find_idlergear_root()
+    if project_root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    typer.secho("🔍 Detecting knowledge gaps...", fg=typer.colors.CYAN)
+    gaps_list = detect_gaps(project_root)
+
+    if not gaps_list:
+        typer.secho("✅ No knowledge gaps detected!", fg=typer.colors.GREEN)
+        return
+
+    # Filter by severity if not showing all
+    if not show_all:
+        gaps_list = [g for g in gaps_list if g.severity in ["high", "medium"]]
+
+    # Attempt auto-fix if requested
+    if fix:
+        fixed_count = 0
+        for gap in gaps_list:
+            if gap.auto_fixable:
+                if auto_fix_gap(gap):
+                    fixed_count += 1
+                    typer.secho(f"✅ Fixed: {gap.description}", fg=typer.colors.GREEN)
+
+        if fixed_count > 0:
+            typer.secho(
+                f"\n🔧 Auto-fixed {fixed_count} gap(s)", fg=typer.colors.GREEN
+            )
+            # Re-detect after fixes
+            gaps_list = detect_gaps(project_root)
+            if not show_all:
+                gaps_list = [g for g in gaps_list if g.severity in ["high", "medium"]]
+
+    # Display report
+    if ctx.obj.output_format == "json":
+        import json
+        output = [
+            {
+                "type": g.type,
+                "severity": g.severity,
+                "location": g.location,
+                "description": g.description,
+                "suggestion": g.suggestion,
+                "auto_fixable": g.auto_fixable,
+            }
+            for g in gaps_list
+        ]
+        typer.echo(json.dumps(output, indent=2))
+    else:
+        report = gap_report(gaps_list)
+        typer.echo(report)
+
+        # Summary
+        by_severity = {"high": 0, "medium": 0, "low": 0}
+        for gap in gaps_list:
+            by_severity[gap.severity] += 1
+
+        typer.echo()
+        typer.secho(
+            f"Found {len(gaps_list)} gap(s): "
+            f"{by_severity['high']} high, {by_severity['medium']} medium, "
+            f"{by_severity['low']} low",
+            fg=typer.colors.YELLOW,
+        )
+
+
+@app.command()
+def suggest(
+    ctx: typer.Context,
+    limit: int = typer.Option(5, "--limit", "-n", help="Max suggestions to show"),
+):
+    """Generate proactive suggestions for next steps.
+
+    Analyzes project state to recommend:
+    - Which task to work on next
+    - When to run tests
+    - Cleanup opportunities
+
+    Examples:
+        idlergear suggest           # Show top 5 suggestions
+        idlergear suggest -n 10     # Show top 10 suggestions
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.suggestions import generate_suggestions, suggestions_report
+
+    project_root = find_idlergear_root()
+    if project_root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    suggestions = generate_suggestions(project_root)
+
+    if not suggestions:
+        typer.secho("No suggestions at this time.", fg=typer.colors.CYAN)
+        return
+
+    # Limit suggestions
+    suggestions = suggestions[:limit]
+
+    # Display report
+    if ctx.obj.output_format == "json":
+        import json
+        output = [
+            {
+                "type": s.type,
+                "priority": s.priority,
+                "title": s.title,
+                "description": s.description,
+                "action": s.action,
+                "reason": s.reason,
+                "confidence": s.confidence,
+            }
+            for s in suggestions
+        ]
+        typer.echo(json.dumps(output, indent=2))
+    else:
+        report = suggestions_report(suggestions)
+        typer.echo(report)
 
 
 @app.command()
@@ -9040,9 +9200,9 @@ def agents_show(
         typer.echo(
             json.dumps(
                 {
-                    "detected_language": detected.value
-                    if detected != Language.UNKNOWN
-                    else None,
+                    "detected_language": (
+                        detected.value if detected != Language.UNKNOWN else None
+                    ),
                     "agents_md_exists": agents_exists,
                     "claude_md_exists": claude_exists,
                     "available_templates": [

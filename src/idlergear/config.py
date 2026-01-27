@@ -12,7 +12,6 @@ else:
 
 import tomli_w
 
-
 # Configuration schemas with defaults and validation
 TEST_CONFIG_SCHEMA = {
     "test": {
@@ -64,11 +63,42 @@ GRAPH_CONFIG_SCHEMA = {
     }
 }
 
+KNOWLEDGE_CONFIG_SCHEMA = {
+    "knowledge": {
+        "decay_function": {
+            "type": "string",
+            "default": "exponential",
+            "description": "Decay function for relevance scoring (exponential, linear, step)",
+        },
+        "half_life_days": {
+            "type": "integer",
+            "default": 30,
+            "description": "Days until relevance drops to 50% (exponential decay)",
+        },
+        "access_boost": {
+            "type": "number",
+            "default": 0.1,
+            "description": "Relevance boost per access (capped at 0.3 total)",
+        },
+        "min_relevance": {
+            "type": "number",
+            "default": 0.3,
+            "description": "Minimum relevance threshold for context filtering",
+        },
+        "auto_update_relevance": {
+            "type": "boolean",
+            "default": True,
+            "description": "Automatically update relevance scores on access",
+        },
+    }
+}
+
 # Combined schema registry
 CONFIG_SCHEMAS = {
     "test": TEST_CONFIG_SCHEMA["test"],
     "projects": PROJECTS_CONFIG_SCHEMA["projects"],
     "graph": GRAPH_CONFIG_SCHEMA["graph"],
+    "knowledge": KNOWLEDGE_CONFIG_SCHEMA["knowledge"],
 }
 
 
@@ -256,7 +286,11 @@ def set_config_value(
             for part in field_path:
                 if isinstance(current, dict) and part in current:
                     current = current[part]
-            expected_type = current.get("type", "unknown") if isinstance(current, dict) else "unknown"
+            expected_type = (
+                current.get("type", "unknown")
+                if isinstance(current, dict)
+                else "unknown"
+            )
             actual_type = type(value).__name__
             raise ValueError(
                 f"Invalid type for {key}: expected {expected_type}, got {actual_type}"
