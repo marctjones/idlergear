@@ -15,6 +15,7 @@ from .populators import (
     PersonPopulator,
     DependencyPopulator,
     TestPopulator,
+    PlanPopulator,
 )
 
 
@@ -32,12 +33,13 @@ def populate_all(
     1. Git history (commits, files)
     2. Code symbols (functions, classes)
     3. Tasks (GitHub Issues)
-    4. Commit-task linking (parse commit messages)
-    5. References (.idlergear/reference/)
-    6. Wiki (GitHub wiki)
-    7. Person (git authors, contributors)
-    8. Dependencies (requirements.txt, package.json, etc.)
-    9. Tests (test files and test cases)
+    4. Plans (Plan Objects)
+    5. Commit-task linking (parse commit messages)
+    6. References (.idlergear/reference/)
+    7. Wiki (GitHub wiki)
+    8. Person (git authors, contributors)
+    9. Dependencies (requirements.txt, package.json, etc.)
+    10. Tests (test files and test cases)
 
     Args:
         project_path: Path to project (defaults to current directory)
@@ -123,7 +125,23 @@ def populate_all(
             print(f"  ✗ Error: {e}")
         results['tasks'] = {"error": str(e)}
 
-    # 4. Link commits to tasks
+    # 4. Populate plans
+    if verbose:
+        print("\n📊 Populating plans...")
+    try:
+        plan_pop = PlanPopulator(db, project_path)
+        results['plans'] = plan_pop.populate(incremental=incremental)
+        if verbose:
+            print(f"  ✓ {results['plans']['plans']} plans indexed")
+            if results['plans'].get('updated', 0) > 0:
+                print(f"  ✓ {results['plans']['updated']} plans updated")
+            print(f"  ✓ {results['plans']['relationships']} relationships created")
+    except Exception as e:
+        if verbose:
+            print(f"  ✗ Error: {e}")
+        results['plans'] = {"error": str(e)}
+
+    # 5. Link commits to tasks
     if verbose:
         print("\n📊 Linking commits to tasks...")
     try:
@@ -230,6 +248,7 @@ def populate_all(
             results.get('git', {}).get('files', 0),
             results.get('code', {}).get('symbols', 0),
             results.get('tasks', {}).get('tasks', 0),
+            results.get('plans', {}).get('plans', 0),
             results.get('references', {}).get('references', 0),
             results.get('wiki', {}).get('documents', 0),
             results.get('persons', {}).get('persons', 0),
@@ -240,6 +259,7 @@ def populate_all(
         total_relationships = sum([
             results.get('git', {}).get('relationships', 0),
             results.get('code', {}).get('relationships', 0),
+            results.get('plans', {}).get('relationships', 0),
             results.get('links', {}).get('links_created', 0),
             results.get('references', {}).get('relationships', 0),
             results.get('wiki', {}).get('relationships', 0),

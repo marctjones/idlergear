@@ -9,6 +9,7 @@ from .wiki_populator import WikiPopulator
 from .person_populator import PersonPopulator
 from .dependency_populator import DependencyPopulator
 from .test_populator import TestPopulator
+from .plan_populator import PlanPopulator
 
 __all__ = [
     "GitPopulator",
@@ -20,4 +21,5 @@ __all__ = [
     "PersonPopulator",
     "DependencyPopulator",
     "TestPopulator",
+    "PlanPopulator",
 ]

@@ -40,6 +40,10 @@ def _drop_tables(conn):
         "PROMOTED_TO_TASK",
         "PROMOTED_TO_REFERENCE",
         "PART_OF_PLAN",
+        "PLAN_CONTAINS_FILE",
+        "PLAN_REFERENCES",
+        "PLAN_PARENT_OF",
+        "PLAN_SUPERSEDES",
         "MODIFIES",
         "CONTAINS",
         "IMPORTS",
@@ -136,13 +140,18 @@ def _create_node_tables(conn):
     # Plan nodes
     conn.execute("""
         CREATE NODE TABLE Plan(
-            id INT64 PRIMARY KEY,
-            name STRING,
-            title STRING,
-            body STRING,
-            state STRING,
+            name STRING PRIMARY KEY,
+            description STRING,
+            status STRING,
+            type STRING,
+            milestone STRING,
+            auto_archive BOOLEAN,
+            github_milestone_id INT64,
+            github_project_id INT64,
             created_at TIMESTAMP,
-            updated_at TIMESTAMP
+            completed_at TIMESTAMP,
+            deprecated_at TIMESTAMP,
+            archived_at TIMESTAMP
         )
     """)
 
@@ -334,6 +343,35 @@ def _create_relationship_tables(conn):
         CREATE REL TABLE PART_OF_PLAN(
             FROM Task TO Plan,
             task_order INT32
+        )
+    """)
+
+    # Plan-File relationships
+    conn.execute("""
+        CREATE REL TABLE PLAN_CONTAINS_FILE(
+            FROM Plan TO File,
+            deprecated BOOLEAN
+        )
+    """)
+
+    # Plan-Reference relationships
+    conn.execute("""
+        CREATE REL TABLE PLAN_REFERENCES(
+            FROM Plan TO Reference
+        )
+    """)
+
+    # Plan hierarchy relationships
+    conn.execute("""
+        CREATE REL TABLE PLAN_PARENT_OF(
+            FROM Plan TO Plan
+        )
+    """)
+
+    conn.execute("""
+        CREATE REL TABLE PLAN_SUPERSEDES(
+            FROM Plan TO Plan,
+            deprecated_at TIMESTAMP
         )
     """)
 
