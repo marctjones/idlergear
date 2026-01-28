@@ -8,12 +8,21 @@ import pytest
 
 from idlergear.plans import (
     Plan,
+    add_file_to_plan,
+    archive_plan,
+    complete_plan,
     create_plan,
     delete_plan,
+    deprecate_file_in_plan,
+    deprecate_plan,
+    get_plan_files,
     list_plans,
     load_plan,
     plan_exists,
+    remove_file_from_plan,
+    restore_plan,
     save_plan,
+    update_file_annotations_for_plan,
     update_plan,
 )
 
@@ -319,3 +328,229 @@ def test_plan_sorting_by_created_date(plans_dir):
     assert plans[0].name == "new-plan"
     assert plans[1].name == "middle-plan"
     assert plans[2].name == "old-plan"
+
+
+# Phase 2: Lifecycle Management Tests
+
+
+def test_deprecate_plan(plans_dir):
+    """Test deprecating a plan."""
+    from idlergear.plans import deprecate_plan
+
+    create_plan("old-plan", "Old plan", plans_dir)
+
+    # Deprecate without successor
+    plan = deprecate_plan("old-plan", plans_dir)
+
+    assert plan.status == "deprecated"
+    assert plan.deprecated_at is not None
+    assert plan.successor_plan is None
+
+
+def test_deprecate_plan_with_successor(plans_dir):
+    """Test deprecating a plan with a successor."""
+    from idlergear.plans import deprecate_plan
+
+    create_plan("v1-plan", "V1", plans_dir)
+    create_plan("v2-plan", "V2", plans_dir)
+
+    # Deprecate with successor
+    plan = deprecate_plan("v1-plan", plans_dir, successor_name="v2-plan")
+
+    assert plan.status == "deprecated"
+    assert plan.successor_plan == "v2-plan"
+
+    # Check successor has supersedes reference
+    successor = load_plan("v2-plan", plans_dir)
+    assert successor.supersedes_plan == "v1-plan"
+
+
+def test_deprecate_plan_with_nonexistent_successor(plans_dir):
+    """Test that deprecate fails with nonexistent successor."""
+    from idlergear.plans import deprecate_plan
+
+    create_plan("old-plan", "Old", plans_dir)
+
+    with pytest.raises(ValueError, match="Successor plan not found"):
+        deprecate_plan("old-plan", plans_dir, successor_name="nonexistent")
+
+
+def test_archive_plan(plans_dir):
+    """Test archiving a plan."""
+    from idlergear.plans import archive_plan
+
+    create_plan("archive-test", "Test archiving", plans_dir)
+
+    plan = archive_plan("archive-test", plans_dir)
+
+    assert plan.status == "archived"
+    assert plan.archived_at is not None
+
+
+def test_restore_plan(plans_dir):
+    """Test restoring an archived plan."""
+    from idlergear.plans import archive_plan, restore_plan
+
+    create_plan("restore-test", "Test restore", plans_dir)
+    archive_plan("restore-test", plans_dir)
+
+    # Restore to active
+    plan = restore_plan("restore-test", plans_dir)
+
+    assert plan.status == "active"
+    assert plan.archived_at is None
+
+
+def test_restore_plan_to_custom_status(plans_dir):
+    """Test restoring a plan to a custom status."""
+    from idlergear.plans import archive_plan, restore_plan
+
+    create_plan("restore-test", "Test restore", plans_dir)
+    archive_plan("restore-test", plans_dir)
+
+    # Restore to completed
+    plan = restore_plan("restore-test", plans_dir, new_status="completed")
+
+    assert plan.status == "completed"
+    assert plan.archived_at is None
+
+
+def test_restore_non_archived_plan_fails(plans_dir):
+    """Test that restore fails for non-archived plans."""
+    from idlergear.plans import restore_plan
+
+    create_plan("active-plan", "Active", plans_dir)
+
+    with pytest.raises(ValueError, match="not archived"):
+        restore_plan("active-plan", plans_dir)
+
+
+# Phase 3: File-Plan Integration Tests
+
+
+def test_add_file_to_plan(plans_dir):
+    """Test adding a file to a plan."""
+    from idlergear.plans import add_file_to_plan
+
+    create_plan("feature-plan", "Feature", plans_dir)
+
+    plan = add_file_to_plan("feature-plan", "src/auth.py", plans_dir)
+
+    assert "src/auth.py" in plan.files
+    assert len(plan.files) == 1
+
+
+def test_add_multiple_files_to_plan(plans_dir):
+    """Test adding multiple files to a plan."""
+    from idlergear.plans import add_file_to_plan
+
+    create_plan("feature-plan", "Feature", plans_dir)
+
+    add_file_to_plan("feature-plan", "src/auth.py", plans_dir)
+    add_file_to_plan("feature-plan", "src/user.py", plans_dir)
+    plan = add_file_to_plan("feature-plan", "tests/test_auth.py", plans_dir)
+
+    assert len(plan.files) == 3
+    assert "src/auth.py" in plan.files
+    assert "src/user.py" in plan.files
+    assert "tests/test_auth.py" in plan.files
+
+
+def test_add_duplicate_file_is_idempotent(plans_dir):
+    """Test that adding a duplicate file is idempotent."""
+    from idlergear.plans import add_file_to_plan
+
+    create_plan("feature-plan", "Feature", plans_dir)
+
+    add_file_to_plan("feature-plan", "src/auth.py", plans_dir)
+    plan = add_file_to_plan("feature-plan", "src/auth.py", plans_dir)
+
+    # Should only appear once
+    assert len(plan.files) == 1
+    assert plan.files.count("src/auth.py") == 1
+
+
+def test_remove_file_from_plan(plans_dir):
+    """Test removing a file from a plan."""
+    from idlergear.plans import add_file_to_plan, remove_file_from_plan
+
+    create_plan("feature-plan", "Feature", plans_dir)
+    add_file_to_plan("feature-plan", "src/auth.py", plans_dir)
+
+    plan = remove_file_from_plan("feature-plan", "src/auth.py", plans_dir)
+
+    assert "src/auth.py" not in plan.files
+    assert len(plan.files) == 0
+
+
+def test_deprecate_file_in_plan(plans_dir):
+    """Test deprecating a file in a plan."""
+    from idlergear.plans import add_file_to_plan, deprecate_file_in_plan
+
+    create_plan("feature-plan", "Feature", plans_dir)
+    add_file_to_plan("feature-plan", "src/legacy.py", plans_dir)
+
+    plan = deprecate_file_in_plan("feature-plan", "src/legacy.py", plans_dir)
+
+    assert "src/legacy.py" not in plan.files
+    assert "src/legacy.py" in plan.deprecated_files
+
+
+def test_get_plan_files(plans_dir):
+    """Test getting files from a plan."""
+    from idlergear.plans import add_file_to_plan, deprecate_file_in_plan, get_plan_files
+
+    create_plan("feature-plan", "Feature", plans_dir)
+    add_file_to_plan("feature-plan", "src/current.py", plans_dir)
+    add_file_to_plan("feature-plan", "src/legacy.py", plans_dir)
+    deprecate_file_in_plan("feature-plan", "src/legacy.py", plans_dir)
+
+    # Get active files only
+    files = get_plan_files("feature-plan", plans_dir, include_deprecated=False)
+    assert len(files) == 1
+    assert "src/current.py" in files
+    assert "src/legacy.py" not in files
+
+    # Get all files including deprecated
+    all_files = get_plan_files("feature-plan", plans_dir, include_deprecated=True)
+    assert len(all_files) == 2
+    assert "src/current.py" in all_files
+    assert "src/legacy.py" in all_files
+
+
+def test_file_path_normalization(plans_dir):
+    """Test that absolute paths are normalized to relative."""
+    from idlergear.plans import add_file_to_plan
+
+    create_plan("feature-plan", "Feature", plans_dir)
+
+    # Add with absolute path
+    abs_path = str(plans_dir / "src" / "auth.py")
+    plan = add_file_to_plan("feature-plan", abs_path, plans_dir)
+
+    # Should be stored as relative
+    assert "src/auth.py" in plan.files
+    assert abs_path not in plan.files
+
+
+def test_update_file_annotations_for_plan(plans_dir):
+    """Test updating file annotations when plan status changes."""
+    from idlergear.plans import (
+        add_file_to_plan,
+        deprecate_plan,
+        update_file_annotations_for_plan,
+    )
+
+    create_plan("v1-plan", "V1", plans_dir)
+    create_plan("v2-plan", "V2", plans_dir)
+    add_file_to_plan("v1-plan", "src/auth.py", plans_dir)
+    add_file_to_plan("v1-plan", "src/user.py", plans_dir)
+
+    # Deprecate plan
+    deprecate_plan("v1-plan", plans_dir, successor_name="v2-plan")
+
+    # Update file annotations
+    updated = update_file_annotations_for_plan("v1-plan", plans_dir)
+
+    # Should update 2 files
+    assert updated == 2

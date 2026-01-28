@@ -3976,6 +3976,211 @@ def plan_complete(name: str):
         raise typer.Exit(1)
 
 
+@plan_app.command("deprecate")
+def plan_deprecate_cmd(
+    name: str,
+    successor: str = typer.Option(None, "--successor", "-s", help="Successor plan name"),
+    reason: str = typer.Option("", "--reason", "-r", help="Deprecation reason"),
+):
+    """Mark a plan as deprecated."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import deprecate_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        plan = deprecate_plan(name, root, successor_name=successor, reason=reason)
+        msg = f"Deprecated plan: {plan.name}"
+        if successor:
+            msg += f" (successor: {successor})"
+        typer.secho(msg, fg=typer.colors.GREEN)
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except ValueError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error deprecating plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("archive")
+def plan_archive_cmd(name: str):
+    """Archive a plan (can be restored later)."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import archive_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        plan = archive_plan(name, root)
+        typer.secho(f"Archived plan: {plan.name}", fg=typer.colors.GREEN)
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error archiving plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("restore")
+def plan_restore_cmd(
+    name: str,
+    status: str = typer.Option("active", "--status", help="Status to restore to"),
+):
+    """Restore an archived plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import restore_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        plan = restore_plan(name, root, new_status=status)
+        typer.secho(
+            f"Restored plan: {plan.name} (status: {plan.status})", fg=typer.colors.GREEN
+        )
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except ValueError as e:
+        typer.secho(str(e), fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error restoring plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("add-file")
+def plan_add_file_cmd(name: str, file_path: str):
+    """Add a file to a plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import add_file_to_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        plan = add_file_to_plan(name, file_path, root)
+        typer.secho(
+            f"Added '{file_path}' to plan '{plan.name}'", fg=typer.colors.GREEN
+        )
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error adding file to plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("remove-file")
+def plan_remove_file_cmd(name: str, file_path: str):
+    """Remove a file from a plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import remove_file_from_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        plan = remove_file_from_plan(name, file_path, root)
+        typer.secho(
+            f"Removed '{file_path}' from plan '{plan.name}'", fg=typer.colors.GREEN
+        )
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error removing file from plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("deprecate-file")
+def plan_deprecate_file_cmd(name: str, file_path: str):
+    """Mark a file as deprecated in a plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import deprecate_file_in_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        plan = deprecate_file_in_plan(name, file_path, root)
+        typer.secho(
+            f"Deprecated '{file_path}' in plan '{plan.name}'", fg=typer.colors.GREEN
+        )
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error deprecating file: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("files")
+def plan_files_cmd(
+    ctx: typer.Context,
+    name: str,
+    include_deprecated: bool = typer.Option(
+        False, "--deprecated", help="Include deprecated files"
+    ),
+):
+    """List files in a plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import get_plan_files
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        files = get_plan_files(name, root, include_deprecated=include_deprecated)
+        display(files, ctx.obj.output_format, "files")
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error listing files: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 @plan_app.command("sync")
 def plan_sync(target: str = typer.Argument("github")):
     """Sync plans with remote."""

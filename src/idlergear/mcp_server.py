@@ -939,6 +939,108 @@ async def list_tools() -> list[Tool]:
                 "required": ["name"],
             },
         ),
+        Tool(
+            name="idlergear_plan_deprecate",
+            description="Mark a plan as deprecated, optionally specifying a successor plan",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name to deprecate"},
+                    "successor_name": {
+                        "type": "string",
+                        "description": "Name of plan that replaces this one",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for deprecation",
+                        "default": "",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_archive",
+            description="Archive a plan (soft archive, can be restored)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_restore",
+            description="Restore an archived plan",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "new_status": {
+                        "type": "string",
+                        "description": "Status to restore to (default: active)",
+                        "default": "active",
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_add_file",
+            description="Add a file to a plan. File annotations will be automatically updated with plan metadata.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "file_path": {
+                        "type": "string",
+                        "description": "File path to add (relative to project root)",
+                    },
+                },
+                "required": ["name", "file_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_remove_file",
+            description="Remove a file from a plan. Plan metadata will be cleared from file annotations.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "file_path": {"type": "string", "description": "File path to remove"},
+                },
+                "required": ["name", "file_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_deprecate_file",
+            description="Mark a file as deprecated in a plan. File annotation will be updated with deprecation metadata.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "file_path": {"type": "string", "description": "File path to deprecate"},
+                },
+                "required": ["name", "file_path"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_files",
+            description="Get all files associated with a plan",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "include_deprecated": {
+                        "type": "boolean",
+                        "description": "Include deprecated files (default: false)",
+                        "default": False,
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
         # Reference tools
         Tool(
             name="idlergear_reference_add",
@@ -4132,6 +4234,91 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 completed_at=datetime.now().isoformat(),
             )
             return _format_result(plan.to_dict())
+
+        elif name == "idlergear_plan_deprecate":
+            from idlergear.plans import deprecate_plan
+
+            plan = deprecate_plan(
+                arguments["name"],
+                root,
+                successor_name=arguments.get("successor_name"),
+                reason=arguments.get("reason", ""),
+            )
+            return _format_result(plan.to_dict())
+
+        elif name == "idlergear_plan_archive":
+            from idlergear.plans import archive_plan
+
+            plan = archive_plan(arguments["name"], root)
+            return _format_result(plan.to_dict())
+
+        elif name == "idlergear_plan_restore":
+            from idlergear.plans import restore_plan
+
+            plan = restore_plan(
+                arguments["name"],
+                root,
+                new_status=arguments.get("new_status", "active"),
+            )
+            return _format_result(plan.to_dict())
+
+        elif name == "idlergear_plan_add_file":
+            from idlergear.plans import add_file_to_plan
+
+            plan = add_file_to_plan(
+                arguments["name"],
+                arguments["file_path"],
+                root,
+            )
+            return _format_result(
+                {
+                    "plan": plan.name,
+                    "file": arguments["file_path"],
+                    "total_files": len(plan.files),
+                }
+            )
+
+        elif name == "idlergear_plan_remove_file":
+            from idlergear.plans import remove_file_from_plan
+
+            plan = remove_file_from_plan(
+                arguments["name"],
+                arguments["file_path"],
+                root,
+            )
+            return _format_result(
+                {
+                    "plan": plan.name,
+                    "file": arguments["file_path"],
+                    "removed": True,
+                }
+            )
+
+        elif name == "idlergear_plan_deprecate_file":
+            from idlergear.plans import deprecate_file_in_plan
+
+            plan = deprecate_file_in_plan(
+                arguments["name"],
+                arguments["file_path"],
+                root,
+            )
+            return _format_result(
+                {
+                    "plan": plan.name,
+                    "file": arguments["file_path"],
+                    "deprecated": True,
+                }
+            )
+
+        elif name == "idlergear_plan_files":
+            from idlergear.plans import get_plan_files
+
+            files = get_plan_files(
+                arguments["name"],
+                root,
+                include_deprecated=arguments.get("include_deprecated", False),
+            )
+            return _format_result({"plan": arguments["name"], "files": files})
 
         # Reference handlers (using backend)
         elif name == "idlergear_reference_add":

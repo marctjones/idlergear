@@ -294,3 +294,355 @@ def update_plan(name: str, root: Path, **updates) -> Plan:
     save_plan(plan, root)
     logger.info(f"Updated plan: {name}")
     return plan
+
+
+# Lifecycle management (Phase 2)
+
+
+def complete_plan(name: str, root: Path) -> Plan:
+    """Mark a plan as completed.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+
+    Returns:
+        Completed Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = update_plan(
+        name, root, status="completed", completed_at=datetime.now().isoformat()
+    )
+    logger.info(f"Completed plan: {name}")
+    return plan
+
+
+def deprecate_plan(
+    name: str, root: Path, successor_name: Optional[str] = None, reason: str = ""
+) -> Plan:
+    """Mark a plan as deprecated, optionally specifying a successor.
+
+    Args:
+        name: Plan name to deprecate
+        root: Project root directory
+        successor_name: Name of plan that replaces this one
+        reason: Reason for deprecation
+
+    Returns:
+        Deprecated Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+        ValueError: If successor doesn't exist
+    """
+    # Validate successor exists
+    if successor_name and not plan_exists(successor_name, root):
+        raise ValueError(f"Successor plan not found: {successor_name}")
+
+    plan = load_plan(name, root)
+    plan.status = "deprecated"
+    plan.deprecated_at = datetime.now().isoformat()
+    if successor_name:
+        plan.successor_plan = successor_name
+
+        # Update successor to reference this plan
+        successor = load_plan(successor_name, root)
+        successor.supersedes_plan = name
+        save_plan(successor, root)
+
+    save_plan(plan, root)
+    logger.info(f"Deprecated plan: {name} (successor: {successor_name})")
+    return plan
+
+
+def archive_plan(name: str, root: Path) -> Plan:
+    """Archive a plan (soft archive, can be restored).
+
+    Args:
+        name: Plan name
+        root: Project root directory
+
+    Returns:
+        Archived Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = update_plan(
+        name, root, status="archived", archived_at=datetime.now().isoformat()
+    )
+    logger.info(f"Archived plan: {name}")
+    return plan
+
+
+def restore_plan(name: str, root: Path, new_status: str = "active") -> Plan:
+    """Restore an archived plan.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+        new_status: Status to restore to (default: active)
+
+    Returns:
+        Restored Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+        ValueError: If plan is not archived
+    """
+    plan = load_plan(name, root)
+    if plan.status != "archived":
+        raise ValueError(f"Plan '{name}' is not archived (status: {plan.status})")
+
+    plan.status = new_status
+    plan.archived_at = None
+    save_plan(plan, root)
+    logger.info(f"Restored plan: {name} to status: {new_status}")
+    return plan
+
+
+# File-plan integration (Phase 3)
+
+
+def add_file_to_plan(name: str, file_path: str, root: Path) -> Plan:
+    """Add a file to a plan.
+
+    Args:
+        name: Plan name
+        file_path: File path to add (relative to root)
+        root: Project root directory
+
+    Returns:
+        Updated Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    # Normalize file path (relative to root)
+    if file_path.startswith("/"):
+        # Convert absolute to relative
+        try:
+            file_path = str(Path(file_path).relative_to(root))
+        except ValueError:
+            # Path is outside root, keep as-is
+            pass
+
+    # Add if not already present
+    if file_path not in plan.files:
+        plan.files.append(file_path)
+        save_plan(plan, root)
+        logger.info(f"Added file '{file_path}' to plan '{name}'")
+
+        # Update file annotation
+        _update_file_annotation(file_path, plan, root)
+
+    return plan
+
+
+def remove_file_from_plan(name: str, file_path: str, root: Path) -> Plan:
+    """Remove a file from a plan.
+
+    Args:
+        name: Plan name
+        file_path: File path to remove
+        root: Project root directory
+
+    Returns:
+        Updated Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    if file_path in plan.files:
+        plan.files.remove(file_path)
+        save_plan(plan, root)
+        logger.info(f"Removed file '{file_path}' from plan '{name}'")
+
+        # Clear file annotation
+        _clear_file_annotation(file_path, root)
+
+    return plan
+
+
+def deprecate_file_in_plan(name: str, file_path: str, root: Path) -> Plan:
+    """Move a file from active to deprecated in a plan.
+
+    Args:
+        name: Plan name
+        file_path: File path to deprecate
+        root: Project root directory
+
+    Returns:
+        Updated Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    if file_path in plan.files:
+        plan.files.remove(file_path)
+        if file_path not in plan.deprecated_files:
+            plan.deprecated_files.append(file_path)
+        save_plan(plan, root)
+        logger.info(f"Deprecated file '{file_path}' in plan '{name}'")
+
+        # Update file annotation
+        _update_file_annotation(file_path, plan, root, deprecated=True)
+
+    return plan
+
+
+def get_plan_files(name: str, root: Path, include_deprecated: bool = False) -> List[str]:
+    """Get all files associated with a plan.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+        include_deprecated: Include deprecated files
+
+    Returns:
+        List of file paths
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+    files = plan.files.copy()
+    if include_deprecated:
+        files.extend(plan.deprecated_files)
+    return files
+
+
+def update_file_annotations_for_plan(name: str, root: Path) -> int:
+    """Update file annotations for all files in a plan.
+
+    Called when plan status changes to propagate changes to file annotations.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+
+    Returns:
+        Number of files updated
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+    updated = 0
+
+    # Update active files
+    for file_path in plan.files:
+        _update_file_annotation(file_path, plan, root)
+        updated += 1
+
+    # Update deprecated files
+    for file_path in plan.deprecated_files:
+        _update_file_annotation(file_path, plan, root, deprecated=True)
+        updated += 1
+
+    logger.info(f"Updated {updated} file annotations for plan '{name}'")
+    return updated
+
+
+def _update_file_annotation(
+    file_path: str, plan: Plan, root: Path, deprecated: bool = False
+) -> None:
+    """Update file annotation with plan metadata.
+
+    Internal helper that integrates with file registry.
+
+    Args:
+        file_path: File path
+        plan: Plan object
+        root: Project root directory
+        deprecated: Whether file is deprecated
+    """
+    try:
+        from idlergear.file_registry import annotate_file, get_file_annotation
+
+        # Build annotation metadata
+        annotation = {
+            "plan": plan.name,
+            "plan_status": plan.status,
+            "plan_type": plan.type,
+        }
+
+        if deprecated:
+            annotation["deprecated"] = True
+            annotation["deprecation_reason"] = f"Part of deprecated plan: {plan.name}"
+
+        if plan.milestone:
+            annotation["milestone"] = plan.milestone
+
+        if plan.successor_plan:
+            annotation["successor_plan"] = plan.successor_plan
+
+        # Check if file already has annotation
+        existing = get_file_annotation(str(root / file_path))
+        if existing:
+            # Merge with existing annotation
+            annotation = {**existing, **annotation}
+
+        # Update annotation
+        annotate_file(
+            path=str(root / file_path),
+            description=annotation.get("description", ""),
+            tags=annotation.get("tags", []),
+            components=annotation.get("components", []),
+            related_files=annotation.get("related_files", []),
+            metadata=annotation,
+        )
+
+    except ImportError:
+        # File registry not available (tests?)
+        logger.debug(f"File registry not available, skipping annotation for {file_path}")
+    except Exception as e:
+        logger.warning(f"Failed to update annotation for {file_path}: {e}")
+
+
+def _clear_file_annotation(file_path: str, root: Path) -> None:
+    """Clear plan-related metadata from file annotation.
+
+    Args:
+        file_path: File path
+        root: Project root directory
+    """
+    try:
+        from idlergear.file_registry import annotate_file, get_file_annotation
+
+        existing = get_file_annotation(str(root / file_path))
+        if not existing:
+            return
+
+        # Remove plan-related fields
+        metadata = existing.get("metadata", {})
+        metadata.pop("plan", None)
+        metadata.pop("plan_status", None)
+        metadata.pop("plan_type", None)
+        metadata.pop("deprecated", None)
+        metadata.pop("deprecation_reason", None)
+        metadata.pop("milestone", None)
+        metadata.pop("successor_plan", None)
+
+        # Update annotation
+        annotate_file(
+            path=str(root / file_path),
+            description=existing.get("description", ""),
+            tags=existing.get("tags", []),
+            components=existing.get("components", []),
+            related_files=existing.get("related_files", []),
+            metadata=metadata,
+        )
+
+    except ImportError:
+        logger.debug(f"File registry not available, skipping clear for {file_path}")
+    except Exception as e:
+        logger.warning(f"Failed to clear annotation for {file_path}: {e}")
