@@ -50,7 +50,7 @@ idlergear task create "Set up authentication" --label feature
 idlergear context
 ```
 
-## Features (v0.8.0)
+## Features (v0.7.51)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -143,10 +143,10 @@ IdlerGear ships **quarterly releases** with major features. Each milestone deliv
 |-----------|-------|--------|--------------|
 | **v0.5.11** ✅ | Plugin System Foundation | Released | LlamaIndex, Langfuse plugins, semantic search, observability |
 | **v0.6.0** ✅ | File Registry Complete | Released | MCP interception, daemon integration, file annotations |
-| **v0.7.0** ✅ | GitHub Integration | Released | GitHub Projects v2 sync, custom fields, bidirectional updates |
-| **v0.8.0** ✅ | Session Management Advanced | CURRENT | Session branching, knowledge harvesting, container support |
-| **v0.9.0** 🤖 | Multi-Assistant | June 2026 | Multi-agent coordination, memory decay, cross-session knowledge |
-| **v0.10.0** 💎 | Polish & Maturity | September 2026 | Pre-release maturity, 80%+ coverage, production validation |
+| **v0.7.51** ✅ | TUI & Performance | CURRENT | Lazy loading (5x faster), keyboard nav, GitHub issue display |
+| **v0.8.0** 🎯 | File Intelligence | April 2027 | Plan Objects, automatic file annotations, workflow-aware context |
+| **v0.9.0** 🤖 | Multi-Assistant | September 2027 | Multi-agent coordination, memory decay, AI observability |
+| **v0.10.0** 💎 | Polish & Maturity | December 2027 | Pre-release maturity, 80%+ coverage, production validation |
 
 **[View Project Board](https://github.com/users/marctjones/projects/18)** | **[View Milestones](https://github.com/marctjones/idlergear/milestones)**
 
