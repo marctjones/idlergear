@@ -242,28 +242,83 @@ class LocalPlanBackend:
         body: str | None = None,
     ) -> dict[str, Any]:
         from idlergear.plans import create_plan
+        from pathlib import Path
 
-        return create_plan(name, title=title, body=body, project_path=self.project_path)
+        # Map old interface (title/body) to new interface (description)
+        # Use title as description, or body if title not provided
+        description = title or body or "No description"
+
+        plan = create_plan(
+            name=name,
+            description=description,
+            root=self.project_path or Path.cwd(),
+        )
+
+        # Convert Plan object to dict for backward compatibility
+        return {
+            "name": plan.name,
+            "description": plan.description,
+            "status": plan.status,
+            "type": plan.type,
+            "created": plan.created,
+        }
 
     def list(self) -> list[dict[str, Any]]:
         from idlergear.plans import list_plans
+        from pathlib import Path
 
-        return list_plans(project_path=self.project_path)
+        plans = list_plans(root=self.project_path or Path.cwd())
+
+        # Convert Plan objects to dicts
+        return [
+            {
+                "name": p.name,
+                "description": p.description,
+                "status": p.status,
+                "type": p.type,
+                "created": p.created,
+            }
+            for p in plans
+        ]
 
     def get(self, name: str) -> dict[str, Any] | None:
-        from idlergear.plans import get_plan
+        from idlergear.plans import load_plan
+        from pathlib import Path
 
-        return get_plan(name, project_path=self.project_path)
+        try:
+            plan = load_plan(name, root=self.project_path or Path.cwd())
+            return {
+                "name": plan.name,
+                "description": plan.description,
+                "status": plan.status,
+                "type": plan.type,
+                "created": plan.created,
+            }
+        except FileNotFoundError:
+            return None
 
     def get_current(self) -> dict[str, Any] | None:
-        from idlergear.plans import get_current_plan
+        """Get current plan (deprecated - Plan Objects doesn't have current plan concept)."""
+        from idlergear.plans import list_plans
+        from pathlib import Path
 
-        return get_current_plan(project_path=self.project_path)
+        # Return first active plan as a fallback
+        plans = list_plans(root=self.project_path or Path.cwd(), status="active")
+        if plans:
+            p = plans[0]
+            return {
+                "name": p.name,
+                "description": p.description,
+                "status": p.status,
+                "type": p.type,
+                "created": p.created,
+            }
+        return None
 
     def switch(self, name: str) -> dict[str, Any] | None:
-        from idlergear.plans import switch_plan
-
-        return switch_plan(name, project_path=self.project_path)
+        """Switch plan (deprecated - Plan Objects doesn't have switch concept)."""
+        # Just return the plan if it exists
+        return self.get(name)
 
     def update(
         self,
@@ -273,10 +328,29 @@ class LocalPlanBackend:
         state: str | None = None,
     ) -> dict[str, Any] | None:
         from idlergear.plans import update_plan
+        from pathlib import Path
 
-        return update_plan(
-            name, title=title, body=body, state=state, project_path=self.project_path
-        )
+        updates = {}
+        if title:
+            updates["description"] = title
+        if state:
+            updates["status"] = state
+
+        try:
+            plan = update_plan(
+                name=name,
+                root=self.project_path or Path.cwd(),
+                **updates
+            )
+            return {
+                "name": plan.name,
+                "description": plan.description,
+                "status": plan.status,
+                "type": plan.type,
+                "created": plan.created,
+            }
+        except FileNotFoundError:
+            return None
 
 
 class LocalVisionBackend:

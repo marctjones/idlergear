@@ -262,7 +262,7 @@ class TestLocalPlanBackend:
         plan = backend.create("v1-release", title="Version 1")
 
         assert plan["name"] == "v1-release"
-        assert plan["title"] == "Version 1"
+        assert plan["description"] == "Version 1"  # Plan Objects uses "description"
 
     def test_switch_plan(self, temp_project):
         """Switch plan through backend."""

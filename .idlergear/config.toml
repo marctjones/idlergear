@@ -9,11 +9,11 @@ name = ""
 auto_start = true
 
 [backends]
-task = "github"
-explore = "github"
-note = "github"
-plan = "github"
-reference = "wiki"
+task = "local"
+explore = "local"
+note = "local"
+plan = "local"
+reference = "local"
 
 [watch]
 enabled = "true"

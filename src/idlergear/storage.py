@@ -73,3 +73,23 @@ def now_iso() -> str:
     from datetime import timezone
 
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_iso(timestamp_str: str) -> datetime | None:
+    """Parse ISO format timestamp string to datetime.
+
+    Args:
+        timestamp_str: ISO format timestamp (e.g., "2026-01-28T02:42:09Z")
+
+    Returns:
+        datetime object with timezone info, or None if parsing fails
+    """
+    if not timestamp_str:
+        return None
+
+    try:
+        # Handle both Z suffix and +00:00 suffix
+        normalized = timestamp_str.replace('Z', '+00:00')
+        return datetime.fromisoformat(normalized)
+    except (ValueError, AttributeError):
+        return None
