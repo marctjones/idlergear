@@ -1,203 +1,296 @@
-"""Plan management for IdlerGear."""
+"""Plan Objects - Scale-flexible development tracking.
 
+Plans track development work from micro (minutes) to macro (months) scales.
+They provide workflow-aware context for file annotations and enable automatic
+annotation updates through plan lifecycle events.
+"""
+
+import json
+import logging
+from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import List, Optional
 
-from idlergear.config import find_idlergear_root, get_config_value, set_config_value
-from idlergear.storage import (
-    now_iso,
-    parse_frontmatter,
-    render_frontmatter,
-    slugify,
-)
+logger = logging.getLogger(__name__)
 
 
-def get_plans_dir(project_path: Path | None = None) -> Path | None:
-    """Get the plans directory path."""
-    if project_path is None:
-        project_path = find_idlergear_root()
-    if project_path is None:
-        return None
-    return project_path / ".idlergear" / "plans"
+@dataclass
+class Plan:
+    """Represents a development plan at any scale.
+
+    Plans can be:
+    - Ephemeral (minutes-hours): AI multi-step workflows
+    - Feature (days): Small feature work (3-5 files)
+    - Roadmap (weeks): Medium initiatives (10-20 files)
+    - Initiative (months): Large projects with sub-plans
+    """
+
+    name: str
+    description: str
+    status: str = "active"  # "active", "completed", "deprecated", "archived"
+    type: str = "feature"  # "ephemeral", "feature", "roadmap", "initiative"
+
+    # Content
+    files: List[str] = None
+    deprecated_files: List[str] = None
+    tasks: List[int] = None
+    references: List[str] = None
+
+    # Hierarchy
+    sub_plans: List[str] = None
+    parent_plan: Optional[str] = None
+
+    # Lifecycle
+    milestone: Optional[str] = None
+    supersedes_plan: Optional[str] = None
+    successor_plan: Optional[str] = None
+
+    # Automation
+    auto_archive: bool = False
+
+    # GitHub sync (optional)
+    github_milestone_id: Optional[int] = None
+    github_project_id: Optional[int] = None
+
+    # Timestamps
+    created: Optional[str] = None
+    completed_at: Optional[str] = None
+    deprecated_at: Optional[str] = None
+    archived_at: Optional[str] = None
+
+    def __post_init__(self):
+        """Initialize lists and timestamps."""
+        if self.files is None:
+            self.files = []
+        if self.deprecated_files is None:
+            self.deprecated_files = []
+        if self.tasks is None:
+            self.tasks = []
+        if self.references is None:
+            self.references = []
+        if self.sub_plans is None:
+            self.sub_plans = []
+        if self.created is None:
+            self.created = datetime.now().isoformat()
+
+        # Auto-archive ephemeral plans by default
+        if self.type == "ephemeral" and not self.auto_archive:
+            self.auto_archive = True
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Plan":
+        """Create Plan from dictionary."""
+        return cls(**data)
+
+
+# Storage functions
+
+
+def get_plans_dir(root: Path) -> Path:
+    """Get plans directory, create if needed."""
+    plans_dir = root / ".idlergear" / "plans"
+    plans_dir.mkdir(parents=True, exist_ok=True)
+    return plans_dir
+
+
+def save_plan(plan: Plan, root: Path) -> None:
+    """Save plan to JSON file."""
+    plans_dir = get_plans_dir(root)
+    file_path = plans_dir / f"{plan.name}.json"
+
+    with open(file_path, "w") as f:
+        json.dump(plan.to_dict(), f, indent=2)
+
+    logger.info(f"Saved plan: {plan.name}")
+
+
+def load_plan(name: str, root: Path) -> Plan:
+    """Load plan from JSON file.
+
+    Args:
+        name: Plan name (without .json extension)
+        root: Project root directory
+
+    Returns:
+        Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plans_dir = get_plans_dir(root)
+    file_path = plans_dir / f"{name}.json"
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"Plan not found: {name}")
+
+    with open(file_path) as f:
+        data = json.load(f)
+
+    return Plan.from_dict(data)
+
+
+def list_plans(root: Path, status: Optional[str] = None, type_filter: Optional[str] = None) -> List[Plan]:
+    """List all plans, optionally filtered by status or type.
+
+    Args:
+        root: Project root directory
+        status: Filter by status (active, completed, deprecated, archived)
+        type_filter: Filter by type (ephemeral, feature, roadmap, initiative)
+
+    Returns:
+        List of Plan objects matching filters
+    """
+    plans_dir = get_plans_dir(root)
+    plans = []
+
+    for file_path in plans_dir.glob("*.json"):
+        try:
+            plan = load_plan(file_path.stem, root)
+
+            # Apply filters
+            if status and plan.status != status:
+                continue
+            if type_filter and plan.type != type_filter:
+                continue
+
+            plans.append(plan)
+        except Exception as e:
+            logger.warning(f"Could not load plan {file_path.stem}: {e}")
+
+    # Sort by created date (newest first)
+    plans.sort(key=lambda p: p.created or "", reverse=True)
+
+    return plans
+
+
+def delete_plan(name: str, root: Path, permanent: bool = False) -> None:
+    """Delete or archive a plan.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+        permanent: If True, permanently delete. If False, archive first.
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    if not permanent and plan.status != "archived":
+        # Archive first
+        plan.status = "archived"
+        plan.archived_at = datetime.now().isoformat()
+        save_plan(plan, root)
+        logger.info(f"Archived plan: {name}")
+    else:
+        # Permanently delete
+        plans_dir = get_plans_dir(root)
+        file_path = plans_dir / f"{name}.json"
+        file_path.unlink()
+        logger.info(f"Permanently deleted plan: {name}")
+
+
+def plan_exists(name: str, root: Path) -> bool:
+    """Check if a plan exists.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+
+    Returns:
+        True if plan exists, False otherwise
+    """
+    plans_dir = get_plans_dir(root)
+    file_path = plans_dir / f"{name}.json"
+    return file_path.exists()
+
+
+# CRUD operations
 
 
 def create_plan(
     name: str,
-    title: str | None = None,
-    body: str | None = None,
-    project_path: Path | None = None,
-) -> dict[str, Any]:
+    description: str,
+    root: Path,
+    type: str = "feature",
+    milestone: Optional[str] = None,
+    parent_plan: Optional[str] = None,
+    auto_archive: bool = False,
+) -> Plan:
     """Create a new plan.
 
-    Returns the created plan data.
+    Args:
+        name: Plan name (must be unique)
+        description: Plan description
+        root: Project root directory
+        type: Plan type (ephemeral, feature, roadmap, initiative)
+        milestone: Milestone name or date
+        parent_plan: Parent plan name for hierarchical plans
+        auto_archive: Whether to auto-archive when completed
+
+    Returns:
+        Created Plan object
+
+    Raises:
+        ValueError: If plan already exists
     """
-    plans_dir = get_plans_dir(project_path)
-    if plans_dir is None:
-        raise RuntimeError("IdlerGear not initialized. Run 'idlergear init' first.")
+    if plan_exists(name, root):
+        raise ValueError(f"Plan already exists: {name}")
 
-    plans_dir.mkdir(parents=True, exist_ok=True)
+    # Validate parent plan exists
+    if parent_plan and not plan_exists(parent_plan, root):
+        raise ValueError(f"Parent plan not found: {parent_plan}")
 
-    slug = slugify(name)
-    filename = f"{slug}.md"
-    filepath = plans_dir / filename
+    plan = Plan(
+        name=name,
+        description=description,
+        type=type,
+        milestone=milestone,
+        parent_plan=parent_plan,
+        auto_archive=auto_archive,
+    )
 
-    if filepath.exists():
-        raise ValueError(f"Plan '{name}' already exists")
+    save_plan(plan, root)
 
-    frontmatter = {
-        "name": name,
-        "title": title or name,
-        "state": "active",
-        "created": now_iso(),
-    }
+    # Add to parent's sub_plans if applicable
+    if parent_plan:
+        parent = load_plan(parent_plan, root)
+        if name not in parent.sub_plans:
+            parent.sub_plans.append(name)
+            save_plan(parent, root)
 
-    content = render_frontmatter(frontmatter, (body or "").strip() + "\n")
-    filepath.write_text(content)
-
-    return {
-        "name": name,
-        "title": frontmatter["title"],
-        "body": body,
-        "state": "active",
-        "created": frontmatter["created"],
-        "path": str(filepath),
-    }
-
-
-def list_plans(project_path: Path | None = None) -> list[dict[str, Any]]:
-    """List all plans.
-
-    Returns list of plan data dicts sorted by name.
-    """
-    plans_dir = get_plans_dir(project_path)
-    if plans_dir is None or not plans_dir.exists():
-        return []
-
-    plans = []
-    for filepath in sorted(plans_dir.glob("*.md")):
-        plan = load_plan_from_file(filepath)
-        if plan:
-            plans.append(plan)
-
-    return sorted(plans, key=lambda p: p.get("name", "").lower())
-
-
-def load_plan_from_file(filepath: Path) -> dict[str, Any] | None:
-    """Load a plan from a file path."""
-    if not filepath.exists():
-        return None
-
-    content = filepath.read_text()
-    frontmatter, body = parse_frontmatter(content)
-
-    return {
-        "name": frontmatter.get("name", filepath.stem),
-        "title": frontmatter.get("title", filepath.stem),
-        "body": body.strip() if body else None,
-        "state": frontmatter.get("state", "active"),
-        "created": frontmatter.get("created"),
-        "github_project": frontmatter.get("github_project"),
-        "path": str(filepath),
-    }
-
-
-def get_plan(name: str, project_path: Path | None = None) -> dict[str, Any] | None:
-    """Get a plan by name."""
-    plans_dir = get_plans_dir(project_path)
-    if plans_dir is None:
-        return None
-
-    # Try direct file match
-    slug = slugify(name)
-    filepath = plans_dir / f"{slug}.md"
-    if filepath.exists():
-        return load_plan_from_file(filepath)
-
-    # Fallback: scan for matching name in frontmatter
-    for filepath in plans_dir.glob("*.md"):
-        plan = load_plan_from_file(filepath)
-        if plan and plan.get("name", "").lower() == name.lower():
-            return plan
-
-    return None
-
-
-def get_current_plan(project_path: Path | None = None) -> dict[str, Any] | None:
-    """Get the current active plan."""
-    current_name = get_config_value("plan.current", project_path)
-    if not current_name:
-        return None
-    return get_plan(current_name, project_path)
-
-
-def switch_plan(name: str, project_path: Path | None = None) -> dict[str, Any] | None:
-    """Switch to a plan.
-
-    Returns the plan data, or None if not found.
-    """
-    plan = get_plan(name, project_path)
-    if plan is None:
-        return None
-
-    set_config_value("plan.current", plan["name"], project_path)
+    logger.info(f"Created plan: {name} (type={type})")
     return plan
 
 
-def update_plan(
-    name: str,
-    title: str | None = None,
-    body: str | None = None,
-    state: str | None = None,
-    project_path: Path | None = None,
-) -> dict[str, Any] | None:
-    """Update a plan.
+def update_plan(name: str, root: Path, **updates) -> Plan:
+    """Update a plan's fields.
 
-    Returns the updated plan data, or None if not found.
+    Args:
+        name: Plan name
+        root: Project root directory
+        **updates: Fields to update (description, status, milestone, etc.)
+
+    Returns:
+        Updated Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
     """
-    plan = get_plan(name, project_path)
-    if plan is None:
-        return None
+    plan = load_plan(name, root)
 
-    filepath = Path(plan["path"])
-    content = filepath.read_text()
-    frontmatter, old_body = parse_frontmatter(content)
+    # Update fields
+    for key, value in updates.items():
+        if hasattr(plan, key):
+            setattr(plan, key, value)
+        else:
+            logger.warning(f"Unknown plan field: {key}")
 
-    if title is not None:
-        frontmatter["title"] = title
-    if state is not None:
-        frontmatter["state"] = state
-
-    new_body = body if body is not None else old_body
-
-    new_content = render_frontmatter(frontmatter, new_body.strip() + "\n")
-    filepath.write_text(new_content)
-
-    return load_plan_from_file(filepath)
-
-
-def delete_plan(name: str, project_path: Path | None = None) -> bool:
-    """Delete a plan by name.
-
-    Returns True if deleted, False if not found.
-    """
-    plan = get_plan(name, project_path)
-    if plan is None:
-        return False
-
-    filepath = Path(plan["path"])
-    filepath.unlink()
-
-    # Clear current plan if it was the deleted plan
-    current = get_current_plan(project_path)
-    if current and current.get("name") == name:
-        set_config_value("plan.current", None, project_path)
-
-    return True
-
-
-def complete_plan(name: str, project_path: Path | None = None) -> dict[str, Any] | None:
-    """Mark a plan as completed.
-
-    Returns the updated plan data, or None if not found.
-    """
-    return update_plan(name, state="completed", project_path=project_path)
+    save_plan(plan, root)
+    logger.info(f"Updated plan: {name}")
+    return plan

@@ -3794,185 +3794,186 @@ def vision_sync(target: str = typer.Argument("github")):
 @plan_app.command("create")
 def plan_create(
     name: str,
-    title: str = typer.Option(None, "--title", "-t", help="Plan title"),
-    body: str = typer.Option(None, "--body", "-b", help="Plan description"),
+    description: str = typer.Option(None, "--description", "-d", help="Plan description"),
+    title: str = typer.Option(None, "--title", "-t", help="Plan title (alias for description)"),
+    body: str = typer.Option(None, "--body", "-b", help="Plan body (alias for description)"),
+    type: str = typer.Option("feature", "--type", help="Plan type: ephemeral, feature, roadmap, initiative"),
+    milestone: str = typer.Option(None, "--milestone", "-m", help="Milestone name or date"),
+    parent: str = typer.Option(None, "--parent", help="Parent plan name (for hierarchical plans)"),
+    auto_archive: bool = typer.Option(False, "--auto-archive", help="Auto-archive when completed"),
 ):
-    """Create a plan."""
-    from idlergear.backends.registry import get_backend
-    from idlergear.config import find_idlergear_root
+    """Create a new plan.
 
-    if find_idlergear_root() is None:
+    Plans track development work at any scale:
+    - ephemeral: AI multi-step workflows (minutes-hours)
+    - feature: Small feature work (days)
+    - roadmap: Medium initiatives (weeks)
+    - initiative: Large projects with sub-plans (months)
+    """
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import create_plan
+
+    root = find_idlergear_root()
+    if root is None:
         typer.secho(
             "Not in an IdlerGear project. Run 'idlergear init' first.",
             fg=typer.colors.RED,
         )
         raise typer.Exit(1)
 
-    backend = get_backend("plan")
+    # Support old --title and --body for backward compatibility
+    desc = description or title or body
+    if not desc:
+        typer.secho("Error: Plan description is required. Use --description, --title, or --body", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
     try:
-        plan = backend.create(name, title=title, body=body)
-        typer.secho(f"Created plan: {plan['name']}", fg=typer.colors.GREEN)
+        plan = create_plan(
+            name=name,
+            description=desc,
+            root=root,
+            type=type,
+            milestone=milestone,
+            parent_plan=parent,
+            auto_archive=auto_archive,
+        )
+        typer.secho(f"Created plan: {plan.name} (type={plan.type})", fg=typer.colors.GREEN)
+        if parent:
+            typer.secho(f"  └─ Parent: {parent}", fg=typer.colors.BLUE)
+    except ValueError as e:
+        typer.secho(f"Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
     except Exception as e:
-        typer.secho(str(e), fg=typer.colors.RED)
+        typer.secho(f"Error creating plan: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
 @plan_app.command("list")
-def plan_list(ctx: typer.Context):
-    """List plans."""
-    from idlergear.backends.registry import get_backend
+def plan_list(
+    ctx: typer.Context,
+    status: str = typer.Option(None, "--status", help="Filter by status: active, completed, deprecated, archived"),
+    type: str = typer.Option(None, "--type", help="Filter by type: ephemeral, feature, roadmap, initiative"),
+):
+    """List all plans with optional filters."""
     from idlergear.config import find_idlergear_root
+    from idlergear.plans import list_plans
 
-    if find_idlergear_root() is None:
+    root = find_idlergear_root()
+    if root is None:
         typer.secho(
             "Not in an IdlerGear project. Run 'idlergear init' first.",
             fg=typer.colors.RED,
         )
         raise typer.Exit(1)
 
-    backend = get_backend("plan")
-    plans = backend.list()
+    plans = list_plans(root, status=status, type_filter=type)
 
-    current = None
-    if hasattr(backend, "get_current"):
-        current = backend.get_current()
+    if not plans:
+        if ctx.obj.output_format == "human":
+            filters = []
+            if status:
+                filters.append(f"status={status}")
+            if type:
+                filters.append(f"type={type}")
+            filter_str = f" ({', '.join(filters)})" if filters else ""
+            typer.echo(f"No plans found{filter_str}.")
+        else:
+            typer.echo("[]")
+        return
 
-    current_name = current["name"] if current else None
-
-    # Augment data for the display function
-    for plan in plans:
-        plan["is_current"] = plan.get("current") or plan["name"] == current_name
-
-    display(plans, ctx.obj.output_format, "plans")
+    # Convert to dict for display
+    plans_data = [p.to_dict() for p in plans]
+    display(plans_data, ctx.obj.output_format, "plans")
 
 
 @plan_app.command("show")
 def plan_show(
     ctx: typer.Context,
-    name: str = typer.Argument(None, help="Plan name (default: current)"),
-):
-    """Show a plan."""
-    from idlergear.backends.registry import get_backend
-    from idlergear.config import find_idlergear_root
-
-    if find_idlergear_root() is None:
-        typer.secho(
-            "Not in an IdlerGear project. Run 'idlergear init' first.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(1)
-
-    backend = get_backend("plan")
-    plan = None
-    if name is None:
-        if hasattr(backend, "get_current"):
-            plan = backend.get_current()
-        if plan is None and ctx.obj.output_format == "human":
-            typer.echo(
-                "No current plan set. Use 'idlergear plan switch <name>' to set one."
-            )
-            raise typer.Exit(0)
-    else:
-        plan = backend.get(name)
-        if plan is None and ctx.obj.output_format == "human":
-            typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
-            raise typer.Exit(1)
-
-    display(plan, ctx.obj.output_format, "plan")
-
-
-@plan_app.command("switch")
-def plan_switch(name: str):
-    """Switch to a plan."""
-    from idlergear.backends.registry import get_backend
-    from idlergear.config import find_idlergear_root
-
-    if find_idlergear_root() is None:
-        typer.secho(
-            "Not in an IdlerGear project. Run 'idlergear init' first.",
-            fg=typer.colors.RED,
-        )
-        raise typer.Exit(1)
-
-    backend = get_backend("plan")
-    plan = backend.switch(name)
-    if plan is None:
-        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
-        raise typer.Exit(1)
-
-    typer.secho(f"Switched to plan: {plan['name']}", fg=typer.colors.GREEN)
-
-
-@plan_app.command("edit")
-def plan_edit(
     name: str,
-    title: str = typer.Option(None, "--title", "-t", help="New title"),
-    body: str = typer.Option(None, "--body", "-b", help="New body"),
-    state: str = typer.Option(
-        None, "--state", "-s", help="New state: active, completed"
-    ),
 ):
-    """Edit a plan."""
-    from idlergear.backends.registry import get_backend
+    """Show plan details."""
     from idlergear.config import find_idlergear_root
+    from idlergear.plans import load_plan
 
-    if find_idlergear_root() is None:
+    root = find_idlergear_root()
+    if root is None:
         typer.secho(
             "Not in an IdlerGear project. Run 'idlergear init' first.",
             fg=typer.colors.RED,
         )
         raise typer.Exit(1)
 
-    backend = get_backend("plan")
-    plan = backend.update(name, title=title, body=body, state=state)
-    if plan is None:
+    try:
+        plan = load_plan(name, root)
+        display(plan.to_dict(), ctx.obj.output_format, "plan")
+    except FileNotFoundError:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
-
-    typer.secho(f"Updated plan: {plan['name']}", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"Error loading plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 @plan_app.command("delete")
-def plan_delete(name: str):
-    """Delete a plan."""
-    from idlergear.backends.registry import get_backend
+def plan_delete(
+    name: str,
+    permanent: bool = typer.Option(
+        False, "--permanent", help="Permanently delete (skip archiving)"
+    ),
+):
+    """Delete or archive a plan."""
     from idlergear.config import find_idlergear_root
+    from idlergear.plans import delete_plan
 
-    if find_idlergear_root() is None:
+    root = find_idlergear_root()
+    if root is None:
         typer.secho(
             "Not in an IdlerGear project. Run 'idlergear init' first.",
             fg=typer.colors.RED,
         )
         raise typer.Exit(1)
 
-    backend = get_backend("plan")
-    if backend.delete(name):
-        typer.secho(f"Deleted plan: {name}", fg=typer.colors.GREEN)
-    else:
+    try:
+        delete_plan(name, root, permanent=permanent)
+        if permanent:
+            typer.secho(f"Permanently deleted plan: {name}", fg=typer.colors.GREEN)
+        else:
+            typer.secho(f"Archived plan: {name}", fg=typer.colors.GREEN)
+    except FileNotFoundError:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error deleting plan: {e}", fg=typer.colors.RED)
         raise typer.Exit(1)
 
 
 @plan_app.command("complete")
 def plan_complete(name: str):
     """Mark a plan as completed."""
-    from idlergear.backends.registry import get_backend
-    from idlergear.config import find_idlergear_root
+    from datetime import datetime
 
-    if find_idlergear_root() is None:
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import update_plan
+
+    root = find_idlergear_root()
+    if root is None:
         typer.secho(
             "Not in an IdlerGear project. Run 'idlergear init' first.",
             fg=typer.colors.RED,
         )
         raise typer.Exit(1)
 
-    backend = get_backend("plan")
-    plan = backend.update(name, state="completed")
-    if plan is None:
+    try:
+        plan = update_plan(
+            name, root, status="completed", completed_at=datetime.now().isoformat()
+        )
+        typer.secho(f"Completed plan: {plan.name}", fg=typer.colors.GREEN)
+    except FileNotFoundError:
         typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
         raise typer.Exit(1)
-
-    typer.secho(f"Completed plan: {plan['name']}", fg=typer.colors.GREEN)
+    except Exception as e:
+        typer.secho(f"Error completing plan: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
 
 
 @plan_app.command("sync")

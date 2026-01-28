@@ -847,82 +847,90 @@ async def list_tools() -> list[Tool]:
         # Plan tools
         Tool(
             name="idlergear_plan_create",
-            description="Create a plan",
+            description="Create a development plan. Plans track work from micro (minutes) to macro (months) scales. Use type='ephemeral' for AI multi-step workflows, 'feature' for small features, 'roadmap' for medium initiatives, 'initiative' for large projects.",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Plan name (identifier)"},
-                    "title": {"type": "string", "description": "Plan title"},
-                    "body": {"type": "string", "description": "Plan description"},
+                    "name": {
+                        "type": "string",
+                        "description": "Plan name (unique identifier)",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Plan description/purpose",
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["ephemeral", "feature", "roadmap", "initiative"],
+                        "description": "Plan type (default: feature)",
+                        "default": "feature",
+                    },
+                    "milestone": {
+                        "type": "string",
+                        "description": "Milestone name or date",
+                    },
+                    "parent": {
+                        "type": "string",
+                        "description": "Parent plan name for hierarchical plans",
+                    },
+                    "auto_archive": {
+                        "type": "boolean",
+                        "description": "Auto-archive when completed (default: true for ephemeral)",
+                        "default": False,
+                    },
                 },
-                "required": ["name"],
+                "required": ["name", "description"],
             },
         ),
         Tool(
             name="idlergear_plan_list",
-            description="List all plans",
+            description="List plans with optional filters",
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "limit": {
-                        "type": "integer",
-                        "description": "Limit number of results",
+                    "status": {
+                        "type": "string",
+                        "enum": ["active", "completed", "deprecated", "archived"],
+                        "description": "Filter by status",
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["ephemeral", "feature", "roadmap", "initiative"],
+                        "description": "Filter by type",
                     },
                 },
             },
         ),
         Tool(
             name="idlergear_plan_show",
-            description="Show a plan (current if no name given)",
+            description="Show plan details including files, tasks, references, and hierarchy",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Plan name"},
-                },
-            },
-        ),
-        Tool(
-            name="idlergear_plan_switch",
-            description="Switch to a plan",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Plan name"},
-                },
-                "required": ["name"],
-            },
-        ),
-        Tool(
-            name="idlergear_plan_edit",
-            description="Edit a plan",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "Plan name"},
-                    "title": {"type": "string", "description": "New title"},
-                    "body": {"type": "string", "description": "New body"},
-                    "state": {
-                        "type": "string",
-                        "description": "New state: active, completed",
-                    },
                 },
                 "required": ["name"],
             },
         ),
         Tool(
             name="idlergear_plan_delete",
-            description="Delete a plan",
+            description="Delete or archive a plan. By default, archives first for safety.",
             inputSchema={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Plan name"},
+                    "permanent": {
+                        "type": "boolean",
+                        "description": "Permanently delete without archiving (default: false)",
+                        "default": False,
+                    },
                 },
                 "required": ["name"],
             },
         ),
         Tool(
             name="idlergear_plan_complete",
-            description="Mark a plan as completed",
+            description="Mark a plan as completed with timestamp",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -4064,64 +4072,66 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         # Plan handlers (using backend)
         elif name == "idlergear_plan_create":
-            backend = get_backend("plan")
-            result = backend.create(
-                arguments["name"],
-                title=arguments.get("title"),
-                body=arguments.get("body"),
+            from datetime import datetime
+
+            from idlergear.plans import create_plan
+
+            plan = create_plan(
+                name=arguments["name"],
+                description=arguments["description"],
+                root=root,
+                type=arguments.get("type", "feature"),
+                milestone=arguments.get("milestone"),
+                parent_plan=arguments.get("parent"),
+                auto_archive=arguments.get("auto_archive", False),
             )
-            return _format_result(result)
+            return _format_result(plan.to_dict())
 
         elif name == "idlergear_plan_list":
-            backend = get_backend("plan")
-            result = backend.list()
-            # Apply limit if specified
-            limit = arguments.get("limit")
-            if limit:
-                result = result[:limit]
+            from idlergear.plans import list_plans
+
+            plans = list_plans(
+                root=root,
+                status=arguments.get("status"),
+                type_filter=arguments.get("type"),
+            )
+            result = [p.to_dict() for p in plans]
             return _format_result(result)
 
         elif name == "idlergear_plan_show":
-            backend = get_backend("plan")
-            name_arg = arguments.get("name")
-            if name_arg:
-                result = backend.get(name_arg)
-            else:
-                result = backend.get_current()
-            return _format_result(result)
+            from idlergear.plans import load_plan
 
-        elif name == "idlergear_plan_switch":
-            backend = get_backend("plan")
-            result = backend.switch(arguments["name"])
-            if result is None:
-                raise ValueError(f"Plan '{arguments['name']}' not found")
-            return _format_result(result)
-
-        elif name == "idlergear_plan_edit":
-            backend = get_backend("plan")
-            result = backend.update(
-                arguments["name"],
-                title=arguments.get("title"),
-                body=arguments.get("body"),
-                state=arguments.get("state"),
-            )
-            if result is None:
-                raise ValueError(f"Plan '{arguments['name']}' not found")
-            return _format_result(result)
+            plan = load_plan(arguments["name"], root)
+            return _format_result(plan.to_dict())
 
         elif name == "idlergear_plan_delete":
-            backend = get_backend("plan")
-            success = backend.delete(arguments["name"])
-            if not success:
-                raise ValueError(f"Plan '{arguments['name']}' not found")
-            return _format_result({"deleted": True, "name": arguments["name"]})
+            from idlergear.plans import delete_plan
+
+            delete_plan(
+                arguments["name"],
+                root,
+                permanent=arguments.get("permanent", False),
+            )
+            return _format_result(
+                {
+                    "deleted": True,
+                    "name": arguments["name"],
+                    "permanent": arguments.get("permanent", False),
+                }
+            )
 
         elif name == "idlergear_plan_complete":
-            backend = get_backend("plan")
-            result = backend.update(arguments["name"], state="completed")
-            if result is None:
-                raise ValueError(f"Plan '{arguments['name']}' not found")
-            return _format_result(result)
+            from datetime import datetime
+
+            from idlergear.plans import update_plan
+
+            plan = update_plan(
+                arguments["name"],
+                root,
+                status="completed",
+                completed_at=datetime.now().isoformat(),
+            )
+            return _format_result(plan.to_dict())
 
         # Reference handlers (using backend)
         elif name == "idlergear_reference_add":
