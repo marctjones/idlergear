@@ -43,10 +43,41 @@ idlergear note promote <id> --to task  # Convert note to task
 ### Project Context
 ```bash
 idlergear vision show                # View project vision
-idlergear plan show                  # View current plan
 idlergear reference list             # List documentation
 idlergear search "query"             # Search all knowledge
 ```
+
+### Plan Objects (Scale-Flexible Work Tracking)
+```bash
+# Basic plan management
+idlergear plan create "v1.0" --description "..." --type feature  # Create plan
+idlergear plan list                                             # List all plans
+idlergear plan show <name>                                      # Show plan details
+idlergear plan complete <name>                                  # Mark completed
+idlergear plan delete <name>                                    # Delete/archive plan
+
+# Lifecycle management
+idlergear plan deprecate <name> --successor <new-name>          # Deprecate plan
+idlergear plan archive <name>                                   # Archive plan
+idlergear plan restore <name>                                   # Restore archived plan
+
+# File-plan integration (automatic annotation updates!)
+idlergear plan add-file <name> <file-path>                      # Add file to plan
+idlergear plan remove-file <name> <file-path>                   # Remove file
+idlergear plan deprecate-file <name> <file-path>                # Deprecate file in plan
+idlergear plan files <name>                                     # List plan files
+
+# Hierarchical plans (initiatives → roadmaps → features)
+idlergear plan hierarchy <name>                                 # Show plan tree
+idlergear plan rollup <name>                                    # Show rollup stats
+idlergear plan root <name>                                      # Find root plan
+```
+
+**Plan Types:**
+- `ephemeral` - AI multi-step workflows (auto-archived)
+- `feature` - Small features (3-5 files, days)
+- `roadmap` - Medium initiatives (10-20 files, weeks)
+- `initiative` - Large projects with sub-plans (months)
 
 ### File Registry (Token-Efficient)
 ```bash
