@@ -92,6 +92,36 @@
         "src/idlergear/storage.py",
         "src/idlergear/file_registry.py"
       ]
+    },
+    "src/idlergear/context.py": {
+      "status": "current",
+      "reason": null,
+      "deprecated_at": null,
+      "current_version": null,
+      "replaces": [],
+      "deprecated_versions": [],
+      "metadata": {},
+      "description": "Context gathering module for AI session initialization. Provides token-efficient context generation with configurable modes (minimal/standard/detailed/full) for different use cases. Handles text/line truncation and integrates vision, plans, tasks, notes, and suggestions.",
+      "tags": [
+        "context",
+        "ai-session",
+        "token-efficiency",
+        "truncation",
+        "knowledge-aggregation"
+      ],
+      "components": [
+        "truncate_text",
+        "truncate_lines",
+        "get_context",
+        "ContextMode"
+      ],
+      "related_files": [
+        "src/idlergear/vision.py",
+        "src/idlergear/tasks.py",
+        "src/idlergear/notes.py",
+        "src/idlergear/plans.py",
+        "src/idlergear/suggestions.py"
+      ]
     }
   },
   "patterns": {}
