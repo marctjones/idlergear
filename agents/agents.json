@@ -1,0 +1,46 @@
+{
+  "test-agent-123": {
+    "agent_id": "test-agent-123",
+    "agent_type": "test",
+    "connected_at": "2026-01-27T17:59:37.360041+00:00",
+    "last_heartbeat": "2026-01-27T17:59:37.360041+00:00",
+    "connection_id": 5,
+    "status": "active",
+    "current_task": null,
+    "capabilities": [
+      "test"
+    ],
+    "metadata": {},
+    "session_id": null,
+    "session_name": null,
+    "working_files": [],
+    "current_task_id": null,
+    "ai_state": {}
+  },
+  "claude-code-20260127-130052": {
+    "agent_id": "claude-code-20260127-130052",
+    "agent_type": "claude-code",
+    "connected_at": "2026-01-27T18:00:52.612639+00:00",
+    "last_heartbeat": "2026-01-27T18:00:52.612639+00:00",
+    "connection_id": 7,
+    "status": "active",
+    "current_task": null,
+    "capabilities": [
+      "task_management",
+      "file_operations",
+      "code_analysis",
+      "ai_state_reporting",
+      "knowledge_management"
+    ],
+    "metadata": {
+      "version": "0.7.33",
+      "pid": 567410,
+      "started_at": "2026-01-27T13:00:52.612366"
+    },
+    "session_id": null,
+    "session_name": null,
+    "working_files": [],
+    "current_task_id": null,
+    "ai_state": {}
+  }
+}

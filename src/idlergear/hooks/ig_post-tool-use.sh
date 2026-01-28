@@ -130,11 +130,20 @@ if [[ "$TOOL" == "Read" ]]; then
     FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.file_path // empty')
 
     if [ -n "$FILE_PATH" ] && [ -f "$FILE_PATH" ]; then
-        # Check if file has annotation by checking registry directly
-        ANNOTATION_FILE=".idlergear/file_registry/annotations/${FILE_PATH//\//_}.json"
+        # Check if file has annotation by checking centralized registry
+        REGISTRY_FILE=".idlergear/file_registry.json"
+        IS_ANNOTATED=false
 
-        # If annotation file doesn't exist, remind to annotate
-        if [ ! -f "$ANNOTATION_FILE" ]; then
+        # If registry exists, check if this file is in it
+        if [ -f "$REGISTRY_FILE" ]; then
+            # Use jq to check if file path exists in registry
+            if jq -e ".files[\"$FILE_PATH\"]" "$REGISTRY_FILE" &>/dev/null; then
+                IS_ANNOTATED=true
+            fi
+        fi
+
+        # If not annotated, remind to annotate
+        if [ "$IS_ANNOTATED" = false ]; then
             # Get file basename for cleaner message
             FILE_BASENAME=$(basename "$FILE_PATH")
 

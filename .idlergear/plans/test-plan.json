@@ -1,0 +1,22 @@
+{
+  "name": "test-plan",
+  "description": "Test plan for Phase 1",
+  "status": "archived",
+  "type": "feature",
+  "files": [],
+  "deprecated_files": [],
+  "tasks": [],
+  "references": [],
+  "sub_plans": [],
+  "parent_plan": null,
+  "milestone": "v0.8.0",
+  "supersedes_plan": null,
+  "successor_plan": null,
+  "auto_archive": false,
+  "github_milestone_id": null,
+  "github_project_id": null,
+  "created": "2026-01-27T20:19:12.390611",
+  "completed_at": "2026-01-27T20:19:22.783308",
+  "deprecated_at": null,
+  "archived_at": "2026-01-27T20:19:31.189454"
+}

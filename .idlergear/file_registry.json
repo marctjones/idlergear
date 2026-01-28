@@ -1,30 +1,97 @@
 {
   "files": {
-    "/tmp/pytest-of-marc/pytest-50/test_agent_deprecates_file_bro0/config_v1.json": {
-      "status": "deprecated",
-      "reason": "Updated to v2",
-      "deprecated_at": "2026-01-21T09:24:16.330492",
-      "current_version": "/tmp/pytest-of-marc/pytest-50/test_agent_deprecates_file_bro0/config_v2.json",
+    "src/idlergear/storage.py": {
+      "status": "current",
+      "reason": null,
+      "deprecated_at": null,
+      "current_version": null,
       "replaces": [],
       "deprecated_versions": [],
       "metadata": {},
-      "description": null,
-      "tags": [],
-      "components": [],
-      "related_files": []
+      "description": "Storage utilities for markdown + YAML frontmatter files. Provides parsing, rendering, ID generation, slugification, and ISO timestamp utilities.",
+      "tags": [
+        "storage",
+        "markdown",
+        "yaml",
+        "frontmatter",
+        "utilities"
+      ],
+      "components": [
+        "parse_frontmatter",
+        "render_frontmatter",
+        "get_next_id",
+        "slugify",
+        "now_iso",
+        "parse_iso"
+      ],
+      "related_files": [
+        "src/idlergear/tasks.py",
+        "src/idlergear/notes.py",
+        "src/idlergear/plans.py"
+      ]
     },
-    "old.txt": {
-      "status": "deprecated",
-      "reason": "Updated",
-      "deprecated_at": "2026-01-21T09:24:16.796291",
-      "current_version": "new.txt",
+    "src/idlergear/backends/local.py": {
+      "status": "current",
+      "reason": null,
+      "deprecated_at": null,
+      "current_version": null,
       "replaces": [],
       "deprecated_versions": [],
       "metadata": {},
-      "description": null,
-      "tags": [],
-      "components": [],
-      "related_files": []
+      "description": "Local file-based backend implementations for all knowledge types (tasks, notes, plans, explorations, references, vision). Uses markdown files with YAML frontmatter stored in .idlergear/",
+      "tags": [
+        "backend",
+        "local",
+        "file-storage",
+        "markdown"
+      ],
+      "components": [
+        "LocalTaskBackend",
+        "LocalNoteBackend",
+        "LocalExploreBackend",
+        "LocalPlanBackend",
+        "LocalReferenceBackend",
+        "LocalVisionBackend"
+      ],
+      "related_files": [
+        "src/idlergear/backends/github.py",
+        "src/idlergear/backends/protocols.py",
+        "src/idlergear/storage.py"
+      ]
+    },
+    "src/idlergear/plans.py": {
+      "status": "current",
+      "reason": null,
+      "deprecated_at": null,
+      "current_version": null,
+      "replaces": [],
+      "deprecated_versions": [],
+      "metadata": {},
+      "description": "Plan Objects implementation - scale-flexible development tracking with 4 plan types (ephemeral, feature, roadmap, initiative). Supports hierarchical plans, lifecycle management, file integration, and AI workflow integration.",
+      "tags": [
+        "plans",
+        "epic-385",
+        "hierarchical",
+        "lifecycle",
+        "ai-workflow"
+      ],
+      "components": [
+        "Plan",
+        "create_plan",
+        "update_plan",
+        "complete_plan",
+        "deprecate_plan",
+        "archive_plan",
+        "restore_plan",
+        "get_plan_hierarchy",
+        "get_plan_rollup_status",
+        "create_ephemeral_plan_from_ai_report"
+      ],
+      "related_files": [
+        "src/idlergear/backends/local.py",
+        "src/idlergear/storage.py",
+        "src/idlergear/file_registry.py"
+      ]
     }
   },
   "patterns": {}
