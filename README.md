@@ -50,7 +50,7 @@ idlergear task create "Set up authentication" --label feature
 idlergear context
 ```
 
-## Features (v0.7.51)
+## Features (v0.7.57)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -235,13 +235,19 @@ idlergear note promote ID --to task  # Promote note to task
 idlergear vision show             # Show project vision
 idlergear vision edit             # Edit vision (opens editor)
 
-idlergear plan create NAME        # Create a plan
+idlergear plan create "v1.0" --type feature  # Create plan (types: ephemeral, feature, roadmap, initiative)
 idlergear plan list               # List all plans
-idlergear plan show [NAME]        # Show a plan (current if no name)
-idlergear plan switch NAME        # Switch to a plan
-idlergear plan edit NAME          # Edit plan title/body/state
+idlergear plan get NAME           # Show plan details
+idlergear plan update NAME        # Update plan properties
 idlergear plan delete NAME        # Delete a plan
-idlergear plan complete NAME      # Mark plan as completed
+idlergear plan complete NAME      # Mark as completed
+idlergear plan deprecate NAME     # Mark as deprecated
+idlergear plan archive NAME       # Archive completed plan
+idlergear plan restore NAME       # Restore archived plan
+idlergear plan add-file NAME FILE # Add file to plan (auto-updates file annotations)
+idlergear plan hierarchy NAME     # Show parent/child relationships
+idlergear plan rollup NAME        # Show rollup statistics
+idlergear plan root NAME          # Find root plan
 
 idlergear reference add TITLE     # Add reference documentation
 idlergear reference list          # List all references
