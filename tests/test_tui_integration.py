@@ -1,17 +1,17 @@
-"""Integration tests for TUI v2 with daemon and real data."""
+"""Integration tests for TUI with daemon and real data."""
 
 import pytest
 from pathlib import Path
 
-from idlergear.tui.app_v2 import IdlerGearAppV2, ViewSwitcher
+from idlergear.tui.app import IdlerGearApp, ViewSwitcher
 from idlergear.tasks import create_task
 from idlergear.notes import create_note
 
 
 @pytest.mark.asyncio
 async def test_app_initialization(temp_project):
-    """Test that IdlerGearAppV2 can be instantiated."""
-    app = IdlerGearAppV2(project_root=temp_project)
+    """Test that IdlerGearApp can be instantiated."""
+    app = IdlerGearApp(project_root=temp_project)
 
     assert app.project_root == temp_project
     assert app.view_manager is None  # Not mounted yet
@@ -20,7 +20,7 @@ async def test_app_initialization(temp_project):
 
 def test_app_bindings_configured():
     """Test that all key bindings are configured."""
-    app = IdlerGearAppV2()
+    app = IdlerGearApp()
 
     binding_keys = [b.key for b in app.BINDINGS]
 
@@ -90,7 +90,7 @@ def test_view_switcher_shows_help_shortcuts():
 @pytest.mark.skip(reason="Requires mounted widgets - widget operations need app context")
 async def test_app_action_switch_view(temp_project):
     """Test view switching action."""
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # Simulate mounting (manually set up view manager)
     from textual.containers import Container
@@ -118,7 +118,7 @@ async def test_app_action_switch_view(temp_project):
 @pytest.mark.asyncio
 async def test_daemon_listener_graceful_without_daemon(temp_project):
     """Test that daemon listener handles missing daemon gracefully."""
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # _start_daemon_listener should not crash if daemon not running
     try:
@@ -136,7 +136,7 @@ def test_app_with_real_tasks(temp_project):
     create_task("Task 2", priority="medium")
     create_task("Task 3", priority="low")
 
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # App should initialize without errors
     assert app.project_root == temp_project
@@ -148,7 +148,7 @@ def test_app_with_real_notes(temp_project):
     create_note("Note 1")
     create_note("Note 2")
 
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # App should initialize without errors
     assert app.project_root == temp_project
@@ -156,7 +156,7 @@ def test_app_with_real_notes(temp_project):
 
 def test_app_title_and_subtitle():
     """Test that app has appropriate title and subtitle."""
-    app = IdlerGearAppV2()
+    app = IdlerGearApp()
 
     # Title will be set on mount, but we can check it's defined
     # After mount, it should be set
@@ -169,7 +169,7 @@ def test_app_title_and_subtitle():
 @pytest.mark.asyncio
 async def test_view_refresh_action(temp_project):
     """Test the refresh action."""
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # Create mock view manager
     from textual.containers import Container
@@ -185,7 +185,7 @@ async def test_view_refresh_action(temp_project):
 @pytest.mark.skip(reason="Requires mounted widgets - widget operations need app context")
 def test_app_compose_creates_all_views(temp_project):
     """Test that compose creates all 6 views."""
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # Get compose result
     widgets = list(app.compose())
@@ -196,8 +196,8 @@ def test_app_compose_creates_all_views(temp_project):
 
 def test_multiple_apps_can_be_created(temp_project):
     """Test that multiple app instances can be created."""
-    app1 = IdlerGearAppV2(project_root=temp_project)
-    app2 = IdlerGearAppV2(project_root=temp_project)
+    app1 = IdlerGearApp(project_root=temp_project)
+    app2 = IdlerGearApp(project_root=temp_project)
 
     assert app1 is not app2
     assert app1.project_root == app2.project_root
@@ -205,14 +205,14 @@ def test_multiple_apps_can_be_created(temp_project):
 
 def test_app_without_project_root():
     """Test app can be created without explicit project_root."""
-    app = IdlerGearAppV2(project_root=None)
+    app = IdlerGearApp(project_root=None)
 
     assert app.project_root is None
 
 
 def test_view_names_match_bindings():
     """Test that view names in bindings match actual views."""
-    app = IdlerGearAppV2()
+    app = IdlerGearApp()
 
     # Get binding descriptions
     binding_descriptions = {b.key: b.description for b in app.BINDINGS}
@@ -228,7 +228,7 @@ def test_view_names_match_bindings():
 @pytest.mark.asyncio
 async def test_daemon_client_handles_ai_events(temp_project):
     """Test that daemon client is configured for AI events."""
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # The _start_daemon_listener creates a custom TUIDaemonClient
     # We can't easily test the full integration, but verify the method exists
@@ -253,7 +253,7 @@ async def test_full_app_lifecycle_simulation(temp_project):
     create_task("Test task", priority="high")
 
     # Create app
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # Verify initialization
     assert app.project_root == temp_project
@@ -279,7 +279,7 @@ async def test_full_app_lifecycle_simulation(temp_project):
 def test_app_handles_empty_project(temp_project):
     """Test that app handles project with no data."""
     # Empty project (no tasks, notes, etc.)
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # Should initialize without errors
     assert app.project_root == temp_project
@@ -291,7 +291,7 @@ def test_app_with_large_dataset(temp_project):
     for i in range(50):
         create_task(f"Task {i}", priority="high" if i % 2 == 0 else "low")
 
-    app = IdlerGearAppV2(project_root=temp_project)
+    app = IdlerGearApp(project_root=temp_project)
 
     # Should handle large dataset without errors
     assert app.project_root == temp_project
