@@ -1041,6 +1041,75 @@ async def list_tools() -> list[Tool]:
                 "required": ["name"],
             },
         ),
+        Tool(
+            name="idlergear_plan_hierarchy",
+            description="Get complete plan hierarchy (parent/child relationships) recursively",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum recursion depth (default: 10)",
+                        "default": 10,
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_rollup",
+            description="Get rollup statistics for plan and all sub-plans (counts, completion %, files, tasks)",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name"},
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_root",
+            description="Find the root (top-level) plan in hierarchy",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Plan name (can be anywhere in hierarchy)"},
+                    "max_depth": {
+                        "type": "integer",
+                        "description": "Maximum search depth (default: 10)",
+                        "default": 10,
+                    },
+                },
+                "required": ["name"],
+            },
+        ),
+        Tool(
+            name="idlergear_plan_create_ephemeral",
+            description="Create ephemeral plan from AI multi-step workflow. Called automatically when AI reports a multi-step plan. Ephemeral plans auto-archive when completed.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "steps": {
+                        "type": "array",
+                        "description": "List of planned steps",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action": {"type": "string", "description": "Action to perform"},
+                                "target": {"type": "string", "description": "Target file/command"},
+                                "reason": {"type": "string", "description": "Reason for this step"},
+                            },
+                        },
+                    },
+                    "task_id": {
+                        "type": "integer",
+                        "description": "Associated task ID (optional)",
+                    },
+                },
+                "required": ["steps"],
+            },
+        ),
         # Reference tools
         Tool(
             name="idlergear_reference_add",
@@ -4319,6 +4388,42 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 include_deprecated=arguments.get("include_deprecated", False),
             )
             return _format_result({"plan": arguments["name"], "files": files})
+
+        elif name == "idlergear_plan_hierarchy":
+            from idlergear.plans import get_plan_hierarchy
+
+            hierarchy = get_plan_hierarchy(
+                arguments["name"],
+                root,
+                max_depth=arguments.get("max_depth", 10),
+            )
+            return _format_result(hierarchy)
+
+        elif name == "idlergear_plan_rollup":
+            from idlergear.plans import get_plan_rollup_status
+
+            rollup = get_plan_rollup_status(arguments["name"], root)
+            return _format_result(rollup)
+
+        elif name == "idlergear_plan_root":
+            from idlergear.plans import get_root_plan
+
+            root_plan = get_root_plan(
+                arguments["name"],
+                root,
+                max_depth=arguments.get("max_depth", 10),
+            )
+            return _format_result({"name": arguments["name"], "root_plan": root_plan})
+
+        elif name == "idlergear_plan_create_ephemeral":
+            from idlergear.plans import create_ephemeral_plan_from_ai_report
+
+            plan = create_ephemeral_plan_from_ai_report(
+                arguments["steps"],
+                root,
+                task_id=arguments.get("task_id"),
+            )
+            return _format_result(plan.to_dict())
 
         # Reference handlers (using backend)
         elif name == "idlergear_reference_add":

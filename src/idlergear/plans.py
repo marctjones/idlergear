@@ -646,3 +646,269 @@ def _clear_file_annotation(file_path: str, root: Path) -> None:
         logger.debug(f"File registry not available, skipping clear for {file_path}")
     except Exception as e:
         logger.warning(f"Failed to clear annotation for {file_path}: {e}")
+
+
+# AI Workflow Integration (Phase 5)
+
+
+def create_ephemeral_plan_from_ai_report(
+    steps: List[dict], root: Path, task_id: Optional[int] = None
+) -> Plan:
+    """Create ephemeral plan from AI multi-step workflow report.
+
+    Automatically called when AI reports a multi-step plan via
+    idlergear_ai_report_plan MCP tool.
+
+    Args:
+        steps: List of planned steps from AI report
+                Each step: {"action": str, "target": str, "reason": str}
+        root: Project root directory
+        task_id: Associated task ID (if working on a task)
+
+    Returns:
+        Created ephemeral Plan object
+
+    Example:
+        >>> steps = [
+        ...     {"action": "read file", "target": "config.py", "reason": "check settings"},
+        ...     {"action": "edit file", "target": "main.py", "reason": "update logic"},
+        ...     {"action": "run tests", "target": "pytest", "reason": "verify changes"}
+        ... ]
+        >>> plan = create_ephemeral_plan_from_ai_report(steps, root, task_id=278)
+    """
+    # Generate plan name from timestamp and task
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if task_id:
+        name = f"ephemeral-task{task_id}-{timestamp}"
+    else:
+        name = f"ephemeral-{timestamp}"
+
+    # Build description from steps
+    description = "AI multi-step workflow:\n"
+    for i, step in enumerate(steps, 1):
+        action = step.get("action", "unknown")
+        target = step.get("target", "")
+        description += f"{i}. {action}: {target}\n"
+
+    plan = create_plan(
+        name=name,
+        description=description,
+        root=root,
+        type="ephemeral",
+        auto_archive=True,
+    )
+
+    # Add task to plan if provided
+    if task_id:
+        plan.tasks.append(task_id)
+        save_plan(plan, root)
+
+    logger.info(f"Created ephemeral plan from AI report: {name} ({len(steps)} steps)")
+    return plan
+
+
+def auto_complete_ephemeral_plan(name: str, root: Path) -> Plan:
+    """Auto-complete and archive an ephemeral plan.
+
+    Called when AI completes a multi-step workflow. Ephemeral plans with
+    auto_archive=True are automatically archived when completed.
+
+    Args:
+        name: Plan name
+        root: Project root directory
+
+    Returns:
+        Completed and archived Plan object
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+        ValueError: If plan is not ephemeral or doesn't have auto_archive enabled
+    """
+    plan = load_plan(name, root)
+
+    if plan.type != "ephemeral":
+        raise ValueError(f"Plan '{name}' is not ephemeral (type: {plan.type})")
+
+    if not plan.auto_archive:
+        raise ValueError(f"Plan '{name}' does not have auto_archive enabled")
+
+    # Mark as completed
+    plan.status = "completed"
+    plan.completed_at = datetime.now().isoformat()
+
+    # Immediately archive (auto_archive behavior)
+    plan.status = "archived"
+    plan.archived_at = datetime.now().isoformat()
+
+    save_plan(plan, root)
+    logger.info(f"Auto-completed and archived ephemeral plan: {name}")
+    return plan
+
+
+# Hierarchical Plans (Phase 6)
+
+
+def get_plan_hierarchy(name: str, root: Path, max_depth: int = 10) -> dict:
+    """Get complete plan hierarchy starting from a plan.
+
+    Recursively fetches all sub-plans to build hierarchy tree.
+
+    Args:
+        name: Plan name (can be parent or child)
+        root: Project root directory
+        max_depth: Maximum recursion depth (prevents infinite loops)
+
+    Returns:
+        Hierarchy dictionary with structure:
+        {
+            "name": "plan-name",
+            "type": "initiative",
+            "status": "active",
+            "sub_plans": [
+                {"name": "sub1", "type": "feature", "status": "active", "sub_plans": []},
+                {"name": "sub2", "type": "feature", "status": "completed", "sub_plans": []}
+            ]
+        }
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    def _build_hierarchy(plan_name: str, depth: int = 0) -> dict:
+        """Recursive helper to build hierarchy."""
+        if depth >= max_depth:
+            logger.warning(f"Max depth {max_depth} reached at plan '{plan_name}'")
+            return {"name": plan_name, "error": "max_depth_reached"}
+
+        try:
+            p = load_plan(plan_name, root)
+            node = {
+                "name": p.name,
+                "type": p.type,
+                "status": p.status,
+                "description": p.description,
+                "created": p.created,
+                "sub_plans": [],
+            }
+
+            # Recursively add sub-plans
+            for sub_name in p.sub_plans:
+                node["sub_plans"].append(_build_hierarchy(sub_name, depth + 1))
+
+            return node
+
+        except FileNotFoundError:
+            logger.warning(f"Sub-plan not found: {plan_name}")
+            return {"name": plan_name, "error": "not_found"}
+
+    return _build_hierarchy(name)
+
+
+def get_plan_rollup_status(name: str, root: Path) -> dict:
+    """Calculate rollup status from all sub-plans.
+
+    Aggregates status, counts, and completion % from sub-plans.
+
+    Args:
+        name: Plan name (typically initiative or roadmap)
+        root: Project root directory
+
+    Returns:
+        Rollup statistics:
+        {
+            "total_sub_plans": 5,
+            "completed": 2,
+            "active": 2,
+            "deprecated": 1,
+            "completion_pct": 40.0,
+            "files": 25,  # Total files across all sub-plans
+            "tasks": 12,  # Total tasks across all sub-plans
+        }
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    rollup = {
+        "total_sub_plans": 0,
+        "completed": 0,
+        "active": 0,
+        "deprecated": 0,
+        "archived": 0,
+        "completion_pct": 0.0,
+        "files": len(plan.files),
+        "tasks": len(plan.tasks),
+    }
+
+    def _count_sub_plans(plan_name: str):
+        """Recursive helper to count sub-plans."""
+        try:
+            p = load_plan(plan_name, root)
+            rollup["total_sub_plans"] += 1
+
+            # Count by status
+            if p.status == "completed":
+                rollup["completed"] += 1
+            elif p.status == "active":
+                rollup["active"] += 1
+            elif p.status == "deprecated":
+                rollup["deprecated"] += 1
+            elif p.status == "archived":
+                rollup["archived"] += 1
+
+            # Aggregate files and tasks
+            rollup["files"] += len(p.files)
+            rollup["tasks"] += len(p.tasks)
+
+            # Recurse into sub-plans
+            for sub_name in p.sub_plans:
+                _count_sub_plans(sub_name)
+
+        except FileNotFoundError:
+            logger.warning(f"Sub-plan not found: {plan_name}")
+
+    # Count all sub-plans recursively
+    for sub_name in plan.sub_plans:
+        _count_sub_plans(sub_name)
+
+    # Calculate completion percentage
+    if rollup["total_sub_plans"] > 0:
+        rollup["completion_pct"] = (
+            rollup["completed"] / rollup["total_sub_plans"]
+        ) * 100
+
+    return rollup
+
+
+def get_root_plan(name: str, root: Path, max_depth: int = 10) -> str:
+    """Find the root (top-level) plan in hierarchy.
+
+    Walks up the parent_plan chain until reaching a plan with no parent.
+
+    Args:
+        name: Plan name (can be anywhere in hierarchy)
+        root: Project root directory
+        max_depth: Maximum recursion depth (prevents infinite loops)
+
+    Returns:
+        Root plan name
+
+    Raises:
+        FileNotFoundError: If plan doesn't exist
+    """
+    plan = load_plan(name, root)
+
+    # Walk up parent chain
+    current_name = name
+    for _ in range(max_depth):
+        current_plan = load_plan(current_name, root)
+        if not current_plan.parent_plan:
+            # Found root
+            return current_name
+        current_name = current_plan.parent_plan
+
+    # Hit max depth
+    logger.warning(f"Max depth {max_depth} reached finding root for '{name}'")
+    return current_name

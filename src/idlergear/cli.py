@@ -4181,6 +4181,91 @@ def plan_files_cmd(
         raise typer.Exit(1)
 
 
+@plan_app.command("hierarchy")
+def plan_hierarchy_cmd(
+    ctx: typer.Context,
+    name: str,
+    max_depth: int = typer.Option(10, "--max-depth", help="Maximum hierarchy depth"),
+):
+    """Show plan hierarchy (parent/child relationships)."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import get_plan_hierarchy
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        hierarchy = get_plan_hierarchy(name, root, max_depth=max_depth)
+        display(hierarchy, ctx.obj.output_format, "hierarchy")
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error getting hierarchy: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("rollup")
+def plan_rollup_cmd(
+    ctx: typer.Context,
+    name: str,
+):
+    """Show rollup statistics for plan and all sub-plans."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import get_plan_rollup_status
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        rollup = get_plan_rollup_status(name, root)
+        display(rollup, ctx.obj.output_format, "rollup")
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error getting rollup: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@plan_app.command("root")
+def plan_root_cmd(
+    name: str,
+    max_depth: int = typer.Option(10, "--max-depth", help="Maximum search depth"),
+):
+    """Find the root (top-level) plan for a given plan."""
+    from idlergear.config import find_idlergear_root
+    from idlergear.plans import get_root_plan
+
+    root = find_idlergear_root()
+    if root is None:
+        typer.secho(
+            "Not in an IdlerGear project. Run 'idlergear init' first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(1)
+
+    try:
+        root_plan = get_root_plan(name, root, max_depth=max_depth)
+        typer.secho(f"Root plan: {root_plan}", fg=typer.colors.GREEN)
+    except FileNotFoundError:
+        typer.secho(f"Plan '{name}' not found.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"Error finding root: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 @plan_app.command("sync")
 def plan_sync(target: str = typer.Argument("github")):
     """Sync plans with remote."""

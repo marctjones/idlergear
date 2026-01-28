@@ -554,3 +554,181 @@ def test_update_file_annotations_for_plan(plans_dir):
 
     # Should update 2 files
     assert updated == 2
+
+
+# Phase 5: AI Workflow Integration Tests
+
+
+def test_create_ephemeral_plan_from_ai_report(plans_dir):
+    """Test creating ephemeral plan from AI multi-step workflow."""
+    from idlergear.plans import create_ephemeral_plan_from_ai_report
+
+    steps = [
+        {"action": "read file", "target": "config.py", "reason": "check settings"},
+        {"action": "edit file", "target": "main.py", "reason": "update logic"},
+        {"action": "run tests", "target": "pytest", "reason": "verify changes"},
+    ]
+
+    plan = create_ephemeral_plan_from_ai_report(steps, plans_dir, task_id=278)
+
+    # Check plan properties
+    assert plan.type == "ephemeral"
+    assert plan.auto_archive is True
+    assert 278 in plan.tasks
+    assert "278" in plan.name  # Name includes task ID
+    assert "3." in plan.description  # Has 3 steps
+
+    # Check plan was saved
+    assert plan_exists(plan.name, plans_dir)
+
+
+def test_create_ephemeral_plan_without_task(plans_dir):
+    """Test creating ephemeral plan without associated task."""
+    from idlergear.plans import create_ephemeral_plan_from_ai_report
+
+    steps = [
+        {"action": "read file", "target": "config.py"},
+    ]
+
+    plan = create_ephemeral_plan_from_ai_report(steps, plans_dir)
+
+    # Check plan properties
+    assert plan.type == "ephemeral"
+    assert plan.tasks == []
+    assert "ephemeral-" in plan.name  # Name has timestamp
+    assert plan_exists(plan.name, plans_dir)
+
+
+def test_auto_complete_ephemeral_plan(plans_dir):
+    """Test auto-completing and archiving ephemeral plan."""
+    from idlergear.plans import (
+        auto_complete_ephemeral_plan,
+        create_ephemeral_plan_from_ai_report,
+    )
+
+    steps = [{"action": "test", "target": "file.py"}]
+    plan = create_ephemeral_plan_from_ai_report(steps, plans_dir)
+
+    # Auto-complete
+    completed_plan = auto_complete_ephemeral_plan(plan.name, plans_dir)
+
+    # Check status
+    assert completed_plan.status == "archived"
+    assert completed_plan.completed_at is not None
+    assert completed_plan.archived_at is not None
+
+
+def test_auto_complete_non_ephemeral_fails(plans_dir):
+    """Test that auto-complete fails for non-ephemeral plans."""
+    from idlergear.plans import auto_complete_ephemeral_plan
+
+    create_plan("feature-plan", "Feature", plans_dir, type="feature")
+
+    with pytest.raises(ValueError, match="not ephemeral"):
+        auto_complete_ephemeral_plan("feature-plan", plans_dir)
+
+
+# Phase 6: Hierarchical Plans Tests
+
+
+def test_get_plan_hierarchy_single_level(plans_dir):
+    """Test getting hierarchy for plan with no sub-plans."""
+    from idlergear.plans import get_plan_hierarchy
+
+    create_plan("standalone", "Standalone plan", plans_dir)
+
+    hierarchy = get_plan_hierarchy("standalone", plans_dir)
+
+    assert hierarchy["name"] == "standalone"
+    assert hierarchy["type"] == "feature"
+    assert hierarchy["status"] == "active"
+    assert len(hierarchy["sub_plans"]) == 0
+
+
+def test_get_plan_hierarchy_multi_level(plans_dir):
+    """Test getting hierarchy for plan with sub-plans."""
+    from idlergear.plans import get_plan_hierarchy
+
+    # Create parent and children
+    create_plan("parent", "Parent", plans_dir, type="initiative")
+    create_plan("child1", "Child 1", plans_dir, type="feature", parent_plan="parent")
+    create_plan("child2", "Child 2", plans_dir, type="feature", parent_plan="parent")
+    create_plan(
+        "grandchild", "Grandchild", plans_dir, type="feature", parent_plan="child1"
+    )
+
+    hierarchy = get_plan_hierarchy("parent", plans_dir)
+
+    # Check structure
+    assert hierarchy["name"] == "parent"
+    assert len(hierarchy["sub_plans"]) == 2
+
+    # Find child1 in sub_plans
+    child1 = next(s for s in hierarchy["sub_plans"] if s["name"] == "child1")
+    assert len(child1["sub_plans"]) == 1
+    assert child1["sub_plans"][0]["name"] == "grandchild"
+
+
+def test_get_plan_rollup_status(plans_dir):
+    """Test rollup statistics for hierarchical plans."""
+    from idlergear.plans import add_file_to_plan, complete_plan, get_plan_rollup_status
+
+    # Create hierarchy
+    create_plan("parent", "Parent", plans_dir, type="initiative")
+    create_plan("child1", "Child 1", plans_dir, type="feature", parent_plan="parent")
+    create_plan("child2", "Child 2", plans_dir, type="feature", parent_plan="parent")
+    create_plan("child3", "Child 3", plans_dir, type="feature", parent_plan="parent")
+
+    # Add files to plans
+    add_file_to_plan("parent", "parent.py", plans_dir)
+    add_file_to_plan("child1", "child1.py", plans_dir)
+    add_file_to_plan("child2", "child2.py", plans_dir)
+
+    # Complete one child
+    complete_plan("child1", plans_dir)
+
+    # Get rollup
+    rollup = get_plan_rollup_status("parent", plans_dir)
+
+    # Check counts
+    assert rollup["total_sub_plans"] == 3
+    assert rollup["completed"] == 1
+    assert rollup["active"] == 2
+    assert rollup["completion_pct"] == pytest.approx(33.33, rel=0.1)
+    assert rollup["files"] == 3  # parent + child1 + child2
+
+
+def test_get_plan_rollup_empty(plans_dir):
+    """Test rollup for plan with no sub-plans."""
+    from idlergear.plans import get_plan_rollup_status
+
+    create_plan("standalone", "Standalone", plans_dir)
+
+    rollup = get_plan_rollup_status("standalone", plans_dir)
+
+    assert rollup["total_sub_plans"] == 0
+    assert rollup["completion_pct"] == 0.0
+
+
+def test_get_root_plan(plans_dir):
+    """Test finding root plan in hierarchy."""
+    from idlergear.plans import get_root_plan
+
+    # Create hierarchy: root -> mid -> leaf
+    create_plan("root", "Root", plans_dir, type="initiative")
+    create_plan("mid", "Middle", plans_dir, type="roadmap", parent_plan="root")
+    create_plan("leaf", "Leaf", plans_dir, type="feature", parent_plan="mid")
+
+    # Get root from any level
+    assert get_root_plan("leaf", plans_dir) == "root"
+    assert get_root_plan("mid", plans_dir) == "root"
+    assert get_root_plan("root", plans_dir) == "root"
+
+
+def test_get_root_plan_standalone(plans_dir):
+    """Test finding root for standalone plan (no parent)."""
+    from idlergear.plans import get_root_plan
+
+    create_plan("standalone", "Standalone", plans_dir)
+
+    assert get_root_plan("standalone", plans_dir) == "standalone"
