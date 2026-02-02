@@ -151,8 +151,11 @@ class PatternRule:
 class FileRegistry:
     """Registry for tracking file status and deprecation.
 
+    Storage: Uses one-file-per-annotation for git-friendly diffs and scalability.
+    Backward compatible: Auto-migrates from legacy single-file format.
+
     Performance optimizations:
-    - Lazy loading: Registry loaded on first access, not __init__
+    - Lazy loading: Annotations loaded on demand
     - TTL-based caching: Status cache expires after 60 seconds
     - Pattern compilation: Regex patterns compiled once and cached
     - Batch operations: Check multiple files in single call
@@ -161,37 +164,92 @@ class FileRegistry:
     # Cache TTL in seconds (60s = 1 minute)
     CACHE_TTL = 60
 
-    def __init__(self, registry_path: Optional[Path] = None, lazy_load: bool = True):
+    def __init__(
+        self,
+        registry_path: Optional[Path] = None,
+        lazy_load: bool = True,
+        storage_backend: Optional[Any] = None,
+    ):
         """Initialize file registry.
 
         Args:
-            registry_path: Path to registry JSON file. Defaults to .idlergear/file_registry.json
+            registry_path: Legacy path or base directory. Defaults to .idlergear/
             lazy_load: If True, delay loading until first access (default: True)
+            storage_backend: Storage backend to use (FileAnnotationStorage).
+                           If None, creates default backend.
         """
-        self.registry_path = registry_path or Path.cwd() / ".idlergear" / "file_registry.json"
+        # Import here to avoid circular dependency
+        from idlergear.file_annotation_storage import FileAnnotationStorage
+
+        # Determine paths
+        if registry_path is None:
+            base_path = Path.cwd() / ".idlergear"
+            legacy_path = base_path / "file_registry.json"
+        elif registry_path.name == "file_registry.json":
+            # Legacy path: .idlergear/file_registry.json
+            legacy_path = registry_path
+            base_path = registry_path.parent
+        else:
+            # Base directory path
+            base_path = registry_path
+            legacy_path = base_path / "file_registry.json"
+
+        # Create storage backend
+        if storage_backend is None:
+            storage_backend = FileAnnotationStorage(base_path / "file_annotations")
+
+        self.storage = storage_backend
+        self.registry_path = legacy_path  # Keep for backward compatibility (tests expect this)
+        self._legacy_path = legacy_path
+
+        # In-memory cache for performance
         self.files: Dict[str, FileEntry] = {}
         self.patterns: Dict[str, PatternRule] = {}
-        self._status_cache: Dict[str, tuple[Optional[FileStatus], float]] = {}  # (status, timestamp)
+        self._status_cache: Dict[str, tuple[Optional[FileStatus], float]] = {}
         self._event_callbacks: Dict[str, list] = {
             "file_registered": [],
             "file_deprecated": [],
         }
         self._loaded: bool = False
+        self._patterns_loaded: bool = False
         self._last_load_time: Optional[float] = None
 
-        # Optionally load immediately (for backward compatibility)
-        if not lazy_load and self.registry_path.exists():
-            self.load()
+        # Auto-migrate from legacy format if detected
+        if not lazy_load and self._legacy_path and self._legacy_path.exists():
+            self._auto_migrate_if_needed()
 
     def _clear_cache(self) -> None:
         """Clear the status lookup cache."""
         self._status_cache.clear()
 
+    def _auto_migrate_if_needed(self) -> None:
+        """Auto-migrate from legacy format if detected."""
+        if self._legacy_path and self._legacy_path.exists():
+            # Check if migration is needed (legacy file exists, new storage doesn't)
+            annotations = self.storage.list_annotations()
+            if len(annotations) == 0:
+                # Migrate
+                from idlergear.file_annotation_storage import migrate_from_legacy
+                report = migrate_from_legacy(self._legacy_path, self.storage, backup=True)
+                if report["success"]:
+                    # Mark as migrated
+                    self._loaded = True
+                    self._patterns_loaded = True
+
     def _ensure_loaded(self) -> None:
-        """Ensure registry is loaded (lazy loading)."""
-        if not self._loaded:
-            if self.registry_path.exists():
-                self.load()
+        """Ensure registry patterns are loaded (lazy loading).
+
+        Note: Individual file annotations are loaded on-demand, not bulk loaded.
+        Only patterns need to be loaded upfront.
+        """
+        if not self._patterns_loaded:
+            # Auto-migrate if needed
+            if self._legacy_path and self._legacy_path.exists():
+                self._auto_migrate_if_needed()
+
+            # Load patterns
+            self.patterns = self.storage.load_patterns()
+            self._patterns_loaded = True
             self._loaded = True
 
     def on(self, event: str, callback) -> None:
@@ -219,49 +277,22 @@ class FileRegistry:
                 pass
 
     def load(self) -> None:
-        """Load registry from JSON file."""
-        if not self.registry_path.exists():
-            self._loaded = True
-            self._last_load_time = time.time()
-            return
+        """Load registry (backward compatibility method).
 
-        try:
-            with open(self.registry_path) as f:
-                data = json.load(f)
-
-            # Load file entries
-            self.files = {
-                path: FileEntry.from_dict(path, entry)
-                for path, entry in data.get("files", {}).items()
-            }
-
-            # Load pattern rules
-            self.patterns = {
-                pattern: PatternRule.from_dict(pattern, rule)
-                for pattern, rule in data.get("patterns", {}).items()
-            }
-
-            # Clear cache after loading new data
-            self._clear_cache()
-            self._loaded = True
-            self._last_load_time = time.time()
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            raise ValueError(f"Failed to load file registry: {e}")
+        Note: With new storage, annotations are loaded on-demand.
+        This method now only loads patterns and is called automatically.
+        """
+        self._ensure_loaded()
 
     def save(self) -> None:
-        """Save registry to JSON file."""
-        # Ensure directory exists
-        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+        """Save registry (backward compatibility method).
 
-        data = {
-            "files": {path: entry.to_dict() for path, entry in self.files.items()},
-            "patterns": {
-                pattern: rule.to_dict() for pattern, rule in self.patterns.items()
-            },
-        }
-
-        with open(self.registry_path, "w") as f:
-            json.dump(data, f, indent=2)
+        Note: With new storage, annotations are auto-saved individually.
+        This method is a no-op but kept for backward compatibility.
+        """
+        # Patterns are saved automatically by annotate_file, etc.
+        # This is a no-op for backward compatibility
+        pass
 
     def register_file(
         self,
@@ -278,15 +309,20 @@ class FileRegistry:
             reason: Optional reason for status
             metadata: Optional metadata
         """
+        self._ensure_loaded()
         entry = FileEntry(
             path=path,
             status=status,
             reason=reason,
             metadata=metadata or {},
         )
+
+        # Save to storage
+        self.storage.save_annotation(entry)
+
+        # Update in-memory cache
         self.files[path] = entry
         self._clear_cache()
-        self.save()
 
         # Emit event
         self._emit(
@@ -312,6 +348,7 @@ class FileRegistry:
             successor: Optional current version to use instead
             reason: Reason for deprecation
         """
+        self._ensure_loaded()
         entry = FileEntry(
             path=path,
             status=FileStatus.DEPRECATED,
@@ -319,15 +356,23 @@ class FileRegistry:
             deprecated_at=datetime.now().isoformat(),
             current_version=successor,
         )
+
+        # Save to storage
+        self.storage.save_annotation(entry)
+
+        # Update in-memory cache
         self.files[path] = entry
 
         # Update successor's deprecated_versions list
-        if successor and successor in self.files:
-            if path not in self.files[successor].deprecated_versions:
-                self.files[successor].deprecated_versions.append(path)
+        if successor:
+            successor_entry = self.storage.load_annotation(successor)
+            if successor_entry:
+                if path not in successor_entry.deprecated_versions:
+                    successor_entry.deprecated_versions.append(path)
+                    self.storage.save_annotation(successor_entry)
+                    self.files[successor] = successor_entry
 
         self._clear_cache()
-        self.save()
 
         # Emit event
         self._emit(
@@ -353,10 +398,14 @@ class FileRegistry:
             status: Status to assign to matching files
             reason: Reason for status
         """
+        self._ensure_loaded()
         rule = PatternRule(pattern=pattern, status=status, reason=reason)
         self.patterns[pattern] = rule
+
+        # Save patterns to storage
+        self.storage.save_patterns(self.patterns)
+
         self._clear_cache()
-        self.save()
 
     def get_status(self, path: str) -> Optional[FileStatus]:
         """Get status of a file.
@@ -376,9 +425,17 @@ class FileRegistry:
             if time.time() - timestamp < self.CACHE_TTL:
                 return cached_status
 
-        # Check exact match first
+        # Check in-memory cache
         if path in self.files:
             status = self.files[path].status
+            self._status_cache[path] = (status, time.time())
+            return status
+
+        # Load from storage (lazy load individual file)
+        entry = self.storage.load_annotation(path)
+        if entry:
+            self.files[path] = entry  # Update cache
+            status = entry.status
             self._status_cache[path] = (status, time.time())
             return status
 
@@ -459,7 +516,18 @@ class FileRegistry:
             FileEntry if file is registered, None otherwise
         """
         self._ensure_loaded()
-        return self.files.get(path)
+
+        # Check cache first
+        if path in self.files:
+            return self.files[path]
+
+        # Load from storage
+        entry = self.storage.load_annotation(path)
+        if entry:
+            # Update cache
+            self.files[path] = entry
+
+        return entry
 
     def get_current_version(self, path: str) -> Optional[str]:
         """Get current version of a deprecated file.
@@ -510,7 +578,13 @@ class FileRegistry:
             List of file entries
         """
         self._ensure_loaded()
-        entries = list(self.files.values())
+
+        # Load all annotations from storage
+        entries = self.storage.list_annotations()
+
+        # Update cache
+        for entry in entries:
+            self.files[entry.path] = entry
 
         if status_filter:
             entries = [e for e in entries if e.status == status_filter]
@@ -526,12 +600,17 @@ class FileRegistry:
         Returns:
             True if file was removed, False if not found
         """
+        self._ensure_loaded()
+
+        # Delete from storage
+        result = self.storage.delete_annotation(path)
+
+        # Remove from cache
         if path in self.files:
             del self.files[path]
-            self._clear_cache()
-            self.save()
-            return True
-        return False
+
+        self._clear_cache()
+        return result
 
     def remove_pattern(self, pattern: str) -> bool:
         """Remove pattern rule.
@@ -542,10 +621,14 @@ class FileRegistry:
         Returns:
             True if pattern was removed, False if not found
         """
+        self._ensure_loaded()
         if pattern in self.patterns:
             del self.patterns[pattern]
+
+            # Save patterns to storage
+            self.storage.save_patterns(self.patterns)
+
             self._clear_cache()
-            self.save()
             return True
         return False
 
@@ -571,11 +654,12 @@ class FileRegistry:
         Returns:
             Updated or created FileEntry
         """
-        # Get or create file entry
-        if path not in self.files:
-            self.files[path] = FileEntry(path=path, status=FileStatus.CURRENT)
+        self._ensure_loaded()
 
-        entry = self.files[path]
+        # Load existing annotation or create new
+        entry = self.storage.load_annotation(path)
+        if entry is None:
+            entry = FileEntry(path=path, status=FileStatus.CURRENT)
 
         # Update annotations (only if provided)
         if description is not None:
@@ -587,8 +671,13 @@ class FileRegistry:
         if related_files is not None:
             entry.related_files = related_files
 
+        # Save to storage
+        self.storage.save_annotation(entry)
+
+        # Update in-memory cache
+        self.files[path] = entry
         self._clear_cache()
-        self.save()
+
         return entry
 
     def search_files(
@@ -609,9 +698,18 @@ class FileRegistry:
         Returns:
             List of matching FileEntry objects
         """
+        self._ensure_loaded()
+
+        # Load all annotations from storage
+        all_entries = self.storage.list_annotations()
+
+        # Update cache
+        for entry in all_entries:
+            self.files[entry.path] = entry
+
         results = []
 
-        for entry in self.files.values():
+        for entry in all_entries:
             # Filter by status
             if status and entry.status != status:
                 continue
@@ -650,7 +748,19 @@ class FileRegistry:
         Returns:
             FileEntry with annotations, or None if not registered
         """
-        return self.files.get(path)
+        self._ensure_loaded()
+
+        # Check cache first
+        if path in self.files:
+            return self.files[path]
+
+        # Load from storage
+        entry = self.storage.load_annotation(path)
+        if entry:
+            # Update cache
+            self.files[path] = entry
+
+        return entry
 
     def list_tags(self) -> Dict[str, Dict[str, Any]]:
         """List all tags used in annotations with usage counts.
@@ -664,9 +774,18 @@ class FileRegistry:
                 }
             }
         """
+        self._ensure_loaded()
+
+        # Load all annotations from storage
+        all_entries = self.storage.list_annotations()
+
+        # Update cache
+        for entry in all_entries:
+            self.files[entry.path] = entry
+
         tag_map: Dict[str, Dict[str, Any]] = {}
 
-        for entry in self.files.values():
+        for entry in all_entries:
             for tag in entry.tags:
                 if tag not in tag_map:
                     tag_map[tag] = {"count": 0, "files": []}

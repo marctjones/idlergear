@@ -220,10 +220,21 @@ def test_file_registry_save_and_load():
         # Load in new instance
         registry2 = FileRegistry(registry_path)
 
-        assert "data.csv" in registry2.files
-        assert "old.csv" in registry2.files
+        # Use proper accessor methods (triggers lazy loading)
+        all_files = registry2.list_files()
+        file_paths = {f.path for f in all_files}
+
+        assert "data.csv" in file_paths
+        assert "old.csv" in file_paths
+
+        # Check patterns were loaded
+        registry2._ensure_loaded()
         assert "*.bak" in registry2.patterns
-        assert registry2.files["old.csv"].current_version == "data.csv"
+
+        # Check file details
+        old_entry = registry2.get_annotation("old.csv")
+        assert old_entry is not None
+        assert old_entry.current_version == "data.csv"
 
 
 def test_file_registry_unregister():
@@ -563,3 +574,94 @@ def test_file_registry_annotations_persistence():
         assert entry.tags == ["test", "unit"]
         assert entry.components == ["TestClass"]
         assert entry.related_files == ["helper.py"]
+
+
+def test_file_registry_lazy_load_mutation_preserves_existing_data():
+    """Regression test for issue #399: MCP file annotation tool does not persist.
+
+    Bug: When FileRegistry is created with lazy_load=True (default), mutation methods
+    (register_file, deprecate_file, add_pattern, annotate_file) would overwrite the
+    entire registry file instead of preserving existing data.
+
+    Root cause: Mutation methods didn't call _ensure_loaded() before accessing
+    self.files, so they operated on an empty dict and saved only the new entry.
+
+    This test verifies that all mutation methods preserve existing data when called
+    on a lazily-loaded registry.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        registry_path = Path(tmpdir) / "file_registry.json"
+
+        # Step 1: Create initial registry with some data
+        registry1 = FileRegistry(registry_path, lazy_load=False)
+        registry1.register_file("existing_file.py", FileStatus.CURRENT)
+        registry1.annotate_file(
+            "existing_file.py",
+            description="Existing file",
+            tags=["existing"],
+        )
+        registry1.add_pattern("*.bak", FileStatus.DEPRECATED)
+        registry1.save()
+
+        # Verify initial state
+        assert len(registry1.files) == 1
+        assert len(registry1.patterns) == 1
+
+        # Step 2: Create NEW registry with lazy_load=True (MCP server behavior)
+        registry2 = FileRegistry(registry_path, lazy_load=True)
+
+        # Internal state should be empty (not loaded yet)
+        assert len(registry2.files) == 0
+        assert len(registry2.patterns) == 0
+        assert registry2._loaded is False
+
+        # Step 3: Call mutation methods - they should load existing data first
+        # Test annotate_file (the main issue from #399)
+        registry2.annotate_file(
+            "new_file.py",
+            description="New file",
+            tags=["new"],
+        )
+
+        # Test register_file
+        registry2.register_file("registered_file.py", FileStatus.CURRENT)
+
+        # Test deprecate_file
+        registry2.deprecate_file("old_file.py", reason="Deprecated")
+
+        # Test add_pattern
+        registry2.add_pattern("*.tmp", FileStatus.DEPRECATED)
+
+        # Step 4: Verify existing data was PRESERVED (check storage, not cache)
+        existing_entry = registry2.get_annotation("existing_file.py")
+        assert existing_entry is not None, "Existing file was lost from storage!"
+        assert existing_entry.description == "Existing file"
+
+        registry2._ensure_loaded()  # Load patterns
+        assert "*.bak" in registry2.patterns, "Existing pattern was lost!"
+
+        # Step 5: Verify new data was ADDED
+        new_entry = registry2.get_annotation("new_file.py")
+        assert new_entry is not None
+
+        registered_entry = registry2.get_annotation("registered_file.py")
+        assert registered_entry is not None
+
+        old_entry = registry2.get_annotation("old_file.py")
+        assert old_entry is not None
+
+        assert "*.tmp" in registry2.patterns
+
+        # Step 6: Verify persistence - load in NEW instance and check all files
+        registry3 = FileRegistry(registry_path)
+        all_files = registry3.list_files()
+        file_paths = {f.path for f in all_files}
+
+        assert len(file_paths) == 4  # All files present
+        assert "existing_file.py" in file_paths  # Original preserved
+        assert "new_file.py" in file_paths  # New added
+        assert "registered_file.py" in file_paths
+        assert "old_file.py" in file_paths
+
+        registry3._ensure_loaded()
+        assert len(registry3.patterns) == 2  # All patterns present

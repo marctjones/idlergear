@@ -63,17 +63,22 @@ class TestRegistryDaemonHandlers:
         # Call handler with patch to use temp registry
         with patch(
             "idlergear.file_registry.FileRegistry.__init__",
-            lambda self, registry_path=None: setattr(
+            lambda self, registry_path=None, lazy_load=True, storage_backend=None: setattr(
                 self, "registry_path", temp_registry
             )
             or setattr(self, "files", {})
             or setattr(self, "patterns", {})
             or setattr(self, "_status_cache", {})
+            or setattr(self, "_loaded", True)
+            or setattr(self, "_patterns_loaded", True)
+            or setattr(self, "_last_load_time", None)
+            or setattr(self, "_legacy_path", temp_registry)
             or setattr(
                 self,
                 "_event_callbacks",
                 {"file_registered": [], "file_deprecated": []},
-            ),
+            )
+            or setattr(self, "storage", __import__('idlergear.file_annotation_storage', fromlist=['FileAnnotationStorage']).FileAnnotationStorage(temp_registry.parent / "file_annotations")),
         ):
             result = await file_register(
                 {
@@ -127,17 +132,22 @@ class TestRegistryDaemonHandlers:
         # Call handler with patch to use temp registry
         with patch(
             "idlergear.file_registry.FileRegistry.__init__",
-            lambda self, registry_path=None: setattr(
+            lambda self, registry_path=None, lazy_load=True, storage_backend=None: setattr(
                 self, "registry_path", temp_registry
             )
             or setattr(self, "files", {})
             or setattr(self, "patterns", {})
             or setattr(self, "_status_cache", {})
+            or setattr(self, "_loaded", True)
+            or setattr(self, "_patterns_loaded", True)
+            or setattr(self, "_last_load_time", None)
+            or setattr(self, "_legacy_path", temp_registry)
             or setattr(
                 self,
                 "_event_callbacks",
                 {"file_registered": [], "file_deprecated": []},
-            ),
+            )
+            or setattr(self, "storage", __import__('idlergear.file_annotation_storage', fromlist=['FileAnnotationStorage']).FileAnnotationStorage(temp_registry.parent / "file_annotations")),
         ):
             result = await file_deprecate(
                 {
