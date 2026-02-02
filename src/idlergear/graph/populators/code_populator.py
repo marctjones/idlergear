@@ -6,19 +6,23 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List, Set
 
 from ..database import GraphDatabase
+from ..parsers import TreeSitterParser
 
 
 class CodePopulator:
-    """Populates graph database with code symbols from Python files.
+    """Populates graph database with code symbols from source files.
 
-    Extracts functions, classes, and methods from Python source files
-    and creates Symbol nodes with CONTAINS relationships to File nodes.
+    Extracts functions, classes, and methods from source files using tree-sitter
+    for multi-language support (Python, JavaScript, TypeScript, Rust, Go, C/C++, Java).
+    Falls back to Python AST for unsupported files.
+
+    Creates Symbol nodes with CONTAINS relationships to File nodes.
 
     Example:
         >>> from idlergear.graph import get_database
         >>> db = get_database()
         >>> populator = CodePopulator(db)
-        >>> populator.populate_directory("src/")
+        >>> populator.populate_directory("src/")  # Indexes all supported languages
     """
 
     def __init__(self, db: GraphDatabase, repo_path: Optional[Path] = None):
@@ -31,6 +35,7 @@ class CodePopulator:
         self.db = db
         self.repo_path = repo_path or Path.cwd()
         self._processed_files: Set[str] = set()
+        self._parser = TreeSitterParser()  # Multi-language parser
 
     def populate_directory(
         self,
@@ -42,14 +47,15 @@ class CodePopulator:
 
         Args:
             directory: Directory to scan (relative to repo_path)
-            extensions: File extensions to process (default: [".py"])
+            extensions: File extensions to process (default: all supported languages)
             incremental: If True, skip files that haven't changed
 
         Returns:
             Dictionary with counts: files, symbols, relationships
         """
         if extensions is None:
-            extensions = [".py"]
+            # Default: all supported languages from TreeSitterParser
+            extensions = list(TreeSitterParser.SUPPORTED_LANGUAGES.keys())
 
         scan_path = self.repo_path / directory
         if not scan_path.exists():
@@ -126,22 +132,35 @@ class CodePopulator:
         self, rel_path: str, full_path: Path
     ) -> Optional[Dict[str, int]]:
         """Populate symbols and imports from a single file."""
-        try:
-            content = full_path.read_text()
-        except (UnicodeDecodeError, PermissionError):
-            return None  # Skip binary or unreadable files
+        # Try tree-sitter parser first (multi-language support)
+        parse_result = self._parser.parse_file(full_path)
 
-        # Parse AST
-        try:
-            tree = ast.parse(content, filename=str(full_path))
-        except SyntaxError:
-            return None  # Skip files with syntax errors
+        if parse_result:
+            # Tree-sitter succeeded - extract symbols, imports, comments
+            symbols = self._convert_treesitter_symbols(parse_result["symbols"], rel_path)
+            imports = parse_result.get("imports", [])
+            comments = parse_result.get("comments", [])
+            language = parse_result.get("language", "unknown")
+        else:
+            # Fall back to AST for Python files or unsupported languages
+            try:
+                content = full_path.read_text()
+            except (UnicodeDecodeError, PermissionError):
+                return None  # Skip binary or unreadable files
 
-        # Extract symbols and imports
-        symbols, imports = self._extract_symbols_and_imports(tree, rel_path)
+            # Parse AST (Python only)
+            try:
+                tree = ast.parse(content, filename=str(full_path))
+            except SyntaxError:
+                return None  # Skip files with syntax errors
 
-        # Ensure file node exists
-        self._ensure_file_node(rel_path, full_path)
+            # Extract symbols and imports using AST
+            symbols, imports = self._extract_symbols_and_imports(tree, rel_path)
+            comments = []
+            language = "python"
+
+        # Ensure file node exists with detected language
+        self._ensure_file_node(rel_path, full_path, language)
 
         # Insert symbols and create relationships
         symbols_added = 0
@@ -161,13 +180,18 @@ class CodePopulator:
 
         # Process imports and create IMPORTS relationships
         for import_info in imports:
-            resolved_path = self._resolve_import_path(
-                import_info["module"], rel_path
-            )
-            if resolved_path and self._create_imports_relationship(
-                rel_path, resolved_path, import_info["line"]
-            ):
-                relationships_added += 1
+            # Handle both tree-sitter format (text-based) and AST format (module-based)
+            if "module" in import_info:
+                # AST format
+                resolved_path = self._resolve_import_path(
+                    import_info["module"], rel_path
+                )
+                if resolved_path and self._create_imports_relationship(
+                    rel_path, resolved_path, import_info["line"]
+                ):
+                    relationships_added += 1
+            # For tree-sitter format, we would need to parse the import text
+            # For now, skip tree-sitter imports (can be enhanced later)
 
         return {"symbols": symbols_added, "relationships": relationships_added}
 
@@ -243,8 +267,44 @@ class CodePopulator:
 
         return symbols, imports
 
-    def _ensure_file_node(self, rel_path: str, full_path: Path) -> None:
-        """Ensure file node exists in database."""
+    def _convert_treesitter_symbols(
+        self, treesitter_symbols: List[Dict[str, Any]], file_path: str
+    ) -> List[Dict[str, Any]]:
+        """Convert tree-sitter symbol format to internal format.
+
+        Args:
+            treesitter_symbols: Symbols from TreeSitterParser
+            file_path: Relative file path
+
+        Returns:
+            List of symbols in internal format with docstring and file_path
+        """
+        converted = []
+        for symbol in treesitter_symbols:
+            # Extract docstring from code if available (basic implementation)
+            # For now, leave empty - full docstring extraction would require
+            # parsing the code field or using tree-sitter queries for docstrings
+            docstring = ""
+
+            converted.append({
+                "name": symbol["name"],
+                "type": symbol["type"],
+                "line_start": symbol["line_start"],
+                "line_end": symbol["line_end"],
+                "docstring": docstring,
+                "file_path": file_path,
+            })
+
+        return converted
+
+    def _ensure_file_node(self, rel_path: str, full_path: Path, language: str = "python") -> None:
+        """Ensure file node exists in database.
+
+        Args:
+            rel_path: Relative path to file
+            full_path: Full path to file
+            language: Detected language (from tree-sitter or fallback)
+        """
         conn = self.db.get_connection()
 
         # Check if exists
@@ -260,7 +320,6 @@ class CodePopulator:
             stat = full_path.stat()
             size = stat.st_size
             lines = len(full_path.read_text().splitlines())
-            language = "python"  # We're only processing Python for now
 
             # Calculate file hash
             content = full_path.read_bytes()
@@ -278,6 +337,17 @@ class CodePopulator:
                 }})
             """)
 
+    def _escape_cypher_string(self, value: str) -> str:
+        """Escape string value for Cypher query.
+
+        Args:
+            value: String to escape
+
+        Returns:
+            Escaped string safe for Cypher queries
+        """
+        return value.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+
     def _insert_symbol(self, symbol_id: str, symbol: Dict[str, Any]) -> bool:
         """Insert symbol node into database.
 
@@ -286,9 +356,16 @@ class CodePopulator:
         """
         conn = self.db.get_connection()
 
+        # Escape all string values for Cypher
+        safe_id = self._escape_cypher_string(symbol_id)
+        safe_name = self._escape_cypher_string(symbol["name"])
+        safe_type = self._escape_cypher_string(symbol["type"])
+        safe_file_path = self._escape_cypher_string(symbol["file_path"])
+        safe_docstring = self._escape_cypher_string(symbol["docstring"])
+
         # Check if exists
         result = conn.execute(f"""
-            MATCH (s:Symbol {{id: '{symbol_id}'}})
+            MATCH (s:Symbol {{id: '{safe_id}'}})
             RETURN COUNT(s) AS count
         """)
 
@@ -297,19 +374,16 @@ class CodePopulator:
         if exists:
             return False  # Already exists
 
-        # Escape quotes and special chars in docstring for Cypher
-        docstring = symbol["docstring"].replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
-
         # Insert symbol
         conn.execute(f"""
             CREATE (s:Symbol {{
-                id: '{symbol_id}',
-                name: '{symbol["name"]}',
-                type: '{symbol["type"]}',
-                file_path: '{symbol["file_path"]}',
+                id: '{safe_id}',
+                name: '{safe_name}',
+                type: '{safe_type}',
+                file_path: '{safe_file_path}',
                 line_start: {symbol["line_start"]},
                 line_end: {symbol["line_end"]},
-                docstring: '{docstring}'
+                docstring: '{safe_docstring}'
             }})
         """)
 

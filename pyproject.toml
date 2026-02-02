@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idlergear"
-version = "0.7.66"
+version = "0.7.67"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,7 +26,7 @@ dependencies = [
     "kuzu>=0.11.3",
     "libtmux>=0.37.0",
     # Code intelligence enhancements (Issues #400-403)
-    "tree-sitter>=0.21.0",
+    "tree-sitter>=0.21.0,<0.22.0",  # Pin to 0.21.x for tree-sitter-languages compatibility
     "tree-sitter-languages>=1.10.0",
     "chromadb>=0.4.22",
     "sentence-transformers>=2.2.0",
