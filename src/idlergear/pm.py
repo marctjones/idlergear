@@ -362,7 +362,7 @@ class ProcessManager:
             )
 
         # Check if session already exists
-        existing = server.find_where({"session_name": name})
+        existing = server.sessions.get(session_name=name, default=None)
         if existing:
             raise ValueError(f"Tmux session '{name}' already exists")
 
@@ -421,7 +421,7 @@ class ProcessManager:
         if server is None:
             return None
 
-        session = server.find_where({"session_name": name})
+        session = server.sessions.get(session_name=name, default=None)
         if not session:
             return None
 
@@ -462,7 +462,7 @@ class ProcessManager:
         if server is None:
             return False
 
-        session = server.find_where({"session_name": name})
+        session = server.sessions.get(session_name=name, default=None)
         if not session:
             return False
 
@@ -487,7 +487,7 @@ class ProcessManager:
         if server is None:
             return False
 
-        session = server.find_where({"session_name": session_name})
+        session = server.sessions.get(session_name=session_name, default=None)
         if not session:
             return False
 
@@ -524,7 +524,7 @@ class ProcessManager:
         if server is None:
             return None
 
-        session = server.find_where({"session_name": session_name})
+        session = server.sessions.get(session_name=session_name, default=None)
         if not session or window_index >= len(session.windows):
             return None
 

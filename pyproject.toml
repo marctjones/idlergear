@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idlergear"
-version = "0.7.65"
+version = "0.7.66"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,6 +25,11 @@ dependencies = [
     "watchdog>=3.0.0",
     "kuzu>=0.11.3",
     "libtmux>=0.37.0",
+    # Code intelligence enhancements (Issues #400-403)
+    "tree-sitter>=0.21.0",
+    "tree-sitter-languages>=1.10.0",
+    "chromadb>=0.4.22",
+    "sentence-transformers>=2.2.0",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +44,17 @@ watch = [
 ]
 docs = [
     "pdoc>=14.0.0",
+]
+rag = [
+    # Optional: Advanced RAG capabilities (Issue #402)
+    "llama-index>=0.9.0",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+]
+advanced = [
+    # Optional: Advanced features (Issue #403)
+    "lancedb>=0.4.0",
+    "scikit-learn>=1.0.0",
 ]
 
 [project.scripts]
