@@ -2,13 +2,16 @@
 id: 1
 title: 'Phase 1: Enhance session start reliability - rename /context to /start and
   update instructions'
-state: closed
+state: open
 created: '2026-01-03T04:57:07.315152Z'
 labels:
 - enhancement
 - core-v1
 - 'component: integration'
 priority: high
+accessed: '2026-02-02T15:37:59.864622Z'
+access_count: 4
+relevance_score: 1.0
 ---
 From integration strategy Phase 1:
 

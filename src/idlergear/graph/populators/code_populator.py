@@ -8,6 +8,13 @@ from typing import Optional, Dict, Any, List, Set
 from ..database import GraphDatabase
 from ..parsers import TreeSitterParser
 
+try:
+    from ..vector import VectorCodeIndex
+    VECTOR_SEARCH_AVAILABLE = True
+except ImportError:
+    VectorCodeIndex = None
+    VECTOR_SEARCH_AVAILABLE = False
+
 
 class CodePopulator:
     """Populates graph database with code symbols from source files.
@@ -25,17 +32,36 @@ class CodePopulator:
         >>> populator.populate_directory("src/")  # Indexes all supported languages
     """
 
-    def __init__(self, db: GraphDatabase, repo_path: Optional[Path] = None):
+    def __init__(
+        self,
+        db: GraphDatabase,
+        repo_path: Optional[Path] = None,
+        vector_index: Optional[Any] = None,
+        enable_vector_search: bool = True,
+    ):
         """Initialize code populator.
 
         Args:
             db: Graph database instance
             repo_path: Path to repository root (defaults to current directory)
+            vector_index: Optional VectorCodeIndex for semantic search
+            enable_vector_search: If True and VectorCodeIndex available, enable semantic indexing
         """
         self.db = db
         self.repo_path = repo_path or Path.cwd()
         self._processed_files: Set[str] = set()
         self._parser = TreeSitterParser()  # Multi-language parser
+
+        # Initialize vector search if enabled and available
+        self.vector_index = vector_index
+        if self.vector_index is None and enable_vector_search and VECTOR_SEARCH_AVAILABLE:
+            try:
+                index_path = self.repo_path / ".idlergear" / "code_index"
+                self.vector_index = VectorCodeIndex(index_path=index_path)
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to initialize vector search: {e}")
+                self.vector_index = None
 
     def populate_directory(
         self,
@@ -165,6 +191,7 @@ class CodePopulator:
         # Insert symbols and create relationships
         symbols_added = 0
         relationships_added = 0
+        vector_indexed_symbols = []  # Collect for batch vector indexing
 
         for symbol in symbols:
             # Create symbol ID: file_path:line_number:name
@@ -177,6 +204,28 @@ class CodePopulator:
                 # Create CONTAINS relationship
                 if self._create_contains_relationship(rel_path, symbol_id):
                     relationships_added += 1
+
+                # Collect for vector indexing
+                if self.vector_index and "code" in symbol:
+                    vector_indexed_symbols.append({
+                        "symbol_id": symbol_id,
+                        "name": symbol["name"],
+                        "type": symbol["type"],
+                        "code": symbol.get("code", symbol.get("docstring", "")),
+                        "file_path": rel_path,
+                        "line_start": symbol["line_start"],
+                        "line_end": symbol["line_end"],
+                    })
+
+        # Batch index symbols in vector database
+        if self.vector_index and vector_indexed_symbols:
+            try:
+                self.vector_index.index_symbols_batch(
+                    vector_indexed_symbols, incremental=True
+                )
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to vector index {rel_path}: {e}")
 
         # Process imports and create IMPORTS relationships
         for import_info in imports:
@@ -277,7 +326,7 @@ class CodePopulator:
             file_path: Relative file path
 
         Returns:
-            List of symbols in internal format with docstring and file_path
+            List of symbols in internal format with docstring, code, and file_path
         """
         converted = []
         for symbol in treesitter_symbols:
@@ -293,6 +342,7 @@ class CodePopulator:
                 "line_end": symbol["line_end"],
                 "docstring": docstring,
                 "file_path": file_path,
+                "code": symbol.get("code", ""),  # Include code for vector indexing
             })
 
         return converted
