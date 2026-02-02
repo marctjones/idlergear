@@ -12949,5 +12949,208 @@ def upstream_status():
         typer.echo("  https://cli.github.com/")
 
 
+@app.command()
+def rag_search(
+    query: str = typer.Argument(..., help="Natural language search query"),
+    top_k: int = typer.Option(5, "--limit", "-n", help="Number of results"),
+    knowledge_type: Optional[str] = typer.Option(
+        None, "--type", "-t", help="Filter by type: reference, note"
+    ),
+):
+    """Search documentation using semantic/natural language search.
+
+    Uses LlamaIndex RAG to find relevant documentation by meaning,
+    not just keyword matching. Much faster than reading all docs.
+
+    Examples:
+        idlergear rag-search "How do I implement authentication?"
+        idlergear rag-search "database connection examples" --limit 10
+        idlergear rag-search "API design patterns" --type reference
+    """
+    try:
+        from idlergear.plugins.llamaindex import LlamaIndexPlugin
+        from idlergear.config import get_config_value
+
+        # Check if enabled
+        enabled = get_config_value("plugins.llamaindex.enabled", default=False)
+        if not enabled:
+            typer.secho(
+                "❌ LlamaIndex plugin not enabled",
+                fg=typer.colors.RED,
+            )
+            typer.echo("\nEnable in .idlergear/config.toml:")
+            typer.echo("[plugins.llamaindex]")
+            typer.echo("enabled = true")
+            raise typer.Exit(1)
+
+        # Initialize plugin
+        config = get_config_value("plugins.llamaindex", default={})
+        plugin = LlamaIndexPlugin(config)
+        plugin.initialize()
+
+        # Search
+        results = plugin.search(query, top_k=top_k, knowledge_type=knowledge_type)
+
+        if not results:
+            typer.secho("No results found", fg=typer.colors.YELLOW)
+            typer.echo("\nTry:")
+            typer.echo("  • Different search terms")
+            typer.echo("  • idlergear rag-index to populate the index")
+            raise typer.Exit(0)
+
+        # Display results
+        typer.secho(f"\n🔍 Found {len(results)} results:\n", fg=typer.colors.GREEN)
+        for i, result in enumerate(results, 1):
+            score = result.get("score", 0)
+            metadata = result.get("metadata", {})
+            text = result.get("text", "")
+
+            typer.secho(f"{i}. ", nl=False, bold=True)
+            if metadata.get("title"):
+                typer.secho(metadata["title"], fg=typer.colors.CYAN, bold=True)
+            typer.secho(f"   Score: {score:.3f}", fg=typer.colors.BRIGHT_BLACK)
+            typer.secho(f"   Type: {metadata.get('type', 'unknown')}", dim=True)
+
+            # Show preview
+            preview = text[:200] + "..." if len(text) > 200 else text
+            typer.echo(f"   {preview}\n")
+
+    except ImportError as e:
+        typer.secho("❌ LlamaIndex not installed", fg=typer.colors.RED)
+        typer.echo("\nInstall with:")
+        typer.echo("  pip install 'idlergear[rag]'")
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command()
+def rag_index(
+    ctx: typer.Context,
+):
+    """Index all references and notes for semantic search.
+
+    This populates the LlamaIndex RAG vector database with your
+    documentation for fast semantic search.
+
+    Run this once after enabling the plugin, or periodically to
+    refresh the index with new/updated documentation.
+
+    Examples:
+        idlergear rag-index
+    """
+    try:
+        from idlergear.plugins.llamaindex import LlamaIndexPlugin
+        from idlergear.config import get_config_value
+        from idlergear.reference import list_references
+        from idlergear.notes import list_notes
+
+        # Check if enabled
+        enabled = get_config_value("plugins.llamaindex.enabled", default=False)
+        if not enabled:
+            typer.secho(
+                "❌ LlamaIndex plugin not enabled",
+                fg=typer.colors.RED,
+            )
+            typer.echo("\nEnable in .idlergear/config.toml:")
+            typer.echo("[plugins.llamaindex]")
+            typer.echo("enabled = true")
+            raise typer.Exit(1)
+
+        # Initialize plugin
+        typer.echo("🔄 Initializing LlamaIndex...")
+        config = get_config_value("plugins.llamaindex", default={})
+        plugin = LlamaIndexPlugin(config)
+        plugin.initialize()
+
+        # Index references
+        typer.echo("📚 Indexing references...")
+        references = list_references()
+        for ref in references:
+            plugin.index_reference(ref)
+
+        # Index notes
+        typer.echo("📝 Indexing notes...")
+        notes = list_notes()
+        for note in notes:
+            plugin.index_note(note)
+
+        typer.secho(
+            f"\n✅ Indexed {len(references)} references and {len(notes)} notes",
+            fg=typer.colors.GREEN,
+        )
+        typer.echo("\nTry searching:")
+        typer.echo('  idlergear rag-search "your query"')
+
+    except ImportError as e:
+        typer.secho("❌ LlamaIndex not installed", fg=typer.colors.RED)
+        typer.echo("\nInstall with:")
+        typer.echo("  pip install 'idlergear[rag]'")
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+@app.command()
+def rag_rebuild(
+    ctx: typer.Context,
+):
+    """Rebuild RAG index from scratch.
+
+    Clears the existing index and creates a new empty one.
+    Use this if the index is corrupted or after major updates.
+
+    After rebuilding, run 'idlergear rag-index' to re-index documents.
+
+    Examples:
+        idlergear rag-rebuild
+    """
+    try:
+        from idlergear.plugins.llamaindex import LlamaIndexPlugin
+        from idlergear.config import get_config_value
+
+        # Check if enabled
+        enabled = get_config_value("plugins.llamaindex.enabled", default=False)
+        if not enabled:
+            typer.secho(
+                "❌ LlamaIndex plugin not enabled",
+                fg=typer.colors.RED,
+            )
+            typer.echo("\nEnable in .idlergear/config.toml:")
+            typer.echo("[plugins.llamaindex]")
+            typer.echo("enabled = true")
+            raise typer.Exit(1)
+
+        # Confirm
+        confirm = typer.confirm("This will delete the existing index. Continue?")
+        if not confirm:
+            raise typer.Exit(0)
+
+        # Initialize plugin
+        typer.echo("🔄 Initializing LlamaIndex...")
+        config = get_config_value("plugins.llamaindex", default={})
+        plugin = LlamaIndexPlugin(config)
+        plugin.initialize()
+
+        # Rebuild
+        typer.echo("🗑️  Clearing existing index...")
+        plugin.rebuild_index()
+
+        typer.secho("\n✅ Index rebuilt", fg=typer.colors.GREEN)
+        typer.echo("\nRe-index your documents:")
+        typer.echo("  idlergear rag-index")
+
+    except ImportError as e:
+        typer.secho("❌ LlamaIndex not installed", fg=typer.colors.RED)
+        typer.echo("\nInstall with:")
+        typer.echo("  pip install 'idlergear[rag]'")
+        raise typer.Exit(1)
+    except Exception as e:
+        typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()

@@ -273,6 +273,60 @@ idlergear_graph_search_documentation(query="authentication", limit=10)
 | Task context | read 5 files (5,000 tokens) | graph query (100 tokens) | 98.0% |
 | File symbols | cat + grep (3,000 tokens) | graph query (150 tokens) | 95.0% |
 
+### OPTIONAL: RAG Semantic Documentation Search (90%+ Token Savings)
+
+**LlamaIndex RAG provides semantic search over documentation, notes, and references.**
+
+**Enable RAG (optional):**
+```toml
+# .idlergear/config.toml
+[plugins.llamaindex]
+enabled = true
+embedding_model = "local"  # or "openai" for better quality
+```
+
+**First-time setup:**
+```bash
+# Install RAG dependencies
+pip install 'idlergear[rag]'
+
+# Index your documentation
+idlergear rag-index
+```
+
+**Query patterns:**
+
+```python
+# Natural language search over documentation
+idlergear_rag_search(query="How do I implement authentication?", top_k=5)
+# Returns: Relevant docs with similarity scores (90%+ token savings vs reading all docs)
+
+# Search specific knowledge type
+idlergear_rag_search(query="database connection patterns", knowledge_type="reference")
+# Returns: Only reference documents about databases
+
+# Re-index after adding new docs
+idlergear_rag_index_all()
+
+# Rebuild if index corrupted
+idlergear_rag_rebuild()
+```
+
+**When to use:**
+- ✅ Finding documentation on a topic ("How do I...?")
+- ✅ Searching references by concept (finds synonyms, related ideas)
+- ✅ Getting context from notes without reading all of them
+- ❌ Don't use for code search (use idlergear_code_search instead)
+- ❌ Don't use for structured queries (use knowledge graph instead)
+
+**Token savings comparison:**
+
+| Query Type | Traditional | RAG Search | Savings |
+|------------|-------------|------------|---------|
+| Find relevant docs | read all docs (15,000 tokens) | RAG query (500 tokens) | 96.7% |
+| Search references | grep + read (8,000 tokens) | RAG query (400 tokens) | 95.0% |
+| Find notes by topic | read all notes (5,000 tokens) | RAG query (300 tokens) | 94.0% |
+
 ### Knowledge Flow
 
 ```
