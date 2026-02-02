@@ -159,6 +159,42 @@ class TreeSitterParser:
         logger.warning(f"Extraction not implemented for {language}")
         return [], [], []
 
+    def _extract_docstring(self, node, code: str) -> str:
+        """Extract docstring from a Python function or class node.
+
+        Args:
+            node: tree-sitter node for function_definition or class_definition
+            code: Source code string
+
+        Returns:
+            Docstring text, or empty string if none found
+        """
+        # Find the body node
+        body_node = None
+        for child in node.children:
+            if child.type == "block":
+                body_node = child
+                break
+
+        if not body_node or len(body_node.children) == 0:
+            return ""
+
+        # Check if first child is an expression statement with a string
+        first_stmt = body_node.children[0]
+        if first_stmt.type == "expression_statement":
+            for child in first_stmt.children:
+                if child.type == "string":
+                    # Extract string content (remove quotes)
+                    doc_text = code[child.start_byte:child.end_byte]
+                    # Remove triple quotes or single quotes
+                    if doc_text.startswith('"""') or doc_text.startswith("'''"):
+                        return doc_text[3:-3].strip()
+                    elif doc_text.startswith('"') or doc_text.startswith("'"):
+                        return doc_text[1:-1].strip()
+                    return doc_text
+
+        return ""
+
     def _extract_python(self, tree, code: str) -> Tuple[List[Dict], List[Dict], List[Dict]]:
         """Extract Python symbols, imports, and comments.
 
@@ -172,7 +208,7 @@ class TreeSitterParser:
         lang = self.get_language("python")
         root = tree.root_node
 
-        # Query for function definitions
+        # Query for function definitions (not inside classes)
         func_query = lang.query("""
             (function_definition
                 name: (identifier) @func_name) @func
@@ -180,21 +216,31 @@ class TreeSitterParser:
 
         for node, tag in func_query.captures(root):
             if tag == "func":
-                # Find the function name node
-                name_node = None
-                for child in node.children:
-                    if child.type == "identifier":
-                        name_node = child
+                # Skip if this is a method (inside a class)
+                parent = node.parent
+                while parent:
+                    if parent.type == "class_definition":
+                        # This is a method, skip it (will be handled in class processing)
                         break
+                    parent = parent.parent
+                else:
+                    # This is a top-level function
+                    name_node = None
+                    for child in node.children:
+                        if child.type == "identifier":
+                            name_node = child
+                            break
 
-                if name_node:
-                    symbols.append({
-                        "name": code[name_node.start_byte:name_node.end_byte],
-                        "type": "function",
-                        "line_start": node.start_point[0] + 1,  # 1-indexed
-                        "line_end": node.end_point[0] + 1,
-                        "code": code[node.start_byte:node.end_byte],
-                    })
+                    if name_node:
+                        docstring = self._extract_docstring(node, code)
+                        symbols.append({
+                            "name": code[name_node.start_byte:name_node.end_byte],
+                            "type": "function",
+                            "line_start": node.start_point[0] + 1,  # 1-indexed
+                            "line_end": node.end_point[0] + 1,
+                            "code": code[node.start_byte:node.end_byte],
+                            "docstring": docstring,
+                        })
 
         # Query for class definitions
         class_query = lang.query("""
@@ -211,13 +257,50 @@ class TreeSitterParser:
                         break
 
                 if name_node:
+                    class_name = code[name_node.start_byte:name_node.end_byte]
+                    docstring = self._extract_docstring(node, code)
                     symbols.append({
-                        "name": code[name_node.start_byte:name_node.end_byte],
+                        "name": class_name,
                         "type": "class",
                         "line_start": node.start_point[0] + 1,
                         "line_end": node.end_point[0] + 1,
                         "code": code[node.start_byte:node.end_byte],
+                        "docstring": docstring,
                     })
+
+                    # Extract methods from this class
+                    body_node = None
+                    for child in node.children:
+                        if child.type == "block":
+                            body_node = child
+                            break
+
+                    if body_node:
+                        # Find all function definitions in the class body
+                        method_query = lang.query("""
+                            (function_definition
+                                name: (identifier) @method_name) @method
+                        """)
+
+                        for method_node, method_tag in method_query.captures(body_node):
+                            if method_tag == "method":
+                                method_name_node = None
+                                for child in method_node.children:
+                                    if child.type == "identifier":
+                                        method_name_node = child
+                                        break
+
+                                if method_name_node:
+                                    method_name = code[method_name_node.start_byte:method_name_node.end_byte]
+                                    method_docstring = self._extract_docstring(method_node, code)
+                                    symbols.append({
+                                        "name": f"{class_name}.{method_name}",
+                                        "type": "method",
+                                        "line_start": method_node.start_point[0] + 1,
+                                        "line_end": method_node.end_point[0] + 1,
+                                        "code": code[method_node.start_byte:method_node.end_byte],
+                                        "docstring": method_docstring,
+                                    })
 
         # Query for comments
         comment_query = lang.query("""

@@ -1,6 +1,5 @@
 """Populates graph database with code symbols (functions, classes, methods)."""
 
-import ast
 import hashlib
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Set
@@ -158,32 +157,17 @@ class CodePopulator:
         self, rel_path: str, full_path: Path
     ) -> Optional[Dict[str, int]]:
         """Populate symbols and imports from a single file."""
-        # Try tree-sitter parser first (multi-language support)
+        # Parse file using tree-sitter (multi-language support)
         parse_result = self._parser.parse_file(full_path)
 
-        if parse_result:
-            # Tree-sitter succeeded - extract symbols, imports, comments
-            symbols = self._convert_treesitter_symbols(parse_result["symbols"], rel_path)
-            imports = parse_result.get("imports", [])
-            comments = parse_result.get("comments", [])
-            language = parse_result.get("language", "unknown")
-        else:
-            # Fall back to AST for Python files or unsupported languages
-            try:
-                content = full_path.read_text()
-            except (UnicodeDecodeError, PermissionError):
-                return None  # Skip binary or unreadable files
+        if not parse_result:
+            return None  # Skip unparseable files
 
-            # Parse AST (Python only)
-            try:
-                tree = ast.parse(content, filename=str(full_path))
-            except SyntaxError:
-                return None  # Skip files with syntax errors
-
-            # Extract symbols and imports using AST
-            symbols, imports = self._extract_symbols_and_imports(tree, rel_path)
-            comments = []
-            language = "python"
+        # Extract symbols, imports, comments
+        symbols = self._convert_treesitter_symbols(parse_result["symbols"], rel_path)
+        imports = parse_result.get("imports", [])
+        comments = parse_result.get("comments", [])
+        language = parse_result.get("language", "unknown")
 
         # Ensure file node exists with detected language
         self._ensure_file_node(rel_path, full_path, language)
@@ -244,77 +228,6 @@ class CodePopulator:
 
         return {"symbols": symbols_added, "relationships": relationships_added}
 
-    def _extract_symbols_and_imports(
-        self, tree: ast.AST, file_path: str
-    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Extract functions, classes, methods, and imports from AST.
-
-        Returns:
-            Tuple of (symbols, imports)
-        """
-        symbols = []
-        imports = []
-
-        # Only iterate through module body to avoid double-counting
-        # ast.walk() would find methods both in class body and as standalone nodes
-        for node in tree.body:
-            if isinstance(node, ast.FunctionDef):
-                # Extract top-level function
-                symbols.append({
-                    "name": node.name,
-                    "type": "function",
-                    "line_start": node.lineno,
-                    "line_end": node.end_lineno or node.lineno,
-                    "docstring": ast.get_docstring(node) or "",
-                    "file_path": file_path,
-                })
-
-            elif isinstance(node, ast.ClassDef):
-                # Extract class
-                symbols.append({
-                    "name": node.name,
-                    "type": "class",
-                    "line_start": node.lineno,
-                    "line_end": node.end_lineno or node.lineno,
-                    "docstring": ast.get_docstring(node) or "",
-                    "file_path": file_path,
-                })
-
-                # Extract methods
-                for item in node.body:
-                    if isinstance(item, ast.FunctionDef):
-                        symbols.append({
-                            "name": f"{node.name}.{item.name}",
-                            "type": "method",
-                            "line_start": item.lineno,
-                            "line_end": item.end_lineno or item.lineno,
-                            "docstring": ast.get_docstring(item) or "",
-                            "file_path": file_path,
-                        })
-
-            elif isinstance(node, ast.Import):
-                # Extract import statements: import foo, bar
-                for alias in node.names:
-                    imports.append({
-                        "module": alias.name,
-                        "names": [],
-                        "line": node.lineno,
-                        "type": "import",
-                    })
-
-            elif isinstance(node, ast.ImportFrom):
-                # Extract from imports: from foo import bar, baz
-                module_name = node.module or ""
-                names = [alias.name for alias in node.names]
-                imports.append({
-                    "module": module_name,
-                    "names": names,
-                    "line": node.lineno,
-                    "type": "from_import",
-                    "level": node.level,  # For relative imports
-                })
-
-        return symbols, imports
 
     def _convert_treesitter_symbols(
         self, treesitter_symbols: List[Dict[str, Any]], file_path: str
@@ -330,10 +243,8 @@ class CodePopulator:
         """
         converted = []
         for symbol in treesitter_symbols:
-            # Extract docstring from code if available (basic implementation)
-            # For now, leave empty - full docstring extraction would require
-            # parsing the code field or using tree-sitter queries for docstrings
-            docstring = ""
+            # Use docstring from tree-sitter parser if available
+            docstring = symbol.get("docstring", "")
 
             converted.append({
                 "name": symbol["name"],

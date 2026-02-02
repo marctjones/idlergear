@@ -350,14 +350,14 @@ class TestPlanCommands:
     """Tests for plan commands."""
 
     def test_plan_create(self, cli_project):
-        result = runner.invoke(app, ["plan", "create", "my-plan"])
+        result = runner.invoke(app, ["plan", "create", "my-plan", "--description", "Test plan"])
 
         assert result.exit_code == 0
         assert "Created plan: my-plan" in result.output
 
     def test_plan_list(self, cli_project):
-        runner.invoke(app, ["plan", "create", "plan-a"])
-        runner.invoke(app, ["plan", "create", "plan-b"])
+        runner.invoke(app, ["plan", "create", "plan-a", "--description", "Plan A"])
+        runner.invoke(app, ["plan", "create", "plan-b", "--description", "Plan B"])
 
         result = runner.invoke(app, ["plan", "list"])
 
@@ -374,12 +374,14 @@ class TestPlanCommands:
         assert "Test Plan" in result.output
 
     def test_plan_switch(self, cli_project):
-        runner.invoke(app, ["plan", "create", "my-plan"])
+        # Note: plan switch command was removed in Plan Objects refactor
+        # Plans no longer have a "current" concept - skipping this test
+        runner.invoke(app, ["plan", "create", "my-plan", "--description", "Test"])
 
-        result = runner.invoke(app, ["plan", "switch", "my-plan"])
+        result = runner.invoke(app, ["plan", "list"])
 
         assert result.exit_code == 0
-        assert "Switched to plan: my-plan" in result.output
+        assert "my-plan" in result.output
 
 
 class TestReferenceCommands:
@@ -693,28 +695,49 @@ class TestAdditionalPlanCommands:
         assert result.exit_code == 1
         assert "not found" in result.output
 
-    def test_plan_show_current(self, cli_project):
-        runner.invoke(app, ["plan", "create", "my-plan"])
-        runner.invoke(app, ["plan", "switch", "my-plan"])
+    def test_plan_show_by_name(self, cli_project):
+        """Test showing a specific plan by name."""
+        runner.invoke(
+            app,
+            [
+                "plan",
+                "create",
+                "my-plan",
+                "--description",
+                "Test plan description",
+            ],
+        )
 
-        result = runner.invoke(app, ["--output", "human", "plan", "show"])
+        result = runner.invoke(app, ["--output", "human", "plan", "show", "my-plan"])
 
         assert result.exit_code == 0
         assert "my-plan" in result.output
 
-    def test_plan_show_no_current(self, cli_project):
-        result = runner.invoke(app, ["--output", "human", "plan", "show"])
-
-        assert result.exit_code == 0
-        assert "No current plan" in result.output
-
-    def test_plan_switch_not_found(self, cli_project):
-        result = runner.invoke(
-            app, ["--output", "human", "plan", "switch", "nonexistent"]
+    def test_plan_delete(self, cli_project):
+        """Test deleting (archiving) a plan."""
+        runner.invoke(
+            app,
+            [
+                "plan",
+                "create",
+                "delete-me",
+                "--description",
+                "Plan to be deleted",
+            ],
         )
 
-        assert result.exit_code == 1
-        assert "not found" in result.output
+        result = runner.invoke(app, ["plan", "delete", "delete-me"])
+
+        assert result.exit_code == 0
+        assert "Archived plan" in result.output
+
+        # Verify it's not in active list
+        result = runner.invoke(app, ["plan", "list", "--status", "active"])
+        assert "delete-me" not in result.output
+
+        # But still exists in archived status
+        result = runner.invoke(app, ["plan", "list", "--status", "archived"])
+        assert "delete-me" in result.output
 
     def test_plan_list_empty(self, cli_project):
         result = runner.invoke(app, ["--output", "human", "plan", "list"])

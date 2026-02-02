@@ -97,16 +97,19 @@ def search_all(
 
     # Search plans
     if "plan" in search_types:
-        for plan in list_plans(project_path=project_path):
-            if _matches(plan, query_lower, ["name", "title", "body"]):
+        # list_plans returns Plan objects, convert to dict for searching
+        root = project_path if project_path else Path.cwd() / ".idlergear" / "plans"
+        for plan in list_plans(root):
+            plan_dict = plan.to_dict() if hasattr(plan, 'to_dict') else plan
+            if _matches(plan_dict, query_lower, ["name", "description"]):
                 results.append(
                     {
                         "type": "plan",
-                        "name": plan.get("name"),
-                        "title": plan.get("title", plan.get("name", "")),
-                        "preview": _get_preview(plan, query_lower),
-                        "state": plan.get("state"),
-                        "path": plan.get("path"),
+                        "name": plan_dict.get("name"),
+                        "title": plan_dict.get("description", plan_dict.get("name", "")),
+                        "preview": _get_preview(plan_dict, query_lower),
+                        "state": plan_dict.get("status"),
+                        "path": plan_dict.get("path"),
                     }
                 )
 

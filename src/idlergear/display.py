@@ -176,14 +176,22 @@ def format_plan(plan: dict | None) -> None:
         return
 
     typer.echo(f"Plan: {plan['name']}")
-    typer.echo(f"Title: {plan['title']}")
-    typer.echo(f"State: {plan['state']}")
+    typer.echo(f"Description: {plan['description']}")
+    typer.echo(f"Status: {plan['status']}")
+    typer.echo(f"Type: {plan['type']}")
     typer.echo(f"Created: {plan['created']}")
-    if plan.get("github_project"):
-        typer.echo(f"GitHub: Project #{plan['github_project']}")
-    typer.echo("")
-    if plan.get("body"):
-        typer.echo(plan["body"])
+    if plan.get("github_project_id"):
+        typer.echo(f"GitHub: Project {plan['github_project_id']}")
+    if plan.get("milestone"):
+        typer.echo(f"Milestone: {plan['milestone']}")
+
+    # Show file and task counts
+    if plan.get("files"):
+        typer.echo(f"Files: {len(plan['files'])}")
+    if plan.get("tasks"):
+        typer.echo(f"Tasks: {len(plan['tasks'])}")
+    if plan.get("sub_plans"):
+        typer.echo(f"Sub-plans: {len(plan['sub_plans'])}")
 
 
 def format_reference_list(refs: list[dict]) -> None:

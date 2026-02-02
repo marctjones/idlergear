@@ -63,9 +63,10 @@ class TestSearchAll:
         assert results[0]["type"] == "reference"
 
     def test_search_plans(self, temp_project):
-        """Search finds plans by name, title, and body."""
-        create_plan("v2-release", title="Version 2 Release", body="Major refactoring")
-        create_plan("other-plan")
+        """Search finds plans by name and description."""
+        plans_root = temp_project / ".idlergear" / "plans"
+        create_plan("v2-release", "Version 2 Release - Major refactoring", plans_root)
+        create_plan("other-plan", "Another plan", plans_root)
 
         results = search_all("refactoring")
         assert len(results) == 1

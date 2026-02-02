@@ -518,11 +518,12 @@ def _create_relationship_tables(conn):
         )
     """)
 
-    # Note: PR MODIFIES File uses the existing MODIFIES table
-    # which already supports FROM Task TO File
-    # We extend it to support FROM PR TO File as well
+    # PR to File relationships (separate from Task MODIFIES File)
     conn.execute("""
-        ALTER TABLE MODIFIES ADD (FROM PR TO File)
+        CREATE REL TABLE PR_MODIFIES(
+            FROM PR TO File,
+            change_type STRING
+        )
     """)
 
     # Person relationships
