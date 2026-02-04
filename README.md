@@ -190,15 +190,23 @@ The difference:
 ## Quick Start
 
 ```bash
-# Install from PyPI (recommended)
+# Install from PyPI (recommended for stable releases)
 pipx install idlergear  # Isolated environment
 # OR
 pip install idlergear   # System/user install
 
-# Install from source (development)
+# Install latest from GitHub (recommended for latest features)
+pipx install git+https://github.com/marctjones/idlergear.git
+# OR
+pip install git+https://github.com/marctjones/idlergear.git
+
+# Install with optional dependencies (RAG support)
+pip install "git+https://github.com/marctjones/idlergear.git#egg=idlergear[rag]"
+
+# Install from source (for development/contributions)
 git clone https://github.com/marctjones/idlergear.git
 cd idlergear
-pip install -e .
+pip install -e ".[dev,rag]"
 
 # Initialize a project
 cd my-project
