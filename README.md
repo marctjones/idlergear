@@ -50,7 +50,7 @@ idlergear task create "Set up authentication" --label feature
 idlergear context
 ```
 
-## Features (v0.7.57)
+## Features (v0.8.0)
 
 ### Knowledge Types
 - **Tasks** - Track work items with status
@@ -65,29 +65,47 @@ idlergear context
 - **Data File Versioning** - Detect when code references old data files (CSV, JSON, etc.)
 - **File Registry** - Track file status (current/deprecated/archived/problematic) + **File Annotations** for token-efficient discovery (93% token savings!)
 
-### Plugin System ⭐ NEW in v0.5.13!
-IdlerGear acts as the **"data layer"** while integrating with best-in-class intelligence tools:
+### Code Intelligence ⭐ NEW in v0.8.0!
+IdlerGear provides **three complementary search systems** for 95-99% token savings:
 
-- **LlamaIndex Plugin** - Semantic search over references/notes (40% faster retrieval)
+- **Tree-sitter Parsing** - Multi-language code analysis (Python, JS, TS, Rust, Go, C/C++, Java)
+  - Extract functions, classes, methods with docstrings
+  - Fully qualified method names (e.g., `ClassName.method`)
+  - Error-tolerant parsing (handles syntax errors)
+  - Language detection from file extensions
+
+- **ChromaDB Vector Search** - Semantic code similarity search (93-98% token savings)
+  - Index code symbols with embeddings (sentence-transformers)
+  - Natural language queries: "find authentication functions"
+  - Sub-second query performance
+  - Duplicate code detection via similarity
+
+- **LlamaIndex RAG** - Semantic documentation search (90%+ token savings)
+  - Search references and notes semantically
   - Local embeddings by default (zero-config)
   - Optional OpenAI embeddings for better quality
-  - Persistent vector storage
-- **Langfuse Plugin** - Observability export for token tracking and cost monitoring
-  - OpenTelemetry log export
-  - Automatic token tracking
-  - LLM request/response inspection
-- **Mem0 Plugin** (Coming Soon) - Experiential memory with pattern learning
+  - Metadata filtering (search only references or only notes)
 
-**Configuration**: Enable plugins in `.idlergear/config.toml`
+- **Knowledge Graph** - Structured relationship queries (95-98% token savings)
+  - Task-file-commit relationships
+  - Import dependencies, symbol lookups
+  - Sub-40ms query response times
+
+**Configuration**: Enable RAG in `.idlergear/config.toml`
 ```toml
 [plugins.llamaindex]
 enabled = true
 embedding_model = "local"  # or "openai"
 ```
 
+**Other Plugins:**
+- **Langfuse Plugin** - Observability export for token tracking and cost monitoring
+- **Mem0 Plugin** (Coming Soon) - Experiential memory with pattern learning
+
 ### Python-Native MCP Servers (Zero Node.js!)
-- **Plugin System** - 6 tools (list, status, enable, search, index) ⭐ NEW in v0.5.13!
+- **Code Intelligence** - 9 tools (semantic code search, RAG docs search, populate) ⭐ NEW in v0.8.0!
 - **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries)
+- **Plugin System** - 6 tools (list, status, enable, search, index)
 - **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks)
 - **File Registry** - 8 tools (file status, annotations, token-efficient search)
 - **Filesystem** - 11 tools (read, write, tree, search, checksums)
@@ -99,15 +117,15 @@ embedding_model = "local"  # or "openai"
 - **Test Framework** - 11 tools (detect, run, status, coverage mapping)
 - **Health Check** - Doctor command for configuration validation
 
-**Total: 146 MCP Tools | 100% Python | 0 Node.js Dependencies**
+**Total: 155 MCP Tools | 100% Python | 0 Node.js Dependencies**
 
 ### Backends
 - **Local** - JSON file storage in `.idlergear/`
 - **GitHub** - Issues, Projects, Wiki integration via `gh` CLI
 
 ### AI Integration
-- **MCP Server** - **146 tools** via Model Context Protocol (universal)
-- **Plugin System** - Integrate with Langfuse, LlamaIndex, Mem0 ⭐ NEW in v0.5.13!
+- **MCP Server** - **155 tools** via Model Context Protocol (universal)
+- **Code Intelligence** - Tree-sitter + ChromaDB + LlamaIndex RAG (93-99% token savings) ⭐ NEW in v0.8.0!
 - **Knowledge Graph** - 95-98% token savings for context retrieval
 - **File Registry + Annotations** - Track file status + annotate files for 93% token-efficient discovery
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
@@ -143,10 +161,10 @@ IdlerGear ships **quarterly releases** with major features. Each milestone deliv
 |-----------|-------|--------|--------------|
 | **v0.5.11** ✅ | Plugin System Foundation | Released | LlamaIndex, Langfuse plugins, semantic search, observability |
 | **v0.6.0** ✅ | File Registry Complete | Released | MCP interception, daemon integration, file annotations |
-| **v0.7.51** ✅ | TUI & Performance | CURRENT | Lazy loading (5x faster), keyboard nav, GitHub issue display |
-| **v0.8.0** 🎯 | File Intelligence | April 2027 | Plan Objects, automatic file annotations, workflow-aware context |
-| **v0.9.0** 🤖 | Multi-Assistant | September 2027 | Multi-agent coordination, memory decay, AI observability |
-| **v0.10.0** 💎 | Polish & Maturity | December 2027 | Pre-release maturity, 80%+ coverage, production validation |
+| **v0.7.73** ✅ | TUI & Performance | Released | Lazy loading (5x faster), keyboard nav, GitHub issue display |
+| **v0.8.0** ✅ | Code Intelligence | Released 2026-02-02 | Tree-sitter parsing, ChromaDB vector search, LlamaIndex RAG |
+| **v0.9.0** 🎯 | Multi-Assistant | June 2026 | Multi-agent coordination, memory decay, AI observability |
+| **v0.10.0** 💎 | Polish & Maturity | December 2026 | Pre-release maturity, 80%+ coverage, production validation |
 
 **[View Project Board](https://github.com/users/marctjones/projects/18)** | **[View Milestones](https://github.com/marctjones/idlergear/milestones)**
 
@@ -206,9 +224,10 @@ idlergear session-end        # End with smart suggestions
 # Start collecting logs
 idlergear otel start         # ERROR logs → notes, FATAL → tasks automatically!
 
-# Enable plugins (NEW v0.8.0!)
-idlergear plugin enable llamaindex  # Enable semantic search
-idlergear plugin search "authentication"  # Search with 40% faster retrieval!
+# Enable code intelligence (NEW v0.8.0!)
+idlergear graph populate              # Populate Knowledge Graph + ChromaDB
+idlergear rag-index                   # Populate LlamaIndex RAG
+idlergear rag-search "authentication" # Semantic docs search
 ```
 
 ## Commands
@@ -302,15 +321,20 @@ idlergear mcp add NAME CMD        # Add an MCP server
 idlergear mcp remove NAME         # Remove an MCP server
 idlergear mcp test                # Test MCP server connectivity
 
-# Plugin System (NEW v0.8.0!)
+# Code Intelligence (NEW v0.8.0!)
+idlergear graph populate          # Populate Knowledge Graph + ChromaDB
+idlergear rag-search QUERY        # Semantic search over documentation
+idlergear rag-search QUERY --top-k 10 --type reference
+idlergear rag-index               # Index all references and notes
+idlergear rag-rebuild             # Rebuild RAG index from scratch
+
+# Plugin System
 idlergear plugin list             # List available/loaded plugins
 idlergear plugin list --loaded    # Only show loaded plugins
 idlergear plugin status           # Show all plugin statuses
 idlergear plugin status NAME      # Check specific plugin
 idlergear plugin enable NAME      # Enable plugin in config.toml
 idlergear plugin disable NAME     # Disable plugin
-idlergear plugin search QUERY     # Semantic search with LlamaIndex
-idlergear plugin search QUERY --top-k 10 --type reference
 
 # File Registry & Annotations
 idlergear file register PATH --status STATUS  # Register file with status
@@ -345,13 +369,51 @@ idlergear config set KEY VAL      # Configure settings
 idlergear config get KEY          # Get config value
 ```
 
-### MCP Tools (146 total - use via AI assistants)
+### MCP Tools (155 total - use via AI assistants)
 
 See [MCP Tools Reference](#mcp-tools-reference) below for complete details.
 
 ## MCP Tools Reference
 
-IdlerGear provides **146 MCP tools** across 18 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+IdlerGear provides **155 MCP tools** across 19 categories. All tools are **100% Python** with **zero Node.js dependencies**.
+
+### Code Intelligence (9 tools) ⭐ **NEW in v0.8.0!**
+
+| Tool | Description |
+|------|-------------|
+| `idlergear_code_search` | Semantic code search using ChromaDB (93-98% token savings) |
+| `idlergear_find_similar_code` | Find duplicate/similar code via vector similarity |
+| `idlergear_rag_search` | Semantic search over documentation (references, notes) |
+| `idlergear_rag_index_all` | Index all references and notes for RAG search |
+| `idlergear_rag_rebuild` | Rebuild RAG index from scratch |
+| `idlergear_graph_populate_all` | Populate all systems: Knowledge Graph + ChromaDB + Code |
+| `idlergear_graph_query_symbols` | Search code symbols by name pattern |
+| `idlergear_graph_query_file` | Get file context: tasks, imports, symbols, changes |
+| `idlergear_graph_query_task` | Get task context: related files, commits, symbols |
+
+**Token Savings**: Combined 95-99% reduction across all three systems!
+- **ChromaDB**: 93-98% savings vs grep + file reads (code similarity)
+- **LlamaIndex RAG**: 90%+ savings vs reading all docs (semantic docs search)
+- **Knowledge Graph**: 95-98% savings vs file reads (structured relationships)
+
+**Example:**
+```python
+# Semantic code search
+results = idlergear_code_search("authentication functions")
+# Returns: matching functions with similarity scores
+
+# Semantic docs search
+docs = idlergear_rag_search("How do I implement JWT?", top_k=5)
+# Returns: relevant reference docs and notes
+
+# Populate everything at once
+idlergear_graph_populate_all(max_commits=100, incremental=True)
+# Indexes: git history, code symbols, tasks, references, wiki
+```
+
+**Documentation**: See [CHANGELOG.md](CHANGELOG.md) for v0.8.0 details
+
+---
 
 ### Session Management (4 tools) ⚡ **Start here!**
 
