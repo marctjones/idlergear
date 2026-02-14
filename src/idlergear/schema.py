@@ -86,6 +86,11 @@ class IdlerGearSchema:
         """Sync state with external systems: .idlergear/sync/"""
         return self.idlergear_dir / "sync"
 
+    @property
+    def file_annotations_dir(self) -> Path:
+        """File annotations for token-efficient discovery: .idlergear/file_annotations/"""
+        return self.idlergear_dir / "file_annotations"
+
     # === Specific files ===
 
     @property
@@ -138,6 +143,7 @@ class IdlerGearSchema:
             self.runs_dir,
             self.projects_dir,
             self.sync_dir,
+            self.file_annotations_dir,
         ]
 
     def get_legacy_directories(self) -> list[Path]:

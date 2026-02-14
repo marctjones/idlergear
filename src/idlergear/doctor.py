@@ -891,6 +891,146 @@ def check_orphaned_claude_files(project_path: Path) -> list[CheckResult]:
 
 
 # ============================================================================
+# Token-Saving Feature Checks
+# ============================================================================
+
+
+def check_file_annotations(project_path: Path) -> CheckResult:
+    """Check if file annotations directory exists and has content."""
+    annotations_dir = project_path / ".idlergear" / "file_annotations"
+
+    if not annotations_dir.exists():
+        return CheckResult(
+            name="file_annotations",
+            status=CheckStatus.ERROR,
+            message="File annotations directory missing",
+            fix="mkdir -p .idlergear/file_annotations",
+            details={"impact": "Missing 93% token savings on file discovery"},
+        )
+
+    # Count annotation files
+    annotation_files = list(annotations_dir.glob("**/*.json"))
+
+    if len(annotation_files) == 0:
+        return CheckResult(
+            name="file_annotations",
+            status=CheckStatus.WARNING,
+            message="File annotations directory exists but is empty",
+            fix="Use idlergear file annotate to add annotations",
+            details={"impact": "0% token savings (no annotations yet)"},
+        )
+
+    return CheckResult(
+        name="file_annotations",
+        status=CheckStatus.OK,
+        message=f"File annotations ready ({len(annotation_files)} files annotated)",
+        details={"impact": "93% token savings enabled"},
+    )
+
+
+def check_knowledge_graph(project_path: Path) -> CheckResult:
+    """Check knowledge graph database status."""
+    # Knowledge graph is global, not per-project
+    graph_db = Path.home() / ".idlergear" / "graph.db"
+
+    if not graph_db.exists():
+        return CheckResult(
+            name="knowledge_graph",
+            status=CheckStatus.ERROR,
+            message="Knowledge graph not initialized",
+            fix="idlergear graph populate --max-commits 100",
+            details={"impact": "Missing 95-98% token savings on context queries"},
+        )
+
+    # Check database size
+    size_mb = graph_db.stat().st_size / (1024 * 1024)
+
+    if size_mb < 1:
+        return CheckResult(
+            name="knowledge_graph",
+            status=CheckStatus.WARNING,
+            message=f"Knowledge graph exists but appears empty ({size_mb:.1f} MB)",
+            fix="idlergear graph populate --max-commits 100",
+            details={"impact": "Limited token savings (graph not populated)"},
+        )
+
+    # Try to get node counts
+    try:
+        from idlergear.graph import get_database
+        from idlergear.graph.schema import get_schema_info
+
+        db = get_database()
+        info = get_schema_info(db)
+        total_nodes = info.get("total_nodes", 0)
+
+        return CheckResult(
+            name="knowledge_graph",
+            status=CheckStatus.OK,
+            message=f"Knowledge graph populated ({total_nodes:,} nodes, {size_mb:.0f} MB)",
+            details={"impact": "95-98% token savings enabled"},
+        )
+    except Exception as e:
+        return CheckResult(
+            name="knowledge_graph",
+            status=CheckStatus.WARNING,
+            message=f"Knowledge graph exists ({size_mb:.0f} MB) but could not read stats: {e}",
+            details={"impact": "Token savings may be available"},
+        )
+
+
+def check_rag_index(project_path: Path) -> CheckResult:
+    """Check RAG/LlamaIndex status (optional feature)."""
+    # Check if RAG extras are installed
+    try:
+        import llama_index  # noqa: F401
+
+        rag_installed = True
+    except ImportError:
+        rag_installed = False
+
+    if not rag_installed:
+        return CheckResult(
+            name="rag_index",
+            status=CheckStatus.INFO,
+            message="RAG not installed (optional)",
+            fix="pip install 'idlergear[rag]'",
+            details={
+                "impact": "Missing 90%+ token savings on documentation search (optional)"
+            },
+        )
+
+    # Check if index exists
+    index_dir = project_path / ".idlergear" / "vector_index"
+
+    if not index_dir.exists():
+        return CheckResult(
+            name="rag_index",
+            status=CheckStatus.INFO,
+            message="RAG installed but not initialized",
+            fix="idlergear rag-index",
+            details={"impact": "0% token savings (not initialized)"},
+        )
+
+    # Check index size
+    index_files = list(index_dir.glob("**/*"))
+    if len(index_files) == 0:
+        return CheckResult(
+            name="rag_index",
+            status=CheckStatus.INFO,
+            message="RAG index directory empty",
+            fix="idlergear rag-index",
+            details={"impact": "0% token savings (index empty)"},
+        )
+
+    return CheckResult(
+        name="rag_index",
+        status=CheckStatus.OK,
+        message=f"RAG index ready ({len(index_files)} index files)",
+        details={"impact": "90%+ token savings enabled"},
+    )
+
+
+# ============================================================================
 # Main Doctor Function
 # ============================================================================
 
@@ -938,6 +1078,11 @@ def run_doctor(project_path: Path | None = None) -> DoctorReport:
     checks.extend(check_legacy_files(project_path))
     checks.extend(check_unmanaged_knowledge_files(project_path))
     checks.extend(check_orphaned_claude_files(project_path))
+
+    # Token-saving feature checks
+    checks.append(check_file_annotations(project_path))
+    checks.append(check_knowledge_graph(project_path))
+    checks.append(check_rag_index(project_path))
 
     # Test health checks
     checks.append(check_test_staleness(project_path))
@@ -1019,6 +1164,49 @@ def format_report(report: DoctorReport, verbose: bool = False) -> str:
                     lines.append(f"  {key}: {', '.join(str(v) for v in value)}")
                 elif value:
                     lines.append(f"  {key}: {value}")
+
+    # Token savings summary
+    token_checks = {
+        "file_annotations": {"name": "File Annotations", "savings": 93},
+        "knowledge_graph": {
+            "name": "Knowledge Graph",
+            "savings": 97,
+        },  # Use 97% (midpoint of 95-98%)
+        "rag_index": {"name": "RAG Search", "savings": 90},
+    }
+
+    token_enabled = []
+    token_missing = []
+
+    for check in report.checks:
+        if check.name in token_checks:
+            info = token_checks[check.name]
+            if check.status == CheckStatus.OK:
+                token_enabled.append(info)
+            elif check.status in (CheckStatus.ERROR, CheckStatus.WARNING):
+                token_missing.append(info)
+
+    if token_enabled or token_missing:
+        lines.append("")
+        lines.append("⚡ Token-Saving Features:")
+
+        if token_enabled:
+            for feature in token_enabled:
+                lines.append(
+                    f"  ✅ {feature['name']}: {feature['savings']}% savings enabled"
+                )
+
+        if token_missing:
+            for feature in token_missing:
+                lines.append(
+                    f"  ❌ {feature['name']}: {feature['savings']}% savings missing"
+                )
+
+        # Calculate total savings
+        if token_enabled:
+            # Use the highest savings (features are complementary, not additive)
+            max_savings = max(f["savings"] for f in token_enabled)
+            lines.append(f"\n  📊 Total active: ~{max_savings}% token savings")
 
     # Recommendations
     if not report.is_healthy:

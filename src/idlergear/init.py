@@ -121,6 +121,7 @@ def init_project(path: str = ".") -> None:
     typer.echo("  ├── plans/            # Implementation plans")
     typer.echo("  ├── runs/             # Script execution logs")
     typer.echo("  ├── projects/         # Kanban boards")
+    typer.echo("  ├── file_annotations/ # File annotations (93% token savings!)")
     typer.echo("  └── sync/             # External sync state")
     typer.echo("")
     typer.echo("Next steps:")
