@@ -160,7 +160,11 @@ def _ensure_daemon_running() -> None:
     Starts the daemon automatically if it's not already running.
     This enables real-time TUI monitoring and multi-agent coordination.
     """
-    from idlergear.daemon.client import DaemonNotRunning, get_daemon_client, start_daemon_process
+    from idlergear.daemon.client import (
+        DaemonNotRunning,
+        get_daemon_client,
+        start_daemon_process,
+    )
 
     try:
         # Check if daemon is already running
@@ -171,6 +175,7 @@ def _ensure_daemon_running() -> None:
             try:
                 # Quick check - daemon.ping is fast
                 import asyncio
+
                 asyncio.run(client.call("daemon.ping", {}))
                 # Daemon is running, we're good
                 return
@@ -189,6 +194,7 @@ def _ensure_daemon_running() -> None:
             start_daemon_process(root)
             # Give it a moment to start up
             import time
+
             time.sleep(0.5)
     except Exception as e:
         # Daemon start failed - not fatal, continue without it
@@ -229,16 +235,19 @@ async def _auto_register_agent() -> None:
         ]
 
         async with client:
-            response = await client.call("agent.register", {
-                "agent_id": agent_id,
-                "agent_type": "claude-code",
-                "capabilities": capabilities,
-                "metadata": {
-                    "version": __version__,
-                    "pid": os.getpid(),
-                    "started_at": datetime.now().isoformat(),
-                }
-            })
+            response = await client.call(
+                "agent.register",
+                {
+                    "agent_id": agent_id,
+                    "agent_type": "claude-code",
+                    "capabilities": capabilities,
+                    "metadata": {
+                        "version": __version__,
+                        "pid": os.getpid(),
+                        "started_at": datetime.now().isoformat(),
+                    },
+                },
+            )
 
         # Store agent_id globally for use in AI state reporting
         _registered_agent_id = agent_id
@@ -1008,7 +1017,10 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Plan name"},
-                    "file_path": {"type": "string", "description": "File path to remove"},
+                    "file_path": {
+                        "type": "string",
+                        "description": "File path to remove",
+                    },
                 },
                 "required": ["name", "file_path"],
             },
@@ -1020,7 +1032,10 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Plan name"},
-                    "file_path": {"type": "string", "description": "File path to deprecate"},
+                    "file_path": {
+                        "type": "string",
+                        "description": "File path to deprecate",
+                    },
                 },
                 "required": ["name", "file_path"],
             },
@@ -1074,7 +1089,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string", "description": "Plan name (can be anywhere in hierarchy)"},
+                    "name": {
+                        "type": "string",
+                        "description": "Plan name (can be anywhere in hierarchy)",
+                    },
                     "max_depth": {
                         "type": "integer",
                         "description": "Maximum search depth (default: 10)",
@@ -1096,9 +1114,18 @@ async def list_tools() -> list[Tool]:
                         "items": {
                             "type": "object",
                             "properties": {
-                                "action": {"type": "string", "description": "Action to perform"},
-                                "target": {"type": "string", "description": "Target file/command"},
-                                "reason": {"type": "string", "description": "Reason for this step"},
+                                "action": {
+                                    "type": "string",
+                                    "description": "Action to perform",
+                                },
+                                "target": {
+                                    "type": "string",
+                                    "description": "Target file/command",
+                                },
+                                "reason": {
+                                    "type": "string",
+                                    "description": "Reason for this step",
+                                },
                             },
                         },
                     },
@@ -3108,17 +3135,17 @@ This ensures messages don't derail your work - only context ones are shown immed
                     },
                     "env": {
                         "type": "object",
-                        "description": "Environment variables as key-value pairs (e.g., {\"DATABASE_URL\": \"postgres://...\"})",
+                        "description": 'Environment variables as key-value pairs (e.g., {"DATABASE_URL": "postgres://..."})',
                         "additionalProperties": {"type": "string"},
                     },
                     "volumes": {
                         "type": "object",
-                        "description": "Volume mounts as host_path:container_path pairs (e.g., {\"/data\": \"/app/data\"})",
+                        "description": 'Volume mounts as host_path:container_path pairs (e.g., {"/data": "/app/data"})',
                         "additionalProperties": {"type": "string"},
                     },
                     "ports": {
                         "type": "object",
-                        "description": "Port mappings as host_port:container_port pairs (e.g., {\"8080\": \"80\"})",
+                        "description": 'Port mappings as host_port:container_port pairs (e.g., {"8080": "80"})',
                         "additionalProperties": {"type": "string"},
                     },
                     "memory": {
@@ -4778,7 +4805,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     }
                 )
             except Exception as e:
-                if "does not exist" in str(e).lower() or "no such file" in str(e).lower():
+                if (
+                    "does not exist" in str(e).lower()
+                    or "no such file" in str(e).lower()
+                ):
                     return _format_result(
                         {
                             "error": "Vector index not initialized",
@@ -4818,7 +4848,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     }
                 )
             except Exception as e:
-                if "does not exist" in str(e).lower() or "no such file" in str(e).lower():
+                if (
+                    "does not exist" in str(e).lower()
+                    or "no such file" in str(e).lower()
+                ):
                     return _format_result(
                         {
                             "error": "Vector index not initialized",
@@ -5161,11 +5194,62 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             max_commits = arguments.get("max_commits", 100)
             incremental = arguments.get("incremental", True)
 
+            # Collect progress events
+            progress_events = []
+
+            def progress_callback(event):
+                """Collect progress events for MCP response."""
+                progress_events.append(event)
+
+            # Run with progress tracking
             result = populate_all(
-                max_commits=max_commits, incremental=incremental, verbose=False
+                max_commits=max_commits,
+                incremental=incremental,
+                verbose=False,
+                progress_callback=progress_callback,
             )
 
-            return _format_result(result)
+            # Calculate summary statistics
+            total_nodes = sum(
+                [
+                    result.get("git", {}).get("commits", 0),
+                    result.get("git", {}).get("files", 0),
+                    result.get("code", {}).get("symbols", 0),
+                    result.get("tasks", {}).get("tasks", 0),
+                    result.get("plans", {}).get("plans", 0),
+                    result.get("references", {}).get("references", 0),
+                    result.get("wiki", {}).get("documents", 0),
+                    result.get("persons", {}).get("persons", 0),
+                    result.get("dependencies", {}).get("dependencies", 0),
+                    result.get("tests", {}).get("tests", 0),
+                ]
+            )
+
+            total_relationships = sum(
+                [
+                    result.get("git", {}).get("relationships", 0),
+                    result.get("code", {}).get("relationships", 0),
+                    result.get("plans", {}).get("relationships", 0),
+                    result.get("links", {}).get("links_created", 0),
+                    result.get("references", {}).get("relationships", 0),
+                    result.get("wiki", {}).get("relationships", 0),
+                    result.get("persons", {}).get("authored", 0),
+                    result.get("persons", {}).get("owns", 0),
+                    result.get("dependencies", {}).get("relationships", 0),
+                    result.get("tests", {}).get("covers", 0),
+                ]
+            )
+
+            # Return results with progress log and summary
+            return _format_result(
+                {
+                    "results": result,
+                    "progress": progress_events,
+                    "summary": f"Indexed {total_nodes:,} nodes and {total_relationships:,} relationships across 10 steps",
+                    "total_nodes": total_nodes,
+                    "total_relationships": total_relationships,
+                }
+            )
 
         # Advanced graph query handlers (Issue #335)
         elif name == "idlergear_graph_impact_analysis":
