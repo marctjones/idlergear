@@ -84,8 +84,19 @@ class Plan:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Plan":
-        """Create Plan from dictionary."""
-        return cls(**data)
+        """Create Plan from dictionary.
+
+        Filters out unknown fields for backwards compatibility with old plan files.
+        """
+        # Get valid field names from dataclass
+        from dataclasses import fields
+
+        valid_fields = {f.name for f in fields(cls)}
+
+        # Filter data to only include valid fields
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+
+        return cls(**filtered_data)
 
 
 # Storage functions
@@ -134,7 +145,9 @@ def load_plan(name: str, root: Path) -> Plan:
     return Plan.from_dict(data)
 
 
-def list_plans(root: Path, status: Optional[str] = None, type_filter: Optional[str] = None) -> List[Plan]:
+def list_plans(
+    root: Path, status: Optional[str] = None, type_filter: Optional[str] = None
+) -> List[Plan]:
     """List all plans, optionally filtered by status or type.
 
     Args:
@@ -499,7 +512,9 @@ def deprecate_file_in_plan(name: str, file_path: str, root: Path) -> Plan:
     return plan
 
 
-def get_plan_files(name: str, root: Path, include_deprecated: bool = False) -> List[str]:
+def get_plan_files(
+    name: str, root: Path, include_deprecated: bool = False
+) -> List[str]:
     """Get all files associated with a plan.
 
     Args:
@@ -603,7 +618,9 @@ def _update_file_annotation(
 
     except ImportError:
         # File registry not available (tests?)
-        logger.debug(f"File registry not available, skipping annotation for {file_path}")
+        logger.debug(
+            f"File registry not available, skipping annotation for {file_path}"
+        )
     except Exception as e:
         logger.warning(f"Failed to update annotation for {file_path}: {e}")
 
