@@ -34,13 +34,20 @@ def setup_tui_logging(
 
     Args:
         project_name: Name of the project (defaults to current directory name)
-        log_dir: Directory for log files (defaults to ~/.idlergear/logs/)
+        log_dir: Directory for log files (defaults to .idlergear/logs/ in project root)
 
     Returns:
         Configured logger instance
     """
     if log_dir is None:
-        log_dir = Path.home() / ".idlergear" / "logs"
+        from idlergear.config import find_idlergear_root
+
+        project_root = find_idlergear_root()
+        if project_root:
+            log_dir = project_root / ".idlergear" / "logs"
+        else:
+            # Fallback to current directory if not in a project
+            log_dir = Path.cwd() / ".idlergear" / "logs"
 
     log_dir.mkdir(parents=True, exist_ok=True)
 

@@ -91,6 +91,16 @@ class IdlerGearSchema:
         """File annotations for token-efficient discovery: .idlergear/file_annotations/"""
         return self.idlergear_dir / "file_annotations"
 
+    @property
+    def secrets_dir(self) -> Path:
+        """Encrypted secrets storage: .idlergear/secrets/"""
+        return self.idlergear_dir / "secrets"
+
+    @property
+    def logs_dir(self) -> Path:
+        """TUI and daemon logs: .idlergear/logs/"""
+        return self.idlergear_dir / "logs"
+
     # === Specific files ===
 
     @property
@@ -144,6 +154,8 @@ class IdlerGearSchema:
             self.projects_dir,
             self.sync_dir,
             self.file_annotations_dir,
+            self.logs_dir,
+            # Note: secrets_dir not included - created only when secrets initialized
         ]
 
     def get_legacy_directories(self) -> list[Path]:

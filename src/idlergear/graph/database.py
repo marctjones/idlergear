@@ -13,7 +13,7 @@ class GraphDatabase:
     """Manages connection to Kuzu graph database.
 
     The database is project-local, stored at .idlergear/graph.db in the project root.
-    If no project is found, falls back to global ~/.idlergear/graph.db.
+    Requires IdlerGear to be initialized in the project (run 'idlergear init').
 
     Database contains:
     - Tasks, Files, Commits, Symbols (nodes)
@@ -45,12 +45,13 @@ class GraphDatabase:
             if project_path is None:
                 project_path = find_idlergear_root()
 
-            if project_path is not None:
-                # Project-local database
-                db_path = project_path / ".idlergear" / "graph.db"
-            else:
-                # Fallback to global database (no project context)
-                db_path = Path.home() / ".idlergear" / "graph.db"
+            if project_path is None:
+                raise RuntimeError(
+                    "IdlerGear not initialized. Run 'idlergear init' in your project directory first."
+                )
+
+            # Project-local database
+            db_path = project_path / ".idlergear" / "graph.db"
 
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,8 +104,8 @@ _db_instance: Optional[GraphDatabase] = None
 def get_database(db_path: Optional[Path] = None, project_path: Optional[Path] = None) -> GraphDatabase:
     """Get or create database instance.
 
-    By default, uses project-local database at .idlergear/graph.db.
-    Falls back to global ~/.idlergear/graph.db if no project found.
+    Uses project-local database at .idlergear/graph.db.
+    Requires IdlerGear to be initialized (run 'idlergear init').
 
     Args:
         db_path: Optional custom database path (overrides auto-detection)
@@ -112,6 +113,9 @@ def get_database(db_path: Optional[Path] = None, project_path: Optional[Path] = 
 
     Returns:
         GraphDatabase instance
+
+    Raises:
+        RuntimeError: If IdlerGear not initialized in project
 
     Example:
         >>> db = get_database()  # Auto-detects project database

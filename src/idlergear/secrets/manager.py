@@ -37,15 +37,13 @@ class SecretsManager:
         return self.project_path / ".idlergear" / "secrets.json"
 
     @property
-    def global_secrets_dir(self) -> Path:
-        """Path to global secrets storage."""
-        return Path.home() / ".idlergear" / "secrets"
-
-    @property
     def project_secrets_dir(self) -> Path:
-        """Path to this project's secrets storage."""
-        project_id = self._get_or_create_project_id()
-        return self.global_secrets_dir / "projects" / project_id
+        """Path to this project's secrets storage.
+
+        Secrets are stored in .idlergear/secrets/ within the project directory.
+        This keeps secrets project-local while still allowing .gitignore to prevent commits.
+        """
+        return self.project_path / ".idlergear" / "secrets"
 
     def _get_or_create_project_id(self) -> str:
         """Get or create unique project ID."""

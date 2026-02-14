@@ -577,7 +577,7 @@ class IdlerGearApp(App):
             if not project_root:
                 return
 
-            socket_path = Path.home() / ".idlergear" / "daemon.sock"
+            socket_path = project_root / ".idlergear" / "daemon.sock"
             if not socket_path.exists():
                 return
 

@@ -100,6 +100,16 @@ def init_project(path: str = ".") -> None:
         # Add sync state to gitignore (ephemeral)
         if ".idlergear/sync/" not in content:
             additions.append(".idlergear/sync/")
+        # Add secrets to gitignore (contains sensitive data)
+        if ".idlergear/secrets/" not in content:
+            additions.append("\n# IdlerGear secrets (sensitive - don't commit)")
+            additions.append(".idlergear/secrets/")
+        # Add logs to gitignore (ephemeral)
+        if ".idlergear/logs/" not in content:
+            additions.append(".idlergear/logs/")
+        # Add graph database to gitignore (large, project-specific)
+        if ".idlergear/graph.db" not in content:
+            additions.append(".idlergear/graph.db")
 
         if additions:
             with open(gitignore_path, "a") as f:
@@ -122,6 +132,9 @@ def init_project(path: str = ".") -> None:
     typer.echo("  ├── runs/             # Script execution logs")
     typer.echo("  ├── projects/         # Kanban boards")
     typer.echo("  ├── file_annotations/ # File annotations (93% token savings!)")
+    typer.echo("  ├── logs/             # TUI and daemon logs")
+    typer.echo("  ├── graph.db          # Knowledge graph (created on first populate)")
+    typer.echo("  ├── secrets/          # Encrypted secrets (created when initialized)")
     typer.echo("  └── sync/             # External sync state")
     typer.echo("")
     typer.echo("Next steps:")
