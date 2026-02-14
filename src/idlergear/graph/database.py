@@ -12,30 +12,45 @@ except ImportError:
 class GraphDatabase:
     """Manages connection to Kuzu graph database.
 
-    The database is stored at ~/.idlergear/graph.db and contains:
+    The database is project-local, stored at .idlergear/graph.db in the project root.
+    If no project is found, falls back to global ~/.idlergear/graph.db.
+
+    Database contains:
     - Tasks, Files, Commits, Symbols (nodes)
     - Relationships between them (edges)
 
     Example:
-        >>> db = GraphDatabase()
+        >>> db = GraphDatabase()  # Uses project-local database
         >>> conn = db.get_connection()
         >>> result = conn.execute("MATCH (t:Task) RETURN t LIMIT 5")
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, project_path: Optional[Path] = None):
         """Initialize graph database connection.
 
         Args:
-            db_path: Path to database directory. Defaults to ~/.idlergear/graph.db
+            db_path: Path to database directory. If not provided, auto-detects project root.
+            project_path: Project root path. If not provided, auto-detects from current directory.
         """
         if kuzu is None:
             raise ImportError(
                 "Kuzu is not installed. Install with: pip install kuzu>=0.11.3"
             )
 
-        # Default path: ~/.idlergear/graph.db
+        # Auto-detect database path if not provided
         if db_path is None:
-            db_path = Path.home() / ".idlergear" / "graph.db"
+            from idlergear.config import find_idlergear_root
+
+            # Try to find project root
+            if project_path is None:
+                project_path = find_idlergear_root()
+
+            if project_path is not None:
+                # Project-local database
+                db_path = project_path / ".idlergear" / "graph.db"
+            else:
+                # Fallback to global database (no project context)
+                db_path = Path.home() / ".idlergear" / "graph.db"
 
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,23 +100,27 @@ class GraphDatabase:
 _db_instance: Optional[GraphDatabase] = None
 
 
-def get_database(db_path: Optional[Path] = None) -> GraphDatabase:
-    """Get or create global database instance.
+def get_database(db_path: Optional[Path] = None, project_path: Optional[Path] = None) -> GraphDatabase:
+    """Get or create database instance.
+
+    By default, uses project-local database at .idlergear/graph.db.
+    Falls back to global ~/.idlergear/graph.db if no project found.
 
     Args:
-        db_path: Optional custom database path
+        db_path: Optional custom database path (overrides auto-detection)
+        project_path: Optional project root path (for auto-detection)
 
     Returns:
         GraphDatabase instance
 
     Example:
-        >>> db = get_database()
+        >>> db = get_database()  # Auto-detects project database
         >>> conn = db.get_connection()
     """
     global _db_instance
 
     if _db_instance is None:
-        _db_instance = GraphDatabase(db_path)
+        _db_instance = GraphDatabase(db_path, project_path)
 
     return _db_instance
 

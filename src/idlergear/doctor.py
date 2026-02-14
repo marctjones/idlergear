@@ -930,8 +930,8 @@ def check_file_annotations(project_path: Path) -> CheckResult:
 
 def check_knowledge_graph(project_path: Path) -> CheckResult:
     """Check knowledge graph database status."""
-    # Knowledge graph is global, not per-project
-    graph_db = Path.home() / ".idlergear" / "graph.db"
+    # Knowledge graph is project-local (v0.8.0+)
+    graph_db = project_path / ".idlergear" / "graph.db"
 
     if not graph_db.exists():
         return CheckResult(
@@ -959,7 +959,7 @@ def check_knowledge_graph(project_path: Path) -> CheckResult:
         from idlergear.graph import get_database
         from idlergear.graph.schema import get_schema_info
 
-        db = get_database()
+        db = get_database(project_path=project_path)
         info = get_schema_info(db)
         total_nodes = info.get("total_nodes", 0)
 
