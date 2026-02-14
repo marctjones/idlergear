@@ -5963,9 +5963,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_env_active":
             # Show currently active environments (Python, Rust, .NET)
-            import os
-            import sys
-
             environments = []
 
             # Python environment

@@ -99,12 +99,15 @@ def check_initialization(project_path: Path) -> CheckResult:
             fix="idlergear init",
         )
 
-    config_file = idlergear_dir / "config.json"
-    if not config_file.exists():
+    # Check for config file (prefer TOML, fallback to JSON)
+    config_toml = idlergear_dir / "config.toml"
+    config_json = idlergear_dir / "config.json"
+
+    if not config_toml.exists() and not config_json.exists():
         return CheckResult(
             name="initialization",
             status=CheckStatus.WARNING,
-            message="Config file missing - .idlergear/config.json",
+            message="Config file missing - .idlergear/config.toml",
             fix="idlergear init",
         )
 
@@ -679,7 +682,9 @@ def check_documentation_coverage(project_path: Path) -> CheckResult:
             "cli_commands_total": len(coverage.cli_commands),
             "cli_commands_documented": len(coverage.documented_in_readme),
             "undocumented_mcp": [t.name for t in coverage.undocumented_mcp_tools[:5]],
-            "undocumented_cli": [c.full_name for c in coverage.undocumented_cli_commands[:5]],
+            "undocumented_cli": [
+                c.full_name for c in coverage.undocumented_cli_commands[:5]
+            ],
         }
 
         return CheckResult(
