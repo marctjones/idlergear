@@ -10,8 +10,61 @@ from typing import Optional
 from .database import GraphDatabase
 
 
+def validate_schema(db: GraphDatabase) -> tuple[bool, list[str]]:
+    """Check if schema is complete and all expected tables exist.
+
+    Args:
+        db: Graph database instance
+
+    Returns:
+        Tuple of (is_valid, missing_tables)
+        - is_valid: True if all tables exist
+        - missing_tables: List of table names that are missing
+
+    Example:
+        >>> db = get_database()
+        >>> is_valid, missing = validate_schema(db)
+        >>> if not is_valid:
+        >>>     print(f"Missing tables: {missing}")
+    """
+    conn = db.get_connection()
+
+    # All expected node tables
+    expected_tables = [
+        "Task",
+        "Note",
+        "Reference",
+        "Plan",
+        "File",
+        "Symbol",
+        "Commit",
+        "Branch",
+        "Documentation",
+        "Test",
+        "Dependency",
+        "Config",
+        "Error",
+        "PR",
+        "Metric",
+        "Person",
+    ]
+
+    missing = []
+    for table in expected_tables:
+        try:
+            # Try to query the table - will fail if it doesn't exist
+            conn.execute(f"MATCH (n:{table}) RETURN n LIMIT 1")
+        except Exception:
+            missing.append(table)
+
+    return (len(missing) == 0, missing)
+
+
 def initialize_schema(db: GraphDatabase, drop_existing: bool = False) -> None:
     """Initialize graph schema (node and relationship tables).
+
+    Automatically detects and repairs corrupted databases (missing tables).
+    If corruption is detected, the database is rebuilt from scratch.
 
     Args:
         db: Graph database instance
@@ -24,11 +77,33 @@ def initialize_schema(db: GraphDatabase, drop_existing: bool = False) -> None:
     """
     conn = db.get_connection()
 
+    # Check for database corruption (unless we're explicitly rebuilding)
+    if not drop_existing:
+        is_valid, missing = validate_schema(db)
+        if not is_valid:
+            # Corruption detected - some tables exist but others don't
+            print(f"⚠️  Corrupted database detected: {len(missing)} tables missing")
+            print(f"   Missing tables: {', '.join(missing[:5])}")
+            if len(missing) > 5:
+                print(f"   ...and {len(missing) - 5} more")
+            print("   Rebuilding database...")
+            drop_existing = True
+
     if drop_existing:
         _drop_tables(conn)
 
-    _create_node_tables(conn)
-    _create_relationship_tables(conn)
+    # Create tables only if they don't exist
+    # This allows incremental schema updates without corruption
+    try:
+        _create_node_tables(conn)
+        _create_relationship_tables(conn)
+    except Exception as e:
+        # If table creation fails, we're in a bad state - force clean rebuild
+        print(f"⚠️  Error during schema creation: {e}")
+        print("   Attempting clean rebuild...")
+        _drop_tables(conn)
+        _create_node_tables(conn)
+        _create_relationship_tables(conn)
 
 
 def _drop_tables(conn):

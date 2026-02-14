@@ -216,10 +216,20 @@ def _validate_config_type(key: str, value: Any) -> bool:
     return True
 
 
-def get_config_value(key: str, project_path: Path | None = None) -> Any:
+def get_config_value(
+    key: str, project_path: Path | None = None, default: Any = None
+) -> Any:
     """Get a configuration value by dot-notation key (e.g., 'github.token').
 
-    Returns the value from config file, environment variable, or schema default.
+    Returns the value from config file, environment variable, schema default, or provided default.
+
+    Args:
+        key: Dot-notation config key (e.g., 'test.block_on_failure')
+        project_path: Optional project path
+        default: Default value to return if key not found (overrides schema default)
+
+    Returns:
+        Configuration value, or default if not found
     """
     config = load_config(project_path)
 
@@ -240,12 +250,12 @@ def get_config_value(key: str, project_path: Path | None = None) -> Any:
                 if env_value is not None:
                     return env_value
 
-            # Try schema default
+            # Try schema default, then provided default
             default_value = _get_schema_default(key)
             if default_value is not None:
                 return default_value
 
-            return None
+            return default
 
     # Return env var if config value is empty
     if value in (None, "") and key in env_mappings:
@@ -258,6 +268,7 @@ def get_config_value(key: str, project_path: Path | None = None) -> Any:
         default_value = _get_schema_default(key)
         if default_value is not None:
             return default_value
+        return default
 
     return value
 

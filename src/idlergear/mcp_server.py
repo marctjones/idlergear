@@ -4830,7 +4830,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_rag_search":
             try:
                 from idlergear.plugins.llamaindex import LlamaIndexPlugin
-                from idlergear.config import get_config_value
 
                 # Check if plugin is enabled
                 enabled = get_config_value("plugins.llamaindex.enabled", default=False)
@@ -4875,7 +4874,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_rag_index_all":
             try:
                 from idlergear.plugins.llamaindex import LlamaIndexPlugin
-                from idlergear.config import get_config_value
                 from idlergear.reference import list_references
                 from idlergear.notes import list_notes
 
@@ -4926,7 +4924,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_rag_rebuild":
             try:
                 from idlergear.plugins.llamaindex import LlamaIndexPlugin
-                from idlergear.config import get_config_value
 
                 # Check if plugin is enabled
                 enabled = get_config_value("plugins.llamaindex.enabled", default=False)

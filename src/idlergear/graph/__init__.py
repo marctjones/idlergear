@@ -10,7 +10,7 @@ Example:
 """
 
 from .database import get_database, GraphDatabase
-from .schema import initialize_schema
+from .schema import initialize_schema, validate_schema
 from .queries import (
     query_task_context,
     query_file_context,
@@ -35,6 +35,7 @@ __all__ = [
     "get_database",
     "GraphDatabase",
     "initialize_schema",
+    "validate_schema",
     "query_task_context",
     "query_file_context",
     "query_recent_changes",
