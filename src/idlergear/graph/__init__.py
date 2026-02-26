@@ -30,6 +30,7 @@ from .populators import (
     TestPopulator,
 )
 from .visualize import GraphVisualizer
+from .lazy_init import ensure_graph_populated, reset_initialization_flag
 
 __all__ = [
     "get_database",
@@ -52,4 +53,6 @@ __all__ = [
     "DependencyPopulator",
     "TestPopulator",
     "GraphVisualizer",
+    "ensure_graph_populated",
+    "reset_initialization_flag",
 ]

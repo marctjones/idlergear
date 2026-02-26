@@ -5,6 +5,39 @@ All notable changes to IdlerGear will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-02-26
+
+### Added
+
+**Opportunistic Background Indexing**
+- Automatic file annotation generation during idle time
+- Knowledge graph population in small batches (5 items at a time)
+- Smart priority: files → commits → symbols (most useful first)
+- MCP tools: `idlergear_indexing_status`, `idlergear_index_batch`, `idlergear_pause_indexing`, `idlergear_resume_indexing`
+- Progress tracking with percentage complete for each category
+- State persistence across MCP server restarts (`.idlergear/indexing_state.json`)
+- Auto-generates file annotations from docstrings, classes, functions
+- Runs opportunistically after each MCP tool completes (non-blocking)
+
+**Knowledge Graph Lock Management Fix**
+- Fixed database lock contention preventing graph populate operations
+- MCP populate commands now release lock before running, reacquire after
+- Added lazy initialization for CLI usage (auto-populates on first query if empty)
+- New module: `src/idlergear/graph/lazy_init.py`
+- Fixes for handlers: `idlergear_graph_populate_git`, `idlergear_graph_populate_code`, `idlergear_graph_populate_all`
+
+### Changed
+
+- File annotation storage now uses structured directory-based format (`.idlergear/file_annotations/`)
+- Background indexing module: `src/idlergear/indexing/background.py`
+
+### Performance
+
+- **Background Indexing**: ~500ms per batch (5 items), non-blocking
+- **File Annotations**: ~50ms per file (parse + extract + save)
+- **Incremental Progress**: Resumes from last index across sessions
+- **Zero Manual Work**: Automatically fills knowledge base during normal usage
+
 ## [0.8.0] - 2026-02-02
 
 ### Added

@@ -288,6 +288,7 @@ def test_plugin_health_check():
 # LlamaIndex plugin tests
 def test_llamaindex_plugin_initialization():
     """Test LlamaIndex plugin basic initialization."""
+    pytest.importorskip("llama_index")
     from idlergear.plugins.llamaindex import LlamaIndexPlugin
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -312,6 +313,7 @@ def test_llamaindex_plugin_initialization():
 
 def test_llamaindex_plugin_requires_llama_index():
     """Test that LlamaIndex plugin requires llama-index package."""
+    pytest.importorskip("llama_index")
     from idlergear.plugins.llamaindex import LlamaIndexPlugin
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -362,7 +364,10 @@ def test_llamaindex_plugin_search():
             (Path(tmpdir) / ".idlergear").mkdir()
 
             plugin = LlamaIndexPlugin({"embedding_model": "local"})
-            plugin.initialize()
+            try:
+                plugin.initialize()
+            except (ImportError, ModuleNotFoundError):
+                pytest.skip("LlamaIndex dependencies not fully installed (torch, transformers, etc.)")
 
             # Index a reference
             plugin.index_reference(
@@ -404,7 +409,10 @@ def test_llamaindex_plugin_filtered_search():
             (Path(tmpdir) / ".idlergear").mkdir()
 
             plugin = LlamaIndexPlugin({"embedding_model": "local"})
-            plugin.initialize()
+            try:
+                plugin.initialize()
+            except (ImportError, ModuleNotFoundError):
+                pytest.skip("LlamaIndex dependencies not fully installed (torch, transformers, etc.)")
 
             # Index both types
             plugin.index_reference(

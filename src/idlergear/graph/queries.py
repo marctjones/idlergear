@@ -6,6 +6,7 @@ Provides token-efficient queries for context retrieval.
 from typing import Any, Optional, List, Dict
 
 from .database import GraphDatabase
+from .lazy_init import ensure_graph_populated
 
 
 def query_task_context(db: GraphDatabase, task_id: int) -> Dict[str, Any]:
@@ -25,6 +26,12 @@ def query_task_context(db: GraphDatabase, task_id: int) -> Dict[str, Any]:
         >>> print(context['title'])
         >>> print(context['files'])
     """
+    # Lazy initialization: populate graph on first query if empty
+    # NOTE: This won't work from MCP server due to database lock.
+    # MCP server populate commands now release lock before populate.
+    # Skip lazy init if db is provided (e.g., in tests)
+    ensure_graph_populated(db=db, verbose=False)
+
     conn = db.get_connection()
 
     # Get full task context (multi-hop query)
@@ -66,6 +73,10 @@ def query_file_context(db: GraphDatabase, file_path: str) -> Dict[str, Any]:
     Returns:
         Dictionary with file context
     """
+    # Lazy initialization: populate graph on first query if empty
+    # Skip lazy init if db is provided (e.g., in tests)
+    ensure_graph_populated(db=db, verbose=False)
+
     conn = db.get_connection()
 
     # Get file context
@@ -195,6 +206,10 @@ def query_symbols_by_name(db: GraphDatabase, name_pattern: str, limit: int = 10)
         >>> for sym in symbols:
         >>>     print(f"{sym['name']} in {sym['file']} at line {sym['line']}")
     """
+    # Lazy initialization: populate graph on first query if empty
+    # Skip lazy init if db is provided (e.g., in tests)
+    ensure_graph_populated(db=db, verbose=False)
+
     conn = db.get_connection()
 
     # Case-insensitive search

@@ -21,17 +21,17 @@ def llamaindex_plugin(temp_llamaindex_storage, monkeypatch):
     """Create LlamaIndex plugin instance for testing."""
     try:
         from idlergear.plugins.llamaindex import LlamaIndexPlugin
+
+        # Mock Path.cwd() to return temp directory
+        monkeypatch.setattr(Path, "cwd", lambda: temp_llamaindex_storage.parent.parent)
+
+        config = {"embedding_model": "local"}
+        plugin = LlamaIndexPlugin(config)
+        plugin.initialize()
+        yield plugin
+        plugin.shutdown()
     except ImportError:
         pytest.skip("LlamaIndex not installed (optional dependency)")
-
-    # Mock Path.cwd() to return temp directory
-    monkeypatch.setattr(Path, "cwd", lambda: temp_llamaindex_storage.parent.parent)
-
-    config = {"embedding_model": "local"}
-    plugin = LlamaIndexPlugin(config)
-    plugin.initialize()
-    yield plugin
-    plugin.shutdown()
 
 
 class TestLlamaIndexPlugin:

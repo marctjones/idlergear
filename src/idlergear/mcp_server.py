@@ -32,6 +32,9 @@ _current_session_id: str | None = None
 _registry_cache: dict[str, Any] = {}
 _registry_cache_lock = asyncio.Lock()
 
+# Background indexing flag (prevent recursive indexing)
+_indexing_in_progress = False
+
 
 def _get_cached_registry(registry_path: Path | None = None) -> Any:
     """Get cached FileRegistry instance or create new one.
@@ -132,6 +135,36 @@ async def _broadcast_registry_change(
     except Exception:
         # Don't let broadcast failures break registry operations
         pass
+
+
+def _run_opportunistic_indexing() -> None:
+    """Run opportunistic background indexing after tool completion.
+
+    Checks if indexing work is available and processes a small batch (5 items)
+    if the system is idle. Prevents recursive indexing calls.
+    """
+    global _indexing_in_progress
+
+    # Prevent recursive indexing
+    if _indexing_in_progress:
+        return
+
+    try:
+        _indexing_in_progress = True
+
+        from idlergear.indexing import should_run_indexing, index_next_batch
+
+        # Check if indexing work available
+        if should_run_indexing():
+            # Process small batch (5 items)
+            # This happens silently in background
+            index_next_batch(batch_size=5, target="auto")
+
+    except Exception:
+        # Don't let indexing failures break normal tool operations
+        pass
+    finally:
+        _indexing_in_progress = False
 
 
 # PID file for external reload triggers
@@ -3924,6 +3957,51 @@ This ensures messages don't derail your work - only context ones are shown immed
                 },
             },
         ),
+        # Background indexing tools (NEW v0.8.8)
+        Tool(
+            name="idlergear_indexing_status",
+            description="Get status of background indexing. Shows progress on file annotations, knowledge graph commits, and symbols.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="idlergear_index_batch",
+            description="Manually trigger indexing of a small batch. Processes 5 items (files, commits, or symbols) at a time.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "batch_size": {
+                        "type": "integer",
+                        "description": "Number of items to process (default: 5)",
+                        "default": 5,
+                    },
+                    "target": {
+                        "type": "string",
+                        "enum": ["auto", "files", "commits", "symbols"],
+                        "description": "What to index (default: auto)",
+                        "default": "auto",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="idlergear_pause_indexing",
+            description="Pause automatic background indexing. Useful when running performance-critical operations.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
+        Tool(
+            name="idlergear_resume_indexing",
+            description="Resume automatic background indexing after pausing.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
         # Plugin tools (NEW v0.8.0)
         Tool(
             name="idlergear_plugin_list",
@@ -4359,8 +4437,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         # Plan handlers (using backend)
         elif name == "idlergear_plan_create":
             from datetime import datetime
-
             from idlergear.plans import create_plan
+            from idlergear.config import find_idlergear_root as get_root
+
+            root = get_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
 
             plan = create_plan(
                 name=arguments["name"],
@@ -4375,6 +4457,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_plan_list":
             from idlergear.plans import list_plans
+            from idlergear.config import find_idlergear_root as get_root
+
+            root = get_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
 
             plans = list_plans(
                 root=root,
@@ -4386,6 +4473,11 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_plan_show":
             from idlergear.plans import load_plan
+            from idlergear.config import find_idlergear_root as get_root
+
+            root = get_root()
+            if not root:
+                raise ValueError("IdlerGear not initialized")
 
             plan = load_plan(arguments["name"], root)
             return _format_result(plan.to_dict())
@@ -4995,60 +5087,80 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_graph_populate_git":
             from idlergear.graph import get_database
+            from idlergear.graph.database import reset_database
             from idlergear.graph.populators import GitPopulator
             from idlergear.graph.schema import initialize_schema
 
-            db = get_database()
-            # Ensure schema exists
+            # Release database lock before populate to avoid lock contention
+            reset_database()
+
             try:
-                from idlergear.graph.schema import get_schema_info
+                # Populate will create its own connection
+                db = get_database()
+                # Ensure schema exists
+                try:
+                    from idlergear.graph.schema import get_schema_info
 
-                get_schema_info(db)
-            except Exception:
-                initialize_schema(db)
+                    get_schema_info(db)
+                except Exception:
+                    initialize_schema(db)
 
-            populator = GitPopulator(db)
-            result = populator.populate(
-                max_commits=arguments.get("max_commits", 100),
-                since=arguments.get("since"),
-                incremental=arguments.get("incremental", True),
-            )
-            return _format_result(
-                {
-                    "status": "completed",
-                    "commits_indexed": result["commits"],
-                    "files_indexed": result["files"],
-                    "relationships_created": result["relationships"],
-                }
-            )
+                populator = GitPopulator(db)
+                result = populator.populate(
+                    max_commits=arguments.get("max_commits", 100),
+                    since=arguments.get("since"),
+                    incremental=arguments.get("incremental", True),
+                )
+                return _format_result(
+                    {
+                        "status": "completed",
+                        "commits_indexed": result["commits"],
+                        "files_indexed": result["files"],
+                        "relationships_created": result["relationships"],
+                    }
+                )
+            finally:
+                # Reacquire connection for subsequent queries
+                # (get_database() will create new instance on next call)
+                pass
 
         elif name == "idlergear_graph_populate_code":
             from idlergear.graph import get_database
+            from idlergear.graph.database import reset_database
             from idlergear.graph.populators import CodePopulator
             from idlergear.graph.schema import initialize_schema
 
-            db = get_database()
-            # Ensure schema exists
+            # Release database lock before populate to avoid lock contention
+            reset_database()
+
             try:
-                from idlergear.graph.schema import get_schema_info
+                # Populate will create its own connection
+                db = get_database()
+                # Ensure schema exists
+                try:
+                    from idlergear.graph.schema import get_schema_info
 
-                get_schema_info(db)
-            except Exception:
-                initialize_schema(db)
+                    get_schema_info(db)
+                except Exception:
+                    initialize_schema(db)
 
-            populator = CodePopulator(db)
-            result = populator.populate_directory(
-                directory=arguments.get("directory", "src"),
-                incremental=arguments.get("incremental", True),
-            )
-            return _format_result(
-                {
-                    "status": "completed",
-                    "files_processed": result["files"],
-                    "symbols_indexed": result["symbols"],
-                    "relationships_created": result["relationships"],
-                }
-            )
+                populator = CodePopulator(db)
+                result = populator.populate_directory(
+                    directory=arguments.get("directory", "src"),
+                    incremental=arguments.get("incremental", True),
+                )
+                return _format_result(
+                    {
+                        "status": "completed",
+                        "files_processed": result["files"],
+                        "symbols_indexed": result["symbols"],
+                        "relationships_created": result["relationships"],
+                    }
+                )
+            finally:
+                # Reacquire connection for subsequent queries
+                # (get_database() will create new instance on next call)
+                pass
 
         elif name == "idlergear_graph_schema_info":
             from idlergear.graph import get_database
@@ -5190,66 +5302,75 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
         elif name == "idlergear_graph_populate_all":
             from idlergear.graph import populate_all
+            from idlergear.graph.database import reset_database
 
-            max_commits = arguments.get("max_commits", 100)
-            incremental = arguments.get("incremental", True)
+            # Release database lock before populate to avoid lock contention
+            reset_database()
 
-            # Collect progress events
-            progress_events = []
+            try:
+                max_commits = arguments.get("max_commits", 100)
+                incremental = arguments.get("incremental", True)
 
-            def progress_callback(event):
-                """Collect progress events for MCP response."""
-                progress_events.append(event)
+                # Collect progress events
+                progress_events = []
 
-            # Run with progress tracking
-            result = populate_all(
-                max_commits=max_commits,
-                incremental=incremental,
-                verbose=False,
-                progress_callback=progress_callback,
-            )
+                def progress_callback(event):
+                    """Collect progress events for MCP response."""
+                    progress_events.append(event)
 
-            # Calculate summary statistics
-            total_nodes = sum(
-                [
-                    result.get("git", {}).get("commits", 0),
-                    result.get("git", {}).get("files", 0),
-                    result.get("code", {}).get("symbols", 0),
-                    result.get("tasks", {}).get("tasks", 0),
-                    result.get("plans", {}).get("plans", 0),
-                    result.get("references", {}).get("references", 0),
-                    result.get("wiki", {}).get("documents", 0),
-                    result.get("persons", {}).get("persons", 0),
-                    result.get("dependencies", {}).get("dependencies", 0),
-                    result.get("tests", {}).get("tests", 0),
-                ]
-            )
+                # Run with progress tracking
+                result = populate_all(
+                    max_commits=max_commits,
+                    incremental=incremental,
+                    verbose=False,
+                    progress_callback=progress_callback,
+                )
 
-            total_relationships = sum(
-                [
-                    result.get("git", {}).get("relationships", 0),
-                    result.get("code", {}).get("relationships", 0),
-                    result.get("plans", {}).get("relationships", 0),
-                    result.get("links", {}).get("links_created", 0),
-                    result.get("references", {}).get("relationships", 0),
-                    result.get("wiki", {}).get("relationships", 0),
-                    result.get("persons", {}).get("authored", 0),
-                    result.get("persons", {}).get("owns", 0),
-                    result.get("dependencies", {}).get("relationships", 0),
-                    result.get("tests", {}).get("covers", 0),
-                ]
-            )
+                # Calculate summary statistics
+                total_nodes = sum(
+                    [
+                        result.get("git", {}).get("commits", 0),
+                        result.get("git", {}).get("files", 0),
+                        result.get("code", {}).get("symbols", 0),
+                        result.get("tasks", {}).get("tasks", 0),
+                        result.get("plans", {}).get("plans", 0),
+                        result.get("references", {}).get("references", 0),
+                        result.get("wiki", {}).get("documents", 0),
+                        result.get("persons", {}).get("persons", 0),
+                        result.get("dependencies", {}).get("dependencies", 0),
+                        result.get("tests", {}).get("tests", 0),
+                    ]
+                )
 
-            # Return results with progress log and summary
-            return _format_result(
-                {
-                    "results": result,
-                    "progress": progress_events,
-                    "summary": f"Indexed {total_nodes:,} nodes and {total_relationships:,} relationships across 10 steps",
-                    "total_nodes": total_nodes,
-                    "total_relationships": total_relationships,
-                }
-            )
+                total_relationships = sum(
+                    [
+                        result.get("git", {}).get("relationships", 0),
+                        result.get("code", {}).get("relationships", 0),
+                        result.get("plans", {}).get("relationships", 0),
+                        result.get("links", {}).get("links_created", 0),
+                        result.get("references", {}).get("relationships", 0),
+                        result.get("wiki", {}).get("relationships", 0),
+                        result.get("persons", {}).get("authored", 0),
+                        result.get("persons", {}).get("owns", 0),
+                        result.get("dependencies", {}).get("relationships", 0),
+                        result.get("tests", {}).get("covers", 0),
+                    ]
+                )
+
+                # Return results with progress log and summary
+                return _format_result(
+                    {
+                        "results": result,
+                        "progress": progress_events,
+                        "summary": f"Indexed {total_nodes:,} nodes and {total_relationships:,} relationships across 10 steps",
+                        "total_nodes": total_nodes,
+                        "total_relationships": total_relationships,
+                    }
+                )
+            finally:
+                # Reacquire connection for subsequent queries
+                # (get_database() will create new instance on next call)
+                pass
 
         # Advanced graph query handlers (Issue #335)
         elif name == "idlergear_graph_impact_analysis":
@@ -7594,6 +7715,34 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             return _format_result(result)
 
+        # Background indexing handlers (NEW v0.8.8)
+        elif name == "idlergear_indexing_status":
+            from idlergear.indexing import get_indexing_status
+
+            status = get_indexing_status()
+            return _format_result(status)
+
+        elif name == "idlergear_index_batch":
+            from idlergear.indexing import index_next_batch
+
+            batch_size = arguments.get("batch_size", 5)
+            target = arguments.get("target", "auto")
+
+            result = index_next_batch(batch_size=batch_size, target=target)
+            return _format_result(result)
+
+        elif name == "idlergear_pause_indexing":
+            from idlergear.indexing import pause_indexing
+
+            result = pause_indexing()
+            return _format_result(result)
+
+        elif name == "idlergear_resume_indexing":
+            from idlergear.indexing import resume_indexing
+
+            result = resume_indexing()
+            return _format_result(result)
+
         # Plugin handlers (NEW v0.8.0)
         elif name == "idlergear_plugin_list":
             from idlergear.plugins import (
@@ -8122,6 +8271,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
     except Exception as e:
         return [TextContent(type="text", text=f"Error: {str(e)}")]
+    finally:
+        # Opportunistic indexing after tool completion
+        # Process 5 items (files, commits, or symbols) if work available
+        _run_opportunistic_indexing()
 
 
 async def _subscribe_to_registry_events():
