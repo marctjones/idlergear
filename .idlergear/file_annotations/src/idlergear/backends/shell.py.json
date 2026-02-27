@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Shell-based backend implementation.",
+  "tags": [],
+  "components": [
+    "ShellBackendError",
+    "ShellTaskBackend",
+    "create",
+    "list",
+    "get",
+    "update",
+    "close",
+    "reopen",
+    "ShellExploreBackend",
+    "create"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/backends/shell.py",
+  "created": "2026-02-26T22:12:43.094688-05:00",
+  "updated": "2026-02-26T22:12:43.094688-05:00"
+}

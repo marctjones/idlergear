@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Documentation generation for Python projects.",
+  "tags": [],
+  "components": [
+    "ParameterDoc",
+    "to_dict",
+    "FunctionDoc",
+    "to_dict",
+    "ClassDoc",
+    "to_dict",
+    "ModuleDoc",
+    "to_dict",
+    "to_json",
+    "check_pdoc_available"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/docs.py",
+  "created": "2026-02-26T22:12:29.058504-05:00",
+  "updated": "2026-02-26T22:12:29.058504-05:00"
+}

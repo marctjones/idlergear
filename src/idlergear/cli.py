@@ -108,6 +108,7 @@ plugin_app = typer.Typer(
 )
 graph_app = typer.Typer(help="Knowledge graph queries and population")
 knowledge_app = typer.Typer(help="Knowledge decay and relevance management")
+index_app = typer.Typer(help="Background indexing for file annotations and knowledge graph")
 upstream_app = typer.Typer(help="Report bugs and features to IdlerGear upstream")
 
 app.add_typer(task_app, name="task")
@@ -134,6 +135,7 @@ app.add_typer(file_app, name="file")
 app.add_typer(plugin_app, name="plugin")
 app.add_typer(graph_app, name="graph")
 app.add_typer(knowledge_app, name="knowledge")
+app.add_typer(index_app, name="index")
 app.add_typer(upstream_app, name="upstream")
 
 
@@ -13149,6 +13151,248 @@ def rag_rebuild(
         raise typer.Exit(1)
     except Exception as e:
         typer.secho(f"❌ Error: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+
+# ============================================================================
+# Background Indexing Commands
+# ============================================================================
+
+
+@index_app.command("status")
+def index_status(ctx: typer.Context):
+    """Show background indexing status (file annotations, commits, symbols)."""
+    try:
+        from idlergear.indexing import get_indexing_status
+
+        status = get_indexing_status()
+
+        if ctx.obj.output_format == OutputFormat.JSON:
+            display(status, ctx.obj.output_format, "index_status")
+        else:
+            # Human-readable output
+            typer.secho("\n📊 Background Indexing Status\n", fg=typer.colors.CYAN, bold=True)
+
+            # Overall status
+            paused_status = "⏸️  PAUSED" if status["paused"] else "▶️  ACTIVE"
+            typer.echo(f"Status: {paused_status}")
+            if status["last_run"]:
+                typer.echo(f"Last Run: {status['last_run']}")
+            typer.echo()
+
+            # File annotations
+            file_stats = status["file_annotations"]
+            typer.secho("📝 File Annotations", bold=True)
+            typer.echo(f"  Progress: {file_stats['percent_complete']}% complete")
+            typer.echo(f"  Annotated: {file_stats['annotated']} / {file_stats['total_files']} files")
+            typer.echo(f"  Remaining: {file_stats['unannotated']} files")
+            typer.echo(f"  Benefit: 93% token savings on file searches")
+            typer.echo()
+
+            # Knowledge graph - commits
+            commit_stats = status["knowledge_graph"]["commits"]
+            typer.secho("🗂️  Git Commits", bold=True)
+            typer.echo(f"  Progress: {commit_stats['percent_complete']}% complete")
+            typer.echo(f"  Indexed: {commit_stats['indexed']} / {commit_stats['estimated_total']} commits")
+            typer.echo(f"  Remaining: {commit_stats['remaining']} commits")
+            typer.echo()
+
+            # Knowledge graph - symbols
+            symbol_stats = status["knowledge_graph"]["symbols"]
+            typer.secho("🔍 Code Symbols", bold=True)
+            typer.echo(f"  Progress: {symbol_stats['percent_complete']}% complete")
+            typer.echo(f"  Indexed: {symbol_stats['indexed']} / {symbol_stats['estimated_total']} symbols")
+            typer.echo(f"  Remaining: {symbol_stats['remaining']} symbols")
+            typer.echo()
+
+            # Graph stats
+            graph_stats = status["knowledge_graph"]
+            typer.secho("📊 Graph Stats", bold=True)
+            typer.echo(f"  Files: {graph_stats['files_in_graph']} tracked")
+            typer.echo(f"  Relationships: {graph_stats['relationships']} created")
+            typer.echo()
+
+            # Summary
+            summary = status["summary"]
+            typer.secho("📈 Summary", bold=True)
+            typer.echo(f"  Total work remaining: {summary['total_work_remaining']} items")
+            typer.echo(f"  Estimated batches: {summary['estimated_batches_remaining']} (at 5 items/batch)")
+            typer.echo()
+
+            if summary['total_work_remaining'] == 0:
+                typer.secho("✅ All indexing complete!", fg=typer.colors.GREEN)
+            elif status["paused"]:
+                typer.secho("⏸️  Indexing paused. Resume with: idlergear index resume", fg=typer.colors.YELLOW)
+            else:
+                typer.echo("💡 Indexing runs automatically after each MCP tool call")
+                typer.echo("   Or manually run: idlergear index run --batches N")
+
+    except Exception as e:
+        typer.secho(f"Failed to get indexing status: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@index_app.command("run")
+def index_run(
+    ctx: typer.Context,
+    batches: int = typer.Option(
+        1, "--batches", "-n", help="Number of batches to process (5 items per batch)"
+    ),
+    batch_size: int = typer.Option(
+        5, "--batch-size", "-b", help="Items per batch (default: 5)"
+    ),
+    target: str = typer.Option(
+        "auto",
+        "--target",
+        "-t",
+        help="What to index: auto, files, commits, symbols",
+    ),
+):
+    """Manually run background indexing.
+
+    Process a specified number of batches to fill in file annotations and knowledge graph.
+    By default, automatically prioritizes: files > commits > symbols.
+
+    Examples:
+        # Process 1 batch (5 items) automatically
+        idlergear index run
+
+        # Process 10 batches (50 items total)
+        idlergear index run --batches 10
+
+        # Process files only with larger batches
+        idlergear index run --target files --batch-size 10 --batches 5
+
+        # Process everything remaining (may take a while!)
+        idlergear index run --batches 1000
+    """
+    try:
+        from idlergear.indexing import index_next_batch, get_indexing_status
+
+        typer.echo(f"🔄 Running {batches} batches ({batch_size} items each, target: {target})...\n")
+
+        total_files = 0
+        total_commits = 0
+        total_symbols = 0
+        errors = []
+
+        for i in range(batches):
+            # Check if work remaining
+            status = get_indexing_status()
+            if status["summary"]["total_work_remaining"] == 0:
+                typer.secho(f"\n✅ All indexing complete after {i} batches!", fg=typer.colors.GREEN)
+                break
+
+            # Run batch
+            result = index_next_batch(batch_size=batch_size, target=target)
+
+            if result.get("completed"):
+                typer.secho(f"\n✅ {result.get('message')}", fg=typer.colors.GREEN)
+                break
+
+            if result.get("skipped"):
+                typer.secho(f"\n⏸️  {result.get('reason')}", fg=typer.colors.YELLOW)
+                break
+
+            # Track progress
+            batch_target = result.get("target", target)
+            if batch_target == "files":
+                files_done = result.get("files_annotated", 0)
+                total_files += files_done
+                typer.echo(f"Batch {i+1}: Annotated {files_done} files")
+            elif batch_target == "commits":
+                commits_done = result.get("commits_indexed", 0)
+                total_commits += commits_done
+                typer.echo(f"Batch {i+1}: Indexed {commits_done} commits")
+            elif batch_target == "symbols":
+                symbols_done = result.get("symbols_indexed", 0)
+                total_symbols += symbols_done
+                typer.echo(f"Batch {i+1}: Indexed {symbols_done} symbols")
+
+            if result.get("errors"):
+                errors.extend(result.get("errors"))
+
+        # Summary
+        typer.echo()
+        typer.secho("📊 Summary:", bold=True)
+        if total_files > 0:
+            typer.echo(f"  Files annotated: {total_files}")
+        if total_commits > 0:
+            typer.echo(f"  Commits indexed: {total_commits}")
+        if total_symbols > 0:
+            typer.echo(f"  Symbols indexed: {total_symbols}")
+
+        if errors:
+            typer.echo()
+            typer.secho(f"⚠️  {len(errors)} errors occurred:", fg=typer.colors.YELLOW)
+            for error in errors[:5]:  # Show first 5 errors
+                typer.echo(f"  {error.get('file', 'unknown')}: {error.get('error')}")
+            if len(errors) > 5:
+                typer.echo(f"  ... and {len(errors) - 5} more")
+
+        # Show remaining work
+        status = get_indexing_status()
+        remaining = status["summary"]["total_work_remaining"]
+        if remaining > 0:
+            typer.echo()
+            typer.echo(f"💡 {remaining} items remaining")
+            typer.echo(f"   Run again with: idlergear index run --batches {min(remaining // batch_size + 1, 10)}")
+        else:
+            typer.echo()
+            typer.secho("✅ All indexing complete!", fg=typer.colors.GREEN)
+
+    except Exception as e:
+        typer.secho(f"Failed to run indexing: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@index_app.command("pause")
+def index_pause(ctx: typer.Context):
+    """Pause automatic background indexing.
+
+    Useful during performance-critical operations or when you want to
+    temporarily disable automatic indexing after tool calls.
+
+    Resume with: idlergear index resume
+    """
+    try:
+        from idlergear.indexing import pause_indexing
+
+        result = pause_indexing()
+
+        if ctx.obj.output_format == OutputFormat.JSON:
+            display(result, ctx.obj.output_format, "index_pause")
+        else:
+            typer.secho("\n⏸️  Background indexing paused", fg=typer.colors.YELLOW)
+            typer.echo("\nAutomatic indexing will not run after MCP tool calls.")
+            typer.echo("Resume with: idlergear index resume")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to pause indexing: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+
+@index_app.command("resume")
+def index_resume(ctx: typer.Context):
+    """Resume automatic background indexing.
+
+    Re-enables indexing after it was paused with 'idlergear index pause'.
+    """
+    try:
+        from idlergear.indexing import resume_indexing
+
+        result = resume_indexing()
+
+        if ctx.obj.output_format == OutputFormat.JSON:
+            display(result, ctx.obj.output_format, "index_resume")
+        else:
+            typer.secho("\n▶️  Background indexing resumed", fg=typer.colors.GREEN)
+            typer.echo("\nAutomatic indexing will now run after each MCP tool call.")
+            typer.echo()
+
+    except Exception as e:
+        typer.secho(f"Failed to resume indexing: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
 

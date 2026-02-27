@@ -1,0 +1,22 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Background indexing system for opportunistic idle-time processing.",
+  "tags": [],
+  "components": [
+    "get_indexing_status",
+    "index_next_batch",
+    "should_run_indexing",
+    "pause_indexing",
+    "resume_indexing"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/indexing/background.py",
+  "created": "2026-02-26T22:08:38.269818-05:00",
+  "updated": "2026-02-26T22:08:38.269818-05:00"
+}

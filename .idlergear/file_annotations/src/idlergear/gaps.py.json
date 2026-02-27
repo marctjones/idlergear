@@ -1,0 +1,21 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Knowledge gap detection module.",
+  "tags": [],
+  "components": [
+    "KnowledgeGap",
+    "detect_gaps",
+    "auto_fix_gap",
+    "gap_report"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/gaps.py",
+  "created": "2026-02-26T22:12:43.213241-05:00",
+  "updated": "2026-02-26T22:12:43.213241-05:00"
+}

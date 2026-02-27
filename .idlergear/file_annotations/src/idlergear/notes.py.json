@@ -1,0 +1,25 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Note management for IdlerGear.",
+  "tags": [],
+  "components": [
+    "get_notes_dir",
+    "create_note",
+    "list_notes",
+    "load_note_from_file",
+    "get_note",
+    "update_note",
+    "delete_note",
+    "promote_note"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/notes.py",
+  "created": "2026-02-26T22:12:43.340323-05:00",
+  "updated": "2026-02-26T22:12:43.340323-05:00"
+}

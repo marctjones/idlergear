@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Test framework detection and result tracking for IdlerGear.",
+  "tags": [],
+  "components": [
+    "TestFramework",
+    "TestResult",
+    "to_dict",
+    "from_dict",
+    "TestConfig",
+    "to_dict",
+    "from_dict",
+    "get_tests_dir",
+    "detect_framework",
+    "get_test_config"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/testing.py",
+  "created": "2026-02-26T22:12:43.466080-05:00",
+  "updated": "2026-02-26T22:12:43.466080-05:00"
+}

@@ -228,33 +228,35 @@ class TestCallToolPlan:
 
     @pytest.mark.asyncio
     async def test_plan_create(self, mcp_project):
-        result = await call_tool("idlergear_plan_create", {"name": "my-plan"})
+        result = await call_tool("idlergear_plan_create", {"name": "my-plan", "description": "My Plan"})
 
         data = json.loads(result[0].text)
         assert data["name"] == "my-plan"
 
     @pytest.mark.asyncio
     async def test_plan_list(self, mcp_project):
-        await call_tool("idlergear_plan_create", {"name": "plan-a"})
-        await call_tool("idlergear_plan_create", {"name": "plan-b"})
+        await call_tool("idlergear_plan_create", {"name": "plan-a", "description": "Plan A"})
+        await call_tool("idlergear_plan_create", {"name": "plan-b", "description": "Plan B"})
 
         result = await call_tool("idlergear_plan_list", {})
 
         data = json.loads(result[0].text)
         assert len(data) == 2
 
+    @pytest.mark.skip(reason="plan_switch removed in v0.8.0 Plan Objects API - no current plan concept")
     @pytest.mark.asyncio
     async def test_plan_switch(self, mcp_project):
-        await call_tool("idlergear_plan_create", {"name": "my-plan"})
+        await call_tool("idlergear_plan_create", {"name": "my-plan", "description": "My Plan"})
 
         result = await call_tool("idlergear_plan_switch", {"name": "my-plan"})
 
         data = json.loads(result[0].text)
         assert data["name"] == "my-plan"
 
+    @pytest.mark.skip(reason="plan_switch removed in v0.8.0 Plan Objects API - no current plan concept")
     @pytest.mark.asyncio
     async def test_plan_show_current(self, mcp_project):
-        await call_tool("idlergear_plan_create", {"name": "my-plan"})
+        await call_tool("idlergear_plan_create", {"name": "my-plan", "description": "My Plan"})
         await call_tool("idlergear_plan_switch", {"name": "my-plan"})
 
         result = await call_tool("idlergear_plan_show", {})

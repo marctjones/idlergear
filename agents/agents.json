@@ -42,5 +42,83 @@
     "working_files": [],
     "current_task_id": null,
     "ai_state": {}
+  },
+  "claude-code-20260223-200127": {
+    "agent_id": "claude-code-20260223-200127",
+    "agent_type": "claude-code",
+    "connected_at": "2026-02-24T01:01:27.928193+00:00",
+    "last_heartbeat": "2026-02-24T01:01:27.928193+00:00",
+    "connection_id": 2,
+    "status": "active",
+    "current_task": null,
+    "capabilities": [
+      "task_management",
+      "file_operations",
+      "code_analysis",
+      "ai_state_reporting",
+      "knowledge_management"
+    ],
+    "metadata": {
+      "version": "0.8.7",
+      "pid": 1272799,
+      "started_at": "2026-02-23T20:01:27.927923"
+    },
+    "session_id": null,
+    "session_name": null,
+    "working_files": [],
+    "current_task_id": null,
+    "ai_state": {}
+  },
+  "claude-code-20260226-162014": {
+    "agent_id": "claude-code-20260226-162014",
+    "agent_type": "claude-code",
+    "connected_at": "2026-02-26T21:20:14.275916+00:00",
+    "last_heartbeat": "2026-02-26T21:20:14.275916+00:00",
+    "connection_id": 4,
+    "status": "active",
+    "current_task": null,
+    "capabilities": [
+      "task_management",
+      "file_operations",
+      "code_analysis",
+      "ai_state_reporting",
+      "knowledge_management"
+    ],
+    "metadata": {
+      "version": "0.8.7",
+      "pid": 1880687,
+      "started_at": "2026-02-26T16:20:14.221657"
+    },
+    "session_id": null,
+    "session_name": null,
+    "working_files": [],
+    "current_task_id": null,
+    "ai_state": {}
+  },
+  "claude-code-20260226-220940": {
+    "agent_id": "claude-code-20260226-220940",
+    "agent_type": "claude-code",
+    "connected_at": "2026-02-27T03:09:40.221931+00:00",
+    "last_heartbeat": "2026-02-27T03:09:40.221931+00:00",
+    "connection_id": 6,
+    "status": "active",
+    "current_task": null,
+    "capabilities": [
+      "task_management",
+      "file_operations",
+      "code_analysis",
+      "ai_state_reporting",
+      "knowledge_management"
+    ],
+    "metadata": {
+      "version": "0.8.7",
+      "pid": 1961795,
+      "started_at": "2026-02-26T22:09:40.221381"
+    },
+    "session_id": null,
+    "session_name": null,
+    "working_files": [],
+    "current_task_id": null,
+    "ai_state": {}
   }
 }

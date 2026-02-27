@@ -1,0 +1,21 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Populates graph database with Person nodes from git commit authors.",
+  "tags": [
+    "graph"
+  ],
+  "components": [
+    "PersonPopulator",
+    "populate"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/graph/populators/person_populator.py",
+  "created": "2026-02-26T22:12:43.863160-05:00",
+  "updated": "2026-02-26T22:12:43.863160-05:00"
+}

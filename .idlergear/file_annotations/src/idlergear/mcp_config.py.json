@@ -1,0 +1,29 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "MCP configuration management for AI assistant integrations.",
+  "tags": [
+    "mcp"
+  ],
+  "components": [
+    "McpServerConfig",
+    "to_dict",
+    "McpConfig",
+    "to_dict",
+    "from_dict",
+    "from_file",
+    "save",
+    "get_idlergear_mcp_config",
+    "get_project_mcp_path",
+    "get_claude_code_config_path"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/mcp_config.py",
+  "created": "2026-02-26T22:08:38.271430-05:00",
+  "updated": "2026-02-26T22:08:38.271430-05:00"
+}

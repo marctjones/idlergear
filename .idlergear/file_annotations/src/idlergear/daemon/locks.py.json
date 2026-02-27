@@ -1,0 +1,19 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Write locking system for coordinated multi-agent writes.",
+  "tags": [],
+  "components": [
+    "Lock",
+    "LockManager"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/daemon/locks.py",
+  "created": "2026-02-26T22:12:43.594863-05:00",
+  "updated": "2026-02-26T22:12:43.594863-05:00"
+}

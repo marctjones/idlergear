@@ -416,36 +416,40 @@ class TestFormatPlan:
         """Test formatting basic plan."""
         plan = {
             "name": "v1",
-            "title": "Version 1",
-            "state": "active",
+            "description": "Version 1",
+            "status": "active",
+            "type": "milestone",
             "created": "2025-01-01",
         }
         format_plan(plan)
         captured = capsys.readouterr()
         assert "Plan: v1" in captured.out
-        assert "Title: Version 1" in captured.out
-        assert "State: active" in captured.out
+        assert "Description: Version 1" in captured.out
+        assert "Status: active" in captured.out
+        assert "Type: milestone" in captured.out
         assert "Created: 2025-01-01" in captured.out
 
     def test_format_plan_with_github_project(self, capsys):
         """Test formatting plan with GitHub project."""
         plan = {
             "name": "v1",
-            "title": "Version 1",
-            "state": "active",
+            "description": "Version 1",
+            "status": "active",
+            "type": "milestone",
             "created": "2025-01-01",
-            "github_project": 123,
+            "github_project_id": 123,
         }
         format_plan(plan)
         captured = capsys.readouterr()
-        assert "GitHub: Project #123" in captured.out
+        assert "GitHub: Project 123" in captured.out
 
     def test_format_plan_with_body(self, capsys):
         """Test formatting plan with body."""
         plan = {
             "name": "v1",
-            "title": "Version 1",
-            "state": "active",
+            "description": "Version 1",
+            "status": "active",
+            "type": "milestone",
             "created": "2025-01-01",
             "body": "Plan description here.",
         }

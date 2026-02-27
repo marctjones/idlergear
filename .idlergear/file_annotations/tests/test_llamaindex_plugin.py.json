@@ -1,0 +1,29 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Test suite for LlamaIndex RAG plugin. Tests initialization, indexing references and notes, semantic search with filters, and index rebuilding. Uses fixtures to handle optional dependencies gracefully.",
+  "tags": [
+    "test",
+    "llamaindex",
+    "rag",
+    "plugin",
+    "search"
+  ],
+  "components": [
+    "TestLlamaIndexPlugin",
+    "TestLlamaIndexWithoutInstall",
+    "llamaindex_plugin"
+  ],
+  "related_files": [
+    "src/idlergear/plugins/llamaindex.py",
+    "tests/test_plugins.py"
+  ],
+  "path": "tests/test_llamaindex_plugin.py",
+  "created": "2026-02-23T20:34:59.204833-05:00",
+  "updated": "2026-02-23T20:34:59.204833-05:00"
+}

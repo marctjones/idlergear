@@ -1,0 +1,26 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Session state persistence - save and restore work context across AI sessions.",
+  "tags": [],
+  "components": [
+    "SessionState",
+    "to_dict",
+    "from_dict",
+    "get_sessions_dir",
+    "capture_session_state",
+    "save_session",
+    "load_session",
+    "list_sessions",
+    "format_session_state"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/sessions.py",
+  "created": "2026-02-26T22:12:42.853770-05:00",
+  "updated": "2026-02-26T22:12:42.853770-05:00"
+}

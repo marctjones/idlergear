@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Reference document management for IdlerGear.",
+  "tags": [],
+  "components": [
+    "ReferenceSource",
+    "get_pinned_reference",
+    "list_pinned_references",
+    "update_pinned_reference",
+    "get_reference_dir",
+    "add_reference",
+    "list_references",
+    "load_reference_from_file",
+    "get_reference",
+    "get_reference_by_id"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/reference.py",
+  "created": "2026-02-26T22:08:38.406355-05:00",
+  "updated": "2026-02-26T22:08:38.406355-05:00"
+}

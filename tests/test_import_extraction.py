@@ -1,4 +1,9 @@
-"""Tests for AST import extraction."""
+"""Tests for AST import extraction.
+
+NOTE: These tests are currently skipped because _extract_symbols_and_imports
+method was removed in v0.8.0 when switching from AST to tree-sitter parsing.
+See CHANGELOG.md: "BREAKING: Removed AST parsing fallback - tree-sitter is now the primary parser"
+"""
 
 import ast
 import tempfile
@@ -10,6 +15,7 @@ from idlergear.graph import get_database
 from idlergear.graph.populators.code_populator import CodePopulator
 
 
+@pytest.mark.skip(reason="AST parsing removed in v0.8.0, replaced with tree-sitter")
 def test_extract_simple_import():
     """Test extraction of simple import statements."""
     code = """
@@ -26,6 +32,7 @@ import sys
     assert imports[1]["module"] == "sys"
 
 
+@pytest.mark.skip(reason="AST parsing removed in v0.8.0, replaced with tree-sitter")
 def test_extract_from_import():
     """Test extraction of from...import statements."""
     code = """
@@ -44,6 +51,7 @@ from utils import helper
     assert imports[1]["names"] == ["helper"]
 
 
+@pytest.mark.skip(reason="AST parsing removed in v0.8.0, replaced with tree-sitter")
 def test_extract_relative_import():
     """Test extraction of relative imports."""
     code = """
@@ -59,6 +67,7 @@ from ..parent import util
     assert imports[1]["level"] == 2  # Double dot
 
 
+@pytest.mark.skip(reason="AST parsing removed in v0.8.0, replaced with tree-sitter")
 def test_extract_mixed():
     """Test extraction of mixed code with imports and symbols."""
     code = """
@@ -150,6 +159,7 @@ def test_resolve_import_path_not_found():
         assert resolved is None
 
 
+@pytest.mark.skip(reason="AST parsing removed in v0.8.0, replaced with tree-sitter")
 def test_full_import_extraction_workflow():
     """Test complete workflow of extracting and storing imports."""
     with tempfile.TemporaryDirectory() as tmpdir:

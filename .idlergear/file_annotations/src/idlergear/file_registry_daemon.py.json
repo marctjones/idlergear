@@ -1,0 +1,19 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Integration between FileRegistry and Daemon for multi-agent coordination.",
+  "tags": [],
+  "components": [
+    "FileRegistryDaemonBridge",
+    "get_file_registry_bridge"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/file_registry_daemon.py",
+  "created": "2026-02-26T22:08:38.033127-05:00",
+  "updated": "2026-02-26T22:08:38.033127-05:00"
+}

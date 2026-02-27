@@ -1,0 +1,23 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Configuration management for IdlerGear.",
+  "tags": [],
+  "components": [
+    "find_idlergear_root",
+    "get_config_path",
+    "load_config",
+    "save_config",
+    "get_config_value",
+    "set_config_value"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/config.py",
+  "created": "2026-02-26T22:12:28.954858-05:00",
+  "updated": "2026-02-26T22:12:28.954858-05:00"
+}

@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "GitHub backend implementation.",
+  "tags": [],
+  "components": [
+    "GitHubBackendError",
+    "LabelManager",
+    "label_exists",
+    "ensure_label",
+    "ensure_standard_label",
+    "ensure_tag_label",
+    "invalidate_cache",
+    "GitHubTaskBackend",
+    "create",
+    "list"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/backends/github.py",
+  "created": "2026-02-26T22:12:43.092473-05:00",
+  "updated": "2026-02-26T22:12:43.092473-05:00"
+}

@@ -184,6 +184,8 @@ def format_plan(plan: dict | None) -> None:
         typer.echo(f"GitHub: Project {plan['github_project_id']}")
     if plan.get("milestone"):
         typer.echo(f"Milestone: {plan['milestone']}")
+    if plan.get("body"):
+        typer.echo(f"\n{plan['body']}")
 
     # Show file and task counts
     if plan.get("files"):

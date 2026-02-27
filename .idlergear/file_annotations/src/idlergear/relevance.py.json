@@ -1,0 +1,22 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Relevance scoring and memory decay for knowledge management.",
+  "tags": [],
+  "components": [
+    "calculate_relevance",
+    "calculate_all_relevance",
+    "filter_by_relevance",
+    "get_stale_items",
+    "sort_by_relevance"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/relevance.py",
+  "created": "2026-02-26T22:08:38.407247-05:00",
+  "updated": "2026-02-26T22:08:38.407247-05:00"
+}

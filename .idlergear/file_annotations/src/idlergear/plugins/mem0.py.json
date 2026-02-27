@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Mem0 experiential memory plugin.",
+  "tags": [],
+  "components": [
+    "Mem0Plugin",
+    "name",
+    "capabilities",
+    "initialize",
+    "shutdown",
+    "health_check",
+    "add_memory",
+    "search_memories",
+    "get_all_memories",
+    "delete_memory"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/plugins/mem0.py",
+  "created": "2026-02-26T22:12:42.726560-05:00",
+  "updated": "2026-02-26T22:12:42.726560-05:00"
+}

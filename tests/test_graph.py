@@ -73,8 +73,11 @@ class TestSchemaInitialization:
         # Verify schema file_exists by checking schema info
         info = get_schema_info(temp_db)
 
-        # Check node types created
-        expected_nodes = ["Task", "File", "Commit", "Symbol", "Note", "Reference", "Plan", "Branch"]
+        # Check node types created (updated for v0.8.0 schema)
+        expected_nodes = [
+            "Task", "File", "Commit", "Symbol", "Note", "Reference", "Plan", "Branch",
+            "Documentation", "Test", "Dependency", "Config", "Error", "PR", "Metric", "Person"
+        ]
         assert set(info["node_types"]) == set(expected_nodes)
 
         # Check relationship types created

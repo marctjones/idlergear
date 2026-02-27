@@ -1,0 +1,20 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Vision management for IdlerGear.",
+  "tags": [],
+  "components": [
+    "get_vision_path",
+    "get_vision",
+    "set_vision"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/vision.py",
+  "created": "2026-02-26T22:08:38.708839-05:00",
+  "updated": "2026-02-26T22:08:38.708839-05:00"
+}

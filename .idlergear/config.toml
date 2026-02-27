@@ -1,4 +1,4 @@
-idlergear_version = "0.7.67"
+idlergear_version = "0.8.7"
 
 [project]
 name = ""
@@ -35,3 +35,7 @@ auto_update = true
 
 [wiki]
 enabled = "true"
+
+[plugins.llamaindex]
+enabled = true
+embedding_model = "local"

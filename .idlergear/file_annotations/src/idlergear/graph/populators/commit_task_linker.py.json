@@ -1,0 +1,21 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Links commits to tasks by parsing commit messages.",
+  "tags": [
+    "graph"
+  ],
+  "components": [
+    "CommitTaskLinker",
+    "link_all"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/graph/populators/commit_task_linker.py",
+  "created": "2026-02-26T22:12:43.861510-05:00",
+  "updated": "2026-02-26T22:12:43.861510-05:00"
+}

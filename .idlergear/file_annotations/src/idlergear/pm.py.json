@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Process management MCP server for IdlerGear.",
+  "tags": [],
+  "components": [
+    "ProcessManager",
+    "list_processes",
+    "get_process",
+    "kill_process",
+    "system_info",
+    "start_run",
+    "list_runs",
+    "get_run_status",
+    "get_run_logs",
+    "stop_run"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/pm.py",
+  "created": "2026-02-26T22:12:42.727380-05:00",
+  "updated": "2026-02-26T22:12:42.727380-05:00"
+}

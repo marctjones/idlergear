@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Run management for IdlerGear - script execution and log tracking.",
+  "tags": [],
+  "components": [
+    "calculate_script_hash",
+    "get_runs_dir",
+    "start_run",
+    "stream_file",
+    "list_runs",
+    "get_run_info",
+    "get_run_status",
+    "get_run_logs",
+    "attach_to_run",
+    "stop_run"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/runs.py",
+  "created": "2026-02-26T22:08:38.408081-05:00",
+  "updated": "2026-02-26T22:08:38.408081-05:00"
+}

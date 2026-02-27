@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Git operations MCP server for IdlerGear.",
+  "tags": [],
+  "components": [
+    "GitStatus",
+    "GitCommit",
+    "is_test_file",
+    "GitServer",
+    "status",
+    "diff",
+    "log",
+    "detect_file_renames",
+    "add",
+    "commit"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/git.py",
+  "created": "2026-02-26T22:08:38.087063-05:00",
+  "updated": "2026-02-26T22:08:38.087063-05:00"
+}

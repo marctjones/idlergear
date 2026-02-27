@@ -1,0 +1,31 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "MCP (Model Context Protocol) server implementation providing 206 tools for knowledge management, including tasks, notes, plans, references, graph queries, file operations, and process management. Main entry point for Claude Code integration.",
+  "tags": [
+    "mcp",
+    "server",
+    "tools",
+    "integration",
+    "api"
+  ],
+  "components": [
+    "list_tools",
+    "call_tool",
+    "_check_initialized",
+    "_format_result"
+  ],
+  "related_files": [
+    "src/idlergear/tasks.py",
+    "src/idlergear/notes.py",
+    "src/idlergear/plans.py"
+  ],
+  "path": "src/idlergear/mcp_server.py",
+  "created": "2026-02-23T20:34:33.165267-05:00",
+  "updated": "2026-02-23T20:34:33.165267-05:00"
+}

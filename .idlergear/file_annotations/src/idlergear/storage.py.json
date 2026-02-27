@@ -1,0 +1,23 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Storage utilities for markdown + YAML frontmatter files.",
+  "tags": [],
+  "components": [
+    "parse_frontmatter",
+    "render_frontmatter",
+    "get_next_id",
+    "slugify",
+    "now_iso",
+    "parse_iso"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/storage.py",
+  "created": "2026-02-26T22:08:38.552820-05:00",
+  "updated": "2026-02-26T22:08:38.552820-05:00"
+}

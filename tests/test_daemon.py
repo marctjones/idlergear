@@ -352,6 +352,7 @@ class TestDaemonIntegration:
             daemon_lifecycle.stop()
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="plan.switch removed in v0.8.0")
     async def test_plan_via_daemon(self, daemon_lifecycle):
         """Test plan operations through the daemon."""
         daemon_lifecycle.start(wait=True)
@@ -363,7 +364,7 @@ class TestDaemonIntegration:
             # Create plan
             result = await client.call(
                 "plan.create",
-                {"name": "my-plan", "title": "My Plan"},
+                {"name": "my-plan", "description": "My Plan"},
             )
             assert result["name"] == "my-plan"
 

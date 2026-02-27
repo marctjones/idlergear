@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "OpenTelemetry log storage using SQLite.",
+  "tags": [],
+  "components": [
+    "LogEntry",
+    "OTelStorage",
+    "insert",
+    "insert_batch",
+    "query",
+    "get_by_id",
+    "count",
+    "delete_old_logs",
+    "update_stats",
+    "get_stats"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/otel_storage.py",
+  "created": "2026-02-26T22:08:38.336783-05:00",
+  "updated": "2026-02-26T22:08:38.336783-05:00"
+}

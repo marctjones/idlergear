@@ -1,0 +1,16 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Project templates for IdlerGear.",
+  "tags": [],
+  "components": [],
+  "related_files": [],
+  "path": "src/idlergear/templates/__init__.py",
+  "created": "2026-02-26T22:08:38.554162-05:00",
+  "updated": "2026-02-26T22:08:38.554162-05:00"
+}

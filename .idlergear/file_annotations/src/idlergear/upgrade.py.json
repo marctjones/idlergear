@@ -1,0 +1,24 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Auto-upgrade functionality for IdlerGear projects.",
+  "tags": [],
+  "components": [
+    "parse_version",
+    "get_project_version",
+    "set_project_version",
+    "needs_upgrade",
+    "get_upgrade_info",
+    "do_upgrade",
+    "check_and_prompt_upgrade"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/upgrade.py",
+  "created": "2026-02-26T22:08:38.708110-05:00",
+  "updated": "2026-02-26T22:08:38.708110-05:00"
+}

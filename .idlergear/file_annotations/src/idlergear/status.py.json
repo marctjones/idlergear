@@ -1,0 +1,26 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Project status dashboard - unified view of tasks, notes, runs, and git.",
+  "tags": [],
+  "components": [
+    "ProjectStatus",
+    "to_dict",
+    "summary",
+    "get_project_status",
+    "task_sort_key",
+    "get_daemon_status",
+    "get_git_status",
+    "get_last_release",
+    "format_detailed_status"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/status.py",
+  "created": "2026-02-26T22:12:42.854978-05:00",
+  "updated": "2026-02-26T22:12:42.854978-05:00"
+}

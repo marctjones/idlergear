@@ -1,0 +1,24 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Proactive suggestion system for IdlerGear.",
+  "tags": [],
+  "components": [
+    "SuggestionType",
+    "SuggestionPriority",
+    "Suggestion",
+    "to_dict",
+    "ProactiveEngine",
+    "get_suggestions",
+    "get_session_start_suggestions"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/proactive.py",
+  "created": "2026-02-26T22:12:42.728369-05:00",
+  "updated": "2026-02-26T22:12:42.728369-05:00"
+}

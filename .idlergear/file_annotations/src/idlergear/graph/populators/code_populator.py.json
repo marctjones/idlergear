@@ -1,0 +1,22 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Populates graph database with code symbols (functions, classes, methods).",
+  "tags": [
+    "graph"
+  ],
+  "components": [
+    "CodePopulator",
+    "populate_directory",
+    "populate_file"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/graph/populators/code_populator.py",
+  "created": "2026-02-26T22:12:29.166491-05:00",
+  "updated": "2026-02-26T22:12:29.166491-05:00"
+}

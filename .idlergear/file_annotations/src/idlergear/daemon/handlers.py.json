@@ -1,0 +1,18 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Daemon method handlers for knowledge management operations.",
+  "tags": [],
+  "components": [
+    "register_handlers"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/daemon/handlers.py",
+  "created": "2026-02-26T16:28:09.296642-05:00",
+  "updated": "2026-02-26T16:28:09.296642-05:00"
+}

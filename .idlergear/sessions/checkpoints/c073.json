@@ -1,0 +1,29 @@
+{
+  "checkpoint_id": "c073",
+  "timestamp": "2026-02-02T14:23:13.377225",
+  "state": {
+    "current_task_id": null,
+    "working_files": [
+      "src/idlergear/display.py",
+      "src/idlergear/graph/parsers/treesitter_parser.py",
+      "src/idlergear/graph/populators/code_populator.py",
+      "src/idlergear/graph/schema.py",
+      "src/idlergear/search.py",
+      "tests/test_cli.py",
+      "tests/test_search.py",
+      ".idlergear/code_index/",
+      ".idlergear/sessions/checkpoints/c062.json",
+      ".idlergear/sessions/checkpoints/c063.json",
+      ".idlergear/sessions/checkpoints/c064.json",
+      ".idlergear/sessions/checkpoints/c065.json",
+      ".idlergear/sessions/checkpoints/c066.json",
+      ".idlergear/sessions/checkpoints/c067.json",
+      ".idlergear/sessions/checkpoints/c068.json",
+      ".idlergear/sessions/checkpoints/c069.json",
+      ".idlergear/sessions/checkpoints/c070.json",
+      ".idlergear/sessions/checkpoints/c071.json",
+      ".idlergear/sessions/checkpoints/c072.json"
+    ],
+    "notes": null
+  }
+}

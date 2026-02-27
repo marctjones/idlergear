@@ -194,6 +194,66 @@ idlergear_fs_read_file(path="src/api/auth.py")
 - ❌ Don't leave files unannotated
 - ❌ Don't use grep when annotations exist
 
+## MANDATORY: File Status Tracking (Prevent Using Outdated Code)
+
+**You MUST mark old files as deprecated when refactoring or creating new versions.**
+
+### When to Use File Status Tracking
+
+1. **Creating new version of a file** - Deprecate old version, link to new one
+2. **Refactoring moves functionality** - Deprecate old location
+3. **Experimental code abandoned** - Archive it with reason
+4. **File has known issues** - Mark as problematic
+
+### File Statuses
+
+- `current` - Active, should be used (default for new files)
+- `deprecated` - Outdated, successor available
+- `archived` - Historical, not for active work
+- `problematic` - Has known issues, use cautiously
+
+### How to Deprecate Files
+
+```python
+# When you create a new version, deprecate the old one
+idlergear_file_deprecate(
+    path="src/api_old/auth.py",
+    successor="src/api/auth.py",  # Path to current version
+    reason="Migrated to OAuth2 with JWT tokens"
+)
+
+# Check file status
+idlergear_file_status(path="src/api_old/auth.py")
+# Returns: {"status": "deprecated", "successor": "src/api/auth.py", "reason": "..."}
+```
+
+### Search Only Current Files
+
+```python
+# Filter out deprecated/archived files
+idlergear_file_search(query="authentication", status="current")
+# Only returns active, current files
+```
+
+### Archive Experimental Code
+
+```python
+idlergear_file_register(
+    path="src/experimental/ml_auth.py",
+    status="archived",
+    reason="ML approach abandoned, too complex for use case"
+)
+```
+
+### Rules
+
+- ✅ Deprecate old files when creating new versions
+- ✅ Always provide `successor` path for deprecated files
+- ✅ Use `status="current"` filter when searching for files
+- ✅ Provide clear `reason` for deprecation/archiving
+- ❌ Don't leave old file versions without status tracking
+- ❌ Don't let deprecated files accumulate without documentation
+
 ## MANDATORY: Knowledge Graph (95-98% Token Savings)
 
 **You MUST use knowledge graph queries instead of grep/file reads for context retrieval.**

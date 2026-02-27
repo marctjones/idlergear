@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": ".NET documentation generation module.",
+  "tags": [],
+  "components": [
+    "DotNetParameter",
+    "to_dict",
+    "DotNetMethod",
+    "to_dict",
+    "DotNetProperty",
+    "to_dict",
+    "DotNetField",
+    "to_dict",
+    "DotNetEvent",
+    "to_dict"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/docs_dotnet.py",
+  "created": "2026-02-26T22:12:29.059520-05:00",
+  "updated": "2026-02-26T22:12:29.059520-05:00"
+}

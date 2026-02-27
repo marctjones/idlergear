@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Local file-based backend implementations.",
+  "tags": [],
+  "components": [
+    "LocalTaskBackend",
+    "create",
+    "list",
+    "get",
+    "update",
+    "close",
+    "reopen",
+    "LocalNoteBackend",
+    "create",
+    "list"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/backends/local.py",
+  "created": "2026-02-26T22:12:43.093134-05:00",
+  "updated": "2026-02-26T22:12:43.093134-05:00"
+}

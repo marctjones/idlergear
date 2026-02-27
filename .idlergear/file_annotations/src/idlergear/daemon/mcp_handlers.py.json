@@ -1,0 +1,29 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "MCP handlers for daemon operations with auto-start support.",
+  "tags": [
+    "mcp"
+  ],
+  "components": [
+    "handle_register_agent",
+    "handle_list_agents",
+    "handle_queue_command",
+    "handle_send_message",
+    "handle_update_status",
+    "handle_list_queue",
+    "handle_session_notify_start",
+    "handle_session_notify_end",
+    "handle_session_list_active",
+    "handle_session_get_agent_status"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/daemon/mcp_handlers.py",
+  "created": "2026-02-26T22:12:43.595420-05:00",
+  "updated": "2026-02-26T22:12:43.595420-05:00"
+}

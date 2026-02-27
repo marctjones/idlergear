@@ -1,0 +1,21 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Populates graph database with Dependency nodes from package manager files.",
+  "tags": [
+    "graph"
+  ],
+  "components": [
+    "DependencyPopulator",
+    "populate"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/graph/populators/dependency_populator.py",
+  "created": "2026-02-26T22:12:43.862108-05:00",
+  "updated": "2026-02-26T22:12:43.862108-05:00"
+}

@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Output formatting for IdlerGear CLI.",
+  "tags": [],
+  "components": [
+    "is_interactive",
+    "display",
+    "print_json",
+    "print_human",
+    "format_task_list",
+    "format_task",
+    "format_vision",
+    "format_note_list",
+    "format_note",
+    "format_plan_list"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/display.py",
+  "created": "2026-02-26T22:08:21.283167-05:00",
+  "updated": "2026-02-26T22:08:21.283167-05:00"
+}

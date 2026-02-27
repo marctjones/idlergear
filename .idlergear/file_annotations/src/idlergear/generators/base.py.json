@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Base classes for documentation generators.",
+  "tags": [],
+  "components": [
+    "GeneratorType",
+    "GeneratorConfig",
+    "to_dict",
+    "from_dict",
+    "GeneratorResult",
+    "to_dict",
+    "Generator",
+    "detect",
+    "get_missing_deps",
+    "generate"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/generators/base.py",
+  "created": "2026-02-26T22:08:38.085606-05:00",
+  "updated": "2026-02-26T22:08:38.085606-05:00"
+}

@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Health check and diagnostics for IdlerGear installations.",
+  "tags": [],
+  "components": [
+    "CheckStatus",
+    "CheckResult",
+    "to_dict",
+    "DoctorReport",
+    "has_errors",
+    "has_warnings",
+    "is_healthy",
+    "to_dict",
+    "check_initialization",
+    "check_version"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/doctor.py",
+  "created": "2026-02-26T22:12:29.061191-05:00",
+  "updated": "2026-02-26T22:12:29.061191-05:00"
+}

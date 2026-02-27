@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "GitHub Projects v2 integration for IdlerGear.",
+  "tags": [],
+  "components": [
+    "get_projects_dir",
+    "create_project",
+    "list_projects",
+    "get_project",
+    "delete_project",
+    "add_task_to_project",
+    "remove_task_from_project",
+    "move_task",
+    "sync_project_to_github",
+    "list_github_projects"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/projects.py",
+  "created": "2026-02-26T22:08:38.405793-05:00",
+  "updated": "2026-02-26T22:08:38.405793-05:00"
+}

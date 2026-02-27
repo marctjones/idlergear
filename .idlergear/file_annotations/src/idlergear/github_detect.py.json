@@ -1,0 +1,22 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "GitHub repository detection and feature availability.",
+  "tags": [],
+  "components": [
+    "GitHubFeatures",
+    "detect_github_features",
+    "get_recommended_backends",
+    "get_github_owner",
+    "format_features_summary"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/github_detect.py",
+  "created": "2026-02-26T22:12:29.164465-05:00",
+  "updated": "2026-02-26T22:12:29.164465-05:00"
+}

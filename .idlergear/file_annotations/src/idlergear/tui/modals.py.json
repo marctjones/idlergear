@@ -1,0 +1,27 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Modal widgets for TUI interactive features.",
+  "tags": [],
+  "components": [
+    "TaskEditModal",
+    "compose",
+    "save_task",
+    "cancel",
+    "ReferenceEditModal",
+    "compose",
+    "save_reference",
+    "preview_reference",
+    "cancel",
+    "NotePromoteModal"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/tui/modals.py",
+  "created": "2026-02-26T22:12:42.972214-05:00",
+  "updated": "2026-02-26T22:12:42.972214-05:00"
+}

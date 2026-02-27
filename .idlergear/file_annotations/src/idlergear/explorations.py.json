@@ -1,0 +1,24 @@
+{
+  "status": "current",
+  "reason": null,
+  "deprecated_at": null,
+  "current_version": null,
+  "replaces": [],
+  "deprecated_versions": [],
+  "metadata": {},
+  "description": "Exploration management for IdlerGear.",
+  "tags": [],
+  "components": [
+    "get_explorations_dir",
+    "create_exploration",
+    "list_explorations",
+    "load_exploration_from_file",
+    "get_exploration",
+    "update_exploration",
+    "close_exploration"
+  ],
+  "related_files": [],
+  "path": "src/idlergear/explorations.py",
+  "created": "2026-02-26T22:08:38.031633-05:00",
+  "updated": "2026-02-26T22:08:38.031633-05:00"
+}

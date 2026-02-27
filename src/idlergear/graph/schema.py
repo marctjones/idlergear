@@ -164,9 +164,11 @@ def _drop_tables(conn):
 
     for table in rel_tables + node_tables:
         try:
-            conn.execute(f"DROP TABLE {table}")
-        except Exception:
-            pass  # Table doesn't exist
+            conn.execute(f"DROP TABLE IF EXISTS {table}")
+        except Exception as e:
+            # Ignore errors for tables that don't exist or can't be dropped
+            import logging
+            logging.debug(f"Could not drop table {table}: {e}")
 
 
 def _create_node_tables(conn):
@@ -232,7 +234,7 @@ def _create_node_tables(conn):
 
     # File nodes
     conn.execute("""
-        CREATE NODE TABLE File(
+        CREATE NODE TABLE IF NOT EXISTS File(
             path STRING PRIMARY KEY,
             language STRING,
             size INT64,

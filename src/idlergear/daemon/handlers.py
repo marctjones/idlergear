@@ -150,44 +150,54 @@ def register_handlers(server: DaemonServer) -> None:
 
     # Plan handlers
     async def plan_create(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
+        from pathlib import Path
         from idlergear.plans import create_plan
 
-        result = create_plan(
-            params["name"],
-            title=params.get("title"),
-            body=params.get("body"),
+        # description is required (not title)
+        description = params.get("description", "")
+        root = server.storage_path.parent if hasattr(server, 'storage_path') else Path.cwd()
+
+        plan = create_plan(
+            name=params["name"],
+            description=description,
+            root=root,
+            type=params.get("type", "feature"),
+            milestone=params.get("milestone"),
+            parent_plan=params.get("parent"),
+            auto_archive=params.get("auto_archive", False),
         )
         await server.broadcast("plan.created", {"name": params["name"]})
-        return result
+        return plan.to_dict()
 
     async def plan_list(params: dict[str, Any], conn: Connection) -> list[dict]:
+        from pathlib import Path
         from idlergear.plans import list_plans
 
-        return list_plans()
+        root = server.storage_path.parent if hasattr(server, 'storage_path') else Path.cwd()
+        plans = list_plans(root=root, status=params.get("status"), type_filter=params.get("type"))
+        return [p.to_dict() for p in plans]
 
     async def plan_get(
         params: dict[str, Any], conn: Connection
     ) -> dict[str, Any] | None:
-        from idlergear.plans import get_plan
+        from pathlib import Path
+        from idlergear.plans import load_plan
 
-        return get_plan(params["name"])
+        root = server.storage_path.parent if hasattr(server, 'storage_path') else Path.cwd()
+        plan = load_plan(params["name"], root)
+        return plan.to_dict()
 
     async def plan_current(
         params: dict[str, Any], conn: Connection
     ) -> dict[str, Any] | None:
-        from idlergear.plans import get_current_plan
-
-        return get_current_plan()
+        # Deprecated in v0.8.0 Plan Objects API - no current plan concept
+        raise NotImplementedError("plan.current deprecated in v0.8.0 - use plan.list to see all plans")
 
     async def plan_switch(
         params: dict[str, Any], conn: Connection
     ) -> dict[str, Any] | None:
-        from idlergear.plans import switch_plan
-
-        result = switch_plan(params["name"])
-        if result:
-            await server.broadcast("plan.switched", {"name": params["name"]})
-        return result
+        # Deprecated in v0.8.0 Plan Objects API - no current plan concept
+        raise NotImplementedError("plan.switch deprecated in v0.8.0 - use plan.show to view specific plans")
 
     # Reference handlers
     async def reference_add(params: dict[str, Any], conn: Connection) -> dict[str, Any]:
