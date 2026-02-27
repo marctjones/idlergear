@@ -178,8 +178,12 @@ def _index_file_annotations_batch(batch_size: int = 5) -> Dict[str, Any]:
             if rel_path not in annotated_paths:
                 unannotated_files.append(py_file)
 
-    # Skip to last index
+    # Reset index if we've gone past the end of available files
     start_index = state.get("last_file_index", 0)
+    if start_index >= len(unannotated_files):
+        start_index = 0
+        state["last_file_index"] = 0
+
     files_to_annotate = unannotated_files[start_index:start_index + batch_size]
 
     annotated_count = 0
@@ -231,13 +235,18 @@ def _index_file_annotations_batch(batch_size: int = 5) -> Dict[str, Any]:
             if "mcp" in path_parts or "mcp" in file_path.stem:
                 tags.append("mcp")
 
-            # Annotate file
-            storage.save_annotation(
+            # Create FileEntry and annotate file
+            from idlergear.file_registry import FileEntry, FileStatus
+
+            entry = FileEntry(
                 path=rel_path,
+                status=FileStatus.CURRENT,
                 description=description[:200] if description else None,  # Limit length
                 tags=tags[:5],  # Limit tags
                 components=components[:10],  # Limit components
+                related_files=[],
             )
+            storage.save_annotation(entry)
 
             annotated_count += 1
         except Exception as e:
@@ -286,9 +295,11 @@ def _index_commits_batch(batch_size: int = 5) -> Dict[str, Any]:
             initialize_schema(db)
 
         # Index next batch of commits
+        # Request more commits than batch_size to ensure we find unindexed ones
+        # The incremental flag will skip already-indexed commits
         populator = GitPopulator(db)
         result = populator.populate(
-            max_commits=batch_size,
+            max_commits=100,  # Always request enough to find unindexed commits
             incremental=True,  # Skip already indexed
         )
 

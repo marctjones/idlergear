@@ -135,8 +135,9 @@ class CodePopulator:
         """Check if file should be skipped in incremental mode."""
         # Get file hash from database
         conn = self.db.get_connection()
+        safe_rel_path = self._escape_cypher_string(rel_path)
         result = conn.execute(f"""
-            MATCH (f:File {{path: '{rel_path}'}})
+            MATCH (f:File {{path: '{safe_rel_path}'}})
             RETURN f.hash AS hash
         """)
 
@@ -268,9 +269,13 @@ class CodePopulator:
         """
         conn = self.db.get_connection()
 
+        # Escape string values for Cypher
+        safe_rel_path = self._escape_cypher_string(rel_path)
+        safe_language = self._escape_cypher_string(language)
+
         # Check if exists
         result = conn.execute(f"""
-            MATCH (f:File {{path: '{rel_path}'}})
+            MATCH (f:File {{path: '{safe_rel_path}'}})
             RETURN COUNT(f) AS count
         """)
 
@@ -288,8 +293,8 @@ class CodePopulator:
 
             conn.execute(f"""
                 CREATE (f:File {{
-                    path: '{rel_path}',
-                    language: '{language}',
+                    path: '{safe_rel_path}',
+                    language: '{safe_language}',
                     size: {size},
                     lines: {lines},
                     last_modified: timestamp('1970-01-01T00:00:00'),
@@ -360,9 +365,13 @@ class CodePopulator:
         """
         conn = self.db.get_connection()
 
+        # Escape string values for Cypher
+        safe_file_path = self._escape_cypher_string(file_path)
+        safe_symbol_id = self._escape_cypher_string(symbol_id)
+
         # Check if relationship exists
         result = conn.execute(f"""
-            MATCH (f:File {{path: '{file_path}'}})-[r:CONTAINS]->(s:Symbol {{id: '{symbol_id}'}})
+            MATCH (f:File {{path: '{safe_file_path}'}})-[r:CONTAINS]->(s:Symbol {{id: '{safe_symbol_id}'}})
             RETURN COUNT(r) AS count
         """)
 
@@ -373,8 +382,8 @@ class CodePopulator:
 
         # Create relationship
         conn.execute(f"""
-            MATCH (f:File {{path: '{file_path}'}})
-            MATCH (s:Symbol {{id: '{symbol_id}'}})
+            MATCH (f:File {{path: '{safe_file_path}'}})
+            MATCH (s:Symbol {{id: '{safe_symbol_id}'}})
             CREATE (f)-[:CONTAINS]->(s)
         """)
 
@@ -455,10 +464,14 @@ class CodePopulator:
         """
         conn = self.db.get_connection()
 
+        # Escape string values for Cypher
+        safe_from_file = self._escape_cypher_string(from_file)
+        safe_to_file = self._escape_cypher_string(to_file)
+
         # Ensure both file nodes exist
-        for file_path in [from_file, to_file]:
+        for file_path, safe_path in [(from_file, safe_from_file), (to_file, safe_to_file)]:
             result = conn.execute(f"""
-                MATCH (f:File {{path: '{file_path}'}})
+                MATCH (f:File {{path: '{safe_path}'}})
                 RETURN COUNT(f) AS count
             """)
             exists = result.get_next()[0] > 0 if result.has_next() else False
@@ -467,14 +480,14 @@ class CodePopulator:
                 # Create minimal file node if it doesn't exist
                 conn.execute(f"""
                     CREATE (f:File {{
-                        path: '{file_path}',
+                        path: '{safe_path}',
                         file_exists: false
                     }})
                 """)
 
         # Check if relationship already exists
         result = conn.execute(f"""
-            MATCH (f1:File {{path: '{from_file}'}})-[r:IMPORTS]->(f2:File {{path: '{to_file}'}})
+            MATCH (f1:File {{path: '{safe_from_file}'}})-[r:IMPORTS]->(f2:File {{path: '{safe_to_file}'}})
             RETURN COUNT(r) AS count
         """)
 
@@ -485,8 +498,8 @@ class CodePopulator:
 
         # Create IMPORTS relationship
         conn.execute(f"""
-            MATCH (f1:File {{path: '{from_file}'}})
-            MATCH (f2:File {{path: '{to_file}'}})
+            MATCH (f1:File {{path: '{safe_from_file}'}})
+            MATCH (f2:File {{path: '{safe_to_file}'}})
             CREATE (f1)-[:IMPORTS {{line: {line}, import_type: 'python'}}]->(f2)
         """)
 
