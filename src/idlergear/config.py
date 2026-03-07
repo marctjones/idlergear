@@ -102,20 +102,73 @@ CONFIG_SCHEMAS = {
 }
 
 
-def find_idlergear_root(start_path: str = ".") -> Path | None:
-    """Find the nearest .idlergear directory by walking up from start_path."""
-    current = Path(start_path).resolve()
+def _find_git_root(start_path: Path) -> Path | None:
+    """Find the git repository root by walking up from start_path.
+
+    Args:
+        start_path: Starting path to search from
+
+    Returns:
+        Path to git repository root, or None if not in a git repository
+    """
+    current = start_path.resolve()
 
     while current != current.parent:
+        git_dir = current / ".git"
+        if git_dir.exists():
+            return current
+        current = current.parent
+
+    return None
+
+
+def find_idlergear_root(start_path: str = ".") -> Path | None:
+    """Find the nearest .idlergear directory within git repository boundaries.
+
+    This function walks up from start_path looking for .idlergear/, but stops
+    at git repository boundaries to ensure project isolation. This prevents
+    global ~/.idlergear/ instances from contaminating project-specific data.
+
+    Args:
+        start_path: Starting path to search from (default: current directory)
+
+    Returns:
+        Path to project root containing .idlergear/, or None if not found
+
+    Examples:
+        >>> # Inside a git repo with .idlergear/
+        >>> find_idlergear_root()
+        Path('/home/user/project')
+
+        >>> # Inside a git repo without .idlergear/
+        >>> find_idlergear_root()
+        None  # Won't search outside git boundaries
+
+        >>> # Not in a git repo
+        >>> find_idlergear_root()
+        None  # Won't search parent directories
+    """
+    current = Path(start_path).resolve()
+
+    # Find git repository root (defines search boundary)
+    git_root = _find_git_root(current)
+
+    # If not in a git repository, only check current directory
+    # This prevents global ~/.idlergear/ from being used
+    if git_root is None:
+        idlergear_path = current / ".idlergear"
+        if idlergear_path.is_dir():
+            return current
+        return None
+
+    # Search within git repository boundaries only
+    stop_at = git_root.parent
+
+    while current != stop_at:
         idlergear_path = current / ".idlergear"
         if idlergear_path.is_dir():
             return current
         current = current.parent
-
-    # Check root
-    idlergear_path = current / ".idlergear"
-    if idlergear_path.is_dir():
-        return current
 
     return None
 
