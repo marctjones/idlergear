@@ -21,7 +21,7 @@ class MockPlugin(IdlerGearPlugin):
         return "mock"
 
     def capabilities(self) -> List[PluginCapability]:
-        return [PluginCapability.VECTOR_SEARCH]
+        return [PluginCapability.MEMORY_EXPERIENTIAL]
 
     def initialize(self) -> None:
         self.mark_initialized()
@@ -212,11 +212,11 @@ enabled = true
         registry.load_all_plugins()
 
         # Get by capability
-        vector_plugins = registry.get_plugins_by_capability(
-            PluginCapability.VECTOR_SEARCH
+        memory_plugins = registry.get_plugins_by_capability(
+            PluginCapability.MEMORY_EXPERIENTIAL
         )
-        assert len(vector_plugins) == 1
-        assert vector_plugins[0].name() == "mock"
+        assert len(memory_plugins) == 1
+        assert memory_plugins[0].name() == "mock"
 
         observability_plugins = registry.get_plugins_by_capability(
             PluginCapability.OBSERVABILITY_EXPORT
@@ -283,152 +283,6 @@ def test_plugin_health_check():
     # Initialize
     plugin.initialize()
     assert plugin.health_check() is True
-
-
-# LlamaIndex plugin tests
-def test_llamaindex_plugin_initialization():
-    """Test LlamaIndex plugin basic initialization."""
-    pytest.importorskip("llama_index")
-    from idlergear.plugins.llamaindex import LlamaIndexPlugin
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        import os
-
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmpdir)
-            Path(tmpdir) / ".idlergear"
-            (Path(tmpdir) / ".idlergear").mkdir()
-
-            plugin = LlamaIndexPlugin({"embedding_model": "local"})
-
-            assert plugin.name() == "llamaindex"
-            assert PluginCapability.VECTOR_SEARCH in plugin.capabilities()
-            assert PluginCapability.VECTOR_EMBEDDING in plugin.capabilities()
-            assert PluginCapability.VECTOR_STORAGE in plugin.capabilities()
-            assert PluginCapability.RAG_RETRIEVAL in plugin.capabilities()
-        finally:
-            os.chdir(old_cwd)
-
-
-def test_llamaindex_plugin_requires_llama_index():
-    """Test that LlamaIndex plugin requires llama-index package."""
-    pytest.importorskip("llama_index")
-    from idlergear.plugins.llamaindex import LlamaIndexPlugin
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        import os
-        import sys
-
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmpdir)
-            (Path(tmpdir) / ".idlergear").mkdir()
-
-            plugin = LlamaIndexPlugin({})
-
-            # Hide llama_index from imports
-            llama_index_modules = [
-                mod for mod in sys.modules.keys() if mod.startswith("llama_index")
-            ]
-            saved_modules = {}
-            for mod in llama_index_modules:
-                saved_modules[mod] = sys.modules[mod]
-                del sys.modules[mod]
-
-            # Should raise ImportError if llama-index not installed
-            try:
-                # If llama-index is not installed, this will fail
-                plugin.initialize()
-            except ImportError as e:
-                assert "llama-index" in str(e)
-            finally:
-                # Restore modules
-                for mod, val in saved_modules.items():
-                    sys.modules[mod] = val
-        finally:
-            os.chdir(old_cwd)
-
-
-def test_llamaindex_plugin_search():
-    """Test LlamaIndex plugin search functionality."""
-    pytest.importorskip("llama_index")
-    from idlergear.plugins.llamaindex import LlamaIndexPlugin
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        import os
-
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmpdir)
-            (Path(tmpdir) / ".idlergear").mkdir()
-
-            plugin = LlamaIndexPlugin({"embedding_model": "local"})
-            try:
-                plugin.initialize()
-            except (ImportError, ModuleNotFoundError):
-                pytest.skip("LlamaIndex dependencies not fully installed (torch, transformers, etc.)")
-
-            # Index a reference
-            plugin.index_reference(
-                {
-                    "title": "Authentication System",
-                    "body": "Our authentication uses JWT tokens for secure access.",
-                }
-            )
-
-            # Index a note
-            plugin.index_note(
-                {"id": 1, "content": "Remember to add rate limiting to auth endpoints"}
-            )
-
-            # Search for authentication
-            results = plugin.search("authentication security", top_k=2)
-
-            # Should get results
-            assert len(results) > 0
-            assert "score" in results[0]
-            assert "text" in results[0]
-
-            plugin.shutdown()
-        finally:
-            os.chdir(old_cwd)
-
-
-def test_llamaindex_plugin_filtered_search():
-    """Test LlamaIndex plugin search with filters."""
-    pytest.importorskip("llama_index")
-    from idlergear.plugins.llamaindex import LlamaIndexPlugin
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        import os
-
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmpdir)
-            (Path(tmpdir) / ".idlergear").mkdir()
-
-            plugin = LlamaIndexPlugin({"embedding_model": "local"})
-            try:
-                plugin.initialize()
-            except (ImportError, ModuleNotFoundError):
-                pytest.skip("LlamaIndex dependencies not fully installed (torch, transformers, etc.)")
-
-            # Index both types
-            plugin.index_reference(
-                {"title": "API Design", "body": "REST API design principles"}
-            )
-            plugin.index_note({"id": 1, "content": "API endpoint for user creation"})
-
-            # Search only references
-            results = plugin.search("API", top_k=5, knowledge_type="reference")
-
-            # Should only get reference results
-            assert all(r["metadata"]["type"] == "reference" for r in results)
-
-            plugin.shutdown()
-        finally:
-            os.chdir(old_cwd)
 
 
 # Mem0 plugin tests

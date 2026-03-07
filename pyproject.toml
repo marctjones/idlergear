@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idlergear"
-version = "0.8.12"
+version = "0.8.13"
 description = "A knowledge management API that synchronizes AI context management with human project management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,13 +44,6 @@ watch = [
 ]
 docs = [
     "pdoc>=14.0.0",
-]
-rag = [
-    # Optional: Advanced RAG capabilities (Issue #402)
-    "llama-index>=0.11.0",
-    "llama-index-core>=0.11.0",
-    "llama-index-embeddings-huggingface>=0.3.0",
-    "llama-index-embeddings-openai>=0.2.0",  # For OpenAI embeddings option
 ]
 advanced = [
     # Optional: Advanced features (Issue #403)

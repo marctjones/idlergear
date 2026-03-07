@@ -5,14 +5,11 @@ maintaining its core value proposition: structured, backend-agnostic knowledge.
 
 Plugin Types:
 - Observability: Export logs/metrics (Langfuse, Helicone)
-- Vector Search: Semantic retrieval (LlamaIndex)
 - Memory: Experiential learning (Mem0)
-- Storage: Vector databases (Milvus, Qdrant)
 """
 
 from .base import IdlerGearPlugin, PluginCapability, PluginRegistry
 from .langfuse import LangfusePlugin
-from .llamaindex import LlamaIndexPlugin
 from .mem0 import Mem0Plugin
 
 __all__ = [
@@ -20,6 +17,5 @@ __all__ = [
     "PluginCapability",
     "PluginRegistry",
     "LangfusePlugin",
-    "LlamaIndexPlugin",
     "Mem0Plugin",
 ]

@@ -1492,47 +1492,6 @@ async def list_tools() -> list[Tool]:
                 "required": ["code_snippet"],
             },
         ),
-        # RAG / LlamaIndex tools
-        Tool(
-            name="idlergear_rag_search",
-            description="Semantic search over documentation (references, notes, wiki). Find docs by natural language query (e.g., 'How do I implement authentication?'). Returns relevant documents with similarity scores. Uses LlamaIndex RAG for 90%+ token savings vs reading all docs.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Natural language search query",
-                    },
-                    "top_k": {
-                        "type": "integer",
-                        "description": "Number of results to return (default: 5)",
-                        "default": 5,
-                    },
-                    "knowledge_type": {
-                        "type": "string",
-                        "enum": ["reference", "note"],
-                        "description": "Optional filter for specific knowledge type",
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-        Tool(
-            name="idlergear_rag_index_all",
-            description="Index all references and notes for semantic search. Call this once to populate the RAG index, or periodically to refresh it.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
-            name="idlergear_rag_rebuild",
-            description="Rebuild RAG index from scratch. Use if index is corrupted or after bulk document updates.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
         Tool(
             name="idlergear_graph_populate_git",
             description="Populate knowledge graph with git history. Indexes commits and file changes for token-efficient queries.",
@@ -4049,71 +4008,6 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "required": ["plugin_name"],
             },
         ),
-        Tool(
-            name="idlergear_plugin_search",
-            description="Semantic search over IdlerGear knowledge (references, notes) using LlamaIndex. Provides 40% faster retrieval than alternatives with relevance scoring.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query",
-                    },
-                    "top_k": {
-                        "type": "integer",
-                        "description": "Number of results to return (default: 5)",
-                        "default": 5,
-                    },
-                    "knowledge_type": {
-                        "type": "string",
-                        "enum": ["reference", "note"],
-                        "description": "Optional filter for knowledge type",
-                    },
-                },
-                "required": ["query"],
-            },
-        ),
-        Tool(
-            name="idlergear_plugin_index_reference",
-            description="Index a reference document for semantic search using LlamaIndex. Call this after creating or updating references.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "title": {
-                        "type": "string",
-                        "description": "Reference title",
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "Reference body content",
-                    },
-                },
-                "required": ["title"],
-            },
-        ),
-        Tool(
-            name="idlergear_plugin_index_note",
-            description="Index a note for semantic search using LlamaIndex. Call this after creating notes to make them searchable.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "note_id": {
-                        "type": "integer",
-                        "description": "Note ID",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Note content",
-                    },
-                    "tags": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "Note tags",
-                    },
-                },
-                "required": ["note_id", "content"],
-            },
-        ),
         # Knowledge gap detection tools
         Tool(
             name="idlergear_knowledge_detect_gaps",
@@ -4951,139 +4845,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                         }
                     )
                 raise
-
-        elif name == "idlergear_rag_search":
-            try:
-                from idlergear.plugins.llamaindex import LlamaIndexPlugin
-
-                # Check if plugin is enabled
-                enabled = get_config_value("plugins.llamaindex.enabled", default=False)
-                if not enabled:
-                    return _format_result(
-                        {
-                            "error": "LlamaIndex plugin not enabled",
-                            "hint": "Enable in .idlergear/config.toml with:\n[plugins.llamaindex]\nenabled = true",
-                        }
-                    )
-
-                # Initialize plugin
-                config = get_config_value("plugins.llamaindex", default={})
-                plugin = LlamaIndexPlugin(config)
-                plugin.initialize()
-
-                # Perform search
-                results = plugin.search(
-                    query=arguments["query"],
-                    top_k=arguments.get("top_k", 5),
-                    knowledge_type=arguments.get("knowledge_type"),
-                )
-
-                return _format_result(
-                    {
-                        "results": results,
-                        "count": len(results),
-                        "query": arguments["query"],
-                    }
-                )
-            except ImportError as e:
-                return _format_result(
-                    {
-                        "error": "LlamaIndex not installed",
-                        "hint": "Install with: pip install 'idlergear[rag]'",
-                        "details": str(e),
-                    }
-                )
-            except Exception as e:
-                return _format_result({"error": str(e)})
-
-        elif name == "idlergear_rag_index_all":
-            try:
-                from idlergear.plugins.llamaindex import LlamaIndexPlugin
-                from idlergear.reference import list_references
-                from idlergear.notes import list_notes
-
-                # Check if plugin is enabled
-                enabled = get_config_value("plugins.llamaindex.enabled", default=False)
-                if not enabled:
-                    return _format_result(
-                        {
-                            "error": "LlamaIndex plugin not enabled",
-                            "hint": "Enable in .idlergear/config.toml with:\n[plugins.llamaindex]\nenabled = true",
-                        }
-                    )
-
-                # Initialize plugin
-                config = get_config_value("plugins.llamaindex", default={})
-                plugin = LlamaIndexPlugin(config)
-                plugin.initialize()
-
-                # Index all references
-                references = list_references()
-                for ref in references:
-                    plugin.index_reference(ref)
-
-                # Index all notes
-                notes = list_notes()
-                for note in notes:
-                    plugin.index_note(note)
-
-                return _format_result(
-                    {
-                        "status": "completed",
-                        "references_indexed": len(references),
-                        "notes_indexed": len(notes),
-                        "total": len(references) + len(notes),
-                    }
-                )
-            except ImportError as e:
-                return _format_result(
-                    {
-                        "error": "LlamaIndex not installed",
-                        "hint": "Install with: pip install 'idlergear[rag]'",
-                        "details": str(e),
-                    }
-                )
-            except Exception as e:
-                return _format_result({"error": str(e)})
-
-        elif name == "idlergear_rag_rebuild":
-            try:
-                from idlergear.plugins.llamaindex import LlamaIndexPlugin
-
-                # Check if plugin is enabled
-                enabled = get_config_value("plugins.llamaindex.enabled", default=False)
-                if not enabled:
-                    return _format_result(
-                        {
-                            "error": "LlamaIndex plugin not enabled",
-                            "hint": "Enable in .idlergear/config.toml with:\n[plugins.llamaindex]\nenabled = true",
-                        }
-                    )
-
-                # Initialize plugin
-                config = get_config_value("plugins.llamaindex", default={})
-                plugin = LlamaIndexPlugin(config)
-                plugin.initialize()
-
-                # Rebuild index
-                plugin.rebuild_index()
-
-                return _format_result(
-                    {
-                        "status": "completed",
-                        "message": "Index rebuilt. Run idlergear_rag_index_all to re-index documents.",
-                    }
-                )
-            except ImportError as e:
-                return _format_result(
-                    {
-                        "error": "LlamaIndex not installed",
-                        "hint": "Install with: pip install 'idlergear[rag]'",
-                        "details": str(e),
-                    }
-                )
-            except Exception as e:
-                return _format_result({"error": str(e)})
 
         elif name == "idlergear_graph_populate_git":
             from idlergear.graph import get_database
@@ -7747,7 +7508,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         elif name == "idlergear_plugin_list":
             from idlergear.plugins import (
                 LangfusePlugin,
-                LlamaIndexPlugin,
                 PluginRegistry,
             )
 
@@ -7755,7 +7515,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
             # Register available plugins
             registry.register_plugin_class(LangfusePlugin)
-            registry.register_plugin_class(LlamaIndexPlugin)
 
             loaded_only = arguments.get("loaded_only", False)
 
@@ -7773,13 +7532,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             )
 
         elif name == "idlergear_plugin_status":
-            from idlergear.plugins import LangfusePlugin, LlamaIndexPlugin
+            from idlergear.plugins import LangfusePlugin
 
             registry = _get_plugin_registry()
 
             # Register available plugins
             registry.register_plugin_class(LangfusePlugin)
-            registry.register_plugin_class(LlamaIndexPlugin)
 
             plugin_name = arguments.get("plugin_name")
 
@@ -7873,100 +7631,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                     "plugin": plugin_name,
                     "enabled": enabled,
                     "config_path": str(config_path),
-                }
-            )
-
-        elif name == "idlergear_plugin_search":
-            from idlergear.plugins import LlamaIndexPlugin
-
-            registry = _get_plugin_registry()
-
-            # Register and load LlamaIndex plugin
-            registry.register_plugin_class(LlamaIndexPlugin)
-            plugin = registry.load_plugin("llamaindex")
-
-            if not plugin:
-                return _format_result(
-                    {
-                        "error": "LlamaIndex plugin not enabled. Enable it first with: idlergear plugin enable llamaindex"
-                    }
-                )
-
-            # Perform search
-            query = arguments["query"]
-            top_k = arguments.get("top_k", 5)
-            knowledge_type = arguments.get("knowledge_type")
-
-            results = plugin.search(query, top_k=top_k, knowledge_type=knowledge_type)
-
-            return _format_result(
-                {
-                    "query": query,
-                    "results": results,
-                    "count": len(results),
-                }
-            )
-
-        elif name == "idlergear_plugin_index_reference":
-            from idlergear.plugins import LlamaIndexPlugin
-
-            registry = _get_plugin_registry()
-
-            # Register and load LlamaIndex plugin
-            registry.register_plugin_class(LlamaIndexPlugin)
-            plugin = registry.load_plugin("llamaindex")
-
-            if not plugin:
-                return _format_result(
-                    {
-                        "error": "LlamaIndex plugin not enabled. Enable it first with: idlergear plugin enable llamaindex"
-                    }
-                )
-
-            # Index reference
-            reference = {
-                "title": arguments["title"],
-                "body": arguments.get("body", ""),
-            }
-            plugin.index_reference(reference)
-
-            return _format_result(
-                {
-                    "success": True,
-                    "indexed": "reference",
-                    "title": arguments["title"],
-                }
-            )
-
-        elif name == "idlergear_plugin_index_note":
-            from idlergear.plugins import LlamaIndexPlugin
-
-            registry = _get_plugin_registry()
-
-            # Register and load LlamaIndex plugin
-            registry.register_plugin_class(LlamaIndexPlugin)
-            plugin = registry.load_plugin("llamaindex")
-
-            if not plugin:
-                return _format_result(
-                    {
-                        "error": "LlamaIndex plugin not enabled. Enable it first with: idlergear plugin enable llamaindex"
-                    }
-                )
-
-            # Index note
-            note = {
-                "id": arguments["note_id"],
-                "content": arguments["content"],
-                "tags": arguments.get("tags", []),
-            }
-            plugin.index_note(note)
-
-            return _format_result(
-                {
-                    "success": True,
-                    "indexed": "note",
-                    "note_id": arguments["note_id"],
                 }
             )
 

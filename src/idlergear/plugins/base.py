@@ -16,20 +16,10 @@ class PluginCapability(str, Enum):
     OBSERVABILITY_METRICS = "observability.metrics"
     OBSERVABILITY_TRACING = "observability.tracing"
 
-    # Vector Search
-    VECTOR_SEARCH = "vector.search"
-    VECTOR_EMBEDDING = "vector.embedding"
-    VECTOR_STORAGE = "vector.storage"
-
     # Memory
     MEMORY_EXPERIENTIAL = "memory.experiential"
     MEMORY_HIERARCHICAL = "memory.hierarchical"
     MEMORY_PATTERN_LEARNING = "memory.pattern_learning"
-
-    # RAG
-    RAG_RETRIEVAL = "rag.retrieval"
-    RAG_GRAPH = "rag.graph"
-    RAG_HYBRID = "rag.hybrid"
 
 
 class PluginConfig:
