@@ -104,7 +104,7 @@ secrets_app = typer.Typer(help="Secure local secrets management")
 release_app = typer.Typer(help="Release management (GitHub Releases)")
 file_app = typer.Typer(help="File registry and annotations (track file status)")
 plugin_app = typer.Typer(
-    help="Plugin management and integration (Langfuse, Mem0)"
+    help="Plugin management and integration (Langfuse)"
 )
 graph_app = typer.Typer(help="Knowledge graph queries and population")
 knowledge_app = typer.Typer(help="Knowledge decay and relevance management")
@@ -2973,8 +2973,8 @@ def task_list(
         idlergear task list --state all      # Include closed tasks
         idlergear task list --label bug      # Only bug tasks
     """
-    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
+    from idlergear.core.tasks import TaskService
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -2983,27 +2983,10 @@ def task_list(
         )
         raise typer.Exit(1)
 
-    backend = get_backend("task")
-    tasks = backend.list(state=state)
-
-    # Filter by priority if specified
-    if priority:
-        tasks = [t for t in tasks if t.get("priority") == priority]
-
-    # Filter by labels if specified
-    if labels:
-        tasks = [
-            t for t in tasks if any(label in t.get("labels", []) for label in labels)
-        ]
-
-    # Apply limit if specified
-    if limit:
-        tasks = tasks[:limit]
-
-    # Strip task bodies if preview mode (token-efficient)
-    if preview:
-        for task in tasks:
-            task["body"] = None
+    task_service = TaskService()
+    tasks = task_service.list_tasks(
+        state=state, priority=priority, labels=labels, limit=limit, preview=preview
+    )
 
     display(tasks, ctx.obj.output_format, "tasks")
 
@@ -11369,7 +11352,7 @@ def plugin_status(
 @plugin_app.command("enable")
 def plugin_enable(
     plugin_name: str = typer.Argument(
-        ..., help="Plugin name (e.g., langfuse, llamaindex)"
+        ..., help="Plugin name (e.g., langfuse)"
     ),
 ):
     """Enable a plugin in config.toml."""

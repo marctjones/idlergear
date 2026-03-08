@@ -10,9 +10,10 @@ from typing import Any
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.types import TextContent, Tool, Resource
 
 from idlergear import __version__
+from idlergear import mcp_resources
 from idlergear.config import find_idlergear_root, get_config_value, set_config_value
 from idlergear.git import GitServer
 from idlergear.pm import ProcessManager
@@ -32,8 +33,10 @@ _current_session_id: str | None = None
 _registry_cache: dict[str, Any] = {}
 _registry_cache_lock = asyncio.Lock()
 
-# Background indexing flag (prevent recursive indexing)
+# Background indexing state
 _indexing_in_progress = False
+_tool_call_counter = 0  # Track tool calls for rate limiting
+_indexing_frequency = 10  # Only run indexing every Nth tool call
 
 
 def _get_cached_registry(registry_path: Path | None = None) -> Any:
@@ -137,16 +140,79 @@ async def _broadcast_registry_change(
         pass
 
 
+def _check_memory_pressure() -> bool:
+    """Check if system is under memory pressure.
+
+    Returns:
+        True if memory usage is high, False otherwise
+    """
+    try:
+        import psutil
+
+        # Get system memory info
+        memory = psutil.virtual_memory()
+
+        # If available memory < 2GB or usage > 90%, consider it pressure
+        available_gb = memory.available / (1024 ** 3)
+        if available_gb < 2.0 or memory.percent > 90:
+            return True
+
+        return False
+    except ImportError:
+        # If psutil not available, assume no pressure
+        return False
+    except Exception:
+        return False
+
+
+def _cleanup_database_connections() -> None:
+    """Periodically cleanup database connections to free memory.
+
+    Closes and resets global database instances every 50 tool calls.
+    """
+    global _tool_call_counter
+
+    # Cleanup every 50 calls
+    if _tool_call_counter % 50 == 0:
+        try:
+            # Reset Kuzu graph database connection
+            from idlergear.graph.database import reset_database
+            reset_database()
+        except Exception:
+            pass
+
+
 def _run_opportunistic_indexing() -> None:
     """Run opportunistic background indexing after tool completion.
 
+    Rate-limited to run only every 10th tool call to reduce memory pressure.
     Checks if indexing work is available and processes a small batch (5 items)
     if the system is idle. Prevents recursive indexing calls.
     """
-    global _indexing_in_progress
+    global _indexing_in_progress, _tool_call_counter
+
+    # Increment tool call counter
+    _tool_call_counter += 1
+
+    # Cleanup database connections periodically
+    _cleanup_database_connections()
+
+    # Rate limiting: only run every Nth call
+    if _tool_call_counter % _indexing_frequency != 0:
+        return
 
     # Prevent recursive indexing
     if _indexing_in_progress:
+        return
+
+    # Check memory pressure before indexing
+    if _check_memory_pressure():
+        # Auto-pause indexing if memory is low
+        try:
+            from idlergear.indexing import pause_indexing
+            pause_indexing()
+        except Exception:
+            pass
         return
 
     try:
@@ -505,6 +571,19 @@ At the start of EVERY session, call idlergear_session_start() to:
 This ensures perfect session continuity and saves you from asking "where did we leave off?"
 
 At the end of your session, call idlergear_session_end() to save state for next time.
+
+MCP Primitives (Full MCP Compliance):
+- **Resources** - Read-only data (no tool calls needed!)
+  - idlergear://project/vision - Project goals
+  - idlergear://project/context - Full context
+  - idlergear://project/tasks/open - Open tasks
+  - idlergear://project/runs/active - Running processes
+  - idlergear://graph/stats - Knowledge graph stats
+
+- **Tools** - Actions that modify state
+  - Session, Tasks, Files, Graph, Git, Runs, etc.
+
+- **Prompts** - Coming in Phase 0.2 (instruction templates)
 
 Available tool categories:
 - Session Management (4 tools) - Start/end sessions with state persistence
@@ -3964,7 +4043,7 @@ This ensures messages don't derail your work - only context ones are shown immed
         # Plugin tools (NEW v0.8.0)
         Tool(
             name="idlergear_plugin_list",
-            description="List available and loaded plugins. Shows which integrations (Langfuse, LlamaIndex, Mem0) are registered and enabled.",
+            description="List available and loaded plugins. Shows which integrations (Langfuse) are registered and enabled.",
             inputSchema={
                 "type": "object",
                 "properties": {
@@ -3997,7 +4076,7 @@ This ensures messages don't derail your work - only context ones are shown immed
                 "properties": {
                     "plugin_name": {
                         "type": "string",
-                        "description": "Plugin name (e.g., 'langfuse', 'llamaindex', 'mem0')",
+                        "description": "Plugin name (e.g., 'langfuse')",
                     },
                     "enabled": {
                         "type": "boolean",
@@ -4182,6 +4261,32 @@ This ensures messages don't derail your work - only context ones are shown immed
     ]
 
 
+# MCP Resources - Phase 0.1: Read-only data access
+@server.list_resources()
+async def list_resources() -> list[Resource]:
+    """List all available IdlerGear resources.
+
+    Resources provide read-only access to project data without tool call overhead.
+    This implements the MCP Resources primitive for efficient data access.
+
+    See: https://modelcontextprotocol.io/specification/2025-11-25#resources
+    """
+    return mcp_resources.list_resources()
+
+
+@server.read_resource()
+async def read_resource(uri: str) -> str:
+    """Read the content of a resource.
+
+    Args:
+        uri: Resource URI (e.g., "idlergear://project/vision")
+
+    Returns:
+        Resource content as string (JSON or markdown)
+    """
+    return mcp_resources.read_resource(uri)
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     """Handle tool calls."""
@@ -4190,11 +4295,14 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     try:
         _check_initialized()
 
-        # Task handlers - use configured backend
+        # Task handlers - use core service
         if name == "idlergear_task_create":
-            backend = get_backend("task")
-            task = backend.create(
-                arguments["title"],
+            from idlergear.core.tasks import TaskService
+            from idlergear.projects import auto_add_task_if_configured
+
+            task_service = TaskService()
+            task = task_service.create_task(
+                title=arguments["title"],
                 body=arguments.get("body"),
                 labels=arguments.get("labels"),
                 priority=arguments.get("priority"),
@@ -4202,8 +4310,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             )
 
             # Auto-add to project if configured
-            from idlergear.projects import auto_add_task_if_configured
-
             added_to_project = auto_add_task_if_configured(task["id"])
 
             # Include in response
@@ -4214,27 +4320,24 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_task_list":
-            backend = get_backend("task")
-            result = backend.list(state=arguments.get("state", "open"))
-            # Filter by priority if specified
-            priority = arguments.get("priority")
-            if priority:
-                result = [t for t in result if t.get("priority") == priority]
-            # Apply limit if specified
-            limit = arguments.get("limit")
-            if limit:
-                result = result[:limit]
-            # Strip bodies if preview mode (token-efficient)
-            if arguments.get("preview", False):
-                for task in result:
-                    task["body"] = None
+            from idlergear.core.tasks import TaskService
+
+            task_service = TaskService()
+            result = task_service.list_tasks(
+                state=arguments.get("state", "open"),
+                priority=arguments.get("priority"),
+                labels=arguments.get("labels"),
+                limit=arguments.get("limit"),
+                preview=arguments.get("preview", False),
+            )
             return _format_result(result)
 
         elif name == "idlergear_task_show":
+            from idlergear.core.tasks import TaskService
             from idlergear.git import GitServer
 
-            backend = get_backend("task")
-            result = backend.get(arguments["id"])
+            task_service = TaskService()
+            result = task_service.get_task(arguments["id"])
             if result is None:
                 raise ValueError(f"Task #{arguments['id']} not found")
 
@@ -4250,15 +4353,19 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result(result)
 
         elif name == "idlergear_task_close":
-            backend = get_backend("task")
-            result = backend.close(arguments["id"])
+            from idlergear.core.tasks import TaskService
+
+            task_service = TaskService()
+            result = task_service.close_task(arguments["id"])
             if result is None:
                 raise ValueError(f"Task #{arguments['id']} not found")
             return _format_result(result)
 
         elif name == "idlergear_task_update":
-            backend = get_backend("task")
-            result = backend.update(
+            from idlergear.core.tasks import TaskService
+
+            task_service = TaskService()
+            result = task_service.update_task(
                 arguments["id"],
                 title=arguments.get("title"),
                 body=arguments.get("body"),
@@ -4905,7 +5012,10 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 except Exception:
                     initialize_schema(db)
 
-                populator = CodePopulator(db)
+                # IMPORTANT: Disable vector search by default to avoid loading torch/chromadb
+                # Vector search (semantic code search) is only needed for idlergear_code_search
+                # and idlergear_find_similar_code tools. Knowledge graph queries use Kuzu, not vectors.
+                populator = CodePopulator(db, enable_vector_search=False)
                 result = populator.populate_directory(
                     directory=arguments.get("directory", "src"),
                     incremental=arguments.get("incremental", True),
