@@ -846,7 +846,8 @@ def add_auto_version_hook(project_path: Path | None = None) -> bool:
     # Check if pre-commit hook already exists
     if pre_commit.exists():
         content = pre_commit.read_text()
-        if "IdlerGear auto-version" in content:
+        # Use the exact marker string to avoid false positives
+        if "# --- IdlerGear auto-version hook ---" in content:
             return False  # Already installed
         # Append to existing hook
         hook_source = files("idlergear") / "hooks" / "auto_version.sh"
