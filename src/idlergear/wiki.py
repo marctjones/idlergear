@@ -568,6 +568,15 @@ def set_wiki_config(key: str, value: str) -> None:
 
     Args:
         key: Configuration key (e.g., "enabled", "auto_sync")
-        value: Configuration value
+        value: Configuration value (will be converted to proper type)
     """
-    set_config_value(f"wiki.{key}", value)
+    # Convert string values to proper types for TOML
+    typed_value: str | bool | int
+    if value.lower() in ("true", "false"):
+        typed_value = value.lower() == "true"
+    elif value.isdigit():
+        typed_value = int(value)
+    else:
+        typed_value = value
+
+    set_config_value(f"wiki.{key}", typed_value)

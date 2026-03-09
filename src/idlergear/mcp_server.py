@@ -4712,9 +4712,49 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
             return _format_result({"key": arguments["key"], "value": result})
 
         elif name == "idlergear_config_set":
-            set_config_value(arguments["key"], arguments["value"])
+            from idlergear.config import CONFIG_SCHEMAS
+
+            key = arguments["key"]
+            value = arguments["value"]
+
+            # Parse value based on schema type (same logic as CLI)
+            parsed_value: str | bool | int | float = value
+            parts = key.split(".")
+            if len(parts) >= 2 and parts[0] in CONFIG_SCHEMAS:
+                schema = CONFIG_SCHEMAS[parts[0]]
+                field_path = parts[1:]
+                current = schema
+                for part in field_path:
+                    if isinstance(current, dict) and part in current:
+                        current = current[part]
+
+                if isinstance(current, dict) and "type" in current:
+                    expected_type = current["type"]
+
+                    # Convert value to expected type
+                    if expected_type == "boolean":
+                        if value.lower() in ("true", "yes", "1"):
+                            parsed_value = True
+                        elif value.lower() in ("false", "no", "0"):
+                            parsed_value = False
+                        else:
+                            raise ValueError(
+                                f"Invalid boolean value: {value}. Use: true, false, yes, no, 1, or 0"
+                            )
+                    elif expected_type == "integer":
+                        try:
+                            parsed_value = int(value)
+                        except ValueError:
+                            raise ValueError(f"Invalid integer value: {value}")
+                    elif expected_type == "float":
+                        try:
+                            parsed_value = float(value)
+                        except ValueError:
+                            raise ValueError(f"Invalid float value: {value}")
+
+            set_config_value(key, parsed_value)
             return _format_result(
-                {"key": arguments["key"], "value": arguments["value"], "set": True}
+                {"key": key, "value": parsed_value, "set": True}
             )
 
         # Context handler
