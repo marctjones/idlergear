@@ -3565,8 +3565,8 @@ def note_list(
     ),
 ):
     """List notes."""
-    from idlergear.backends.registry import get_backend
     from idlergear.config import find_idlergear_root
+    from idlergear.core.notes import NoteService
 
     if find_idlergear_root() is None:
         typer.secho(
@@ -3575,8 +3575,8 @@ def note_list(
         )
         raise typer.Exit(1)
 
-    backend = get_backend("note")
-    notes = backend.list(tag=tag)
+    note_service = NoteService()
+    notes = note_service.list_notes(tag=tag)
     display(notes, ctx.obj.output_format, "notes")
 
 

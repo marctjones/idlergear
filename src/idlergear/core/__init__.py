@@ -16,6 +16,7 @@ Principles:
 - Easy to test (test once, works everywhere)
 """
 
+from idlergear.core.notes import NoteService
 from idlergear.core.tasks import TaskService
 
-__all__ = ["TaskService"]
+__all__ = ["TaskService", "NoteService"]

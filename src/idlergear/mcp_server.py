@@ -4377,51 +4377,50 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
                 raise ValueError(f"Task #{arguments['id']} not found")
             return _format_result(result)
 
-        # Note handlers (using backend)
+        # Note handlers - use core service
         elif name == "idlergear_note_create":
-            backend = get_backend("note")
-            result = backend.create(
-                arguments["content"],
+            from idlergear.core.notes import NoteService
+
+            note_service = NoteService()
+            result = note_service.create_note(
+                content=arguments["content"],
                 tags=arguments.get("tags"),
             )
             return _format_result(result)
 
         elif name == "idlergear_note_list":
-            backend = get_backend("note")
-            result = backend.list(tag=arguments.get("tag"))
-            limit = arguments.get("limit")
-            preview = arguments.get("preview", False)
-            if limit and len(result) > limit:
-                result = result[:limit]
-            if preview:
-                result = [
-                    {
-                        "id": n.get("id"),
-                        "tags": n.get("tags", []),
-                        "created": n.get("created"),
-                    }
-                    for n in result
-                ]
+            from idlergear.core.notes import NoteService
+
+            note_service = NoteService()
+            result = note_service.list_notes(
+                tag=arguments.get("tag"),
+                limit=arguments.get("limit"),
+                preview=arguments.get("preview", False),
+            )
             return _format_result(result)
 
         elif name == "idlergear_note_show":
-            backend = get_backend("note")
-            result = backend.get(arguments["id"])
+            from idlergear.core.notes import NoteService
+
+            note_service = NoteService()
+            result = note_service.get_note(arguments["id"])
             if result is None:
                 raise ValueError(f"Note #{arguments['id']} not found")
             return _format_result(result)
 
         elif name == "idlergear_note_delete":
-            backend = get_backend("note")
-            if not backend.delete(arguments["id"]):
+            from idlergear.core.notes import NoteService
+
+            note_service = NoteService()
+            if not note_service.delete_note(arguments["id"]):
                 raise ValueError(f"Note #{arguments['id']} not found")
             return _format_result({"deleted": True, "id": arguments["id"]})
 
         elif name == "idlergear_note_promote":
-            backend = get_backend("note")
-            result = backend.promote(arguments["id"], arguments["to"])
-            if result is None:
-                raise ValueError(f"Note #{arguments['id']} not found")
+            from idlergear.core.notes import NoteService
+
+            note_service = NoteService()
+            result = note_service.promote_note(arguments["id"], arguments["to"])
             return _format_result(result)
 
         # Vision handlers (using backend)
