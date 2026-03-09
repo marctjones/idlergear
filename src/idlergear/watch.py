@@ -923,24 +923,23 @@ class WatchConfig:
             return cls()
 
     def save(self) -> None:
-        """Save config to .idlergear/config.json."""
+        """Save config to .idlergear/config.toml."""
         from idlergear.config import set_config_value
 
-        set_config_value("watch.enabled", str(self.enabled).lower())
-        set_config_value("watch.debounce", str(self.debounce))
+        # Pass native Python types - TOML library handles serialization
+        set_config_value("watch.enabled", self.enabled)
+        set_config_value("watch.debounce", self.debounce)
+        set_config_value("watch.files_changed_threshold", self.files_changed_threshold)
         set_config_value(
-            "watch.files_changed_threshold", str(self.files_changed_threshold)
+            "watch.uncommitted_lines_threshold", self.uncommitted_lines_threshold
         )
         set_config_value(
-            "watch.uncommitted_lines_threshold", str(self.uncommitted_lines_threshold)
+            "watch.test_failures_threshold", self.test_failures_threshold
         )
-        set_config_value(
-            "watch.test_failures_threshold", str(self.test_failures_threshold)
-        )
-        set_config_value("watch.detect_todos", str(self.detect_todos).lower())
-        set_config_value("watch.detect_fixmes", str(self.detect_fixmes).lower())
-        set_config_value("watch.detect_hacks", str(self.detect_hacks).lower())
-        set_config_value("watch.poll_interval", str(self.poll_interval))
+        set_config_value("watch.detect_todos", self.detect_todos)
+        set_config_value("watch.detect_fixmes", self.detect_fixmes)
+        set_config_value("watch.detect_hacks", self.detect_hacks)
+        set_config_value("watch.poll_interval", self.poll_interval)
 
 
 @dataclass
