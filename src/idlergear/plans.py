@@ -162,6 +162,8 @@ def list_plans(
     plans = []
 
     for file_path in plans_dir.glob("*.json"):
+        if file_path.name == "index.json":
+            continue
         try:
             plan = load_plan(file_path.stem, root)
 
