@@ -978,58 +978,6 @@ def check_knowledge_graph(project_path: Path) -> CheckResult:
         )
 
 
-def check_rag_index(project_path: Path) -> CheckResult:
-    """Check RAG/LlamaIndex status (optional feature)."""
-    # Check if RAG extras are installed
-    try:
-        import llama_index  # noqa: F401
-
-        rag_installed = True
-    except ImportError:
-        rag_installed = False
-
-    if not rag_installed:
-        return CheckResult(
-            name="rag_index",
-            status=CheckStatus.INFO,
-            message="RAG not installed (optional)",
-            fix="pip install 'idlergear[rag]'",
-            details={
-                "impact": "Missing 90%+ token savings on documentation search (optional)"
-            },
-        )
-
-    # Check if index exists
-    index_dir = project_path / ".idlergear" / "vector_index"
-
-    if not index_dir.exists():
-        return CheckResult(
-            name="rag_index",
-            status=CheckStatus.INFO,
-            message="RAG installed but not initialized",
-            fix="idlergear rag-index",
-            details={"impact": "0% token savings (not initialized)"},
-        )
-
-    # Check index size
-    index_files = list(index_dir.glob("**/*"))
-    if len(index_files) == 0:
-        return CheckResult(
-            name="rag_index",
-            status=CheckStatus.INFO,
-            message="RAG index directory empty",
-            fix="idlergear rag-index",
-            details={"impact": "0% token savings (index empty)"},
-        )
-
-    return CheckResult(
-        name="rag_index",
-        status=CheckStatus.OK,
-        message=f"RAG index ready ({len(index_files)} index files)",
-        details={"impact": "90%+ token savings enabled"},
-    )
-
-
 # ============================================================================
 # Main Doctor Function
 # ============================================================================
@@ -1082,7 +1030,6 @@ def run_doctor(project_path: Path | None = None) -> DoctorReport:
     # Token-saving feature checks
     checks.append(check_file_annotations(project_path))
     checks.append(check_knowledge_graph(project_path))
-    checks.append(check_rag_index(project_path))
 
     # Test health checks
     checks.append(check_test_staleness(project_path))

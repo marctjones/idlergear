@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -116,28 +117,82 @@ def init_project(path: str = ".") -> None:
                 f.write("\n".join(additions) + "\n")
 
     typer.secho(
-        f"Initialized IdlerGear v{SCHEMA_VERSION} in {project_path}",
+        f"✓ Initialized IdlerGear v{SCHEMA_VERSION} in {project_path}",
         fg=typer.colors.GREEN,
     )
     typer.echo(f"  Created: {schema.idlergear_dir}")
     typer.echo("")
-    typer.echo("Directory structure:")
-    typer.echo("  VISION.md             # Project vision (committed to git)")
-    typer.echo("  .idlergear/")
-    typer.echo("  ├── config.toml       # Configuration")
-    typer.echo("  ├── issues/           # Local issue tracking")
-    typer.echo("  ├── wiki/             # Knowledge base")
-    typer.echo("  ├── notes/            # Quick notes")
-    typer.echo("  ├── plans/            # Implementation plans")
-    typer.echo("  ├── runs/             # Script execution logs")
-    typer.echo("  ├── projects/         # Kanban boards")
-    typer.echo("  ├── file_annotations/ # File annotations (93% token savings!)")
-    typer.echo("  ├── logs/             # TUI and daemon logs")
-    typer.echo("  ├── graph.db          # Knowledge graph (created on first populate)")
-    typer.echo("  ├── secrets/          # Encrypted secrets (created when initialized)")
-    typer.echo("  └── sync/             # External sync state")
+
+    # Offer to populate knowledge graph for token savings
+    typer.echo("⚡ Token-Saving Features Setup:")
+    typer.echo("")
+    typer.echo("  ✅ File annotations: Ready (93% token savings enabled)")
+    typer.echo("     → Use 'idlergear file annotate' to annotate files")
+    typer.echo("")
+
+    # Only prompt in interactive mode (skip in tests/scripts)
+    is_interactive = sys.stdin.isatty()
+    if is_interactive:
+        populate_graph = typer.confirm(
+            "  Populate knowledge graph now? (Enables 95-98% token savings)",
+            default=True,
+        )
+    else:
+        # Non-interactive mode: skip graph population
+        populate_graph = False
+        typer.echo("  ⏭  Knowledge graph: Skipped in non-interactive mode")
+        typer.echo("     → Run 'idlergear graph populate' to enable 95-98% savings")
+
+    if populate_graph and is_interactive:
+        typer.echo("  ⏳ Populating knowledge graph...")
+        try:
+            from idlergear.graph.populate import populate_all
+
+            result = populate_all(
+                project_path=project_path,
+                max_commits=100,
+                incremental=True,
+            )
+
+            typer.secho(
+                f"  ✅ Knowledge graph ready! ({result.get('total_nodes', 0):,} nodes)",
+                fg=typer.colors.GREEN,
+            )
+            typer.echo("     → Query with 'idlergear graph query-symbols' or MCP tools")
+            graph_enabled = True
+        except Exception as e:
+            typer.secho(
+                f"  ⚠ Could not populate graph: {e}",
+                fg=typer.colors.YELLOW,
+            )
+            typer.echo("     → Run manually: idlergear graph populate")
+            graph_enabled = False
+    else:
+        typer.echo("  ⏭  Knowledge graph: Skipped (run 'idlergear graph populate' later)")
+        graph_enabled = False
+
+    typer.echo("")
+    typer.echo("📊 Initialization Summary:")
+    typer.echo("  ✅ Directory structure created")
+    typer.echo("  ✅ File annotations ready (93% savings)")
+    if graph_enabled:
+        typer.echo("  ✅ Knowledge graph populated (95-98% savings)")
+        typer.secho(
+            "  💎 Total token savings: ~95%!",
+            fg=typer.colors.GREEN,
+            bold=True,
+        )
+    else:
+        typer.echo("  ⏭  Knowledge graph not populated")
+        typer.secho(
+            "  📈 Current token savings: ~93%",
+            fg=typer.colors.YELLOW,
+        )
+        typer.echo("     Run 'idlergear graph populate' to enable 95-98% savings")
+
     typer.echo("")
     typer.echo("Next steps:")
     typer.echo("  idlergear vision edit     # Set your project vision")
     typer.echo("  idlergear task create     # Create your first task")
     typer.echo("  idlergear install         # Install Claude Code integration")
+    typer.echo("  idlergear doctor          # Verify installation health")

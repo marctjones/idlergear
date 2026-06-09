@@ -21,7 +21,7 @@ class MockPlugin(IdlerGearPlugin):
         return "mock"
 
     def capabilities(self) -> List[PluginCapability]:
-        return [PluginCapability.MEMORY_EXPERIENTIAL]
+        return [PluginCapability.OBSERVABILITY_METRICS]
 
     def initialize(self) -> None:
         self.mark_initialized()
@@ -212,11 +212,11 @@ enabled = true
         registry.load_all_plugins()
 
         # Get by capability
-        memory_plugins = registry.get_plugins_by_capability(
-            PluginCapability.MEMORY_EXPERIENTIAL
+        metrics_plugins = registry.get_plugins_by_capability(
+            PluginCapability.OBSERVABILITY_METRICS
         )
-        assert len(memory_plugins) == 1
-        assert memory_plugins[0].name() == "mock"
+        assert len(metrics_plugins) == 1
+        assert metrics_plugins[0].name() == "mock"
 
         observability_plugins = registry.get_plugins_by_capability(
             PluginCapability.OBSERVABILITY_EXPORT
@@ -283,78 +283,3 @@ def test_plugin_health_check():
     # Initialize
     plugin.initialize()
     assert plugin.health_check() is True
-
-
-# Mem0 plugin tests
-def test_mem0_plugin_initialization():
-    """Test Mem0 plugin basic initialization."""
-    from idlergear.plugins.mem0 import Mem0Plugin
-
-    plugin = Mem0Plugin({})
-
-    assert plugin.name() == "mem0"
-    assert PluginCapability.MEMORY_EXPERIENTIAL in plugin.capabilities()
-    assert PluginCapability.MEMORY_HIERARCHICAL in plugin.capabilities()
-    assert PluginCapability.MEMORY_PATTERN_LEARNING in plugin.capabilities()
-
-
-def test_mem0_plugin_requires_mem0ai():
-    """Test that Mem0 plugin requires mem0ai package."""
-    from idlergear.plugins.mem0 import Mem0Plugin
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        import os
-        import sys
-
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmpdir)
-            (Path(tmpdir) / ".idlergear").mkdir()
-
-            plugin = Mem0Plugin({"api_key": "test_key"})
-
-            # Hide mem0 from imports
-            mem0_modules = [mod for mod in sys.modules.keys() if mod.startswith("mem0")]
-            saved_modules = {}
-            for mod in mem0_modules:
-                saved_modules[mod] = sys.modules[mod]
-                del sys.modules[mod]
-
-            # Should raise ImportError if mem0ai not installed
-            try:
-                plugin.initialize()
-            except ImportError as e:
-                assert "mem0ai" in str(e)
-            finally:
-                # Restore modules
-                for mod, val in saved_modules.items():
-                    sys.modules[mod] = val
-        finally:
-            os.chdir(old_cwd)
-
-
-def test_mem0_plugin_memory_operations():
-    """Test Mem0 plugin memory operations."""
-    pytest.importorskip("mem0")
-    from idlergear.plugins.mem0 import Mem0Plugin
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        import os
-
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(tmpdir)
-            (Path(tmpdir) / ".idlergear").mkdir()
-
-            # Mock API key for testing
-            plugin = Mem0Plugin({"api_key": "test_key"})
-
-            # Note: Actual initialization would require valid API key or mock
-            # This test validates the structure is correct
-            assert hasattr(plugin, "add_memory")
-            assert hasattr(plugin, "search_memories")
-            assert hasattr(plugin, "remember_task")
-            assert hasattr(plugin, "remember_decision")
-            assert hasattr(plugin, "get_context_for_task")
-        finally:
-            os.chdir(old_cwd)

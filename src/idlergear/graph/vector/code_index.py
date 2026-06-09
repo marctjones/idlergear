@@ -13,11 +13,13 @@ Example:
 
 import logging
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 
-import chromadb
-from chromadb.config import Settings
-from sentence_transformers import SentenceTransformer
+# Lazy imports for heavy dependencies (torch, chromadb)
+# Only loaded when actually using semantic search features
+if TYPE_CHECKING:
+    import chromadb
+    from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
 
@@ -49,27 +51,45 @@ class VectorCodeIndex:
         self.model_name = model_name
         self.collection_name = collection_name
 
-        # Initialize ChromaDB client
+        # Lazy-load ChromaDB client (don't load until first use)
         self.index_path.mkdir(parents=True, exist_ok=True)
-        self.client = chromadb.PersistentClient(
-            path=str(self.index_path),
-            settings=Settings(anonymized_telemetry=False),
-        )
-
-        # Get or create collection
-        self.collection = self.client.get_or_create_collection(
-            name=collection_name,
-            metadata={"description": "Code symbols with semantic embeddings"},
-        )
+        self._client = None
+        self._collection = None
 
         # Initialize embedding model (lazy-loaded)
-        self._embedder: Optional[SentenceTransformer] = None
+        self._embedder = None
 
     @property
-    def embedder(self) -> SentenceTransformer:
+    def client(self):
+        """Get or create ChromaDB client (lazy loading)."""
+        if self._client is None:
+            import chromadb
+            from chromadb.config import Settings
+
+            logger.info("Loading ChromaDB (heavy dependency)")
+            self._client = chromadb.PersistentClient(
+                path=str(self.index_path),
+                settings=Settings(anonymized_telemetry=False),
+            )
+        return self._client
+
+    @property
+    def collection(self):
+        """Get or create collection (lazy loading)."""
+        if self._collection is None:
+            self._collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"description": "Code symbols with semantic embeddings"},
+            )
+        return self._collection
+
+    @property
+    def embedder(self):
         """Get or create embedding model (lazy loading)."""
         if self._embedder is None:
-            logger.info(f"Loading embedding model: {self.model_name}")
+            from sentence_transformers import SentenceTransformer
+
+            logger.info(f"Loading embedding model (torch + transformers): {self.model_name}")
             self._embedder = SentenceTransformer(self.model_name)
         return self._embedder
 

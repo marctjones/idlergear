@@ -16,11 +16,6 @@ class PluginCapability(str, Enum):
     OBSERVABILITY_METRICS = "observability.metrics"
     OBSERVABILITY_TRACING = "observability.tracing"
 
-    # Memory
-    MEMORY_EXPERIENTIAL = "memory.experiential"
-    MEMORY_HIERARCHICAL = "memory.hierarchical"
-    MEMORY_PATTERN_LEARNING = "memory.pattern_learning"
-
 
 class PluginConfig:
     """Plugin configuration loaded from config.toml."""
@@ -86,7 +81,7 @@ class IdlerGearPlugin(ABC):
         """Return the plugin name.
 
         Returns:
-            Plugin name (e.g., "langfuse", "llama-index")
+            Plugin name (e.g., "langfuse")
         """
         pass
 

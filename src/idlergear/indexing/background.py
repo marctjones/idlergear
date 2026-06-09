@@ -4,9 +4,12 @@ Automatically fills in file annotations and knowledge graph during idle time.
 """
 
 import json
+import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 def _get_state_file() -> Path:
@@ -195,6 +198,12 @@ def _index_file_annotations_batch(batch_size: int = 5) -> Dict[str, Any]:
             rel_path = str(file_path.relative_to(root))
 
             # Extract classes/functions from file (simple approach)
+            # Add memory protection: skip files larger than 1MB
+            file_size = file_path.stat().st_size
+            if file_size > 1_000_000:  # 1MB limit
+                logger.warning(f"Skipping {rel_path}: file too large ({file_size / 1024 / 1024:.1f}MB)")
+                continue
+
             content = file_path.read_text()
             lines = content.split("\n")
 
@@ -349,7 +358,8 @@ def _index_symbols_batch(batch_size: int = 5) -> Dict[str, Any]:
             initialize_schema(db)
 
         # Index code symbols (incremental - skips already indexed files)
-        populator = CodePopulator(db)
+        # Disable vector search to avoid loading torch/chromadb in background
+        populator = CodePopulator(db, enable_vector_search=False)
         result = populator.populate_directory(
             directory="src",
             incremental=True,

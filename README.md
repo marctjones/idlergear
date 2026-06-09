@@ -80,30 +80,16 @@ IdlerGear provides **three complementary search systems** for 95-99% token savin
   - Sub-second query performance
   - Duplicate code detection via similarity
 
-- **LlamaIndex RAG** - Semantic documentation search (90%+ token savings)
-  - Search references and notes semantically
-  - Local embeddings by default (zero-config)
-  - Optional OpenAI embeddings for better quality
-  - Metadata filtering (search only references or only notes)
-
 - **Knowledge Graph** - Structured relationship queries (95-98% token savings)
   - Task-file-commit relationships
   - Import dependencies, symbol lookups
   - Sub-40ms query response times
 
-**Configuration**: Enable RAG in `.idlergear/config.toml`
-```toml
-[plugins.llamaindex]
-enabled = true
-embedding_model = "local"  # or "openai"
-```
-
-**Other Plugins:**
+**Plugins:**
 - **Langfuse Plugin** - Observability export for token tracking and cost monitoring
-- **Mem0 Plugin** (Coming Soon) - Experiential memory with pattern learning
 
 ### Python-Native MCP Servers (Zero Node.js!)
-- **Code Intelligence** - 9 tools (semantic code search, RAG docs search, populate) ⭐ NEW in v0.8.0!
+- **Code Intelligence** - 9 tools (semantic code search, populate) ⭐ NEW in v0.8.0!
 - **Knowledge Graph** - 6 tools (95-98% token savings, relationship queries)
 - **Plugin System** - 6 tools (list, status, enable, search, index)
 - **Project Boards** - 9 tools (Kanban boards, GitHub sync, auto-add tasks)
@@ -125,7 +111,7 @@ embedding_model = "local"  # or "openai"
 
 ### AI Integration
 - **MCP Server** - **155 tools** via Model Context Protocol (universal)
-- **Code Intelligence** - Tree-sitter + ChromaDB + LlamaIndex RAG (93-99% token savings) ⭐ NEW in v0.8.0!
+- **Code Intelligence** - Tree-sitter + ChromaDB vector search (93-98% token savings) ⭐ NEW in v0.8.0!
 - **Knowledge Graph** - 95-98% token savings for context retrieval
 - **File Registry + Annotations** - Track file status + annotate files for 93% token-efficient discovery
 - **Claude Code Hooks** - Lifecycle hooks for 100% enforcement
@@ -159,10 +145,10 @@ IdlerGear ships **quarterly releases** with major features. Each milestone deliv
 
 | Milestone | Theme | Target | Key Features |
 |-----------|-------|--------|--------------|
-| **v0.5.11** ✅ | Plugin System Foundation | Released | LlamaIndex, Langfuse plugins, semantic search, observability |
+| **v0.5.11** ✅ | Plugin System Foundation | Released | Langfuse plugin, observability |
 | **v0.6.0** ✅ | File Registry Complete | Released | MCP interception, daemon integration, file annotations |
 | **v0.7.73** ✅ | TUI & Performance | Released | Lazy loading (5x faster), keyboard nav, GitHub issue display |
-| **v0.8.0** ✅ | Code Intelligence | Released 2026-02-02 | Tree-sitter parsing, ChromaDB vector search, LlamaIndex RAG |
+| **v0.8.0** ✅ | Code Intelligence | Released 2026-02-02 | Tree-sitter parsing, ChromaDB vector search, code intelligence |
 | **v0.9.0** 🎯 | Multi-Assistant | June 2026 | Multi-agent coordination, memory decay, AI observability |
 | **v0.10.0** 💎 | Polish & Maturity | December 2026 | Pre-release maturity, 80%+ coverage, production validation |
 
@@ -200,13 +186,10 @@ pipx install git+https://github.com/marctjones/idlergear.git
 # OR
 pip install git+https://github.com/marctjones/idlergear.git
 
-# Install with optional dependencies (RAG support)
-pip install "git+https://github.com/marctjones/idlergear.git#egg=idlergear[rag]"
-
 # Install from source (for development/contributions)
 git clone https://github.com/marctjones/idlergear.git
 cd idlergear
-pip install -e ".[dev,rag]"
+pip install -e ".[dev]"
 
 # Initialize a project
 cd my-project
@@ -234,8 +217,6 @@ idlergear otel start         # ERROR logs → notes, FATAL → tasks automatical
 
 # Enable code intelligence (NEW v0.8.0!)
 idlergear graph populate              # Populate Knowledge Graph + ChromaDB
-idlergear rag-index                   # Populate LlamaIndex RAG
-idlergear rag-search "authentication" # Semantic docs search
 ```
 
 ## Commands
@@ -331,10 +312,6 @@ idlergear mcp test                # Test MCP server connectivity
 
 # Code Intelligence (NEW v0.8.0!)
 idlergear graph populate          # Populate Knowledge Graph + ChromaDB
-idlergear rag-search QUERY        # Semantic search over documentation
-idlergear rag-search QUERY --top-k 10 --type reference
-idlergear rag-index               # Index all references and notes
-idlergear rag-rebuild             # Rebuild RAG index from scratch
 
 # Plugin System
 idlergear plugin list             # List available/loaded plugins
@@ -391,17 +368,13 @@ IdlerGear provides **155 MCP tools** across 19 categories. All tools are **100% 
 |------|-------------|
 | `idlergear_code_search` | Semantic code search using ChromaDB (93-98% token savings) |
 | `idlergear_find_similar_code` | Find duplicate/similar code via vector similarity |
-| `idlergear_rag_search` | Semantic search over documentation (references, notes) |
-| `idlergear_rag_index_all` | Index all references and notes for RAG search |
-| `idlergear_rag_rebuild` | Rebuild RAG index from scratch |
-| `idlergear_graph_populate_all` | Populate all systems: Knowledge Graph + ChromaDB + Code |
+| `idlergear_graph_populate_all` | Populate all systems: Knowledge Graph + ChromaDB |
 | `idlergear_graph_query_symbols` | Search code symbols by name pattern |
 | `idlergear_graph_query_file` | Get file context: tasks, imports, symbols, changes |
 | `idlergear_graph_query_task` | Get task context: related files, commits, symbols |
 
-**Token Savings**: Combined 95-99% reduction across all three systems!
+**Token Savings**: Combined 95-98% reduction across both systems!
 - **ChromaDB**: 93-98% savings vs grep + file reads (code similarity)
-- **LlamaIndex RAG**: 90%+ savings vs reading all docs (semantic docs search)
 - **Knowledge Graph**: 95-98% savings vs file reads (structured relationships)
 
 **Example:**
@@ -409,10 +382,6 @@ IdlerGear provides **155 MCP tools** across 19 categories. All tools are **100% 
 # Semantic code search
 results = idlergear_code_search("authentication functions")
 # Returns: matching functions with similarity scores
-
-# Semantic docs search
-docs = idlergear_rag_search("How do I implement JWT?", top_k=5)
-# Returns: relevant reference docs and notes
 
 # Populate everything at once
 idlergear_graph_populate_all(max_commits=100, incremental=True)
